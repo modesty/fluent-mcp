@@ -1,0 +1,62 @@
+{
+  "name": "@modesty/fluent-mcp",
+  "version": "0.0.1",
+  "description": "Fluent MCP server for ServiceNow SDK",
+  "keywords": [
+    "servicenow SDK",
+    "fluent",
+    "mcp",
+    "sdk",
+    "model-context-protocol",
+    "DSL",
+    "domain specific language MCP"
+  ],
+  "author": {
+    "name": "Modesty Zhang",
+    "email": "modestyz@hotmail.com",
+    "url": "https://www.google.com/search?q=modesty+zhang+site%3Acodeproject.com"
+  },
+  "homepage": "https://github.com/modesty/fluent-mcp",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/modesty/fluent-mcp.git"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "lint": "eslint src/**/*.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=22.15.1"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "npm",
+      "version": ">=11.4.1"
+    }
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  },
+  "peerDependencies": {
+    "@servicenow/sdk": "~3.0.2"
+  },
+  "devDependencies": {
+    "@servicenow/sdk": "^3.0.2",
+    "@types/jest": "^29.5.0",
+    "@types/node": "^22.15.30",
+    "@typescript-eslint/eslint-plugin": "^8.33.1",
+    "@typescript-eslint/parser": "^8.33.1",
+    "eslint": "^9.28.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.3"
+  },
+  "license": "MIT"
+}

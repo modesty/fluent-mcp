@@ -1,0 +1,53 @@
+# Node/npm
+node_modules/
+dist/
+target/
+coverage/
+.nyc_output/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor/IDE
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Environment
+.env
+.env.*
+
+# Misc
+*.tgz
+*.log
+
+# TypeScript
+*.tsbuildinfo
+
+# Jest
+jest-coverage/
+
+# Build output
+build/
+
+# OS generated files
+Thumbs.db
+Desktop.ini
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
