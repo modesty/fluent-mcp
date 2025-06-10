@@ -32,15 +32,15 @@ The generated task list _must_ follow this structure:
 ## Relevant Files
 
 - `src/[path/to/potential/file1.ts]` - Brief description of why this file is relevant (e.g., Contains the main component for this feature).
-- `src/[path/to/file1.test.ts]` - Unit tests for `file1.ts`.
+- `src/test/[path/to/file1.test.ts]` - Unit tests for `file1.ts`.
 - `src/[path/to/another/file.tsx]` - Brief description (e.g., API route handler for data submission).
-- `src/[path/to/another/file.test.tsx]` - Unit tests for `another/file.tsx`.
+- `src/test/[path/to/another/file.test.tsx]` - Unit tests for `another/file.tsx`.
 - `src/lib/[utils/helpers.ts]` - Brief description (e.g., Utility functions needed for calculations).
-- `src/lib/[utils/helpers.test.ts]` - Unit tests for `helpers.ts`.
+- `src/test/lib/[utils/helpers.test.ts]` - Unit tests for `helpers.ts`.
 
 ### Notes
 
-- Unit tests should typically be placed alongside the code files they are testing (e.g., `MyComponent.tsx` and `MyComponent.test.tsx` in the same directory).
+- Unit tests should typically be placed under `/src/test/` , with the same file base name as the source code file they are testing (e.g., `MyComponent.tsx` and `MyComponent.test.tsx` in the `src/test/` directory).
 - Use `npx jest [optional/path/to/test/file]` to run tests. Running without a path executes all tests found by the Jest configuration.
 
 ## Epics and Stories
