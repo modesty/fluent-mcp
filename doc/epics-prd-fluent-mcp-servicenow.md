@@ -7,6 +7,7 @@
 - `src/tools/resources.ts` - MCP tools for accessing API specs, snippets, and instructions
 - `src/utils/commandExecution.ts` - Utility for executing ServiceNow SDK CLI commands
 - `src/utils/resourceLoader.ts` - Utility for loading resources from the res/ directory
+- `src/utils/logger.ts` - Logging utility that provides structured JSON logging with timestamps
 - `src/types/index.ts` - TypeScript type definitions for the MCP server and tools
 - `src/config.ts` - Configuration for the MCP server
 - `src/test/tools/sdkCommands.test.ts` - Unit tests for the SDK commands tools
@@ -20,12 +21,12 @@
 
 ## Epics and Stories
 
-- [ ] 1.0 Set up project infrastructure and MCP server
+- [x] 1.0 Set up project infrastructure and MCP server
     - [x] 1.1 Initialize a new Node.js/TypeScript project with package.json, tsconfig.json, and initial folder structure
     - [x] 1.2 Install required dependencies including MCP TypeScript SDK and ServiceNow SDK
     - [x] 1.3 Create base MCP server implementation using stdio transport
-    - [ ] 1.4 Set up configuration management for the MCP server, create `src/config.ts` to manage server settings and environment variables, also incoporate package.json for version, name, and description exposure and reference
-    - [ ] 1.5 Implement error handling and logging mechanism, create `src/utils/logger.ts` that wraps console info, warn, error, and debug methods and ensure the output is formatted as JSON with a timestamp
+    - [x] 1.4 Set up configuration management for the MCP server, create `src/config.ts` to manage server settings and environment variables, also incorporate package.json for version, name, and description exposure and reference
+    - [x] 1.5 Implement error handling and logging mechanism, create `src/utils/logger.ts` that wraps console log, info, warn, error, and debug methods and ensure the output is formatted as JSON with a timestamp
 
 - [ ] 2.0 Implement MCP tools for ServiceNow SDK CLI commands
     - [ ] 2.1 Create command execution utility for running ServiceNow SDK CLI commands

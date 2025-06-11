@@ -16,6 +16,7 @@ import {
   NodeProcessRunner,
 } from "../tools/cliCommandTools.js";
 import { CommandResult } from "../utils/types.js";
+import logger from "../utils/logger.js";
 
 /**
  * Implementation of the Model Context Protocol server for ServiceNow SDK
@@ -36,12 +37,12 @@ export class FluentMcpServer {
     const config = getConfig();
     this.commandRegistry = new CommandRegistry();
 
-    // Create MCP server instance with server info
+    // Create MCP server instance with server info from package.json
     this.mcpServer = new McpServer(
       {
-        name: "fluent-mcp-server",
-        version: "0.0.1",
-        description: "MCP Server for Fluent - ServiceNow SDK",
+        name: config.name,
+        version: config.version,
+        description: config.description,
       },
       {
         capabilities: {
@@ -60,14 +61,25 @@ export class FluentMcpServer {
    */
   private registerTools(): void {
     if (!this.mcpServer) {
-      throw new Error("MCP server not initialized");
+      const error = new Error("MCP server not initialized");
+      logger.error("Failed to register tools", error);
+      throw error;
     }
 
-    // Register ServiceNow SDK CLI command tools
-    this.registerSdkCommandTools();
+    try {
+      // Register ServiceNow SDK CLI command tools
+      this.registerSdkCommandTools();
 
-    // Register resource access tools
-    this.registerResourceTools();
+      // Register resource access tools
+      this.registerResourceTools();
+
+      logger.debug("All tools registered successfully");
+    } catch (error) {
+      logger.error("Error registering tools",
+        error instanceof Error ? error : new Error(String(error))
+      );
+      throw error;
+    }
   }
 
   /**
@@ -213,13 +225,13 @@ export class FluentMcpServer {
    */
   async start(): Promise<void> {
     if (this.status === ServerStatus.RUNNING) {
-    //   console.log("MCP server is already running");
+      logger.info("MCP server is already running");
       return;
     }
 
     try {
       this.status = ServerStatus.INITIALIZING;
-    //   console.log("Starting MCP server...");
+      logger.info("Starting MCP server...");
 
       if (!this.mcpServer) {
         throw new Error("MCP server not properly initialized");
@@ -231,11 +243,14 @@ export class FluentMcpServer {
       // Connect the server to the stdio transport
       await this.mcpServer.connect(transport);
 
-    //   console.log("MCP server initialized and connected via stdio");
+      logger.info("MCP server initialized and connected via stdio");
       this.status = ServerStatus.RUNNING;
     } catch (error) {
       this.status = ServerStatus.STOPPED;
-    //   console.error("Failed to start MCP server:", error);
+      logger.error("Failed to start MCP server",
+        error instanceof Error ? error : new Error(String(error)),
+        { status: this.status }
+      );
       throw error;
     }
   }
@@ -245,22 +260,25 @@ export class FluentMcpServer {
    */
   async stop(): Promise<void> {
     if (this.status !== ServerStatus.RUNNING) {
-    //   console.log("MCP server is not running");
+      logger.info("MCP server is not running", { status: this.status });
       return;
     }
 
     try {
       this.status = ServerStatus.STOPPING;
-    //   console.log("Stopping MCP server...");
+      logger.info("Stopping MCP server...");
 
       if (this.mcpServer) {
         await this.mcpServer.close();
       }
 
       this.status = ServerStatus.STOPPED;
-    //   console.log("MCP server stopped");
+      logger.info("MCP server stopped");
     } catch (error) {
-    //   console.error("Error stopping MCP server:", error);
+      logger.error("Error stopping MCP server",
+        error instanceof Error ? error : new Error(String(error)),
+        { status: this.status }
+      );
       this.status = ServerStatus.STOPPED;
       throw error;
     }
