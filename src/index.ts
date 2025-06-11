@@ -22,7 +22,7 @@ process.on('uncaughtException', (error) => {
 });
 
 async function handleShutdown() {
-  console.log('Shutting down...');
+//   console.log('Shutting down...');
   try {
     await server.stop();
   } catch (error) {
@@ -34,14 +34,14 @@ async function handleShutdown() {
 // Start the server
 async function main() {
   try {
-    console.log('Initializing Fluent MCP server...');
+    // console.log('Initializing Fluent MCP server...');
 
     // Use the global server instance instead of creating a new one
     await server.start();
 
-    console.log('Fluent MCP Server is ready and waiting for connections');
+    // console.log('Fluent MCP Server is ready and waiting for connections');
   } catch (error) {
-    console.error('Error initializing Fluent MCP Server:', error);
+    // console.error('Error initializing Fluent MCP Server:', error);
     process.exit(1);
   }
 }

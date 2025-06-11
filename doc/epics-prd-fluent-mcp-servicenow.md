@@ -24,9 +24,8 @@
     - [x] 1.1 Initialize a new Node.js/TypeScript project with package.json, tsconfig.json, and initial folder structure
     - [x] 1.2 Install required dependencies including MCP TypeScript SDK and ServiceNow SDK
     - [x] 1.3 Create base MCP server implementation using stdio transport
-    - [ ] 1.4 Set up configuration management for the MCP server
-    - [ ] 1.5 Implement error handling and logging mechanism
-    - [ ] 1.6 Create entry point script for running the MCP server
+    - [ ] 1.4 Set up configuration management for the MCP server, create `src/config.ts` to manage server settings and environment variables, also incoporate package.json for version, name, and description exposure and reference
+    - [ ] 1.5 Implement error handling and logging mechanism, create `src/utils/logger.ts` that wraps console info, warn, error, and debug methods and ensure the output is formatted as JSON with a timestamp
 
 - [ ] 2.0 Implement MCP tools for ServiceNow SDK CLI commands
     - [ ] 2.1 Create command execution utility for running ServiceNow SDK CLI commands

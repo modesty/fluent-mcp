@@ -2,19 +2,27 @@
  * Type definitions for utility functions
  */
 
+// Domain Models
+export interface CommandArgument {
+  name: string;
+  type: "string" | "number" | "boolean" | "array";
+  required: boolean;
+  description: string;
+  defaultValue?: unknown;
+}
+
 /**
  * Command execution result
  */
 export interface CommandResult {
   /** Exit code of the command */
   exitCode: number;
-  /** Standard output from the command */
-  stdout: string;
-  /** Standard error output from the command */
-  stderr: string;
+  success: boolean;
+  output: string;
   /** Error that occurred during execution, if any */
   error?: Error;
 }
+
 
 /**
  * Resource loading result
@@ -30,4 +38,28 @@ export interface ResourceResult {
   resourceType: string;
   /** Whether the resource was found */
   found: boolean;
+}
+
+export interface ProcessResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+}
+
+// Abstractions (Dependency Inversion)
+export interface ProcessRunner {
+  run(command: string, args: string[]): Promise<ProcessResult>;
+}
+
+export interface CommandExecutor {
+  execute(args: Record<string, unknown>): Promise<CommandResult>;
+}
+
+export interface CommandMetadata {
+  name: string;
+  description: string;
+  arguments: CommandArgument[];
+}
+
+export interface CLICommand extends CommandExecutor, CommandMetadata {
 }
