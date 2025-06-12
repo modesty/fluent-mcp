@@ -2,37 +2,49 @@
  * Configuration for the Fluent MCP Server for ServiceNow SDK
  * This module manages server settings and environment variables
  */
-import path from 'path';
-import fs from 'fs';
+import path from "node:path";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 
-// Load package.json information
-// Using import.meta.url instead of __dirname for ES modules
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+/**
+ * Find the project root by examining the module path.
+ * This works reliably in all environments including Claude Desktop App.
+ *
+ * In runtime (ESM environment): Uses import.meta.url to get the actual file location
+ * In test environment: Falls back to process.cwd() with directory traversal
+ */
+export function getProjectRootPath(): string {
+  // For ESM runtime: Use import.meta.url to get the actual module path
+  if (import.meta?.url) {
+    const modulePath = fileURLToPath(import.meta.url);
+    const moduleDir = path.dirname(modulePath);
+    return path.resolve(moduleDir, ".."); // navigate up to the project root
+  }
+  return process.cwd();
+}
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const packageJsonPath = path.resolve(__dirname, '../package.json');
+const packageJsonPath = path.resolve(getProjectRootPath(), "package.json");
 let packageInfo: {
   name: string;
   version: string;
   description: string;
   [key: string]: any;
+} = {
+  name: "@modesty/fluent-mcp",
+  version: "0.0.0",
+  description: "Fluent MCP server for ServiceNow SDK",
 };
 
 try {
-  const packageData = fs.readFileSync(packageJsonPath, 'utf-8');
+  const packageData = fs.readFileSync(packageJsonPath, "utf-8");
   packageInfo = JSON.parse(packageData);
 } catch (err) {
-  console.error(`Failed to load package.json: ${err}`);
-  packageInfo = {
-    name: '@modesty/fluent-mcp',
-    version: '0.0.0',
-    description: 'Fluent MCP server for ServiceNow SDK',
-  };
+//   console.error(`Failed to load package.json: ${err}`);
 }
 
+/**
+ * Configuration interface for the MCP server
+ */
 export interface McpServerConfig {
   /** Server name from package.json */
   name: string;
@@ -69,7 +81,7 @@ export interface McpServerConfig {
 }
 
 // Environment variable names
-const ENV_PREFIX = 'FLUENT_MCP_';
+const ENV_PREFIX = "FLUENT_MCP_";
 const ENV_VAR = {
   LOG_LEVEL: `${ENV_PREFIX}LOG_LEVEL`,
   LOG_FILE_PATH: `${ENV_PREFIX}LOG_FILE_PATH`,
@@ -87,15 +99,15 @@ export const defaultConfig: McpServerConfig = {
   name: packageInfo.name,
   version: packageInfo.version,
   description: packageInfo.description,
-  logLevel: 'info',
+  logLevel: "info",
   // By default, use stderr for logging (no logFilePath)
   resourcePaths: {
-    spec: path.resolve(process.cwd(), './res/spec'),
-    snippet: path.resolve(process.cwd(), './res/snippet'),
-    instruct: path.resolve(process.cwd(), './res/instruct'),
+    spec: path.resolve(getProjectRootPath(), "./res/spec"),
+    snippet: path.resolve(getProjectRootPath(), "./res/snippet"),
+    instruct: path.resolve(getProjectRootPath(), "./res/instruct"),
   },
   servicenowSdk: {
-    cliPath: 'snc', // Default command name if installed globally
+    cliPath: "snc", // Default command name if installed globally
     commandTimeoutMs: 30000, // 30 seconds default timeout
   },
 };
@@ -111,13 +123,31 @@ export function getConfig(): McpServerConfig {
     description: packageInfo.description,
     logLevel: getEnvVar(ENV_VAR.LOG_LEVEL, defaultConfig.logLevel),
     resourcePaths: {
-      spec: getEnvVar(ENV_VAR.RESOURCE_PATH_SPEC, defaultConfig.resourcePaths.spec),
-      snippet: getEnvVar(ENV_VAR.RESOURCE_PATH_SNIPPET, defaultConfig.resourcePaths.snippet),
-      instruct: getEnvVar(ENV_VAR.RESOURCE_PATH_INSTRUCT, defaultConfig.resourcePaths.instruct),
+      spec: getEnvVar(
+        ENV_VAR.RESOURCE_PATH_SPEC,
+        defaultConfig.resourcePaths.spec
+      ),
+      snippet: getEnvVar(
+        ENV_VAR.RESOURCE_PATH_SNIPPET,
+        defaultConfig.resourcePaths.snippet
+      ),
+      instruct: getEnvVar(
+        ENV_VAR.RESOURCE_PATH_INSTRUCT,
+        defaultConfig.resourcePaths.instruct
+      ),
     },
     servicenowSdk: {
-      cliPath: getEnvVar(ENV_VAR.SERVICENOW_SDK_CLI_PATH, defaultConfig.servicenowSdk.cliPath),
-      commandTimeoutMs: parseInt(getEnvVar(ENV_VAR.COMMAND_TIMEOUT_MS, defaultConfig.servicenowSdk.commandTimeoutMs.toString()), 10),
+      cliPath: getEnvVar(
+        ENV_VAR.SERVICENOW_SDK_CLI_PATH,
+        defaultConfig.servicenowSdk.cliPath
+      ),
+      commandTimeoutMs: parseInt(
+        getEnvVar(
+          ENV_VAR.COMMAND_TIMEOUT_MS,
+          defaultConfig.servicenowSdk.commandTimeoutMs.toString()
+        ),
+        10
+      ),
     },
   };
 
@@ -161,7 +191,7 @@ export function validateConfig(config: McpServerConfig): boolean {
     resourcePathExists(config.resourcePaths.instruct);
 
   if (!validResourcePaths) {
-    console.warn('One or more resource paths do not exist or are not directories');
+    // console.warn("One or more resource paths do not exist or are not directories");
     return false;
   }
 

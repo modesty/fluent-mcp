@@ -29,8 +29,8 @@
     - [x] 1.5 Implement error handling and logging mechanism, create `src/utils/logger.ts` that wraps console log, info, warn, error, and debug methods and ensure the output is formatted as JSON with a timestamp
 
 - [ ] 2.0 Implement MCP tools for ServiceNow SDK CLI commands
-    - [ ] 2.1 Create command execution utility for running ServiceNow SDK CLI commands
-    - [ ] 2.2 Implement MCP tool for basic SDK commands (version, help, debug, upgrade)
+    - [x] 2.1 Create command execution helper in `tools/cliCommandTools.ts` for running ServiceNow SDK CLI commands
+    - [x] 2.2 Implement MCP tool for basic SDK commands (version, help, debug, upgrade)
     - [ ] 2.3 Implement MCP tool for authentication commands
     - [ ] 2.4 Implement MCP tool for initialization commands
     - [ ] 2.5 Implement MCP tool for build commands

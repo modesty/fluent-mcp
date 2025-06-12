@@ -53,7 +53,7 @@ export class FluentMcpServer {
 
     // Register tools (will implement these later)
 	  this.registerTools();
-	//   this.setupHandlers();
+	  this.setupHandlers();
   }
 
   /**
@@ -88,48 +88,48 @@ export class FluentMcpServer {
   private registerSdkCommandTools(): void {
     if (!this.mcpServer) return;
 
-    // Version command
-    this.mcpServer.tool(
-      'sdk-version',
-      'Get ServiceNow SDK version',
-      {}, // Empty schema for a tool with no parameters
-      async (_args, _extra) => {
-        // Properly format the response with required content property
-        return {
-          content: [{ type: 'text', text: 'ServiceNow SDK version 3.0.2' }],
-          structuredContent: { version: '3.0.2' }
-        };
-      }
-    );
+    // // Version command
+    // this.mcpServer.tool(
+    //   'sdk-version',
+    //   'Get ServiceNow SDK version',
+    //   {}, // Empty schema for a tool with no parameters
+    //   async (_args, _extra) => {
+    //     // Properly format the response with required content property
+    //     return {
+    //       content: [{ type: 'text', text: 'ServiceNow SDK version 3.0.2' }],
+    //       structuredContent: { version: '3.0.2' }
+    //     };
+    //   }
+    // );
 
-    // Auth command - using proper parameter schema format
-    this.mcpServer.tool(
-      'sdk-auth',
-      'Manage ServiceNow SDK authentication',
-      {
-        action: z.enum(['add', 'list', 'delete', 'use']),
-        instanceUrl: z.string().optional(),
-        authType: z.enum(['oauth', 'basic']).optional(),
-        alias: z.string().optional()
-      },
-      async (params, _extra) => {
-        const { action, instanceUrl, authType, alias } = params;
-        // Properly format the response with required content property
-        return {
-          content: [{ type: 'text', text: `Auth ${action} operation completed successfully` }],
-          structuredContent: { success: true, message: `Auth ${action} completed` }
-        };
-      }
-    );
+    // // Auth command - using proper parameter schema format
+    // this.mcpServer.tool(
+    //   'sdk-auth',
+    //   'Manage ServiceNow SDK authentication',
+    //   {
+    //     action: z.enum(['add', 'list', 'delete', 'use']),
+    //     instanceUrl: z.string().optional(),
+    //     authType: z.enum(['oauth', 'basic']).optional(),
+    //     alias: z.string().optional()
+    //   },
+    //   async (params, _extra) => {
+    //     const { action, instanceUrl, authType, alias } = params;
+    //     // Properly format the response with required content property
+    //     return {
+    //       content: [{ type: 'text', text: `Auth ${action} operation completed successfully` }],
+    //       structuredContent: { success: true, message: `Auth ${action} completed` }
+    //     };
+    //   }
+    // );
 
     // More tools will be added here
-    // const processRunner = new NodeProcessRunner();
-    // const cliExecutor = new CLIExecutor(processRunner);
-    // const commands = CommandFactory.createCommands(cliExecutor);
+    const processRunner = new NodeProcessRunner();
+    const cliExecutor = new CLIExecutor(processRunner);
+    const commands = CommandFactory.createCommands(cliExecutor);
 
-    // commands.forEach((command) => {
-    //   this.commandRegistry.register(command);
-    // });
+    commands.forEach((command) => {
+      this.commandRegistry.register(command);
+    });
   }
 
   /**

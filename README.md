@@ -41,8 +41,10 @@ The MCP server communicates via stdio according to the MCP specification, allowi
 
 | Tool Name | Description | Parameters |
 |-----------|-------------|------------|
-| `authAddInstance` | Add ServiceNow instance credentials | `instance`: The instance name to authenticate with |
-| `listCommands` | List available ServiceNow SDK command types | `commandType`: (Optional) Command type to filter (auth, app, table, etc.) |
+| `get_fluent_version` | Get Fluent (ServiceNow SDK) version information | None |
+| `get_fluent_help` | Get help information about Fluent (ServiceNow SDK) commands | `command`: (Optional) The specific command to get help for |
+| `enable_fluent_debug` | Return debug logs generated with a command for Fluent (ServiceNow SDK) | `command`: (Optional) The command to run with debug mode enabled |
+| `upgrade_fluent` | Upgrade Fluent (ServiceNow SDK) to the latest version | `check`: (Optional) Only check for updates without upgrading, `debug`: (Optional) Enable debug mode for the upgrade process |
 
 ### Resource Tools
 

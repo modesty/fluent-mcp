@@ -48,7 +48,7 @@ export interface ProcessResult {
 
 // Abstractions (Dependency Inversion)
 export interface ProcessRunner {
-  run(command: string, args: string[]): Promise<ProcessResult>;
+  run(command: string, args: string[], cwd?: string): Promise<ProcessResult>;
 }
 
 export interface CommandExecutor {

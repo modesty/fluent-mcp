@@ -6,12 +6,7 @@
 import { getConfig } from '../config.js';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 
-// Get directory name for file operations
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 // Log levels enum
 export enum LogLevel {

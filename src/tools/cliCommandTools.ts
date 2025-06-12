@@ -1,35 +1,35 @@
-import { spawn } from 'node:child_process';
-import { promisify } from 'node:util';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  Tool,
-  CallToolResult,
-} from '@modelcontextprotocol/sdk/types.js';
+import { spawn, SpawnOptionsWithoutStdio } from 'node:child_process';
+import { Tool } from '@modelcontextprotocol/sdk/types.js';
 
-import { CLICommand, CommandArgument, CommandResult, ProcessResult, ProcessRunner } from "../utils/types";
+import { CLICommand, CommandResult, ProcessResult, ProcessRunner } from "../utils/types";
+import { getProjectRootPath } from '../config.js';
+import { VersionCommand, HelpCommand, DebugCommand, UpgradeCommand } from './commands/index.js';
+import logger from '../utils/logger.js';
 
 // Infrastructure Layer
 export class NodeProcessRunner implements ProcessRunner {
-  async run(command: string, args: string[] = []): Promise<ProcessResult> {
+  async run(command: string, args: string[] = [], cwd?: string): Promise<ProcessResult> {
     return new Promise((resolve, reject) => {
-      const child = spawn(command, args, {
-        stdio: ['pipe', 'pipe', 'pipe'],
+      const options: SpawnOptionsWithoutStdio = {
+        stdio: 'pipe',
         shell: true,
-      });
+        ...(cwd ? { cwd } : {})
+      };
+
+      const child = spawn(command, args, options);
 
       let stdout = '';
       let stderr = '';
 
-      child.stdout?.on('data', (data) => {
+      child.stdout?.on('data', (data: Buffer) => {
         stdout += data.toString();
       });
 
-      child.stderr?.on('data', (data) => {
+      child.stderr?.on('data', (data: Buffer) => {
         stderr += data.toString();
       });
 
-      child.on('close', (code) => {
+      child.on('close', (code: number | null) => {
         resolve({
           stdout: stdout.trim(),
           stderr: stderr.trim(),
@@ -37,7 +37,7 @@ export class NodeProcessRunner implements ProcessRunner {
         });
       });
 
-      child.on('error', (error) => {
+      child.on('error', (error: Error) => {
         reject(error);
       });
     });
@@ -46,11 +46,28 @@ export class NodeProcessRunner implements ProcessRunner {
 
 // Application Layer
 export class CLIExecutor {
+  private mcpCwd: string | undefined;
+
   constructor(private processRunner: ProcessRunner) {}
 
-  async execute(command: string, args: string[]): Promise<CommandResult> {
+  /**
+   * Gets the MCP root directory path (calculated once and cached)
+   * @returns The absolute path to the MCP root directory
+   */
+	private getMcpCwd(): string {
+      if (!this.mcpCwd) {
+        // Use the utility function that returns the project root path
+        this.mcpCwd = getProjectRootPath();
+    }
+
+    return this.mcpCwd;
+  }
+
+  async execute(command: string, args: string[], useMcpCwd: boolean = false): Promise<CommandResult> {
     try {
-      const result = await this.processRunner.run(command, args);
+		const cwd = useMcpCwd ? this.getMcpCwd() : undefined;
+		logger.info(`Executing CWD: ${cwd}`);
+      const result = await this.processRunner.run(command, args, cwd);
 
       return {
         success: result.exitCode === 0,
@@ -69,25 +86,7 @@ export class CLIExecutor {
   }
 }
 
-// Domain Layer - Base Command (Open/Closed Principle)
-abstract class BaseCLICommand implements CLICommand {
-  abstract name: string;
-  abstract description: string;
-  abstract arguments: CommandArgument[];
-
-  constructor(protected cliExecutor: CLIExecutor) {}
-
-  abstract execute(args: Record<string, unknown>): Promise<CommandResult>;
-
-  // Template method for common validation
-  protected validateArgs(args: Record<string, unknown>): void {
-    for (const arg of this.arguments) {
-      if (arg.required && !(arg.name in args)) {
-        throw new Error(`Required argument '${arg.name}' is missing`);
-      }
-    }
-  }
-}
+// Domain Layer - Base Command has been moved to ./commands/baseCommand.ts
 
 // Application Services
 export class CommandRegistry {
@@ -127,23 +126,21 @@ export class CommandRegistry {
   }
 }
 
-// Concrete Commands
-class VersionCommand extends BaseCLICommand {
-  name = 'get_fluent_version';
-  description = 'Get Fluent (ServiceNow SDK) version information';
-  arguments: CommandArgument[] = [];
-
-  async execute(args: Record<string, unknown>): Promise<CommandResult> {
-    this.validateArgs(args);
-    return await this.cliExecutor.execute('npx', ['now-sdk', '--version']);
-  }
-}
+// Concrete Commands have been moved to individual files in ./commands/ directory
 
 // Factory Pattern for Command Creation
 export class CommandFactory {
+  /**
+   * Creates all CLI command instances
+   * @param cliExecutor The CLI executor to use for command execution
+   * @returns An array of command instances
+   */
   static createCommands(cliExecutor: CLIExecutor): CLICommand[] {
     return [
-      new VersionCommand(cliExecutor)
+      new VersionCommand(cliExecutor),
+      new HelpCommand(cliExecutor),
+      new DebugCommand(cliExecutor),
+      new UpgradeCommand(cliExecutor)
     ];
   }
 }
