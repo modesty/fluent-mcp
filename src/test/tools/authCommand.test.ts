@@ -1,6 +1,16 @@
 import { CommandResult } from "../../utils/types";
 import { CLIExecutor } from "../../tools/cliCommandTools";
 import { AuthCommand } from "../../tools/commands/authCommand";
+import { SessionManager } from "../../utils/sessionManager";
+
+// Mock the session manager
+jest.mock("../../utils/sessionManager", () => ({
+  SessionManager: {
+    getInstance: jest.fn().mockReturnValue({
+      getWorkingDirectory: jest.fn().mockReturnValue(undefined),
+    }),
+  },
+}));
 
 // Mock the config module
 jest.mock("../../config", () => ({
@@ -45,7 +55,7 @@ describe("AuthCommand", () => {
   test("should create an auth command with correct properties", () => {
     expect(authCommand.name).toBe("manage_fluent_auth");
     expect(authCommand.description).toBe(
-      "Manage ServiceNow SDK authentication profiles"
+      "Manage Fluent (ServiceNow SDK) authentication profiles"
     );
     expect(authCommand.arguments.length).toBeGreaterThan(0);
   });
@@ -56,7 +66,8 @@ describe("AuthCommand", () => {
     expect(mockExecutor.execute).toHaveBeenCalledWith(
       "npx",
       ["now-sdk", "auth", "--list"],
-      true
+      false,
+      process.cwd()
     );
     expect(result.success).toBe(true);
   });
@@ -81,7 +92,8 @@ describe("AuthCommand", () => {
         "--alias",
         "testuser",
       ],
-      true
+      false,
+      process.cwd()
     );
     expect(result.success).toBe(true);
   });
@@ -92,7 +104,8 @@ describe("AuthCommand", () => {
     expect(mockExecutor.execute).toHaveBeenCalledWith(
       "npx",
       ["now-sdk", "auth", "--delete", "testuser"],
-      true
+      false,
+      process.cwd()
     );
     expect(result.success).toBe(true);
   });
@@ -103,7 +116,8 @@ describe("AuthCommand", () => {
     expect(mockExecutor.execute).toHaveBeenCalledWith(
       "npx",
       ["now-sdk", "auth", "--use", "testuser"],
-      true
+      false,
+      process.cwd()
     );
     expect(result.success).toBe(true);
   });

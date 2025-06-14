@@ -1,15 +1,15 @@
 import logger from "../../utils/logger.js";
 import { CommandArgument, CommandResult } from "../../utils/types.js";
 import { CLIExecutor } from "../cliCommandTools.js";
-import { BaseCLICommand } from "./baseCommand.js";
+import { SessionFallbackCommand } from "./sessionFallbackCommand.js";
 
 /**
  * Command to manage ServiceNow SDK authentication
  * Handles adding, listing, deleting, and selecting auth profiles
  */
-export class AuthCommand extends BaseCLICommand {
+export class AuthCommand extends SessionFallbackCommand {
   name = "manage_fluent_auth";
-  description = "Manage ServiceNow SDK authentication profiles";
+  description = "Manage Fluent (ServiceNow SDK) authentication profiles";
   arguments: CommandArgument[] = [
     {
       name: "add",
@@ -94,6 +94,6 @@ export class AuthCommand extends BaseCLICommand {
       sdkArgs.push("--use", args.use as string);
     }
 
-    return await this.cliExecutor.execute("npx", sdkArgs, true);
+    return await this.executeWithFallback("npx", sdkArgs);
   }
 }

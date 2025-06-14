@@ -14,6 +14,11 @@ import {
   DebugCommand,
   UpgradeCommand,
   AuthCommand,
+  InitCommand,
+  BuildCommand,
+  InstallCommand,
+  TransformCommand,
+  DependenciesCommand,
 } from "./commands/index.js";
 import logger from "../utils/logger.js";
 
@@ -84,11 +89,22 @@ export class CLIExecutor {
   async execute(
     command: string,
     args: string[],
-    useMcpCwd: boolean = false
+    useMcpCwd: boolean = false,
+    customWorkingDir?: string
   ): Promise<CommandResult> {
     try {
-      const cwd = useMcpCwd ? this.getMcpCwd() : undefined;
-      logger.info(`Executing CWD: ${cwd} : ${command} ${args.join(" ")}`);
+      let cwd = customWorkingDir;
+      if (!cwd && useMcpCwd) {
+        cwd = this.getMcpCwd();
+      }
+      
+      // Better logging with clear working directory information
+      logger.info(`Executing command: ${command} ${args.join(" ")}`, process.env);
+      
+      // Sanity check on working directory - warn if it's the system root
+      if (cwd === "/" || cwd === "\\") {
+        logger.warn(`WARNING: Command executing with system root (/) as working directory!`);
+      }
       
       const result = await this.processRunner.run(command, args, cwd);
 
@@ -168,6 +184,11 @@ export class CommandFactory {
       new DebugCommand(cliExecutor),
       new UpgradeCommand(cliExecutor),
       new AuthCommand(cliExecutor),
+      new InitCommand(cliExecutor),
+      new BuildCommand(cliExecutor),
+      new InstallCommand(cliExecutor),
+      new TransformCommand(cliExecutor),
+      new DependenciesCommand(cliExecutor),
     ];
   }
 }

@@ -50,6 +50,23 @@ Fluent MCP is a Model Context Protocol (MCP) server that provides ServiceNow SDK
 			- `npx now-sdk auth --list`: List all stored authentication aliases.
 			- `npx now-sdk auth --use devuser1`: Use the stored authentication alias
 	2.3 Init command:
+		prerequisites:
+			- Change the current working directory to the directory where you want to create the ServiceNow application.
+			- The current working directory must not already contain a ServiceNow application, meaning it must not contain a `now.config.json` file, and it's package.json (if exists) must not have dependencies for `@servicenow/now-sdk` or `@servicenow/now-sdk-cli`. Otherwise, return a message indicating that the current directory already contains a Fluent (ServiceNow SDK) application, and tell the user current scope name and package name.
+			- working directory handling:
+				- If working directory is provided
+					- If the provided working directory doesn't exist, create it, save it as the working directory for the session, then move onto command execution
+					- If the provided working directory exists: 
+						- If the provided working directory does not contain Fluent app, save it as the working directory for the session, then move onto command execution
+						- If the provided working directory contains Fluent app, return a message indicating that the current directory already contains a Fluent (ServiceNow SDK) application, and tell the user current scope name and package name. also save the working directory as the working directory for the session, then exist without executing the command
+				- If working directory is not provided:
+					- Create a new root directory under the user's home directory, save it as the working directory for the session, then move onto command execution
+				- the saved working directory for the session will be used for the consecutive invocation of the following commands: 
+					- `npx now-sdk build`
+					- `npx now-sdk install`
+					- `npx now-sdk transform`
+					- `npx now-sdk dependencies`
+
 		2.3.1 `npx now-sdk init [--from <sys_id or path>] [--appName <name>] [--packageName <name>] [--scopeName <name>] [--auth <alias>]`: Initialize a new ServiceNow application in the current directory. Details can be found by terminal command `npx now-sdk --help init`. Example: `npx now-sdk init --from dbce0f6a3b3fda107b45b5d355e45af6 --appName Example App --packageName example-app --scopeName x_snc_example --auth devuser1`
 	2.4 Build command:
 		2.4.1 `npx now-sdk build <source> [--frozenKeys <flag>]`: Compile source files and generate an installable package. Details can be found by terminal command `npx now-sdk --help build`. Example: `npx now-sdk build /path/to/package --frozenKeys true`

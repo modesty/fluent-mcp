@@ -3,17 +3,16 @@
  * Outputs formatted JSON logs to stderr or a file to avoid interfering with MCP's stdio transport
  */
 
-import { getConfig } from '../config.js';
-import fs from 'fs';
-import path from 'path';
-
+import { getConfig } from "../config.js";
+import fs from "fs";
+import path from "path";
 
 // Log levels enum
 export enum LogLevel {
-  DEBUG = 'debug',
-  INFO = 'info',
-  WARN = 'warn',
-  ERROR = 'error',
+  DEBUG = "debug",
+  INFO = "info",
+  WARN = "warn",
+  ERROR = "error",
 }
 
 // Level priorities - higher number means more severe
@@ -67,11 +66,11 @@ export class Logger {
       }
 
       this.logFilePath = logFilePath;
-      this.logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+      this.logStream = fs.createWriteStream(logFilePath, { flags: "a" });
       this.useStderr = false;
 
       // Handle process exit to close log file
-      process.on('exit', () => {
+      process.on("exit", () => {
         this.logStream?.end();
       });
     } catch (err) {
@@ -112,7 +111,11 @@ export class Logger {
    * @param context Optional context object
    * @returns The formatted log entry
    */
-  private formatLogEntry(level: LogLevel, message: string, context?: Record<string, unknown>): LogEntry {
+  private formatLogEntry(
+    level: LogLevel,
+    message: string,
+    context?: Record<string, unknown>
+  ): LogEntry {
     return {
       timestamp: new Date().toISOString(),
       level,
@@ -132,7 +135,9 @@ export class Logger {
    * Write a log entry to the configured output (stderr or file)
    */
   private writeLogEntry(entry: LogEntry): void {
-	const logJson = `[${entry.timestamp}] [${entry.level.toUpperCase()}]: ${entry.message} ${JSON.stringify(entry.context || {})}`;
+    const logJson = `[${entry.timestamp}] [${entry.level.toUpperCase()}]: ${
+      entry.message
+    } ${JSON.stringify(entry.context || {})}`;
 
     if (this.useStderr) {
       process.stderr.write(`${logJson}\n`);
@@ -180,16 +185,22 @@ export class Logger {
    * @param error Optional error object
    * @param context Optional context object
    */
-  public error(message: string, error?: Error, context?: Record<string, unknown>): void {
+  public error(
+    message: string,
+    error?: Error,
+    context?: Record<string, unknown>
+  ): void {
     if (!this.shouldLog(LogLevel.ERROR)) return;
-    const errorContext = error ? {
-      ...context,
-      error: {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-      }
-    } : context;
+    const errorContext = error
+      ? {
+          ...context,
+          error: {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+          },
+        }
+      : context;
 
     const entry = this.formatLogEntry(LogLevel.ERROR, message, errorContext);
     this.writeLogEntry(entry);

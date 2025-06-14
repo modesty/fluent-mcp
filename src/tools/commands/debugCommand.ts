@@ -1,13 +1,13 @@
 import { CommandArgument, CommandResult } from "../../utils/types";
 import { CLIExecutor } from "../cliCommandTools.js";
-import { BaseCLICommand } from "./baseCommand.js";
+import { SessionFallbackCommand } from "./sessionFallbackCommand.js";
 
 /**
  * Command to enable debug mode for Fluent (ServiceNow SDK)
  */
-export class DebugCommand extends BaseCLICommand {
+export class DebugCommand extends SessionFallbackCommand {
   name = 'enable_fluent_debug';
-  description = 'Return debug logs generated with a command for Fluent (ServiceNow SDK)';
+  description = 'Return debug logs generated with a command for Fluent (ServiceNow SDK) commands';
   arguments: CommandArgument[] = [
     {
       name: 'command',
@@ -30,6 +30,6 @@ export class DebugCommand extends BaseCLICommand {
       cmdArgs.push(command);
     }
 
-    return await this.cliExecutor.execute('npx', cmdArgs, true);
+    return await this.executeWithFallback('npx', cmdArgs);
   }
 }

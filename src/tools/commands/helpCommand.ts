@@ -1,11 +1,11 @@
 import { CommandArgument, CommandResult } from "../../utils/types";
 import { CLIExecutor } from "../cliCommandTools.js";
-import { BaseCLICommand } from "./baseCommand.js";
+import { SessionFallbackCommand } from "./sessionFallbackCommand.js";
 
 /**
  * Command to get help information about Fluent (ServiceNow SDK) commands
  */
-export class HelpCommand extends BaseCLICommand {
+export class HelpCommand extends SessionFallbackCommand {
   name = 'get_fluent_help';
   description = 'Get help information about Fluent (ServiceNow SDK) commands';
   arguments: CommandArgument[] = [
@@ -26,9 +26,9 @@ export class HelpCommand extends BaseCLICommand {
     const command = args.command as string | undefined;
 
     if (command) {
-      return await this.cliExecutor.execute('npx', ['now-sdk', command, '--help'], true);
+      return await this.executeWithFallback('npx', ['now-sdk', command, '--help']);
     } else {
-      return await this.cliExecutor.execute('npx', ['now-sdk', '--help'], true);
+      return await this.executeWithFallback('npx', ['now-sdk', '--help']);
     }
   }
 }

@@ -1,15 +1,25 @@
 ## Relevant Files
 
 - `src/index.ts` - Entry point for the MCP server, contains the main server setup and initialization
-- `src/server/mcpServer.ts` - Core MCP server implementation using the MCP TypeScript SDK
+- `src/server/fluentMCPServer.ts` - Core MCP server implementation using the MCP TypeScript SDK
 - `src/tools/index.ts` - Exports for all MCP tools
-- `src/tools/sdkCommands.ts` - MCP tools for all ServiceNow SDK CLI commands
+- `src/tools/cliCommandTools.ts` - Utility for executing ServiceNow SDK CLI commands
+- `src/tools/commands/index.ts` - Exports for all command implementations
+- `src/tools/commands/baseCommand.ts` - Base class for all command implementations
+- `src/tools/commands/authCommand.ts` - Authentication command implementation
+- `src/tools/commands/initCommand.ts` - Init command implementation for creating new ServiceNow applications
+- `src/tools/commands/versionCommand.ts` - Version command implementation
+- `src/tools/commands/helpCommand.ts` - Help command implementation
+- `src/tools/commands/debugCommand.ts` - Debug command implementation
+- `src/tools/commands/upgradeCommand.ts` - Upgrade command implementation
 - `src/tools/resources.ts` - MCP tools for accessing API specs, snippets, and instructions
-- `src/utils/commandExecution.ts` - Utility for executing ServiceNow SDK CLI commands
 - `src/utils/resourceLoader.ts` - Utility for loading resources from the res/ directory
 - `src/utils/logger.ts` - Logging utility that provides structured JSON logging with timestamps
+- `src/utils/types.ts` - TypeScript type definitions for command execution and utilities
 - `src/types/index.ts` - TypeScript type definitions for the MCP server and tools
 - `src/config.ts` - Configuration for the MCP server
+- `src/test/tools/initCommand.test.ts` - Unit tests for the Init command
+- `src/test/tools/authCommand.test.ts` - Unit tests for the Auth command
 - `src/test/tools/sdkCommands.test.ts` - Unit tests for the SDK commands tools
 - `src/test/tools/resources.test.ts` - Unit tests for the resources tools
 - `src/test/server/mcpServer.test.ts` - Unit tests for the MCP server
@@ -32,12 +42,11 @@
     - [x] 2.1 Create command execution helper in `tools/cliCommandTools.ts` for running ServiceNow SDK CLI commands
     - [x] 2.2 Implement MCP tool for basic SDK commands (version, help, debug, upgrade)
     - [x] 2.3 Implement MCP tool for authentication commands
-    - [ ] 2.4 Implement MCP tool for initialization commands
+    - [x] 2.4 Implement MCP tool for initialization commands
     - [ ] 2.5 Implement MCP tool for build commands
     - [ ] 2.6 Implement MCP tool for install commands
     - [ ] 2.7 Implement MCP tool for transform commands
     - [ ] 2.8 Implement MCP tool for dependencies commands
-    - [ ] 2.9 Create structured response formatters for all command outputs
 
 - [ ] 3.0 Implement MCP tools for accessing resources
     - [ ] 3.1 Develop resource loading utility to access files in the res/ directory
