@@ -31,7 +31,7 @@
 - [ ] 2.0 Implement MCP tools for ServiceNow SDK CLI commands
     - [x] 2.1 Create command execution helper in `tools/cliCommandTools.ts` for running ServiceNow SDK CLI commands
     - [x] 2.2 Implement MCP tool for basic SDK commands (version, help, debug, upgrade)
-    - [ ] 2.3 Implement MCP tool for authentication commands
+    - [x] 2.3 Implement MCP tool for authentication commands
     - [ ] 2.4 Implement MCP tool for initialization commands
     - [ ] 2.5 Implement MCP tool for build commands
     - [ ] 2.6 Implement MCP tool for install commands
