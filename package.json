@@ -1,10 +1,10 @@
 {
   "name": "@modesty/fluent-mcp",
   "version": "0.0.1",
-  "description": "Fluent MCP server for ServiceNow SDK",
+  "description": "MCP server for Fluent (ServiceNow SDK)",
   "keywords": [
-    "servicenow SDK",
-    "fluent",
+    "Servicenow SDK",
+    "Fluent",
     "mcp",
     "sdk",
     "model-context-protocol",
