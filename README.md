@@ -1,4 +1,4 @@
-# Fluent MCP Server for ServiceNow SDK
+# MCP Server for Fluent (ServiceNow SDK)
 
 A stdio MCP Server for [Fluent (ServiceNow SDK)](https://www.servicenow.com/docs/bundle/yokohama-application-development/page/build/servicenow-sdk/concept/servicenow-fluent.html), a TypeScript-based declarative domain-specific language for creating and managing metadata, modules, records and tests in ServiceNow platform. It support all commands available in the ServiceNow SDK CLI, and provides access to primary Fluent Plugin's API specifications, code snippets, and instructions for various metadata types. It can be configured for any MCP client, such as VSCode Agent mode, Claude Desktop, Cursor, or Windsurf, for either development or learning purposes.
 
