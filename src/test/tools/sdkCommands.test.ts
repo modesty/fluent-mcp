@@ -1,24 +1,3 @@
-jest.mock('../../config', () => ({
-  getProjectRootPath: jest.fn(() => process.cwd()),
-  getConfig: jest.fn(() => ({
-    name: 'mocked-name',
-    version: 'mocked-version',
-    description: 'mocked-description',
-    logLevel: 'info',
-    resourcePaths: {
-      spec: '/mocked/spec',
-      snippet: '/mocked/snippet',
-      instruct: '/mocked/instruct',
-    },
-    servicenowSdk: {
-      cliPath: '.',
-      commandTimeoutMs: 30000,
-    },
-  })),
-}));
-
-const configModule = jest.requireMock('../../config');
-
 // Import cliCommandTools after mocking
 import { CommandFactory, CLIExecutor, NodeProcessRunner } from '../../tools/cliCommandTools';
 import { ProcessResult } from '../../utils/types';

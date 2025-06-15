@@ -15,8 +15,15 @@ import {
   CommandRegistry,
   NodeProcessRunner,
 } from "../tools/cliCommandTools.js";
-import { CommandResult } from "../utils/types.js";
+import { CLICommand, CommandArgument, CommandResult } from "../utils/types.js";
 import logger from "../utils/logger.js";
+// Import resource tools
+import {
+  GetApiSpecCommand,
+  GetSnippetCommand,
+  GetInstructCommand,
+  ListMetadataTypesCommand,
+} from "../tools/resourceTools.js";
 
 /**
  * Implementation of the Model Context Protocol server for ServiceNow SDK
@@ -138,30 +145,89 @@ export class FluentMcpServer {
   private registerResourceTools(): void {
     if (!this.mcpServer) return;
 
-    // Get API specifications
+    try {
+      // Register metadata type listing tool
+      const listMetadataTypesCommand = new ListMetadataTypesCommand();
+      this.commandRegistry.register(listMetadataTypesCommand);
+      this.registerToolFromCommand(listMetadataTypesCommand);
+
+      // Register API specification tool
+      const getApiSpecCommand = new GetApiSpecCommand();
+      this.commandRegistry.register(getApiSpecCommand);
+      this.registerToolFromCommand(getApiSpecCommand);
+
+      // Register code snippet tool
+      const getSnippetCommand = new GetSnippetCommand();
+      this.commandRegistry.register(getSnippetCommand);
+      this.registerToolFromCommand(getSnippetCommand);
+
+      // Register instruction tool
+      const getInstructCommand = new GetInstructCommand();
+      this.commandRegistry.register(getInstructCommand);
+      this.registerToolFromCommand(getInstructCommand);
+
+      logger.debug("Resource tools registered successfully");
+    } catch (error) {
+      logger.error("Error registering resource tools",
+        error instanceof Error ? error : new Error(String(error))
+      );
+      throw error;
+    }
+  }
+  
+  /**
+   * Registers a command as an MCP tool
+   * @param command The command to register
+   */
+  private registerToolFromCommand(command: CLICommand): void {
+    if (!this.mcpServer) return;
+    
+    // Convert command arguments to Zod schema
+    const schema: Record<string, z.ZodTypeAny> = {};
+    
+    // Build schema from command arguments
+    for (const arg of command.arguments) {
+      let zodType: z.ZodTypeAny;
+      
+      // Map command argument types to Zod types
+      switch (arg.type) {
+        case 'string':
+          zodType = z.string();
+          break;
+        case 'number':
+          zodType = z.number();
+          break;
+        case 'boolean':
+          zodType = z.boolean();
+          break;
+        case 'array':
+          zodType = z.array(z.any());
+          break;
+        default:
+          zodType = z.any();
+      }
+      
+      // Make optional if not required
+      if (!arg.required) {
+        zodType = zodType.optional();
+      }
+      
+      schema[arg.name] = zodType;
+    }
+    
+    // Register with MCP server
     this.mcpServer.tool(
-      "get-api-spec",
-      "Get API specification for a ServiceNow metadata type",
-      {
-        metadataType: z
-          .string()
-          .describe(
-            "ServiceNow metadata type (e.g., business-rule, script-include)"
-          ),
-      },
-      async (params, _extra) => {
-        const { metadataType } = params;
-        // Properly format the response with required content property
+      command.name,
+      command.description,
+      schema,
+      async (params: Record<string, unknown>) => {
+        const result = await command.execute(params);
         return {
-          content: [
-            { type: "text", text: `API specification for ${metadataType}` },
-          ],
-          structuredContent: { spec: `API specification for ${metadataType}` },
+          content: [{ type: 'text', text: result.output }],
+          structuredContent: { success: result.success }
         };
       }
     );
-
-    // More resource tools will be added here
   }
 
   private setupHandlers(): void {
@@ -289,5 +355,20 @@ export class FluentMcpServer {
    */
   getStatus(): ServerStatus {
     return this.status;
+  }
+
+  /**
+   * This method is no longer used - using registerToolFromCommand instead
+   * Keep as a stub for backward compatibility
+   */
+  private commandToSchema(command: CLICommand): Record<string, any> {
+    // Convert to a simple schema object
+    const schema: Record<string, any> = {};
+    
+    for (const arg of command.arguments) {
+      schema[arg.name] = arg.required ? {} : { optional: true };
+    }
+    
+    return schema;
   }
 }

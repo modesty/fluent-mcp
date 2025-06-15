@@ -99,11 +99,11 @@ export class CLIExecutor {
       }
       
       // Better logging with clear working directory information
-      logger.info(`Executing command: ${command} ${args.join(" ")}`, process.env);
+      logger.info(`Executing command: ${command}`, { cmd: `${args.join(" ")}` } );
       
       // Sanity check on working directory - warn if it's the system root
       if (cwd === "/" || cwd === "\\") {
-        logger.warn(`WARNING: Command executing with system root (/) as working directory!`);
+        throw new Error(`ERROR: Command should never be executed with system root (/) as working directory`);
       }
       
       const result = await this.processRunner.run(command, args, cwd);

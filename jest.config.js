@@ -10,7 +10,7 @@ export default {
     "^.+\\.tsx?$": [
       "ts-jest",
       {
-		  useESM: true
+        useESM: true
       },
     ],
   },
@@ -18,5 +18,7 @@ export default {
   collectCoverage: true,
   collectCoverageFrom: ["src/**/*.ts", "!src/**/*.d.ts"],
   coverageDirectory: "coverage",
-  coverageReporters: ["text", "lcov"]
+  coverageReporters: ["text", "lcov"],
+  setupFilesAfterEnv: ["./src/test/setup.js"],
+  moduleDirectories: ["node_modules", "<rootDir>"]
 };

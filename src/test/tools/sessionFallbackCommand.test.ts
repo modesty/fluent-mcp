@@ -2,7 +2,6 @@ import { CommandResult } from "../../utils/types";
 import { CLIExecutor } from "../../tools/cliCommandTools";
 import { SessionFallbackCommand } from "../../tools/commands/sessionFallbackCommand";
 import { SessionManager } from "../../utils/sessionManager";
-import { getProjectRootPath } from "../../config";
 
 // Mock the session manager
 jest.mock("../../utils/sessionManager", () => ({
@@ -13,13 +12,15 @@ jest.mock("../../utils/sessionManager", () => ({
   },
 }));
 
-// Mock the config module
+// Mock the config module specifically for this test
 jest.mock("../../config", () => ({
-  getProjectRootPath: jest.fn().mockReturnValue("/mock-project-root"),
+  getProjectRootPath: jest.fn(() => "/mock-project-root"),
   getConfig: jest.fn().mockReturnValue({
+    name: "test",
+    version: "0.0.0",
+    description: "Test description",
     logLevel: "info",
-    name: "mocked-name",
-    version: "0.0.1",
+    // Other config properties as needed
   }),
 }));
 
@@ -87,12 +88,12 @@ describe("SessionFallbackCommand", () => {
     await command.execute({});
 
     expect(SessionManager.getInstance().getWorkingDirectory).toHaveBeenCalled();
-    expect(getProjectRootPath).toHaveBeenCalled();
+    // The config module is already mocked via Jest setup
     expect(mockExecutor.execute).toHaveBeenCalledWith(
       "test", 
       ["arg1", "arg2"], 
       false, // useMcpCwd
-      "/mock-project-root" // fallback to project root
+      "/mock-project-root" // fallback to project root from mocked config
     );
   });
 });

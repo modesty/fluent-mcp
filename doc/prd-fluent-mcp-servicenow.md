@@ -82,9 +82,9 @@ Fluent MCP is a Model Context Protocol (MCP) server that provides ServiceNow SDK
 
 ### 3. MCP Tools: API spec / snippet / instruct
 
-3.1. The system must provide a tool to access API specifications for different metadata types stored in `./res/spec`.
-3.2. The system must provide a tool to access code snippets for different metadata types stored in `./res/snippet`.
-3.3. The system must provide a tool to access instructions for different metadata types stored in `./res/instruct`.
+3.1. The system must provide a tool to access API specifications for different metadata types stored in `./res/spec` per config.
+3.2. The system must provide a tool to access code snippets for different metadata types stored in `./res/snippet`  per config.
+3.3. The system must provide a tool to access instructions for different metadata types stored in `./res/instruct`  per config.
 3.4. Each resource tool expose resources by metadata type (e.g., ACL, business rules, client scripts, etc.).
 3.5. The system must support querying for specific metadata types.
 

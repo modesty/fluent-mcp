@@ -1,7 +1,6 @@
 import { CommandResult } from "../../utils/types";
 import { CLIExecutor } from "../../tools/cliCommandTools";
 import { AuthCommand } from "../../tools/commands/authCommand";
-import { SessionManager } from "../../utils/sessionManager";
 
 // Mock the session manager
 jest.mock("../../utils/sessionManager", () => ({
@@ -10,26 +9,6 @@ jest.mock("../../utils/sessionManager", () => ({
       getWorkingDirectory: jest.fn().mockReturnValue(undefined),
     }),
   },
-}));
-
-// Mock the config module
-jest.mock("../../config", () => ({
-  getProjectRootPath: jest.fn(() => process.cwd()),
-  getConfig: jest.fn(() => ({
-    name: "mocked-name",
-    version: "mocked-version",
-    description: "mocked-description",
-    logLevel: "info",
-    resourcePaths: {
-      spec: "/mocked/spec",
-      snippet: "/mocked/snippet",
-      instruct: "/mocked/instruct",
-    },
-    servicenowSdk: {
-      cliPath: ".",
-      commandTimeoutMs: 30000,
-    },
-  })),
 }));
 
 describe("AuthCommand", () => {

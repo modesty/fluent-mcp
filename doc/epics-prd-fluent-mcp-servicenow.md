@@ -43,10 +43,10 @@
     - [x] 2.2 Implement MCP tool for basic SDK commands (version, help, debug, upgrade)
     - [x] 2.3 Implement MCP tool for authentication commands
     - [x] 2.4 Implement MCP tool for initialization commands
-    - [ ] 2.5 Implement MCP tool for build commands
-    - [ ] 2.6 Implement MCP tool for install commands
-    - [ ] 2.7 Implement MCP tool for transform commands
-    - [ ] 2.8 Implement MCP tool for dependencies commands
+    - [x] 2.5 Implement MCP tool for build commands
+    - [x] 2.6 Implement MCP tool for install commands
+    - [x] 2.7 Implement MCP tool for transform commands
+    - [x] 2.8 Implement MCP tool for dependencies commands
 
 - [ ] 3.0 Implement MCP tools for accessing resources
     - [ ] 3.1 Develop resource loading utility to access files in the res/ directory

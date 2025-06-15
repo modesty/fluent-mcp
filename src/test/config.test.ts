@@ -2,18 +2,13 @@
 import { expect, test, describe } from '@jest/globals';
 import path from 'path';
 import fs from 'fs';
+import { getConfig, getProjectRootPath } from "../config.js";
 
-// Mock the module with a factory BEFORE importing it
-jest.mock('../config', () => ({
-  getProjectRootPath: jest.fn(() => process.cwd()),
-}));
-
-// Replace require with jest.requireMock
-const configModule = jest.requireMock('../config');
+// The config module is automatically mocked via Jest setup
 
 describe('Config Module', () => {
   test('getProjectRootPath returns a valid directory path', () => {
-    const rootPath = configModule.getProjectRootPath();
+    const rootPath = getProjectRootPath();
 
     // Check if the path exists and is a directory
     expect(fs.existsSync(rootPath)).toBe(true);

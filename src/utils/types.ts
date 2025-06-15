@@ -23,6 +23,14 @@ export interface CommandResult {
   error?: Error;
 }
 
+/**
+ * Resource types supported by the loader
+ */
+export enum ResourceTypeEnum {
+  SPEC = "spec",
+  SNIPPET = "snippet",
+  INSTRUCT = "instruct",
+}
 
 /**
  * Resource loading result

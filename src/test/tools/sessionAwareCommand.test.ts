@@ -14,25 +14,6 @@ jest.mock("../../utils/sessionManager", () => {
   };
 });
 
-jest.mock('../../config', () => ({
-  getProjectRootPath: jest.fn(() => process.cwd()),
-  getConfig: jest.fn(() => ({
-    name: 'mocked-name',
-    version: 'mocked-version',
-    description: 'mocked-description',
-    logLevel: 'info',
-    resourcePaths: {
-      spec: '/mocked/spec',
-      snippet: '/mocked/snippet',
-      instruct: '/mocked/instruct',
-    },
-    servicenowSdk: {
-      cliPath: '.',
-      commandTimeoutMs: 30000,
-    },
-  })),
-}));
-
 // Create a concrete implementation of SessionAwareCLICommand for testing
 class TestSessionAwareCommand extends SessionAwareCLICommand {
   name = "test_command";
