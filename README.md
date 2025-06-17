@@ -164,18 +164,18 @@ I'm working on a ServiceNow app. Can you show me how to create a UI Action?
 
 To configure the Fluent MCP Server for Windsurf:
 
+1. `CMD + ,` to open Windsurf settings, and navigate to the Cascade section.
+2. Click `Add Server` in `Model Context Protocol (MCP) Servers` section.
+3. Select `Add Custom MCP Server +` in the `Model Context Protocol (MCP) Servers Templates` popup.
+4. Paste in the following to `mcp_config.json`:
 
-1. Add a MCP Server configuration to Windsurf:
-
-    - Open Windsurf settings
-    - Add a new MCP Server with the following configuration:
-  
       ```json
       {
         "mcpServers": {
           "fluent-mcp": {
             "command": "npx",
             "args": [
+              "-y",
               "@modesty/fluent-mcp"
             ]
           }
@@ -183,10 +183,14 @@ To configure the Fluent MCP Server for Windsurf:
       }
       ```
 
-Example usage in Windsurf:
+5. After closing the `mcp_config.json` edit tab, click `Refresh` in the `Model Context Protocol (MCP) Servers` section to apply the changes. All tools under `fluent-mcp` will be listed and available when refereshing is complete.
+
+6. Example usage
+ in Windsurf:
 
 ```text
-I need to understand the API for ServiceNow tables. Can you help me with that?
+* Show the help on how to authenticate to ServiceNow instance using Fluent
+* Authenticate me to http://localhost:8080 with my credentials
 ```
 
 ## License
