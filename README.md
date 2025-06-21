@@ -75,26 +75,28 @@ Note, use `init` command to switch to a working directory for existing Fluent (S
 
 To configure the Fluent MCP Server for use with VSCode Agent mode (such as with GitHub Copilot or CodeLlama):
 
-1. Create or modify the MCP configuration file in your workspace:
+### VSCode GitHub Copilot Agent Mode
 
-- Create a `.vscode` folder in your workspace if it doesn't already exist
-- Create a file named `mcp.json` in the `.vscode` folder
-Add the following configuration to the mcp.json file:
+1. `Shift + CMD + p` to open VS Code command palette, search for `MCP: Add Server...`
+2. Select `NPM Package.  (Model Assisted)` as the server type.
+3. Fill in package name as `@modesty/fluent-mcp` and follow the prompts to complete the setup.
+4. Restart VS Code and the agent will now have access to ServiceNow Fluent SDK tools.
+5. If any issues arise, ensure the `~/Library/Application Support/Code/User/settings.json` file is correctly configured.
 
-   ```json
-     {
-      "mcpServers": {
-        "fluent-mcp": {
-          "command": "npx",
-          "args": [
-            "@modesty/fluent-mcp"
-          ]
-        }
-      }
-    }
-    ```
-
-2. Restart VS Code and the agent will now have access to ServiceNow Fluent SDK tools.
+```json
+"mcp": {
+  "servers": {
+			"fluent-mcp": {
+				"command": "npx",
+				"args": [
+					"-y",
+					"@modesty/fluent-mcp"
+				],
+				"cwd": "${input:cwd}"
+			}
+		}
+}
+```
 
 Example usage in VS Code Agent Chat:
 
