@@ -21,6 +21,8 @@ export class ResourceLoader {
    */
   constructor() {
     const config = getConfig();
+    
+    // Use the configured resource paths from config
     this.resourcePaths = {
       [ResourceType.SPEC]: config.resourcePaths.spec,
       [ResourceType.SNIPPET]: config.resourcePaths.snippet,

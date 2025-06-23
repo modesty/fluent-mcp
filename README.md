@@ -65,6 +65,7 @@ Note, use `init` command to switch to a working directory for existing Fluent (S
 - `table`: Tables
 - `ui-action`: UI Actions
 - `user-preference`: User Preferences
+- `atf`: Automated Test Framework, including 'atf-appnav', 'atf-catalog-action','atf-catalog-validation','atf-catalog-variable','atf-email','atf-form','atf-form-action','atf-form-declarative-action','atf-form-field','atf-reporting','atf-rest-api','atf-rest-assert-payload','atf-server','atf-server-catalog-item','atf-server-record',
 
 ## Requirements
 
@@ -185,7 +186,7 @@ To configure the Fluent MCP Server for Windsurf:
       }
       ```
 
-5. After closing the `mcp_config.json` edit tab, click `Refresh` in the `Model Context Protocol (MCP) Servers` section to apply the changes. All tools under `fluent-mcp` will be listed and available when refereshing is complete.
+5. After closing the `mcp_config.json` edit tab, click `Refresh` in the `Model Context Protocol (MCP) Servers` section to apply the changes. All tools under `fluent-mcp` will be listed and available when refreshing is complete.
 
 6. Example usage
  in Windsurf:

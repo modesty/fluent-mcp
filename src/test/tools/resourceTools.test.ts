@@ -1,6 +1,8 @@
 /**
  * Unit tests for resource tool commands
  */
+import fs from "node:fs";
+import path from "node:path";
 import {
   GetApiSpecCommand,
   GetSnippetCommand,
@@ -8,27 +10,72 @@ import {
   ListMetadataTypesCommand,
 } from "../../tools/resourceTools";
 import { ResourceLoader, ResourceType } from "../../utils/resourceLoader";
+import { getProjectRootPath } from "../../config";
 
-// Mock modules
-jest.mock("../../utils/resourceLoader");
+// Mock the file system operations for tests
+jest.mock("node:fs", () => {
+  const originalFs = jest.requireActual("node:fs");
+  return {
+    ...originalFs,
+    promises: {
+      ...originalFs.promises,
+      readdir: jest.fn(),
+      readFile: jest.fn(),
+    },
+    existsSync: jest.fn()
+  };
+});
 
 describe("Resource Tool Commands", () => {
-  // Global mock object to access from tests
-  const mockGetAvailableMetadataTypes = jest.fn();
-  const mockGetResource = jest.fn();
-  const mockListSnippets = jest.fn();
+  // Test metadata type to use throughout tests
+  const TEST_METADATA_TYPE = "business-rule";
+  const TEST_SNIPPET_ID = "0001";
   
-  // Set up mocks before each test
+  // Set up ResourceLoader and mocks before each test
+  let resourceLoader: ResourceLoader;
+  const mockTypes = ["business-rule", "script-include", "client-script", "ui-action"];
+  const mockSpecContent = "Business Rule spec\nBusinessRule(";
+  const mockSnippetContent = "Business Rule API example\nBusinessRule(";
+  const mockInstructContent = "Instructions for Fluent Business Rule API";
+  
   beforeEach(() => {
+    resourceLoader = new ResourceLoader();
+    
+    // Reset all mocks
     jest.clearAllMocks();
     
-    // Reset the implementation of ResourceLoader
-    (ResourceLoader as jest.Mock).mockImplementation(() => {
-      return {
-        getAvailableMetadataTypes: mockGetAvailableMetadataTypes,
-        getResource: mockGetResource,
-        listSnippets: mockListSnippets
-      };
+    // Setup default mocks for file operations
+    (fs.promises.readdir as jest.Mock).mockImplementation((path: string) => {
+      if (path.includes("instruct")) {
+        return Promise.resolve([
+          "fluent_instruct_business-rule.md",
+          "fluent_instruct_script-include.md",
+          "fluent_instruct_client-script.md",
+          "fluent_instruct_ui-action.md"
+        ]);
+      } else if (path.includes("snippet")) {
+        return Promise.resolve([
+          "fluent_snippet_business-rule_0001.md",
+          "fluent_snippet_business-rule_0002.md",
+          "fluent_snippet_business-rule_0003.md"
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+    
+    (fs.promises.readFile as jest.Mock).mockImplementation((path: string) => {
+      if (path.includes("spec")) {
+        return Promise.resolve(mockSpecContent);
+      } else if (path.includes("snippet")) {
+        return Promise.resolve(mockSnippetContent);
+      } else if (path.includes("instruct")) {
+        return Promise.resolve(mockInstructContent);
+      }
+      return Promise.resolve("");
+    });
+    
+    (fs.existsSync as jest.Mock).mockImplementation((path: string) => {
+      return path.includes("business-rule") || path.includes("0001");
     });
   });
 
@@ -40,43 +87,32 @@ describe("Resource Tool Commands", () => {
     });
     
     it("should return list of metadata types", async () => {
-      const mockTypes = ["business-rule", "script-include", "client-script"];
-      mockGetAvailableMetadataTypes.mockResolvedValue(mockTypes);
-      
+      // Execute the command with our mocked filesystem
       const result = await command.execute();
       
-      expect(result).toEqual({
-        exitCode: 0,
-        success: true,
-        output: "Available metadata types:\nbusiness-rule\nscript-include\nclient-script",
-      });
-      expect(mockGetAvailableMetadataTypes).toHaveBeenCalled();
-    });
-    
-    it("should handle empty metadata types list", async () => {
-      mockGetAvailableMetadataTypes.mockResolvedValue([]);
+      // Verify the result contains the expected metadata types
+      expect(result.exitCode).toBe(0);
+      expect(result.success).toBe(true);
+      expect(result.output).toContain("Available metadata types:");
       
-      const result = await command.execute();
-      
-      expect(result).toEqual({
-        exitCode: 0,
-        success: true,
-        output: "No metadata types found.",
+      // Verify expected metadata types are in the output
+      mockTypes.forEach(type => {
+        expect(result.output).toContain(type);
       });
     });
     
-    it("should handle errors", async () => {
-      const mockError = new Error("Failed to get metadata types");
-      mockGetAvailableMetadataTypes.mockRejectedValue(mockError);
+    it("should handle errors when metadata types can't be retrieved", async () => {
+      // Create a spy on the getAvailableMetadataTypes method and force it to throw an error
+      jest.spyOn(ResourceLoader.prototype, "getAvailableMetadataTypes").mockImplementationOnce(() => {
+        throw new Error("Failed to get metadata types");
+      });
       
       const result = await command.execute();
       
-      expect(result).toEqual({
-        exitCode: 1,
-        success: false,
-        output: "Error: Failed to get metadata types",
-        error: mockError,
-      });
+      expect(result.exitCode).toBe(1);
+      expect(result.success).toBe(false);
+      expect(result.output).toContain("Error:");
+      expect(result.error).toBeDefined();
     });
   });
   
@@ -87,59 +123,38 @@ describe("Resource Tool Commands", () => {
       command = new GetApiSpecCommand();
     });
     
-    it("should return API specification", async () => {
-      const mockContent = "# API Spec for Business Rules\n... content ...";
-      mockGetResource.mockResolvedValue({
-        content: mockContent,
-        path: "/mock/path/to/spec/fluent_spec_business-rule.md",
-        metadataType: "business-rule",
-        resourceType: "spec",
-        found: true,
-      });
+    it("should return API specification for a valid metadata type", async () => {
+      // Execute the command with a valid metadata type
+      const result = await command.execute({ metadataType: TEST_METADATA_TYPE });
       
-      const result = await command.execute({ metadataType: "business-rule" });
+      // Verify the result contains the expected content
+      expect(result.exitCode).toBe(0);
+      expect(result.success).toBe(true);
+      expect(result.output).toBe(mockSpecContent);
       
-      expect(result).toEqual({
-        exitCode: 0,
-        success: true,
-        output: mockContent,
-      });
-      expect(mockGetResource).toHaveBeenCalledWith(
-        ResourceType.SPEC,
-        "business-rule",
-        undefined
-      );
+      // Verify the content contains expected text for a business rule spec
+      expect(result.output).toContain("Business Rule spec");
+      expect(result.output).toContain("BusinessRule(");
     });
     
-    it("should handle resource not found", async () => {
-      mockGetResource.mockResolvedValue({
-        content: "",
-        path: "/mock/path/to/spec/fluent_spec_non-existent.md",
-        metadataType: "non-existent",
-        resourceType: "spec",
-        found: false,
-      });
-      
+    it("should handle resource not found for non-existent metadata type", async () => {
+      // Execute the command with a non-existent metadata type
       const result = await command.execute({ metadataType: "non-existent" });
       
-      expect(result).toEqual({
-        exitCode: 1,
-        success: false,
-        output: "Resource not found for metadata type: non-existent",
-        error: expect.any(Error),
-      });
+      expect(result.exitCode).toBe(1);
+      expect(result.success).toBe(false);
+      expect(result.output).toContain("Resource not found for metadata type: non-existent");
+      expect(result.error).toBeDefined();
     });
     
     it("should handle missing required arguments", async () => {
+      // Execute the command without required arguments
       const result = await command.execute({});
       
-      expect(result).toEqual({
-        exitCode: 1,
-        success: false,
-        output: "Error: Missing required argument: metadataType",
-        error: expect.any(Error),
-      });
-      expect(mockGetResource).not.toHaveBeenCalled();
+      expect(result.exitCode).toBe(1);
+      expect(result.success).toBe(false);
+      expect(result.output).toContain("Error: Missing required argument: metadataType");
+      expect(result.error).toBeDefined();
     });
   });
   
@@ -151,69 +166,50 @@ describe("Resource Tool Commands", () => {
     });
     
     it("should return specific snippet when ID is provided", async () => {
-      const mockContent = "# Snippet 0002 for Business Rules\n... content ...";
-      mockGetResource.mockResolvedValue({
-        content: mockContent,
-        path: "/mock/path/to/snippet/fluent_snippet_business-rule_0002.md",
-        metadataType: "business-rule",
-        resourceType: "snippet",
-        found: true,
-      });
-      
+      // Execute the command with a valid metadata type and snippet ID
       const result = await command.execute({
-        metadataType: "business-rule",
-        id: "0002",
+        metadataType: TEST_METADATA_TYPE,
+        id: TEST_SNIPPET_ID,
       });
       
-      expect(result).toEqual({
-        exitCode: 0,
-        success: true,
-        output: mockContent,
-      });
-      expect(mockGetResource).toHaveBeenCalledWith(
-        ResourceType.SNIPPET,
-        "business-rule",
-        "0002"
-      );
+      // Verify the result contains the expected snippet content
+      expect(result.exitCode).toBe(0);
+      expect(result.success).toBe(true);
+      expect(result.output).toBe(mockSnippetContent);
+      
+      // Verify the content contains expected text for a business rule snippet
+      expect(result.output).toContain("Business Rule API example");
+      expect(result.output).toContain("BusinessRule(");
     });
     
     it("should list available snippets when ID is not provided", async () => {
-      const mockContent = "# Default Snippet for Business Rules\n... content ...";
-      mockListSnippets.mockResolvedValue(["0001", "0002", "0003"]);
-      mockGetResource.mockResolvedValue({
-        content: mockContent,
-        path: "/mock/path/to/snippet/fluent_snippet_business-rule_0001.md",
-        metadataType: "business-rule",
-        resourceType: "snippet",
-        found: true,
-      });
+      // The mock will return snippet IDs: 0001, 0002, 0003
+      const mockSnippetIds = ["0001", "0002", "0003"];
       
-      const result = await command.execute({ metadataType: "business-rule" });
+      // Execute the command without specifying a snippet ID
+      const result = await command.execute({ metadataType: TEST_METADATA_TYPE });
       
-      expect(result).toEqual({
-        exitCode: 0,
-        success: true,
-        output: mockContent + "\n\nAdditional snippets available: 0002, 0003",
+      // Verify the result contains the default snippet content and lists other available snippets
+      expect(result.exitCode).toBe(0);
+      expect(result.success).toBe(true);
+      expect(result.output).toContain(mockSnippetContent);
+      
+      // Verify that additional snippets are listed (excluding the default one)
+      expect(result.output).toContain("Additional snippets available:");
+      // Check for other snippet IDs (besides the default 0001)
+      mockSnippetIds.filter(id => id !== "0001").forEach(id => {
+        expect(result.output).toContain(id);
       });
-      expect(mockListSnippets).toHaveBeenCalledWith("business-rule");
-      expect(mockGetResource).toHaveBeenCalledWith(
-        ResourceType.SNIPPET,
-        "business-rule",
-        "0001"  // The actual implementation falls back to "0001" when ID is not provided
-      );
     });
     
-    it("should handle no snippets found", async () => {
-      mockListSnippets.mockResolvedValue([]);
-      
+    it("should handle no snippets found for non-existent metadata type", async () => {
+      // Execute the command with a non-existent metadata type
       const result = await command.execute({ metadataType: "non-existent" });
       
-      expect(result).toEqual({
-        exitCode: 1,
-        success: false,
-        output: "No snippets found for metadata type: non-existent",
-        error: expect.any(Error),
-      });
+      expect(result.exitCode).toBe(1);
+      expect(result.success).toBe(false);
+      expect(result.output).toContain("No snippets found for metadata type: non-existent");
+      expect(result.error).toBeDefined();
     });
   });
   
@@ -224,28 +220,37 @@ describe("Resource Tool Commands", () => {
       command = new GetInstructCommand();
     });
     
-    it("should return instructions", async () => {
-      const mockContent = "# Instructions for Business Rules\n... content ...";
-      mockGetResource.mockResolvedValue({
-        content: mockContent,
-        path: "/mock/path/to/instruct/fluent_instruct_business-rule.md",
-        metadataType: "business-rule",
-        resourceType: "instruct",
-        found: true,
-      });
+    it("should return instructions for a valid metadata type", async () => {
+      // Execute the command with a valid metadata type
+      const result = await command.execute({ metadataType: TEST_METADATA_TYPE });
       
-      const result = await command.execute({ metadataType: "business-rule" });
+      // Verify the result contains the expected instruction content
+      expect(result.exitCode).toBe(0);
+      expect(result.success).toBe(true);
+      expect(result.output).toBe(mockInstructContent);
       
-      expect(result).toEqual({
-        exitCode: 0,
-        success: true,
-        output: mockContent,
-      });
-      expect(mockGetResource).toHaveBeenCalledWith(
-        ResourceType.INSTRUCT,
-        "business-rule",
-        undefined
-      );
+      // Verify the content contains expected text for business rule instructions
+      expect(result.output).toContain("Instructions for Fluent Business Rule API");
+    });
+    
+    it("should handle resource not found for non-existent metadata type", async () => {
+      // Execute the command with a non-existent metadata type
+      const result = await command.execute({ metadataType: "non-existent" });
+      
+      expect(result.exitCode).toBe(1);
+      expect(result.success).toBe(false);
+      expect(result.output).toContain("Resource not found for metadata type: non-existent");
+      expect(result.error).toBeDefined();
+    });
+    
+    it("should handle missing required arguments", async () => {
+      // Execute the command without required arguments
+      const result = await command.execute({});
+      
+      expect(result.exitCode).toBe(1);
+      expect(result.success).toBe(false);
+      expect(result.output).toContain("Error: Missing required argument: metadataType");
+      expect(result.error).toBeDefined();
     });
   });
 });

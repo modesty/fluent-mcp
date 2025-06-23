@@ -31,7 +31,7 @@ let packageInfo: {
   [key: string]: any;
 } = {
   name: "@modesty/fluent-mcp",
-  version: "0.0.0",
+  version: "0.0.2",
   description: "Fluent MCP server for ServiceNow SDK",
 };
 
