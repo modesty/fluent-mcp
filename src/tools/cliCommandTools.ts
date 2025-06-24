@@ -6,7 +6,7 @@ import {
   CommandResult,
   ProcessResult,
   ProcessRunner,
-} from "../utils/types";
+} from "../utils/types.js";
 import { getProjectRootPath } from "../config.js";
 import {
   VersionCommand,

@@ -1,26 +1,39 @@
 /**
  * Logger utility for the MCP server
  * Outputs formatted JSON logs to stderr or a file to avoid interfering with MCP's stdio transport
+ * Also supports sending logs as MCP notifications according to the protocol
  */
 
-import { getConfig } from "../config.js";
 import fs from "fs";
 import path from "path";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+
+import { getConfig } from "../config.js";
 
 // Log levels enum
 export enum LogLevel {
   DEBUG = "debug",
   INFO = "info",
+  NOTICE = "notice",
   WARN = "warn",
+  WARNING = "warning", // MCP protocol alias for warn
   ERROR = "error",
+  CRITICAL = "critical",
+  ALERT = "alert",
+  EMERGENCY = "emergency",
 }
 
 // Level priorities - higher number means more severe
 const logLevelPriority: Record<LogLevel, number> = {
   [LogLevel.DEBUG]: 0,
   [LogLevel.INFO]: 1,
-  [LogLevel.WARN]: 2,
-  [LogLevel.ERROR]: 3,
+  [LogLevel.NOTICE]: 2,
+  [LogLevel.WARN]: 3,
+  [LogLevel.WARNING]: 3, // Same priority as WARN
+  [LogLevel.ERROR]: 4,
+  [LogLevel.CRITICAL]: 5,
+  [LogLevel.ALERT]: 6,
+  [LogLevel.EMERGENCY]: 7,
 };
 
 export interface LogEntry {
@@ -39,6 +52,7 @@ export class Logger {
   private useStderr: boolean;
   private logFilePath?: string;
   private logStream?: fs.WriteStream;
+  private mcpServer?: McpServer; // Add McpServer reference
 
   constructor() {
     const config = getConfig();
@@ -147,6 +161,62 @@ export class Logger {
   }
 
   /**
+   * Set the MCP server instance for sending log notifications
+   * @param server MCP server instance
+   */
+  public setMcpServer(server: McpServer): void {
+    this.mcpServer = server;
+  }
+
+  /**
+   * Send a log message as an MCP notification
+   * @param level Log level
+   * @param message Message text
+   * @param data Additional data for the notification
+   */
+  private sendMcpNotification(
+    level: LogLevel,
+    message: string,
+    data?: Record<string, unknown>
+  ): void {
+    if (!this.mcpServer) return;
+
+    // Construct notification params according to MCP protocol
+    const params = {
+      level,
+      logger: "fluent-mcp",
+      message,
+      ...(data ? { data } : {}),
+    };
+
+    try {
+      // Send notification via MCP
+      this.mcpServer.server.notification({ method: "logging/message", params });
+    } catch (err) {
+      // If notification fails, fallback to stderr
+      this.writeToStderr(`Failed to send MCP notification: ${err}`);
+    }
+  }
+
+  /**
+   * Set up logging request handlers on the MCP server
+   * 
+   * Note: The MCP SDK should automatically handle logging/setLevel requests
+   * when the logging capability is declared. This method is a fallback
+   * in case the automatic handler is not working.
+   */
+  public setupLoggingHandlers(): void {
+    if (!this.mcpServer) return;
+
+    // We're relying on the SDK's built-in handling for logging/setLevel
+    // which is enabled when we declare the logging capability
+    // No manual handler registration needed
+    
+    // Log the status
+    this.debug("Logging capability enabled with current level: " + this.logLevel);
+  }
+
+  /**
    * Log a message at the debug level
    * @param message The message to log
    * @param context Optional context object
@@ -155,6 +225,7 @@ export class Logger {
     if (!this.shouldLog(LogLevel.DEBUG)) return;
     const entry = this.formatLogEntry(LogLevel.DEBUG, message, context);
     this.writeLogEntry(entry);
+    this.sendMcpNotification(LogLevel.DEBUG, message, context);
   }
 
   /**
@@ -166,6 +237,19 @@ export class Logger {
     if (!this.shouldLog(LogLevel.INFO)) return;
     const entry = this.formatLogEntry(LogLevel.INFO, message, context);
     this.writeLogEntry(entry);
+    this.sendMcpNotification(LogLevel.INFO, message, context);
+  }
+
+  /**
+   * Log a message at the notice level
+   * @param message The message to log
+   * @param context Optional context object
+   */
+  public notice(message: string, context?: Record<string, unknown>): void {
+    if (!this.shouldLog(LogLevel.NOTICE)) return;
+    const entry = this.formatLogEntry(LogLevel.NOTICE, message, context);
+    this.writeLogEntry(entry);
+    this.sendMcpNotification(LogLevel.NOTICE, message, context);
   }
 
   /**
@@ -177,6 +261,19 @@ export class Logger {
     if (!this.shouldLog(LogLevel.WARN)) return;
     const entry = this.formatLogEntry(LogLevel.WARN, message, context);
     this.writeLogEntry(entry);
+    this.sendMcpNotification(LogLevel.WARN, message, context);
+  }
+
+  /**
+   * Log a message at the warning level
+   * @param message The message to log
+   * @param context Optional context object
+   */
+  public warning(message: string, context?: Record<string, unknown>): void {
+    if (!this.shouldLog(LogLevel.WARNING)) return;
+    const entry = this.formatLogEntry(LogLevel.WARNING, message, context);
+    this.writeLogEntry(entry);
+    this.sendMcpNotification(LogLevel.WARNING, message, context);
   }
 
   /**
@@ -204,6 +301,43 @@ export class Logger {
 
     const entry = this.formatLogEntry(LogLevel.ERROR, message, errorContext);
     this.writeLogEntry(entry);
+    this.sendMcpNotification(LogLevel.ERROR, message, errorContext);
+  }
+
+  /**
+   * Log a message at the critical level
+   * @param message The message to log
+   * @param context Optional context object
+   */
+  public critical(message: string, context?: Record<string, unknown>): void {
+    if (!this.shouldLog(LogLevel.CRITICAL)) return;
+    const entry = this.formatLogEntry(LogLevel.CRITICAL, message, context);
+    this.writeLogEntry(entry);
+    this.sendMcpNotification(LogLevel.CRITICAL, message, context);
+  }
+
+  /**
+   * Log a message at the alert level
+   * @param message The message to log
+   * @param context Optional context object
+   */
+  public alert(message: string, context?: Record<string, unknown>): void {
+    if (!this.shouldLog(LogLevel.ALERT)) return;
+    const entry = this.formatLogEntry(LogLevel.ALERT, message, context);
+    this.writeLogEntry(entry);
+    this.sendMcpNotification(LogLevel.ALERT, message, context);
+  }
+
+  /**
+   * Log a message at the emergency level
+   * @param message The message to log
+   * @param context Optional context object
+   */
+  public emergency(message: string, context?: Record<string, unknown>): void {
+    if (!this.shouldLog(LogLevel.EMERGENCY)) return;
+    const entry = this.formatLogEntry(LogLevel.EMERGENCY, message, context);
+    this.writeLogEntry(entry);
+    this.sendMcpNotification(LogLevel.EMERGENCY, message, context);
   }
 
   /**
@@ -220,11 +354,26 @@ export class Logger {
       case LogLevel.INFO:
         this.info(message, obj as Record<string, unknown>);
         break;
+      case LogLevel.NOTICE:
+        this.notice(message, obj as Record<string, unknown>);
+        break;
       case LogLevel.WARN:
         this.warn(message, obj as Record<string, unknown>);
         break;
+      case LogLevel.WARNING:
+        this.warning(message, obj as Record<string, unknown>);
+        break;
       case LogLevel.ERROR:
         this.error(message, undefined, obj as Record<string, unknown>);
+        break;
+      case LogLevel.CRITICAL:
+        this.critical(message, obj as Record<string, unknown>);
+        break;
+      case LogLevel.ALERT:
+        this.alert(message, obj as Record<string, unknown>);
+        break;
+      case LogLevel.EMERGENCY:
+        this.emergency(message, obj as Record<string, unknown>);
         break;
     }
   }

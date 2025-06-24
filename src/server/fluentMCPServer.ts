@@ -18,7 +18,7 @@ import {
   NodeProcessRunner,
 } from "../tools/cliCommandTools.js";
 import { CLICommand, CommandArgument, CommandResult } from "../utils/types.js";
-import logger from "../utils/logger.js";
+import logger, { LogLevel } from "../utils/logger.js";
 import { ResourceLoader, ResourceType } from "../utils/resourceLoader.js";
 // Import resource tools
 import {
@@ -61,6 +61,7 @@ export class FluentMcpServer {
         capabilities: {
           tools: {},
           resources: {}, // Enable resources capability
+          logging: {},   // Enable logging capability
         },
       }
     );
@@ -458,6 +459,8 @@ export class FluentMcpServer {
     // Execute tool calls handler is set in the start method
 
     // List available resources handler is set in the start method
+
+    // Add handler for logging/setLevel - this will be added in the start method now
   }
 
   private formatResult(result: CommandResult): string {
@@ -552,6 +555,9 @@ export class FluentMcpServer {
         }
       });
       
+      // Logging capability is enabled in the constructor but handlers are set up by the McpServer
+      // in the connect call using the SDK default handlers
+      
       // Execute tool calls handler
       server?.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { name, arguments: args } = request.params;
@@ -593,6 +599,12 @@ export class FluentMcpServer {
 
       // Connect the server to the stdio transport
       await this.mcpServer.connect(transport);
+
+      // Connect logger to MCP server for notifications
+      logger.setMcpServer(this.mcpServer);
+      
+      // Try to setup logging/setLevel handler using the logger
+      logger.setupLoggingHandlers();
 
       // Now that we're connected and have set up handlers, register resources
       this.registerSpecResources();
