@@ -67,6 +67,17 @@ Note, use `init` command to switch to a working directory for existing Fluent (S
 - `user-preference`: User Preferences
 - `atf`: Automated Test Framework, including 'atf-appnav', 'atf-catalog-action','atf-catalog-validation','atf-catalog-variable','atf-email','atf-form','atf-form-action','atf-form-declarative-action','atf-form-field','atf-reporting','atf-rest-api','atf-rest-assert-payload','atf-server','atf-server-catalog-item','atf-server-record',
 
+## Resources Capabilities
+
+The MCP server provides access to various resources that enhance the development experience with ServiceNow Fluent SDK in addition to the resource Tools for each metadata type per [MCP specification](https://modelcontextprotocol.io/specification/2025-06-18/server). These resources are designed to assist developers and AI models in understanding and implementing ServiceNow features effectively:
+
+- API Specifications (sn-spec://{metadataType}) - These provide detailed technical specifications for ServiceNow metadata types like business rules, script includes, tables, etc. They help AI models understand the capabilities and requirements of each metadata type.
+
+- Code Snippets (sn-snippet://{metadataType}/{snippetId}) - These offer practical examples of how to implement various ServiceNow features. The snippets can be referenced by ID, and the resource handler provides parameter completions to help list available snippets.
+
+- Instructions (sn-instruct://{metadataType}) - These provide guidance and best practices for working with specific ServiceNow metadata types, helping AI models generate more accurate and practical code.
+
+
 ## Requirements
 
 - Node.js 22.15.1 or later
