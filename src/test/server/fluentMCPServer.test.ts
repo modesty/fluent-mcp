@@ -1,0 +1,163 @@
+/**
+ * Tests for FluentMCPServer resource capability with refactored module design
+ */
+import { FluentMcpServer } from "../../server/fluentMCPServer";
+import { ToolsManager } from "../../tools/toolsManager";
+import { ResourceManager } from "../../res/resourceManager";
+import { ServerStatus } from "../../types";
+import { patchLoggerForTests } from "../utils/loggerPatch";
+
+// Mock the Model Context Protocol SDK
+jest.mock("@modelcontextprotocol/sdk/server/mcp.js", () => {
+  // Create mock implementation for the MCP Server
+  const mockRegisterResource = jest.fn();
+  const mockRegisterTool = jest.fn();
+  const mockSetRequestHandler = jest.fn();
+  const mockConnect = jest.fn();
+  const mockClose = jest.fn();
+  const mockNotification = jest.fn();
+  
+  return {
+    McpServer: jest.fn().mockImplementation(() => ({
+      registerResource: mockRegisterResource,
+      registerTool: mockRegisterTool,
+      connect: mockConnect,
+      close: mockClose,
+      server: {
+        setRequestHandler: mockSetRequestHandler,
+        notification: mockNotification
+      }
+    })),
+    ResourceTemplate: jest.fn().mockImplementation((template, options) => ({
+      template,
+      options
+    }))
+  };
+});
+
+// Mock the StdioServerTransport
+jest.mock("@modelcontextprotocol/sdk/server/stdio.js", () => {
+  return {
+    StdioServerTransport: jest.fn().mockImplementation(() => ({}))
+  };
+});
+
+// Mock the config
+jest.mock('../../config.js', () => ({
+  getConfig: jest.fn().mockReturnValue({
+    name: "test-mcp-server",
+    version: "1.0.0",
+    description: "Test MCP Server",
+    resourcePaths: {
+      spec: "/mock/path/to/spec",
+      snippet: "/mock/path/to/snippet",
+      instruct: "/mock/path/to/instruct",
+    }
+  })
+}));
+
+// Mock the ToolsManager
+jest.mock("../../tools/toolsManager.js", () => {
+  return {
+    ToolsManager: jest.fn().mockImplementation(() => ({
+      getMCPTools: jest.fn().mockReturnValue([
+        { id: "mock-tool", title: "Mock Tool", description: "A mock tool for testing" }
+      ]),
+      getCommand: jest.fn().mockImplementation((name) => {
+        if (name === "mock-tool") {
+          return {
+            name: "mock-tool",
+            description: "A mock tool for testing",
+            execute: jest.fn().mockResolvedValue({ success: true, output: "Mock output" })
+          };
+        }
+        return undefined;
+      }),
+      formatResult: jest.fn().mockImplementation((result) => {
+        if (result.success) {
+          return `✅ Command executed successfully\n\nOutput:\n${result.output}`;
+        } else {
+          return `❌ Command failed (exit code: ${result.exitCode})\n\nError:\n${
+            result.error || "Unknown error"
+          }\n\nOutput:\n${result.output}`;
+        }
+      })
+    }))
+  };
+});
+
+// Mock the ResourceManager
+jest.mock("../../res/resourceManager.js", () => {
+  return {
+    ResourceManager: jest.fn().mockImplementation(() => ({
+      initialize: jest.fn().mockResolvedValue(undefined),
+      registerAll: jest.fn(),
+      listResources: jest.fn().mockResolvedValue([
+        {
+          uri: "sn-spec://business-rule",
+          title: "ServiceNow business-rule API Specification",
+          mimeType: "text/markdown"
+        },
+        {
+          uri: "sn-instruct://business-rule",
+          title: "ServiceNow business-rule Instructions",
+          mimeType: "text/markdown"
+        },
+        {
+          uri: "sn-snippet://business-rule/0001",
+          title: "ServiceNow business-rule Code Snippet",
+          mimeType: "text/markdown"
+        }
+      ])
+    }))
+  };
+});
+
+// Mock logger
+jest.mock("../../utils/logger.js", () => {
+  return {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    setMcpServer: jest.fn(),
+    setupLoggingHandlers: jest.fn(),
+    __esModule: true,
+    default: {
+      debug: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      setMcpServer: jest.fn(),
+      setupLoggingHandlers: jest.fn()
+    }
+  };
+});
+
+describe("FluentMcpServer with Modular Design", () => {
+  let server: FluentMcpServer;
+  
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Patch the logger to handle missing notification function
+    patchLoggerForTests();
+    server = new FluentMcpServer();
+  });
+
+  test("should initialize correctly", () => {
+    expect(server).toBeDefined();
+    expect(ToolsManager).toHaveBeenCalled();
+    expect(ResourceManager).toHaveBeenCalled();
+  });
+  
+  test("should start server correctly", async () => {
+    await server.start();
+    expect(server.getStatus()).toBe(ServerStatus.RUNNING);
+  });
+  
+  test("should stop server correctly", async () => {
+    await server.start();
+    await server.stop();
+    expect(server.getStatus()).toBe(ServerStatus.STOPPED);
+  });
+});
