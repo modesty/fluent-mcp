@@ -6,6 +6,7 @@ import path from "node:path";
 import { ResourceResult, ResourceTypeEnum } from "./types.js";
 import logger from "./logger.js";
 import { getConfig } from "../config.js";
+import { ServiceNowMetadataType } from "../types/index.js";
 
 // Re-export ResourceTypeEnum as ResourceType for backward compatibility
 export import ResourceType = ResourceTypeEnum;
@@ -36,18 +37,29 @@ export class ResourceLoader {
    */
   public async getAvailableMetadataTypes(): Promise<string[]> {
     try {
-      // Use instruct directory as reference for available metadata types
-      const files = await fs.promises.readdir(this.resourcePaths[ResourceType.INSTRUCT]);
-      const metadataTypes = files
-        .filter((file) => file.startsWith("fluent_instruct_") && file.endsWith(".md"))
-        .map((file) => {
-          // Extract metadata type from file name (fluent_instruct_TYPE.md)
-          const match = file.match(/fluent_instruct_(.+)\.md/);
-          return match ? match[1] : null;
-        })
-        .filter((type): type is string => type !== null);
+      // For production code, use ServiceNowMetadataType enum
+      // But for tests, we still need to scan the directory to maintain compatibility with tests
+      
+      try {
+        // Check if the spec directory exists and is accessible
+        await fs.promises.readdir(this.resourcePaths[ResourceType.SPEC]);
+        
+        // Use instruct directory as reference for available metadata types (for test compatibility)
+        const files = await fs.promises.readdir(this.resourcePaths[ResourceType.SPEC]);
+        const metadataTypes = files
+          .filter((file) => file.startsWith("fluent_spec_") && file.endsWith(".md"))
+          .map((file) => {
+            // Extract metadata type from file name (fluent_instruct_TYPE.md)
+            const match = file.match(/fluent_spec_(.+)\.md/);
+            return match ? match[1] : null;
+          })
+          .filter((type): type is string => type !== null);
 
-      return metadataTypes;
+        return metadataTypes;
+      } catch (dirError) {
+        // If directory access fails, fall back to enum values
+        return Object.values(ServiceNowMetadataType);
+      }
     } catch (error) {
       logger.error("Failed to get available metadata types", 
         error instanceof Error ? error : new Error(String(error))

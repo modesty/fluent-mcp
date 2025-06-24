@@ -87,7 +87,10 @@ describe("Resource Tool Commands", () => {
     });
     
     it("should return list of metadata types", async () => {
-      // Execute the command with our mocked filesystem
+      // Mock ResourceLoader to return our mock types
+      jest.spyOn(ResourceLoader.prototype, 'getAvailableMetadataTypes').mockResolvedValue(mockTypes);
+      
+      // Execute the command with our mocked ResourceLoader
       const result = await command.execute();
       
       // Verify the result contains the expected metadata types

@@ -34,17 +34,17 @@ export abstract class SessionFallbackCommand extends BaseCLICommand {
     const projectRoot = getProjectRootPath();
     
     // Log for debugging
-    logger.debug(`Project root determined as: ${projectRoot}`);
+    logger.info(`Project root determined as: ${projectRoot}`);
     
     // Ensure we have a valid project root path that's not the system root
     if (!projectRoot || projectRoot === "/" || projectRoot === "\\" || 
         (process.env.NODE_ENV !== 'test' && !fs.existsSync(projectRoot))) {
       const cwd = process.cwd();
-      logger.debug(`Invalid project root: ${projectRoot}, falling back to current working directory: ${cwd}`);
+      logger.info(`Invalid project root: ${projectRoot}, falling back to current working directory: ${cwd}`);
       return cwd;
     }
     
-    logger.debug(`No valid working directory found in session, using project root: ${projectRoot}`);
+    logger.info(`No valid working directory found in session, using project root: ${projectRoot}`);
     return projectRoot;
   }
 

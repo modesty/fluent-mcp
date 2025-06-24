@@ -1,6 +1,3 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import logger from "./logger.js";
 
 /**
@@ -16,25 +13,16 @@ export interface SessionData {
 /**
  * Manager for Fluent SDK session data
  * Handles storage and retrieval of session information like working directory
+ * All session data is kept in memory only (not persisted to filesystem)
  */
 export class SessionManager {
   private static instance: SessionManager;
   private sessionData: SessionData = {};
-  private readonly sessionFilePath: string;
 
   private constructor() {
-    // Create .fluent directory in user's home if it doesn't exist
-    const fluentDir = path.join(os.homedir(), ".fluent");
-    if (!fs.existsSync(fluentDir)) {
-      try {
-        fs.mkdirSync(fluentDir, { recursive: true });
-      } catch (error) {
-        logger.error(`Failed to create .fluent directory: ${error}`);
-      }
-    }
-
-    this.sessionFilePath = path.join(fluentDir, "session.json");
-    this.loadSession();
+    // Initialize with empty session data - in-memory only
+    this.resetSession();
+    logger.debug("Session manager initialized with in-memory storage");
   }
 
   /**
@@ -49,31 +37,11 @@ export class SessionManager {
   }
 
   /**
-   * Load session data from file
+   * Reset the session data to empty state
    */
-  private loadSession(): void {
-    try {
-      if (fs.existsSync(this.sessionFilePath)) {
-        const data = fs.readFileSync(this.sessionFilePath, "utf-8");
-        this.sessionData = JSON.parse(data);
-        logger.debug(`Session loaded: ${JSON.stringify(this.sessionData)}`);
-      }
-    } catch (error) {
-      logger.error(`Failed to load session data: ${error}`);
-      this.sessionData = {};
-    }
-  }
-
-  /**
-   * Save session data to file
-   */
-  private saveSession(): void {
-    try {
-      fs.writeFileSync(this.sessionFilePath, JSON.stringify(this.sessionData, null, 2), "utf-8");
-      logger.debug(`Session saved: ${JSON.stringify(this.sessionData)}`);
-    } catch (error) {
-      logger.error(`Failed to save session data: ${error}`);
-    }
+  private resetSession(): void {
+    this.sessionData = {};
+    logger.debug("Session data reset");
   }
 
   /**
@@ -90,14 +58,14 @@ export class SessionManager {
    */
   public setWorkingDirectory(directory: string): void {
     this.sessionData.workingDirectory = directory;
-    this.saveSession();
+    logger.debug(`Working directory set: ${directory}`);
   }
 
   /**
    * Clear the session data
    */
   public clearSession(): void {
-    this.sessionData = {};
-    this.saveSession();
+    this.resetSession();
+    logger.debug("Session data cleared");
   }
 }

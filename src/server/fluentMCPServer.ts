@@ -65,38 +65,22 @@ export class FluentMcpServer {
       }
     );
 
-    // Register tools and resources
-    this.registerTools();
-    this.setupHandlers();
+    // Register tools and setup handlers at last
+    // Both setRequestHandler and registerTool/registerResource should be called only once
+    this.registerSdkCommandTools();
+    this.registerResourceTools();
+    this.registerResources().then(() => {
+      // Now that all tools and resources are registered, we can set up the handlers
+      this.setupHandlers();
+    });
   }
 
   /**
-   * Register all MCP tools for ServiceNow SDK
+   * Register all MCP tools for ServiceNow SDK - NOT USED ANYMORE
+   * Tools are now registered directly in the constructor
    */
   private registerTools(): void {
-    if (!this.mcpServer) {
-      const error = new Error("MCP server not initialized");
-      logger.error("Failed to register tools", error);
-      throw error;
-    }
-
-    try {
-      // Register ServiceNow SDK CLI command tools
-      this.registerSdkCommandTools();
-
-      // Register resource access tools
-      this.registerResourceTools();
-
-      // Register metadata resources
-      this.registerResources();
-
-      logger.debug("All tools and resources registered successfully");
-    } catch (error) {
-      logger.error("Error registering tools and resources",
-        error instanceof Error ? error : new Error(String(error))
-      );
-      throw error;
-    }
+    logger.warn("registerTools method is deprecated and no longer used.");
   }
 
   /**
@@ -249,6 +233,7 @@ export class FluentMcpServer {
 
   /**
    * Register ServiceNow metadata resources that can be accessed through MCP resources
+   * Only load metadata types here - actual resource registration happens after setRequestHandler in start()
    */
   private async registerResources(): Promise<void> {
     if (!this.mcpServer) return;
@@ -256,15 +241,9 @@ export class FluentMcpServer {
     try {
       // Get available metadata types
       this.metadataTypes = await this.resourceLoader.getAvailableMetadataTypes();
-      
-      // Register a resource template for each resource type
-      this.registerSpecResources();
-      this.registerSnippetResources();
-      this.registerInstructResources();
-      
-      logger.debug(`Registered resources for ${this.metadataTypes.length} metadata types`);
+      logger.debug(`Loaded ${this.metadataTypes.length} metadata types for resources`);
     } catch (error) {
-      logger.error("Error registering resources",
+      logger.error("Error loading metadata types",
         error instanceof Error ? error : new Error(String(error))
       );
       throw error;
@@ -474,103 +453,11 @@ export class FluentMcpServer {
 
   private setupHandlers(): void {
     const server = this.mcpServer?.server;
-    // List available tools
-    server?.setRequestHandler(ListToolsRequestSchema, async () => {
-      return {
-        tools: this.commandRegistry.toMCPTools(),
-      };
-    });
+    // List available tools handler is set in the start method
 
-    // Execute tool calls
-    server?.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const { name, arguments: args } = request.params;
+    // Execute tool calls handler is set in the start method
 
-      const command = this.commandRegistry.getCommand(name);
-      if (!command) {
-        throw new Error(`Unknown command: ${name}`);
-      }
-
-      try {
-        const result = await command.execute(args || {});
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: this.formatResult(result),
-            },
-          ],
-        } as CallToolResult;
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Error: ${errorMessage}`,
-            },
-          ],
-          isError: true,
-        } as CallToolResult;
-      }
-    });
-
-    // List available resources
-    server?.setRequestHandler(ListResourcesRequestSchema, async () => {
-      try {
-        // Get metadata types to build resource URIs
-        if (!this.metadataTypes || this.metadataTypes.length === 0) {
-          this.metadataTypes = await this.resourceLoader.getAvailableMetadataTypes();
-        }
-        
-        const resources = [];
-        
-        // Add spec resources
-        for (const type of this.metadataTypes) {
-          resources.push({
-            uri: `sn-spec://${type}`,
-            title: `ServiceNow ${type} API Specification`,
-            mimeType: "text/markdown"
-          });
-        }
-        
-        // Add instruction resources
-        for (const type of this.metadataTypes) {
-          resources.push({
-            uri: `sn-instruct://${type}`,
-            title: `ServiceNow ${type} Instructions`,
-            mimeType: "text/markdown"
-          });
-        }
-        
-        // For snippets, use the first one of each type
-        for (const type of this.metadataTypes) {
-          try {
-            const snippetIds = await this.resourceLoader.listSnippets(type);
-            if (snippetIds.length > 0) {
-              resources.push({
-                uri: `sn-snippet://${type}/${snippetIds[0]}`,
-                title: `ServiceNow ${type} Code Snippet`,
-                mimeType: "text/markdown"
-              });
-            }
-          } catch (error) {
-            logger.error(`Error listing snippets for ${type}`,
-              error instanceof Error ? error : new Error(String(error))
-            );
-          }
-        }
-        
-        return { resources };
-      } catch (error) {
-        logger.error("Error listing resources", 
-          error instanceof Error ? error : new Error(String(error))
-        );
-        return { resources: [] };
-      }
-    });
+    // List available resources handler is set in the start method
   }
 
   private formatResult(result: CommandResult): string {
@@ -600,11 +487,117 @@ export class FluentMcpServer {
         throw new Error("MCP server not properly initialized");
       }
 
+      // Set up handlers required by the MCP protocol
+      const server = this.mcpServer.server;
+      
+      // Set up the tools/list handler
+      server?.setRequestHandler(ListToolsRequestSchema, async () => {
+        return {
+          tools: this.commandRegistry.toMCPTools(),
+        };
+      });
+
+      // Set up the resources/list handler
+      server?.setRequestHandler(ListResourcesRequestSchema, async () => {
+        try {
+          // Get metadata types to build resource URIs
+          if (!this.metadataTypes || this.metadataTypes.length === 0) {
+            this.metadataTypes = await this.resourceLoader.getAvailableMetadataTypes();
+          }
+          
+          const resources = [];
+          
+          // Add spec resources
+          for (const type of this.metadataTypes) {
+            resources.push({
+              uri: `sn-spec://${type}`,
+              title: `ServiceNow ${type} API Specification`,
+              mimeType: "text/markdown"
+            });
+          }
+          
+          // Add instruction resources
+          for (const type of this.metadataTypes) {
+            resources.push({
+              uri: `sn-instruct://${type}`,
+              title: `ServiceNow ${type} Instructions`,
+              mimeType: "text/markdown"
+            });
+          }
+          
+          // For snippets, use the first one of each type
+          for (const type of this.metadataTypes) {
+            try {
+              const snippetIds = await this.resourceLoader.listSnippets(type);
+              if (snippetIds.length > 0) {
+                resources.push({
+                  uri: `sn-snippet://${type}/${snippetIds[0]}`,
+                  title: `ServiceNow ${type} Code Snippet`,
+                  mimeType: "text/markdown"
+                });
+              }
+            } catch (error) {
+              logger.error(`Error listing snippets for ${type}`,
+                error instanceof Error ? error : new Error(String(error))
+              );
+            }
+          }
+          
+          return { resources };
+        } catch (error) {
+          logger.error("Error listing resources", 
+            error instanceof Error ? error : new Error(String(error))
+          );
+          return { resources: [] };
+        }
+      });
+      
+      // Execute tool calls handler
+      server?.setRequestHandler(CallToolRequestSchema, async (request) => {
+        const { name, arguments: args } = request.params;
+
+        const command = this.commandRegistry.getCommand(name);
+        if (!command) {
+          throw new Error(`Unknown command: ${name}`);
+        }
+
+        try {
+          const result = await command.execute(args || {});
+
+          return {
+            content: [
+              {
+                type: "text",
+                text: this.formatResult(result),
+              },
+            ],
+          } as CallToolResult;
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Error: ${errorMessage}`,
+              },
+            ],
+            isError: true,
+          } as CallToolResult;
+        }
+      });
+
       // Create stdio transport for communication
       const transport = new StdioServerTransport();
 
       // Connect the server to the stdio transport
       await this.mcpServer.connect(transport);
+
+      // Now that we're connected and have set up handlers, register resources
+      this.registerSpecResources();
+      this.registerSnippetResources();
+      this.registerInstructResources();
 
       logger.info("MCP server initialized and connected via stdio");
       this.status = ServerStatus.RUNNING;

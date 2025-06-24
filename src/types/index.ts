@@ -52,6 +52,6 @@ export enum ResourceType {
 /**
  * Export all types from the server, tools, and utils
  */
-export * from '../server/types';
-export * from '../tools/types';
-export * from '../utils/types';
+export * from '../server/types.js';
+export * from '../tools/types.js';
+export * from '../utils/types.js';
