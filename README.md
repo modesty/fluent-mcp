@@ -69,13 +69,65 @@ Note, use `init` command to switch to a working directory for existing Fluent (S
 
 ## Resources Capabilities
 
-The MCP server provides access to various resources that enhance the development experience with ServiceNow Fluent SDK in addition to the resource Tools for each metadata type per [MCP specification](https://modelcontextprotocol.io/specification/2025-06-18/server). These resources are designed to assist developers and AI models in understanding and implementing ServiceNow features effectively:
+The MCP server provides access to various resources that enhance the development experience with ServiceNow Fluent SDK. These resources are designed to assist developers and AI models in understanding and implementing ServiceNow features effectively:
 
-- API Specifications (sn-spec://{metadataType}) - These provide detailed technical specifications for ServiceNow metadata types like business rules, script includes, tables, etc. They help AI models understand the capabilities and requirements of each metadata type.
+### Resource URI Formats
 
-- Code Snippets (sn-snippet://{metadataType}/{snippetId}) - These offer practical examples of how to implement various ServiceNow features. The snippets can be referenced by ID, and the resource handler provides parameter completions to help list available snippets.
+All resources follow standardized URI patterns according to the [MCP specification](https://modelcontextprotocol.io/specification/2025-06-18/server):
 
-- Instructions (sn-instruct://{metadataType}) - These provide guidance and best practices for working with specific ServiceNow metadata types, helping AI models generate more accurate and practical code.
+1. **API Specifications**: `sn-spec://{metadataType}`
+   - Example: `sn-spec://business-rule`
+   - Provides detailed technical specifications for ServiceNow metadata types
+   - Contains complete API documentation with parameter descriptions and usage guidelines
+
+2. **Instructions**: `sn-instruct://{metadataType}`
+   - Example: `sn-instruct://script-include`
+   - Offers guidance and best practices for working with specific metadata types
+   - Includes implementation notes and considerations
+
+3. **Code Snippets**: `sn-snippet://{metadataType}/{snippetId}`
+   - Example: `sn-snippet://acl/0001`
+   - Presents practical examples of how to implement various ServiceNow features
+   - Multiple snippets may be available for each metadata type (with different IDs)
+   - Supports auto-completion for available snippet IDs
+
+### Resource Navigation
+
+Resources can be discovered and accessed in two ways:
+
+1. **Direct URI access**: Use the URI formats above to directly access a specific resource
+2. **Resource listing**: Query available resources using the `resources/list` method
+   - Returns all available resources with their URIs, titles, and MIME types
+   - Resources can be filtered by metadata type
+
+### Resource Content
+
+All resources are returned as Markdown text, which includes:
+
+- Detailed technical documentation for API specifications
+- Implementation guidelines for instructions
+- Well-commented code examples for snippets
+
+### Available Resource Types
+
+The following ServiceNow metadata types are supported across all resource categories:
+
+- `acl`: Access Control Lists
+- `application-menu`: Application Menus
+- `business-rule`: Business Rules
+- `client-script`: Client Scripts
+- `cross-scope-privilege`: Cross Scope Privileges
+- `form`: Forms
+- `list`: Lists
+- `property`: System Properties
+- `role`: Roles
+- `scheduled-script`: Scheduled Scripts
+- `script-include`: Script Includes
+- `scripted-rest`: Scripted REST APIs
+- `table`: Tables
+- `ui-action`: UI Actions
+- `user-preference`: User Preferences
+- `atf-*`: Various Automated Test Framework types (appnav, catalog-action, form, etc.)
 
 
 ## Requirements
@@ -206,6 +258,28 @@ To configure the Fluent MCP Server for Windsurf:
 * Show the help on how to authenticate to ServiceNow instance using Fluent
 * Authenticate me to http://localhost:8080 with my credentials
 ```
+
+## Testing Resource URIs
+
+You can test the MCP server's resource capability in two ways:
+
+### Using the Jest Test Suite
+
+Run the resource URI tests to verify resource access:
+
+```bash
+npm test -- src/test/resourceUri.test.ts
+```
+
+### Using Claude Desktop App
+
+1. Configure Claude Desktop with your MCP server (see "Claude Desktop / Claude on macOS" section above)
+2. Start a new chat in Claude and test resource access with prompts like:
+   - "What ServiceNow API specifications do you have available?"
+   - "Show me the resource at sn-spec://business-rule"
+   - "Do you have any snippets for ServiceNow tables?"
+
+When testing with Claude Desktop, check the MCP server logs (typically in `~/Library/Logs/Claude/mcp-server-fluent-mcp.log`) to see the actual resource requests being processed.
 
 ## License
 
