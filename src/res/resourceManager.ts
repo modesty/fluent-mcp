@@ -56,8 +56,8 @@ export class ResourceManager {
         `sn-spec-${type}`,
         template,
         {
-          title: `ServiceNow ${type} API Specification`,
-          description: `API specification for ServiceNow ${type}`,
+          title: `${type} API Specification for Fluent (ServiceNow SDK)`,
+          description: `API specification for Fluent (ServiceNow SDK) ${type}`,
           mimeType: "text/markdown"
         },
         async (uri: URL) => {
@@ -133,8 +133,8 @@ export class ResourceManager {
         `sn-snippet-${type}`,
         template,
         {
-          title: `ServiceNow ${type} Code Snippets`,
-          description: `Example code snippets for ServiceNow ${type}`,
+          title: `${type} Code Snippets for Fluent (ServiceNow SDK)`,
+          description: `Example code snippets for Fluent (ServiceNow SDK) ${type}`,
           mimeType: "text/markdown"
         },
         async (uri: URL, extra: any) => {
@@ -196,8 +196,8 @@ export class ResourceManager {
         `sn-instruct-${type}`,
         template,
         {
-          title: `ServiceNow ${type} Instructions`,
-          description: `Development instructions for ServiceNow ${type}`,
+          title: `${type} Instructions for Fluent (ServiceNow SDK)`,
+          description: `Development instructions for Fluent (ServiceNow SDK) ${type}`,
           mimeType: "text/markdown"
         },
         async (uri: URL) => {
@@ -262,7 +262,7 @@ export class ResourceManager {
       for (const type of this.metadataTypes) {
         resources.push({
           uri: `sn-spec://${type}`,
-          title: `ServiceNow ${type} API Specification`,
+          title: `${type} API Specification for Fluent (ServiceNow SDK) `,
           mimeType: "text/markdown"
         });
       }
@@ -271,7 +271,7 @@ export class ResourceManager {
       for (const type of this.metadataTypes) {
         resources.push({
           uri: `sn-instruct://${type}`,
-          title: `ServiceNow ${type} Instructions`,
+          title: `${type} Instructions for Fluent (ServiceNow SDK)`,
           mimeType: "text/markdown"
         });
       }
@@ -283,7 +283,7 @@ export class ResourceManager {
           if (snippetIds.length > 0) {
             resources.push({
               uri: `sn-snippet://${type}/${snippetIds[0]}`,
-              title: `ServiceNow ${type} Code Snippet`,
+              title: `${type} Code Snippet for Fluent (ServiceNow SDK)`,
               mimeType: "text/markdown"
             });
           }

@@ -53,7 +53,8 @@ jest.mock('../../config.js', () => ({
       snippet: "/mock/path/to/snippet",
       instruct: "/mock/path/to/instruct",
     }
-  })
+  }),
+  getProjectRootPath: jest.fn().mockReturnValue("/mock/project/root")
 }));
 
 // Mock the ToolsManager
@@ -95,17 +96,17 @@ jest.mock("../../res/resourceManager.js", () => {
       listResources: jest.fn().mockResolvedValue([
         {
           uri: "sn-spec://business-rule",
-          title: "ServiceNow business-rule API Specification",
+          title: "business-rule API Specification for Fluent (ServiceNow SDK)",
           mimeType: "text/markdown"
         },
         {
           uri: "sn-instruct://business-rule",
-          title: "ServiceNow business-rule Instructions",
+          title: "business-rule Instructions for Fluent (ServiceNow SDK)",
           mimeType: "text/markdown"
         },
         {
           uri: "sn-snippet://business-rule/0001",
-          title: "ServiceNow business-rule Code Snippet",
+          title: "business-rule Code Snippet for Fluent (ServiceNow SDK)",
           mimeType: "text/markdown"
         }
       ])

@@ -110,6 +110,29 @@ export class LoggingManager {
       error instanceof Error ? error : new Error(String(error))
     );
   }
+
+  /**
+   * Log prompt listing failed
+   * @param error The error that occurred
+   */
+  logPromptListingFailed(error: unknown): void {
+    logger.error(
+      "Failed to list prompts",
+      error instanceof Error ? error : new Error(String(error))
+    );
+  }
+
+  /**
+   * Log prompt retrieval failed
+   * @param promptName The name of the prompt that failed to retrieve
+   * @param error The error that occurred
+   */
+  logPromptRetrievalFailed(promptName: string, error: unknown): void {
+    logger.error(
+      `Failed to get prompt '${promptName}'`,
+      error instanceof Error ? error : new Error(String(error))
+    );
+  }
 }
 
 // Create and export a singleton instance

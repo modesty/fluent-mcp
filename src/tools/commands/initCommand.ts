@@ -147,7 +147,7 @@ export class InitCommand extends BaseCLICommand {
     sessionManager.setWorkingDirectory(workingDirectory);
 
     // Prepare the init command
-    const sdkArgs = ["now-sdk", "init"];
+    const sdkArgs = ["@servicenow/sdk", "init"];
     
     // Add optional arguments if provided
     if (args.from) {

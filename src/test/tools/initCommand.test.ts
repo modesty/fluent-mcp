@@ -132,7 +132,7 @@ describe("InitCommand", () => {
     expect(mockExecutor.execute).toHaveBeenCalledWith(
       'npx',
       [
-        'now-sdk', 
+        '@servicenow/sdk', 
         'init', 
         '--from', 'template-id',
         '--appName', 'Test App',

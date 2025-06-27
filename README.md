@@ -46,6 +46,7 @@ Note, use `init` command to switch to a working directory for existing Fluent (S
 | `get-api-spec` | Get API specification for a ServiceNow metadata type | `metadataType`: The metadata type to get specifications for |
 | `get-snippet` | Get code snippet for a ServiceNow metadata type | `metadataType`: The metadata type to get snippets for, `id`: (Optional) Specific snippet ID to retrieve |
 | `get-instruct` | Get instructions for a ServiceNow metadata type | `metadataType`: The metadata type to get instructions for |
+| `get-prompt` | Get specialized prompts for ServiceNow Fluent development | `promptId`: The ID of the prompt to retrieve (e.g., `coding_in_fluent`) |
 | `list-metadata-types` | List all available ServiceNow metadata types | None |
 
 ### Supported Metadata Types
@@ -91,6 +92,11 @@ All resources follow standardized URI patterns according to the [MCP specificati
    - Multiple snippets may be available for each metadata type (with different IDs)
    - Supports auto-completion for available snippet IDs
 
+4. **Prompts**: `sn-prompt://{promptId}`
+   - Example: `sn-prompt://coding_in_fluent`
+   - Provides comprehensive guides and best practices for Fluent development
+   - Contains detailed information on coding patterns, standards, and recommendations
+
 ### Resource Navigation
 
 Resources can be discovered and accessed in two ways:
@@ -108,36 +114,138 @@ All resources are returned as Markdown text, which includes:
 - Implementation guidelines for instructions
 - Well-commented code examples for snippets
 
-### Available Resource Types
+### Prompt Capabilities
 
-The following ServiceNow metadata types are supported across all resource categories:
+The MCP server also provides access to specialized prompts that enhance the development experience with ServiceNow Fluent SDK:
 
-- `acl`: Access Control Lists
-- `application-menu`: Application Menus
-- `business-rule`: Business Rules
-- `client-script`: Client Scripts
-- `cross-scope-privilege`: Cross Scope Privileges
-- `form`: Forms
-- `list`: Lists
-- `property`: System Properties
-- `role`: Roles
-- `scheduled-script`: Scheduled Scripts
-- `script-include`: Script Includes
-- `scripted-rest`: Scripted REST APIs
-- `table`: Tables
-- `ui-action`: UI Actions
-- `user-preference`: User Preferences
-- `atf-*`: Various Automated Test Framework types (appnav, catalog-action, form, etc.)
+#### Available Prompts
 
+| Prompt Name | Description | URI Format |
+|-------------|-------------|------------|
+| `Coding in Fluent` | General guide for coding in ServiceNow Fluent | `sn-prompt://coding_in_fluent` |
+
+#### Prompt Content
+
+The `Coding in Fluent` prompt includes:
+
+- Introduction to Fluent (ServiceNow SDK) features and benefits
+- Key concepts in Fluent development
+- Syntax guidelines and best practices
+- Tips for working with specific metadata types
+- Examples of proper Fluent code patterns
+- Common pitfalls to avoid
+
+This prompt is particularly useful for developers new to Fluent or those looking for a quick reference on Fluent coding standards.
 
 ## Requirements
 
 - Node.js 22.15.1 or later
 - npm 11.4.1 or later
 
-## Configuring with AI Tools
+## Configuration with AI Tools
 
-To configure the Fluent MCP Server for use with VSCode Agent mode (such as with GitHub Copilot or CodeLlama):
+### Claude Desktop / Claude on macOS
+
+To configure the Fluent MCP Server for Claude Desktop:
+
+1. Configure Claude Desktop to use the MCP server:
+
+   - Settings > Developers
+   - Add a new MCP Server with configuration:
+
+```json
+{
+ "mcpServers": {
+   "fluent-mcp": {
+     "command": "npx",
+     "args": [
+       "@modesty/fluent-mcp"
+     ]
+   }
+ }
+}
+```
+
+When testing with Claude Desktop, check the MCP server logs (typically in `~/Library/Logs/Claude/mcp-server-fluent-mcp.log`) to see the actual resource requests being processed.
+
+Example usage in Clause Desktop Chat:
+
+#### Domain-Driven Business Rule
+
+Prompt:
+"I'm building a ServiceNow application for IT asset management. Using Fluent, help me design and implement a domain-driven business rule for the following scenario:
+When an IT asset (like a laptop) is assigned to an employee, I need to:
+
+Validate the asset is available and not already assigned
+Update the asset status to 'In Use'
+Create an audit trail entry
+Notify the asset manager if it's a high-value asset (>$2000)
+
+Please show me the business rule structure using Fluent's TypeScript API, following SOLID principles. Think of this like designing a service layer in a traditional enterprise application - how would you structure the business logic to be maintainable and testable?"
+
+#### Legacy Application Modernization with Transform
+
+Prompt:
+"I have a legacy ServiceNow application with scattered XML customizations that violate SOLID principles. Using Fluent MCP's transform capabilities, help me:
+
+Transform the existing XML-based business rules into modern TypeScript code
+Refactor the code to follow single responsibility principle
+Show me how to extract reusable script includes for common operations
+
+Use the transform command to convert my existing 'Incident Management' customizations, then demonstrate how to restructure them using proper separation of concerns - like how you'd refactor a monolithic service into microservices."
+
+#### Test-Driven Development with ATF Integration
+
+Prompt:
+"Using Fluent MCP tools, help me set up a test-driven development workflow for ServiceNow. I want to:
+
+Create a new application for 'Employee Onboarding'
+Set up the project structure with proper dependency management
+Show me how to write ATF tests for business rules before implementing them
+Demonstrate the build and install process
+
+Think of this like setting up a new Spring Boot project with Maven - show me the equivalent best practices for ServiceNow development using Fluent SDK."
+
+#### API-First Development with Scripted REST
+
+Prompt:
+
+"Help me design and implement a RESTful API for a ServiceNow application using Fluent MCP tools. The API should handle 'Project Management' operations:
+
+GET /projects - list all projects
+POST /projects - create new project
+PUT /projects/{id} - update project
+DELETE /projects/{id} - delete project
+
+Show me how to:
+
+Use the scripted-rest metadata type to define the API endpoints
+Implement proper error handling and validation
+Follow REST best practices and HTTP status codes
+Structure the code using dependency injection patterns
+
+This should be like building a REST controller in Spring Boot - clean, testable, and following OpenAPI standards."
+
+#### Full-Stack Application Development Pipeline
+
+Prompt:
+"Using all Fluent MCP capabilities, walk me through creating a complete ServiceNow application from scratch. I want to build a 'Vendor Management' system with:
+
+Custom tables for vendors, contracts, and purchase orders
+Business rules for validation and workflow
+Client scripts for UI interactions
+REST APIs for external integration
+Proper authentication and authorization
+
+Show me the complete development workflow:
+
+Initialize the project with proper structure
+Set up dependencies and build configuration
+Implement the domain models and business logic
+Create the UI components and forms
+Build and deploy to a development instance
+
+Think of this as building a full-stack application with proper CI/CD pipeline - what would be the ServiceNow equivalent using Fluent SDK?"
 
 ### VSCode GitHub Copilot Agent Mode
 
@@ -162,63 +270,57 @@ To configure the Fluent MCP Server for use with VSCode Agent mode (such as with 
 }
 ```
 
-Example usage in VS Code Agent Chat:
+### Example usage in VS Code Agent Chat:
 
-```text
-Please create a business rule for ServiceNow that validates a record before insert.
-```
+#### Script Include Dependency Pattern
 
-### Claude Desktop / Claude on macOS
+Prompt:
+"Create a UserService script include that depends on a BaseService script include. Show the TypeScript API calls for both, implementing constructor injection pattern. Use get-api-spec script-include to verify the structure."
 
-To configure the Fluent MCP Server for Claude Desktop:
 
-1. Configure Claude Desktop to use the MCP server:
+#### Multi-Environment Auth Setup
 
-   - Settings > Developers
-   - Add a new MCP Server with configuration:
+Prompt:
+"Configure auth profiles for dev/test/prod environments, then create a build script that deploys to each sequentially. Handle auth failures with rollback. Show the exact manage_fluent_auth and fluent_install commands."
 
-     ```json
-     {
-      "mcpServers": {
-        "fluent-mcp": {
-          "command": "npx",
-          "args": [
-            "@modesty/fluent-mcp"
-          ]
-        }
-      }
-    }
+#### Form Field Validation Chain
 
-    ```
+Prompt:
+"Create 3 client scripts: onChange validation for 'priority' field, onLoad to set field states, onSubmit for final validation. Make them work together using shared utility functions. Use the client-script API spec."
 
-Example usage in Claude Desktop:
+#### Legacy Code Transformation
 
-```text
-- I need to create a ServiceNow client script that validates a field value. Can you help me with that?
-```
+Prompt:
+"Transform existing business rules from instance using fluent_transform, identify SOLID violations, refactor into separate script includes, then rebuild. Show the complete transform → refactor → build workflow."
+
+
+#### Business Rule Error Handling
+
+Prompt:
+"Create before/after/async business rules for incident creation with proper error handling, logging, and transaction rollback. Show how to coordinate execution order and handle failures gracefully."
 
 ### Cursor
 
 To configure the Fluent MCP Server for Cursor:
 
-1. Add a new MCP Server with the following configuration: 
-
+1. Add a new MCP Server with the following configuration:
+   
    - Open Cursor settings
    - Navigate to MCP Servers
    - Add a new MCP Server with the following configuration:
 
-     ```json
-     {
-      "mcpServers": {
-        "fluent-mcp": {
-          "command": "npx",
-          "args": [
-            "@modesty/fluent-mcp"
-          ]
-        }
-      }
-    }
-    ```
+```json
+{
+ "mcpServers": {
+   "fluent-mcp": {
+     "command": "npx",
+     "args": [
+       "@modesty/fluent-mcp"
+     ]
+   }
+ }
+}
+```
 
 Example usage in Cursor:
 
@@ -270,16 +372,6 @@ Run the resource URI tests to verify resource access:
 ```bash
 npm test -- src/test/resourceUri.test.ts
 ```
-
-### Using Claude Desktop App
-
-1. Configure Claude Desktop with your MCP server (see "Claude Desktop / Claude on macOS" section above)
-2. Start a new chat in Claude and test resource access with prompts like:
-   - "What ServiceNow API specifications do you have available?"
-   - "Show me the resource at sn-spec://business-rule"
-   - "Do you have any snippets for ServiceNow tables?"
-
-When testing with Claude Desktop, check the MCP server logs (typically in `~/Library/Logs/Claude/mcp-server-fluent-mcp.log`) to see the actual resource requests being processed.
 
 ## License
 

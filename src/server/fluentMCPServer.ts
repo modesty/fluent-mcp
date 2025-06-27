@@ -5,6 +5,8 @@ import {
   ListToolsRequestSchema,
   CallToolResult,
   ListResourcesRequestSchema,
+  ListPromptsRequestSchema,
+  GetPromptRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { getConfig } from "../config.js";
@@ -13,17 +15,19 @@ import { CommandResult } from "../utils/types.js";
 import loggingManager from "../utils/loggingManager.js";
 import { ToolsManager } from "../tools/toolsManager.js";
 import { ResourceManager } from "../res/resourceManager.js";
+import { PromptManager } from "../prompts/promptManager.js";
 
 /**
- * Implementation of the Model Context Protocol server for ServiceNow SDK
+ * Implementation of the Model Context Protocol server for Fluent (ServiceNow SDK) 
  *
- * This server provides ServiceNow SDK functionality to AI assistants and developers
+ * This server provides Fluent (ServiceNow SDK) functionality to AI assistants and developers
  * through the standardized Model Context Protocol interface.
  */
 export class FluentMcpServer {
   private mcpServer: McpServer;
   private toolsManager: ToolsManager;
   private resourceManager: ResourceManager;
+  private promptManager: PromptManager;
   private status: ServerStatus = ServerStatus.STOPPED;
 
   /**
@@ -45,17 +49,24 @@ export class FluentMcpServer {
           tools: {},
           resources: {}, // Enable resources capability
           logging: {},   // Enable logging capability
+          prompts: {
+            listChanged: true, // Enable prompt list change notifications
+          },
         },
       }
     );
 
-    // Initialize managers for tools and resources
+    // Initialize managers for tools, resources, and prompts
     this.toolsManager = new ToolsManager(this.mcpServer);
     this.resourceManager = new ResourceManager(this.mcpServer);
+    this.promptManager = new PromptManager(this.mcpServer);
 
-    // Initialize resources
-    this.resourceManager.initialize().then(() => {
-      // Now that all tools and resources are registered, we can set up the handlers
+    // Initialize resources and prompts
+    Promise.all([
+      this.resourceManager.initialize(),
+      this.promptManager.initialize()
+    ]).then(() => {
+      // Now that all tools, resources, and prompts are registered, we can set up the handlers
       this.setupHandlers();
     });
   }
@@ -76,7 +87,7 @@ export class FluentMcpServer {
   }
 
   /**
-   * Set up MCP protocol handlers for tools, resources, and logging
+   * Set up MCP protocol handlers for tools, resources, prompts, and logging
    */
   private setupHandlers(): void {
     const server = this.mcpServer?.server;
@@ -99,6 +110,9 @@ export class FluentMcpServer {
         return { resources: [] };
       }
     });
+    
+    // Set up prompts handlers
+    this.promptManager.setupHandlers();
     
     // Execute tool calls handler
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -164,6 +178,7 @@ export class FluentMcpServer {
       loggingManager.configure(this.mcpServer);
 
       // Now that we're connected and have set up handlers, register resources
+      // The prompt handlers are already registered by setupHandlers
       this.resourceManager.registerAll();
 
       loggingManager.logServerStarted();
