@@ -68,9 +68,19 @@ describe("InitCommand", () => {
       "Initialize a Fluent (ServiceNow SDK) application: If specified directory has no Fluent (ServiceNow SDK) application, it will create a new one. If it has a Fluent (ServiceNow SDK) application, it will save the directory as the working directory for future commands, including build, install, transform and dependencies."
     );
     expect(initCommand.arguments.length).toBeGreaterThan(0);
-    // workingDirectory should be optional now
+    
     const workingDirArg = initCommand.arguments.find(arg => arg.name === "workingDirectory");
-    expect(workingDirArg?.required).toBe(false);
+    expect(workingDirArg?.required).toBe(false); // Changed to false since workingDirectory is now optional
+
+    const appNameArg = initCommand.arguments.find(arg => arg.name === "appName");
+    expect(appNameArg?.required).toBe(true);
+
+    const scopeNameArg = initCommand.arguments.find(arg => arg.name === "scopeName");
+    expect(scopeNameArg?.required).toBe(true);
+
+    const packageNameArg = initCommand.arguments.find(arg => arg.name === "packageName");
+    expect(packageNameArg?.required).toBe(true);
+
   });
 
   test('should create directory if it does not exist', async () => {
@@ -132,10 +142,11 @@ describe("InitCommand", () => {
     expect(mockExecutor.execute).toHaveBeenCalledWith(
       'npx',
       [
+        '-y',
         '@servicenow/sdk', 
         'init', 
         '--from', 'template-id',
-        '--appName', 'Test App',
+        '--appName', '"Test App"',
         '--packageName', 'test-app',
         '--scopeName', 'x_test_scope',
         '--auth', 'test-auth'

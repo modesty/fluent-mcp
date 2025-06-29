@@ -25,26 +25,26 @@ export class InitCommand extends BaseCLICommand {
     {
       name: "appName",
       type: "string",
-      required: false,
-      description: "The name of the application",
+      required: true,
+      description: "The name of the application, this is the user friendly name that will be displayed in ServiceNow UI.",
     },
     {
       name: "packageName",
       type: "string",
-      required: false,
-      description: "The package name for the application",
+      required: true,
+      description: "The NPM package name for the application, usually it's the snake-case of appName in lowercase.",
     },
     {
       name: "scopeName",
       type: "string",
-      required: false,
-      description: "The scope name for the application",
+      required: true,
+      description: "The scope name for the application in <prefix>_<scope_name> format. For localhost development, it should be in the format of 'sn_<scope_name>'. This is required to create a new Fluent (ServiceNow SDK) application, no spaces allowed.",
     },
     {
       name: "auth",
       type: "string",
       required: false,
-      description: "The authentication alias to use",
+      description: "The authentication alias to use. If not provided, the default authentication alias will be used. You can set up authentication using the 'auth' command.",
     },
     {
       name: "workingDirectory",
@@ -89,7 +89,12 @@ export class InitCommand extends BaseCLICommand {
     // Handle working directory logic
     if (args.workingDirectory) {
       // If working directory is provided
-      workingDirectory = args.workingDirectory as string;
+      let inputDir = args.workingDirectory as string;
+      // Normalize ~ to home directory on Mac/Linux
+      if (inputDir.startsWith("~/")) {
+        inputDir = path.join(os.homedir(), inputDir.slice(2));
+      }
+      workingDirectory = path.resolve(inputDir);
       
       // Check if the directory exists, create it if not
       if (!fs.existsSync(workingDirectory)) {
@@ -147,7 +152,7 @@ export class InitCommand extends BaseCLICommand {
     sessionManager.setWorkingDirectory(workingDirectory);
 
     // Prepare the init command
-    const sdkArgs = ["@servicenow/sdk", "init"];
+    const sdkArgs = ["-y", "@servicenow/sdk", "init"];
     
     // Add optional arguments if provided
     if (args.from) {
@@ -155,7 +160,10 @@ export class InitCommand extends BaseCLICommand {
     }
     
     if (args.appName) {
-      sdkArgs.push("--appName", args.appName as string);
+      const appNameArg = typeof args.appName === "string" && !/^".*"$/.test(args.appName)
+        ? `"${args.appName}"`
+        : args.appName as string;
+      sdkArgs.push("--appName", appNameArg);
     }
     
     if (args.packageName) {
@@ -173,7 +181,7 @@ export class InitCommand extends BaseCLICommand {
     // Execute the command in the specified working directory
     try {
       const result = await this.cliExecutor.execute("npx", sdkArgs, false, workingDirectory);
-      
+      logger.info(`Executed init command in directory: ${workingDirectory} - ${JSON.stringify(result)}`);
       // Add confirmation that the working directory has been saved
       if (result.success) {
         result.output += `\n\nThis directory (${workingDirectory}) has been saved as your working directory for future commands.`;

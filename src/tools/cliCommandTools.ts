@@ -31,28 +31,51 @@ export class NodeProcessRunner implements ProcessRunner {
   ): Promise<ProcessResult> {
     return new Promise((resolve, reject) => {
       const env = { ...process.env }; // ensure full environment inheritance
+      // Create AbortController for timeout handling
+      const controller = new AbortController();
+      const { signal } = controller;
+      // Set timeout to automatically abort if process hangs
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+        logger.warn(`Command execution timed out after 12000ms: ${command} ${args.join(" ")}`);
+      }, 12000); // 12 seconds timeout
+
       const options: SpawnOptionsWithoutStdio = {
         stdio: "pipe",
         shell: true,
-        cwd,
-        env
+        cwd, env, signal
       };
       logger.info(`Spawning child process: ${command} ${args.join(" ")}`, { cwd });
 
-      const child = spawn(command, args, options);
+      let child;
+      try {
+        child = child = spawn(command, args, options);
+      } catch (error) {
+        clearTimeout(timeoutId);
+        reject(error);
+        return;
+      }
 
       let stdout = "";
       let stderr = "";
 
       child.stdout?.on("data", (data: Buffer) => {
-        stdout += data.toString();
+        const text = data.toString();
+        stdout += text;
+        // Log real-time output for debugging
+        logger.info(`[STDOUT] ${text.trim()}`);
       });
 
       child.stderr?.on("data", (data: Buffer) => {
-        stderr += data.toString();
+        const text = data.toString();
+        stderr += text;
+        // Log real-time errors for debugging
+        logger.info(`[STDERR] ${text.trim()}`);
       });
 
       child.on("close", (code: number | null) => {
+        clearTimeout(timeoutId);
+        logger.info(`Process exited with code ${code}: ${command} ${args.join(" ")}`);
         resolve({
           stdout: stdout.trim(),
           stderr: stderr.trim(),
@@ -61,8 +84,20 @@ export class NodeProcessRunner implements ProcessRunner {
       });
 
       child.on("error", (error: Error) => {
+        clearTimeout(timeoutId);
+        logger.error(`Process error: ${error.message}`);
         reject(error);
       });
+
+      // Handle aborted processes
+      signal.addEventListener('abort', () => {
+        if (child && !child.killed) {
+          // Force kill the process that's hanging
+          child.kill('SIGKILL');
+          reject(new Error(`Process killed after timeout (12000ms): ${command} ${args.join(" ")}`));
+        }
+      });
+
     });
   }
 }
@@ -98,14 +133,14 @@ export class CLIExecutor {
         cwd = this.getMcpCwd();
       }
       
-      // Better logging with clear working directory information
-      logger.info(`Executing command: ${command}`, { cmd: `${args.join(" ")}` } );
-      
       // Sanity check on working directory - warn if it's the system root
       if (cwd === "/" || cwd === "\\") {
         throw new Error(`ERROR: Command should never be executed with system root (/) as working directory`);
       }
-      
+
+      // Better logging with clear working directory information
+      logger.info(`Executing command: ${command} ${args.join(" ")}`, { cwd });
+            
       const result = await this.processRunner.run(command, args, cwd);
 
       return {

@@ -20,6 +20,14 @@ The MCP server communicates via stdio according to the MCP specification, allowi
 - Access to code snippets and examples for different metadata types
 - Access to instructions for creating and modifying different metadata types
 
+Example of prompt to create a new Fluent application:
+
+```text
+Create a new Fluent app under ~/Downloads/fluent-app to track employee time off requests
+```
+
+Watch how the MCP server responds to help LLM create auth credential alias, tables (i.e., dictionary, or data model) for time off requests, business rules to handle request approvals, ACLs to control access, Form view to access time off request info, UI Actions to enhance user experience, and more.
+
 ## Available MCP Tools
 
 ### ServiceNow SDK Command Tools
