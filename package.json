@@ -5,7 +5,7 @@
   "keywords": [
     "Servicenow SDK",
     "Fluent",
-    "mcp",
+    "mcp", "MCP Server",
     "sdk",
     "model-context-protocol",
     "DSL",
@@ -65,5 +65,11 @@
   "publishConfig": {
     "access": "public"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "files": [
+    "dist",
+    "res",
+    "README.md",
+    "license.txt"
+  ]
 }
