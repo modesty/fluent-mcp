@@ -34,28 +34,28 @@ Watch how the MCP server responds to help LLM create auth credential alias, tabl
 
 Note, use `init` command to switch to a working directory for existing Fluent (ServiceNow SDK) project, or to create a new one.
 
-| Tool Name | Description | Parameters |
-|-----------|-------------|------------|
-| `version` | Get ServiceNow SDK version information | None |
-| `help` | Get help information about ServiceNow SDK commands | `command`: (Optional) The specific command to get help for |
-| `debug` | Enable debug mode for ServiceNow SDK commands | `command`: The command to run with debug mode enabled |
-| `upgrade` | Upgrade ServiceNow SDK to the latest version | `check`: (Optional) Only check for updates without upgrading, `debug`: (Optional) Enable debug mode |
-| `auth` | Authenticate to a ServiceNow instance | `add`: (Optional) Instance URL to add, `type`: (Optional) Authentication method, `alias`: (Optional) Alias for the instance |
-| `init` | Initialize a new ServiceNow application | `from`: (Optional) sys_id or path, `appName`: App name, `packageName`: Package name, `scopeName`: Scope name, `auth`: (Optional) Authentication alias |
-| `build` | Build a ServiceNow application package | `source`: Path to source files, `frozenKeys`: (Optional) Whether to use frozen keys |
-| `install` | Install a ServiceNow application to an instance | `source`: (Optional) Package path, `reinstall`: (Optional) Whether to reinstall, `auth`: (Optional) Authentication alias, `open-browser`: (Optional) Open browser after install, `info`: (Optional) Show info after install |
-| `transform` | Transform ServiceNow metadata to Fluent source code | `from`: (Optional) Path to metadata, `directory`: (Optional) Package path, `preview`: (Optional) Preview only, `auth`: (Optional) Authentication alias |
-| `dependencies` | Download application dependencies | `directory`: (Optional) Package path, `auth`: (Optional) Authentication alias |
+| Tool Name      | Description                                         | Parameters                                                                                                                                                                                                                  |
+| -------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`      | Get ServiceNow SDK version information              | None                                                                                                                                                                                                                        |
+| `help`         | Get help information about ServiceNow SDK commands  | `command`: (Optional) The specific command to get help for                                                                                                                                                                  |
+| `debug`        | Enable debug mode for ServiceNow SDK commands       | `command`: The command to run with debug mode enabled                                                                                                                                                                       |
+| `upgrade`      | Upgrade ServiceNow SDK to the latest version        | `check`: (Optional) Only check for updates without upgrading, `debug`: (Optional) Enable debug mode                                                                                                                         |
+| `auth`         | Authenticate to a ServiceNow instance               | `add`: (Optional) Instance URL to add, `type`: (Optional) Authentication method, `alias`: (Optional) Alias for the instance                                                                                                 |
+| `init`         | Initialize a new ServiceNow application             | `from`: (Optional) sys_id or path, `appName`: App name, `packageName`: Package name, `scopeName`: Scope name, `auth`: (Optional) Authentication alias                                                                       |
+| `build`        | Build a ServiceNow application package              | `source`: Path to source files, `frozenKeys`: (Optional) Whether to use frozen keys                                                                                                                                         |
+| `install`      | Install a ServiceNow application to an instance     | `source`: (Optional) Package path, `reinstall`: (Optional) Whether to reinstall, `auth`: (Optional) Authentication alias, `open-browser`: (Optional) Open browser after install, `info`: (Optional) Show info after install |
+| `transform`    | Transform ServiceNow metadata to Fluent source code | `from`: (Optional) Path to metadata, `directory`: (Optional) Package path, `preview`: (Optional) Preview only, `auth`: (Optional) Authentication alias                                                                      |
+| `dependencies` | Download application dependencies                   | `directory`: (Optional) Package path, `auth`: (Optional) Authentication alias                                                                                                                                               |
 
 ### Resource Tools
 
-| Tool Name | Description | Parameters |
-|-----------|-------------|------------|
-| `get-api-spec` | Get API specification for a ServiceNow metadata type | `metadataType`: The metadata type to get specifications for |
-| `get-snippet` | Get code snippet for a ServiceNow metadata type | `metadataType`: The metadata type to get snippets for, `id`: (Optional) Specific snippet ID to retrieve |
-| `get-instruct` | Get instructions for a ServiceNow metadata type | `metadataType`: The metadata type to get instructions for |
-| `get-prompt` | Get specialized prompts for ServiceNow Fluent development | `promptId`: The ID of the prompt to retrieve (e.g., `coding_in_fluent`) |
-| `list-metadata-types` | List all available ServiceNow metadata types | None |
+| Tool Name             | Description                                               | Parameters                                                                                              |
+| --------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `get-api-spec`        | Get API specification for a ServiceNow metadata type      | `metadataType`: The metadata type to get specifications for                                             |
+| `get-snippet`         | Get code snippet for a ServiceNow metadata type           | `metadataType`: The metadata type to get snippets for, `id`: (Optional) Specific snippet ID to retrieve |
+| `get-instruct`        | Get instructions for a ServiceNow metadata type           | `metadataType`: The metadata type to get instructions for                                               |
+| `get-prompt`          | Get specialized prompts for ServiceNow Fluent development | `promptId`: The ID of the prompt to retrieve (e.g., `coding_in_fluent`)                                 |
+| `list-metadata-types` | List all available ServiceNow metadata types              | None                                                                                                    |
 
 ### Supported Metadata Types
 
@@ -85,16 +85,19 @@ The MCP server provides access to various resources that enhance the development
 All resources follow standardized URI patterns according to the [MCP specification](https://modelcontextprotocol.io/specification/2025-06-18/server):
 
 1. **API Specifications**: `sn-spec://{metadataType}`
+
    - Example: `sn-spec://business-rule`
    - Provides detailed technical specifications for ServiceNow metadata types
    - Contains complete API documentation with parameter descriptions and usage guidelines
 
 2. **Instructions**: `sn-instruct://{metadataType}`
+
    - Example: `sn-instruct://script-include`
    - Offers guidance and best practices for working with specific metadata types
    - Includes implementation notes and considerations
 
 3. **Code Snippets**: `sn-snippet://{metadataType}/{snippetId}`
+
    - Example: `sn-snippet://acl/0001`
    - Presents practical examples of how to implement various ServiceNow features
    - Multiple snippets may be available for each metadata type (with different IDs)
@@ -128,8 +131,8 @@ The MCP server also provides access to specialized prompts that enhance the deve
 
 #### Available Prompts
 
-| Prompt Name | Description | URI Format |
-|-------------|-------------|------------|
+| Prompt Name        | Description                                   | URI Format                     |
+| ------------------ | --------------------------------------------- | ------------------------------ |
 | `Coding in Fluent` | General guide for coding in ServiceNow Fluent | `sn-prompt://coding_in_fluent` |
 
 #### Prompt Content
@@ -163,14 +166,12 @@ To configure the Fluent MCP Server for Claude Desktop:
 
 ```json
 {
- "mcpServers": {
-   "fluent-mcp": {
-     "command": "npx",
-     "args": [
-       "@modesty/fluent-mcp"
-     ]
-   }
- }
+  "mcpServers": {
+    "fluent-mcp": {
+      "command": "npx",
+      "args": ["-y", "@modesty/fluent-mcp"]
+    }
+  }
 }
 ```
 
@@ -278,13 +279,12 @@ Think of this as building a full-stack application with proper CI/CD pipeline - 
 }
 ```
 
-### Example usage in VS Code Agent Chat:
+### Example usage in VS Code Agent Chat
 
 #### Script Include Dependency Pattern
 
 Prompt:
 "Create a UserService script include that depends on a BaseService script include. Show the TypeScript API calls for both, implementing constructor injection pattern. Use get-api-spec script-include to verify the structure."
-
 
 #### Multi-Environment Auth Setup
 
@@ -301,7 +301,6 @@ Prompt:
 Prompt:
 "Transform existing business rules from instance using fluent_transform, identify SOLID violations, refactor into separate script includes, then rebuild. Show the complete transform → refactor → build workflow."
 
-
 #### Business Rule Error Handling
 
 Prompt:
@@ -312,21 +311,19 @@ Prompt:
 To configure the Fluent MCP Server for Cursor:
 
 1. Add a new MCP Server with the following configuration:
-   
+
    - Open Cursor settings
    - Navigate to MCP Servers
    - Add a new MCP Server with the following configuration:
 
 ```json
 {
- "mcpServers": {
-   "fluent-mcp": {
-     "command": "npx",
-     "args": [
-       "@modesty/fluent-mcp"
-     ]
-   }
- }
+  "mcpServers": {
+    "fluent-mcp": {
+      "command": "npx",
+      "args": ["-y", "@modesty/fluent-mcp"]
+    }
+  }
 }
 ```
 
@@ -345,40 +342,48 @@ To configure the Fluent MCP Server for Windsurf:
 3. Select `Add Custom MCP Server +` in the `Model Context Protocol (MCP) Servers Templates` popup.
 4. Paste in the following to `mcp_config.json`:
 
-      ```json
-      {
-        "mcpServers": {
-          "fluent-mcp": {
-            "command": "npx",
-            "args": [
-              "-y",
-              "@modesty/fluent-mcp"
-            ]
-          }
-        }
-      }
-      ```
+   ```json
+   {
+     "mcpServers": {
+       "fluent-mcp": {
+         "command": "npx",
+         "args": ["-y", "@modesty/fluent-mcp"]
+       }
+     }
+   }
+   ```
 
 5. After closing the `mcp_config.json` edit tab, click `Refresh` in the `Model Context Protocol (MCP) Servers` section to apply the changes. All tools under `fluent-mcp` will be listed and available when refreshing is complete.
 
 6. Example usage
- in Windsurf:
+   in Windsurf:
 
 ```text
 * Show the help on how to authenticate to ServiceNow instance using Fluent
 * Authenticate me to http://localhost:8080 with my credentials
 ```
 
-## Testing Resource URIs
+### Gemini CLI
 
-You can test the MCP server's resource capability in two ways:
+To configure the Fluent MCP Server for Gemini CLI:
 
-### Using the Jest Test Suite
+1. Open the Gemini CLI configuration file
+    - User's setting: `~/.gemini/settings.json`
+    - Project's setting: `./.gemini/settings.json`
+2. Add the following MCP server configuration:
 
-Run the resource URI tests to verify resource access:
-
-```bash
-npm test -- src/test/resourceUri.test.ts
+```json
+{
+  "mcpServers": {
+    "fluent-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modesty/fluent-mcp"
+      ]
+    }
+  }
+}
 ```
 
 ## License
