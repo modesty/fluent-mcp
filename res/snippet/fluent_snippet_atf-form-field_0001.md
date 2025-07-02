@@ -9,10 +9,12 @@ Test({
   failOnServerError: true // boolean
 }, (atf) => {
   atf.server.impersonate({
+    $id: Now.ID['0001'], 
     user: 'b6b364e253131300e321ddeeff7b121b', // Impersonate the user 'ATF Change Management'
   })
 
   const insertedRecord = atf.server.recordInsert({
+    $id: Now.ID['0002'],
     table: 'change_request', // Insert a record into 'change_request'
     fieldValues: {
       'type': 'Normal',
@@ -25,6 +27,7 @@ Test({
   })
 
   atf.form.openExistingRecord({
+    $id: Now.ID['0003'],
     table: 'change_request', // Open the 'Change Request' form
     recordId: insertedRecord.record_id,
     formUI: 'standard_ui',
@@ -33,6 +36,7 @@ Test({
   })
 
   atf.form.clickUIAction({
+    $id: Now.ID['0004'],
     table: 'change_request', // Click UI Action 'Cancel Change'
     formUI: 'standard_ui',
     actionType: 'ui_action',
@@ -42,6 +46,7 @@ Test({
   })
 
   atf.form.setFieldValue({
+    $id: Now.ID['0005'],
     table: 'change_request', // Set the components on the page
     fieldValues: {
       'textarea': 'Invalid' // 'Textarea <textarea>: Reason' = 'Invalid'
@@ -50,6 +55,7 @@ Test({
   })
 
   atf.form.clickModalButton({
+    $id: Now.ID['0006'],
     formUI: 'standard_ui', // Click the ok button
     uiPage: '06a7db02b7703300fecf082e7e11a9e8',
     assertType: '',
@@ -58,6 +64,7 @@ Test({
   })
 
   atf.form.fieldValueValidation({
+    $id: Now.ID['0007'],
     table: 'change_request', // Validate that form matches the condition 'state' = 'Canceled'
     conditions: 'state=Canceled',
     formUI: 'standard_ui'

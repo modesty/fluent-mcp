@@ -14,24 +14,33 @@ failOnServerError: true // boolean
 // ATF step API goes here, including atf.form, atf.server, etc.
 // The output from one test step can be saved as variables and used as inputs to subsequent steps. Example:
 // atf.server.impersonate({
-//   user: get_sys_id('sys_user', 'user_name=admin^ORuser_name=system'), // function get_sys_id has two parameters: table name and encoded query string
+//  $id: Now.ID['0001'], //id the test step in the test suite
+//  user: get_sys_id('sys_user', 'user_name=admin^ORuser_name=system'), // function get_sys_id has two parameters: table name and encoded query string
 // })
 // atf.form.openNewForm({
+//  $id: Now.ID['0002'], //id the test step in the test suite
 //  table: get_table_name('incident'), // function get_table_name has one parameter: table name hints
 //  view: '',
-//  formUI: 'standard_ui',
+//  formUI: 'standard_ui'
+// })
 // only declare return variable if and only if it is used later
 // const outputOfSubmit = atf.form.submitForm({
+//   $id: Now.ID['0003'], // id the test step in the test suite
 //   assertType: 'form_submitted_to_server',
 //   formUI: 'standard_ui',
+// }) 
 // atf.form.openExistingRecord({
+//   $id: Now.ID['0004'], // id the test step in the test suite
 //   table: get_table_name('incident'), // function get_table_name has one parameter: table name hints
 //   recordId: outputOfSubmit.record_id, // use the declared variable to fill in value
 //   formUI: 'service_operations_workspace',
 //   view: '',
 //   selectedTabIndex: 0,
+// })
 // atf.server.log({
+//   $id: Now.ID['0005'], // id the test step in the test suite
 //   log: `record opened: ${outputOfSubmit.record_id}` // explicitly use ${} for embedding function calls or variables in strings Template Literals
+// })
 // Additional steps...
 })
 //

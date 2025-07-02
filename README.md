@@ -386,6 +386,13 @@ To configure the Fluent MCP Server for Gemini CLI:
 }
 ```
 
+Example usage in Gemini CLI:
+
+```text
+show me an example of creating a table with 3 columns, String, Boolean and Reference in Fluent ;
+create a business rule to ensure the assigned_to is not null when insert and update for the table created above 
+```
+
 ## License
 
 MIT

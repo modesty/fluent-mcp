@@ -10,9 +10,11 @@ Test({
     failOnServerError: true // boolean
 }, (atf) => {
     atf.server.impersonate({
+        $id: Now.ID['0001'], 
         user: 'cae9ddbedbd313001d47765f369619bd', // function get_sys_id has two parameters: table name and encoded query string
     })
     atf.form.openExistingRecord({
+        $id: Now.ID['0002'],
         table: 'incident', // function get_table_name has one parameter: table name hints
         recordId: 'INC0009005', // sys_id of the record
         formUI: 'standard_ui', // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace'
@@ -20,6 +22,7 @@ Test({
         selectedTabIndex: 0
     })
     const outputOfCreateProblem = atf.form.clickUIAction({
+        $id: Now.ID['0003'],
         table: 'incident', // function get_table_name has one parameter: table name hints
         formUI: 'standard_ui', // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace'
         actionType: 'ui_action', // 'ui_action' | 'declarative_action'
@@ -28,6 +31,7 @@ Test({
         assertType: 'form_submitted_to_server' // 'form_submitted_to_server' | 'form_submission_canceled_in_browser' | 'page_reloaded_or_redirected'
     })
     const outputOfSave = atf.form.clickUIAction({
+        $id: Now.ID['0004'],
         table: 'incident', // function get_table_name has one parameter: table name hints
         formUI: 'standard_ui', // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace'
         actionType: 'ui_action', // 'ui_action' | 'declarative_action'
@@ -36,11 +40,13 @@ Test({
         assertType: 'form_submitted_to_server' // 'form_submitted_to_server' | 'form_submission_canceled_in_browser' | 'page_reloaded_or_redirected'
     })
     atf.form.fieldValueValidation({
+        $id: Now.ID['0005'],
         table: 'incident', // function resolve_table_fields has one parameter: table name hints
         conditions: `problem_statement=Email server is down`, // string, servicenow encoded query
         formUI: 'standard_ui' // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace'
     })
     atf.server.recordValidation({
+        $id: Now.ID['0006'],
         table: 'incident', // function resolve_table_fields has one parameter: table name hints
         fieldValues: `problem_id=${outputOfCreateProblem.record_id}`, // string, servicenow encoded query
         recordId: outputOfSave.record_id, // sys_id of the record

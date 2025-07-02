@@ -15,7 +15,7 @@ UserPreference({
 // Sets the admin_email preference to `admin@example.com`
 UserPreference({
     $id: Now.ID['admin_email'],
-	name: 'admin_email',
+		name: 'admin_email',
     type: 'string',
     value: 'admin@example.com',
 })

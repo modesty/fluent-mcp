@@ -9,10 +9,12 @@ Test({
   failOnServerError: true // boolean
 }, (atf) => {
   atf.server.impersonate({
+    $id: Now.ID['0001'],
     user: 'f8588956937002002dcef157b67ffb98', // Impersonate Change Manager
   })
 
   const insertedChangeRequest = atf.server.recordInsert({
+    $id: Now.ID['0002'],
     table: 'change_request', // Insert into Change Request table
     fieldValues: {
       'type': 'Emergency',
@@ -25,6 +27,7 @@ Test({
   })
 
   atf.form.openExistingRecord({
+    $id: Now.ID['0003'],
     table: 'change_request', // Open the Change Request record
     recordId: insertedChangeRequest.record_id,
     formUI: 'standard_ui',
@@ -33,6 +36,7 @@ Test({
   })
 
   atf.form.clickUIAction({
+    $id: Now.ID['0004'],
     table: 'change_request', // Click UI Action 'Create Outage'
     formUI: 'standard_ui',
     actionType: 'ui_action',
@@ -42,12 +46,14 @@ Test({
   })
 
   atf.form.fieldValueValidation({
+    $id: Now.ID['0005'],
     table: 'change_request', // Validate Short Description
     conditions: `short_description=Outage created from change request`,
     formUI: 'standard_ui'
   })
 
   atf.form.clickUIAction({
+    $id: Now.ID['0006'],
     table: 'change_request', // Click UI Action 'Submit'
     formUI: 'standard_ui',
     actionType: 'ui_action',
@@ -57,6 +63,7 @@ Test({
   })
 
   atf.form.fieldValueValidation({
+    $id: Now.ID['0007'],
     table: 'change_request', // Validate Unauthorized field
     conditions: `unauthorized=false`,
     formUI: 'standard_ui'

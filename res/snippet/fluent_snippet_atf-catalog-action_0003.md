@@ -9,9 +9,11 @@ Test({
   failOnServerError: true // boolean
 }, (atf) => {
   atf.catalog.openCatalogItem({
+    $id: Now.ID['001']
     catalogItem: '1e01f08ac0a801070187b08d81c0845c' // sys_id of the catalog item to open
   })
   atf.catalog.addItemToShoppingCart({
+    $id: Now.ID['002'],
     assert: 'form_submitted_to_server'
   })
 })

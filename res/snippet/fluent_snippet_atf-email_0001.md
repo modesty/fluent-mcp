@@ -9,6 +9,7 @@ Test({
   failOnServerError: true // boolean
 }, (atf) => {
   atf.email.validateOutboundEmailGeneratedByNotification({
+    $id: Now.ID['0001'],
     sourceNotification: '02b3d8ccbf11110032a0854b3f0739e4', // sys_id | Record<'sysevent_email_action'>
     conditions: '' // string, Servicenow encoded query
   })

@@ -9,10 +9,12 @@ Test({
   failOnServerError: true // boolean
 }, (atf) => {
   atf.server.impersonate({
+    $id: Now.ID['0001'],
     user: 'cae9ddbedbd313001d47765f369619bd',
   })
 
   const insertedIncident = atf.server.recordInsert({
+    $id: Now.ID['0002'],
     table: 'incident',
     fieldValues: {
       'short_description': 'Database server is down',
@@ -23,6 +25,7 @@ Test({
   })
 
   atf.form.openExistingRecord({
+    $id: Now.ID['0003'],
     table: 'incident',
     recordId: insertedIncident.record_id,
     formUI: 'standard_ui',
@@ -31,6 +34,7 @@ Test({
   })
 
   atf.form.clickUIAction({
+    $id: Now.ID['0004'],
     table: 'incident',
     formUI: 'standard_ui',
     actionType: 'ui_action',
@@ -40,6 +44,7 @@ Test({
   })
 
   atf.form.clickUIAction({
+    $id: Now.ID['0005'],
     table: 'incident',
     formUI: 'standard_ui',
     actionType: 'ui_action',
@@ -49,6 +54,7 @@ Test({
   })
 
   atf.form.fieldValueValidation({
+    $id: Now.ID['0006'],
     table: 'incident',
     conditions: `short_description=Database server is down`,
     formUI: 'standard_ui',
