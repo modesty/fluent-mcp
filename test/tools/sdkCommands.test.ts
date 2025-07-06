@@ -154,8 +154,6 @@ describe('SDK Command Tools', () => {
     mockRunner.run = originalRun;
   });
 
-
-
   test('UpgradeCommand should execute correctly with basic upgrade', async () => {
     const upgradeCommand = commands.find((cmd) => cmd.name === 'upgrade_fluent');
     expect(upgradeCommand).toBeDefined();
@@ -165,13 +163,6 @@ describe('SDK Command Tools', () => {
     expect(result.output).toContain('upgraded to latest version');
   });
 
-  test('UpgradeCommand should execute correctly with check option', async () => {
-    const upgradeCommand = commands.find((cmd) => cmd.name === 'upgrade_fluent');
-
-    const result = await upgradeCommand.execute({ check: true });
-    expect(result.success).toBe(true);
-    expect(result.output).toContain('up to date');
-  });
 
   test('UpgradeCommand should execute correctly with debug option', async () => {
     const upgradeCommand = commands.find((cmd) => cmd.name === 'upgrade_fluent');

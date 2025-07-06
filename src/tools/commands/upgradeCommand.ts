@@ -7,15 +7,8 @@ import { BaseCLICommand } from "./baseCommand.js";
  */
 export class UpgradeCommand extends BaseCLICommand {
   name = 'upgrade_fluent';
-  description = 'Upgrade Fluent (ServiceNow SDK) to the latest version';
+  description = 'Upgrade globally installed Fluent (ServiceNow SDK) to the latest version. For a typical Fluent project, Fluent (ServiceNow SDK) is installed locally, not in global.';
   arguments: CommandArgument[] = [
-    {
-      name: 'check',
-      type: 'boolean',
-      required: false,
-      description: 'Only check for updates without upgrading',
-      defaultValue: false,
-    },
     {
       name: 'debug',
       type: 'boolean',
@@ -31,18 +24,12 @@ export class UpgradeCommand extends BaseCLICommand {
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
     this.validateArgs(args);
-    const check = args.check as boolean | undefined;
     const debug = args.debug as boolean | undefined;
 
     const cmdArgs = ['now-sdk', 'upgrade'];
 
-    if (check) {
-      cmdArgs.push('--check');
-    }
-
     if (debug) {
       cmdArgs.push('--debug');
-      cmdArgs.push('true');
     }
 
     return await this.cliExecutor.execute('npx', cmdArgs, true);

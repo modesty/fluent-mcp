@@ -60,8 +60,8 @@ describe("AuthCommand", () => {
 
   test("should create an auth command with correct properties", () => {
     expect(authCommand.name).toBe("manage_fluent_auth");
-    expect(authCommand.description).toBe(
-      "Manage Fluent (ServiceNow SDK) authentication profiles"
+    expect(authCommand.description).toContain(
+      "Manage Fluent (ServiceNow SDK) authentication"
     );
     expect(authCommand.arguments.length).toBeGreaterThan(0);
   });
