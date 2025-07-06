@@ -63,10 +63,19 @@ export interface CommandExecutor {
   execute(args: Record<string, unknown>): Promise<CommandResult>;
 }
 
+/**
+ * Metadata annotations for commands
+ */
+export interface CommandAnnotations {
+  title?: string;
+  [key: string]: any;
+}
+
 export interface CommandMetadata {
   name: string;
   description: string;
   arguments: CommandArgument[];
+  annotations?: CommandAnnotations;
 }
 
 export interface CLICommand extends CommandExecutor, CommandMetadata {

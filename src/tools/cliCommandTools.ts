@@ -179,26 +179,32 @@ export class CommandRegistry {
 
   // Convert to MCP Tool format
   toMCPTools(): Tool[] {
-    return this.getAllCommands().map((command) => ({
-      name: command.name,
-      description: command.description,
-      inputSchema: {
-        type: "object",
-        properties: command.arguments.reduce(
-          (props, arg) => {
-            props[arg.name] = {
-              type: arg.type === "array" ? "array" : arg.type,
-              description: arg.description,
-            };
-            return props;
-          },
-          {} as Record<string, any>
-        ),
-        required: command.arguments
-          .filter((arg) => arg.required)
-          .map((arg) => arg.name),
-      },
-    }));
+    return this.getAllCommands().map((command) => {
+      // Create the tool with standard properties and optional annotations
+      const tool: Tool = {
+        name: command.name,
+        description: command.description,
+        ...(command.annotations && { annotations: command.annotations }),
+        inputSchema: {
+          type: "object",
+          properties: command.arguments.reduce(
+            (props, arg) => {
+              props[arg.name] = {
+                type: arg.type === "array" ? "array" : arg.type,
+                description: arg.description,
+              };
+              return props;
+            },
+            {} as Record<string, any>
+          ),
+          required: command.arguments
+            .filter((arg) => arg.required)
+            .map((arg) => arg.name),
+        }
+      };
+      
+      return tool;
+    });
   }
 }
 
