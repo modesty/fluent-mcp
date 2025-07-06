@@ -9,7 +9,7 @@ import { SessionFallbackCommand } from "./sessionFallbackCommand.js";
  */
 export class AuthCommand extends SessionFallbackCommand {
   name = "manage_fluent_auth";
-  description = "Manage Fluent (ServiceNow SDK) authentication to <instance_url>. This the prerequisite command before init, build, install, dependencies, and transform commands.";
+  description = "Manage Fluent (ServiceNow SDK) authentication to <instance_url> with credential profiles";
   arguments: CommandArgument[] = [
     {
       name: "add",
