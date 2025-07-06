@@ -1,7 +1,7 @@
 /**
  * Tests for ToolsManager
  */
-import { ToolsManager } from "../../tools/toolsManager";
+import { ToolsManager } from "../../src/tools/toolsManager.js";
 
 // Mock the Model Context Protocol SDK
 jest.mock("@modelcontextprotocol/sdk/server/mcp.js", () => {
@@ -26,7 +26,7 @@ jest.mock("@modelcontextprotocol/sdk/server/mcp.js", () => {
 });
 
 // Mock command registry
-jest.mock("../../tools/cliCommandTools.js", () => {
+jest.mock("../../src/tools/cliCommandTools.js", () => {
   const mockRegister = jest.fn();
   const mockGetCommand = jest.fn();
   const mockToMCPTools = jest.fn().mockReturnValue([
@@ -55,7 +55,7 @@ jest.mock("../../tools/cliCommandTools.js", () => {
 });
 
 // Mock the resource tools
-jest.mock("../../tools/resourceTools.js", () => {
+jest.mock("../../src/tools/resourceTools.js", () => {
   return {
     GetApiSpecCommand: jest.fn().mockImplementation(() => ({
       name: "get-api-spec",

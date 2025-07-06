@@ -1,11 +1,11 @@
 /**
  * Tests for FluentMCPServer resource capability with refactored module design
  */
-import { FluentMcpServer } from "../../server/fluentMCPServer";
-import { ToolsManager } from "../../tools/toolsManager";
-import { ResourceManager } from "../../res/resourceManager";
-import { ServerStatus } from "../../types";
-import { patchLoggerForTests } from "../utils/loggerPatch";
+import { FluentMcpServer } from "../../src/server/fluentMCPServer.js";
+import { ToolsManager } from "../../src/tools/toolsManager.js";
+import { ResourceManager } from "../../src/res/resourceManager.js";
+import { ServerStatus } from "../../src/types.js";
+import { patchLoggerForTests } from "../utils/loggerPatch.js";
 
 // Mock the Model Context Protocol SDK
 jest.mock("@modelcontextprotocol/sdk/server/mcp.js", () => {
@@ -43,7 +43,7 @@ jest.mock("@modelcontextprotocol/sdk/server/stdio.js", () => {
 });
 
 // Mock the config
-jest.mock('../../config.js', () => ({
+jest.mock('../../src/config.js', () => ({
   getConfig: jest.fn().mockReturnValue({
     name: "test-mcp-server",
     version: "1.0.0",
@@ -58,7 +58,7 @@ jest.mock('../../config.js', () => ({
 }));
 
 // Mock the ToolsManager
-jest.mock("../../tools/toolsManager.js", () => {
+jest.mock("../../src/tools/toolsManager.js", () => {
   return {
     ToolsManager: jest.fn().mockImplementation(() => ({
       getMCPTools: jest.fn().mockReturnValue([
@@ -88,7 +88,7 @@ jest.mock("../../tools/toolsManager.js", () => {
 });
 
 // Mock the ResourceManager
-jest.mock("../../res/resourceManager.js", () => {
+jest.mock("../../src/res/resourceManager.js", () => {
   return {
     ResourceManager: jest.fn().mockImplementation(() => ({
       initialize: jest.fn().mockResolvedValue(undefined),
@@ -115,7 +115,7 @@ jest.mock("../../res/resourceManager.js", () => {
 });
 
 // Mock logger
-jest.mock("../../utils/logger.js", () => {
+jest.mock("../../src/utils/logger.js", () => {
   return {
     debug: jest.fn(),
     info: jest.fn(),

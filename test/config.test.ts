@@ -2,7 +2,7 @@
 import { expect, test, describe } from '@jest/globals';
 import path from 'path';
 import fs from 'fs';
-import { getConfig, getProjectRootPath } from "../config.js";
+import { getConfig, getProjectRootPath } from "../src/config.js";
 
 // The config module is automatically mocked via Jest setup
 

@@ -1,6 +1,6 @@
 // Import cliCommandTools after mocking
-import { CommandFactory, CLIExecutor, NodeProcessRunner } from '../../tools/cliCommandTools';
-import { ProcessResult } from '../../utils/types';
+import { CommandFactory, CLIExecutor, NodeProcessRunner } from '../../src/tools/cliCommandTools.js';
+import { ProcessResult } from '../../src/utils/types.js';
 
 // Mock the NodeProcessRunner for testing
 class MockProcessRunner extends NodeProcessRunner {

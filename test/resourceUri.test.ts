@@ -1,4 +1,4 @@
-import { ResourceType } from "../utils/resourceLoader";
+import { ResourceType } from "../src/utils/resourceLoader.js";
 import { describe, expect, it } from "@jest/globals";
 
 describe('ResourceURI Support Tests', () => {

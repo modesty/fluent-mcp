@@ -1,12 +1,12 @@
 /**
  * Tests for LoggingManager
  */
-import { LoggingManager } from "../../utils/loggingManager";
-import { ServerStatus } from "../../types";
-import logger from "../../utils/logger";
+import { LoggingManager } from "../../src/utils/loggingManager.js";
+import { ServerStatus } from "../../src/types.js";
+import logger from "../../src/utils/logger.js";
 
 // Mock the logger
-jest.mock("../../utils/logger.js", () => {
+jest.mock("../../src/utils/logger.js", () => {
   return {
     debug: jest.fn(),
     info: jest.fn(),

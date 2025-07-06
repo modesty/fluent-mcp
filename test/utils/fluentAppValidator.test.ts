@@ -1,4 +1,4 @@
-import { FluentAppValidator } from "../../utils/fluentAppValidator";
+import { FluentAppValidator } from "../../src/utils/fluentAppValidator.js";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -13,7 +13,7 @@ jest.mock("node:path", () => ({
 }));
 
 // Mock the logger
-jest.mock("../../utils/logger", () => ({
+jest.mock("../../src/utils/logger.js", () => ({
   __esModule: true,
   default: {
     info: jest.fn(),

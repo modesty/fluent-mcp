@@ -1,8 +1,8 @@
 /**
  * Tests for FluentMCPServer resource capability
  */
-import { FluentMcpServer } from "../../server/fluentMCPServer";
-import { ResourceLoader, ResourceType } from "../../utils/resourceLoader";
+import { FluentMcpServer } from "../../src/server/fluentMCPServer.js";
+import { ResourceLoader, ResourceType } from "../../src/utils/resourceLoader.js";
 
 // Mock the Model Context Protocol SDK
 jest.mock("@modelcontextprotocol/sdk/server/mcp.js", () => {
@@ -38,7 +38,7 @@ jest.mock("@modelcontextprotocol/sdk/server/stdio.js", () => {
 });
 
 // Mock the config
-jest.mock('../../config.js', () => ({
+jest.mock('../../src/config.js', () => ({
   getConfig: jest.fn().mockReturnValue({
     name: "test-mcp-server",
     version: "1.0.0",
@@ -53,7 +53,7 @@ jest.mock('../../config.js', () => ({
 }));
 
 // Mock the ResourceLoader
-jest.mock("../../utils/resourceLoader.js", () => {
+jest.mock("../../src/utils/resourceLoader.js", () => {
   // Create a mock implementation with controlled behavior
   const mockGetAvailableMetadataTypes = jest.fn().mockResolvedValue([
     "business-rule",
@@ -90,7 +90,7 @@ jest.mock("../../utils/resourceLoader.js", () => {
 });
 
 // Mock command registry
-jest.mock("../../tools/cliCommandTools.js", () => {
+jest.mock("../../src/tools/cliCommandTools.js", () => {
   const mockRegister = jest.fn();
   const mockGetCommand = jest.fn();
   const mockToMCPTools = jest.fn().mockReturnValue([]);
@@ -110,7 +110,7 @@ jest.mock("../../tools/cliCommandTools.js", () => {
 });
 
 // Mock the resource tools
-jest.mock("../../tools/resourceTools.js", () => {
+jest.mock("../../src/tools/resourceTools.js", () => {
   return {
     GetApiSpecCommand: jest.fn().mockImplementation(() => ({
       name: "get-api-spec",

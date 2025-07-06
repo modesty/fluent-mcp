@@ -1,12 +1,12 @@
-import { CommandResult } from "../../utils/types";
-import { CLIExecutor } from "../../tools/cliCommandTools";
-import { InitCommand } from "../../tools/commands/initCommand";
-import { FluentAppValidator } from "../../utils/fluentAppValidator";
-import { SessionManager } from "../../utils/sessionManager";
+import { CommandResult } from "../../src/utils/types.js";
+import { CLIExecutor } from "../../src/tools/cliCommandTools.js";
+import { InitCommand } from "../../src/tools/commands/initCommand.js";
+import { FluentAppValidator } from "../../src/utils/fluentAppValidator.js";
+import { SessionManager } from "../../src/utils/sessionManager.js";
 import fs from "node:fs";
 import os from "node:os";
 
-jest.mock("../../utils/sessionManager", () => {
+jest.mock("../../src/utils/sessionManager.js", () => {
   return {
     SessionManager: {
       getInstance: jest.fn().mockReturnValue({

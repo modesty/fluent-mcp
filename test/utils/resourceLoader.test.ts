@@ -4,10 +4,10 @@
 import fs from "fs";
 import path from "path";
 import * as nodeFs from 'node:fs';
-import { ResourceLoader, ResourceType } from "../../utils/resourceLoader";
+import { ResourceLoader, ResourceType } from "../../src/utils/resourceLoader.js";
 
 // Mock configuration
-jest.mock('../../config.js', () => ({
+jest.mock('../../src/config.js', () => ({
   getConfig: jest.fn().mockReturnValue({
     resourcePaths: {
       spec: "/mock/path/to/spec",

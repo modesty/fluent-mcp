@@ -23,7 +23,7 @@ export function patchLoggerForTests(): void {
 
     // Mock LoggingManager if it's being used in the test
     try {
-      const LoggingManagerMock = jest.requireMock('../../utils/loggingManager.js');
+      const LoggingManagerMock = jest.requireMock('../../src/utils/loggingManager.js');
       if (LoggingManagerMock && LoggingManagerMock.loggingManager) {
         // Make sure any methods that need the MCP server are patched
         const mockLoggingManager = LoggingManagerMock.loggingManager;

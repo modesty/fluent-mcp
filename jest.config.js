@@ -4,7 +4,7 @@ export default {
   testEnvironment: "node",
   extensionsToTreatAsEsm: [".ts"],
   moduleNameMapper: {
-    "^(\\.{1,2}/.*)\\.js$": "$1",
+    "^(\\.{1,2}/.*)\\.(js|ts)$": "$1",
   },
   transform: {
     "^.+\\.tsx?$": [
@@ -16,9 +16,9 @@ export default {
   },
   testMatch: ["**/*.test.ts"],
   collectCoverage: true,
-  collectCoverageFrom: ["src/**/*.ts", "!src/**/*.d.ts"],
+  collectCoverageFrom: ["src/**/*.ts", "!src/**/*.d.ts", "!test/**/*.ts"],
   coverageDirectory: "coverage",
   coverageReporters: ["text", "lcov"],
-  setupFilesAfterEnv: ["./src/test/setup.js"],
+  setupFilesAfterEnv: ["./test/setup.js"],
   moduleDirectories: ["node_modules", "<rootDir>"]
 };

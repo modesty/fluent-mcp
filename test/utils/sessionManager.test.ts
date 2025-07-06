@@ -1,7 +1,7 @@
-import { SessionManager } from "../../utils/sessionManager";
+import { SessionManager } from "../../src/utils/sessionManager.js";
 
 // Mock the logger
-jest.mock("../../utils/logger", () => ({
+jest.mock("../../src/utils/logger.js", () => ({
   __esModule: true,
   default: {
     debug: jest.fn(),

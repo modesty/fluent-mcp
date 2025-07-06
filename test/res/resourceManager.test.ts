@@ -1,7 +1,7 @@
 /**
  * Tests for ResourceManager
  */
-import { ResourceManager } from "../../res/resourceManager";
+import { ResourceManager } from "../../src/res/resourceManager.js";
 
 // Mock the Model Context Protocol SDK
 jest.mock("@modelcontextprotocol/sdk/server/mcp.js", () => {
@@ -20,7 +20,7 @@ jest.mock("@modelcontextprotocol/sdk/server/mcp.js", () => {
 });
 
 // Mock the ResourceLoader
-jest.mock("../../utils/resourceLoader.js", () => {
+jest.mock("../../src/utils/resourceLoader.js", () => {
   // Create a mock implementation with controlled behavior
   const mockGetAvailableMetadataTypes = jest.fn().mockResolvedValue([
     "business-rule",

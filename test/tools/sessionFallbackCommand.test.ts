@@ -1,10 +1,10 @@
-import { CommandResult } from "../../utils/types";
-import { CLIExecutor } from "../../tools/cliCommandTools";
-import { SessionFallbackCommand } from "../../tools/commands/sessionFallbackCommand";
-import { SessionManager } from "../../utils/sessionManager";
+import { CommandResult } from "../../src/utils/types.js";
+import { CLIExecutor } from "../../src/tools/cliCommandTools.js";
+import { SessionFallbackCommand } from "../../src/tools/commands/sessionFallbackCommand.js";
+import { SessionManager } from "../../src/utils/sessionManager.js";
 
 // Mock the session manager
-jest.mock("../../utils/sessionManager", () => ({
+jest.mock("../../src/utils/sessionManager.js", () => ({
   SessionManager: {
     getInstance: jest.fn().mockReturnValue({
       getWorkingDirectory: jest.fn(),
@@ -13,7 +13,7 @@ jest.mock("../../utils/sessionManager", () => ({
 }));
 
 // Mock the config module specifically for this test
-jest.mock("../../config", () => ({
+jest.mock("../../src/config.js", () => ({
   getProjectRootPath: jest.fn(() => "/mock-project-root"),
   getConfig: jest.fn().mockReturnValue({
     name: "test",
@@ -25,7 +25,7 @@ jest.mock("../../config", () => ({
 }));
 
 // Mock the logger
-jest.mock("../../utils/logger", () => ({
+jest.mock("../../src/utils/logger.js", () => ({
   __esModule: true,
   default: {
     debug: jest.fn(),

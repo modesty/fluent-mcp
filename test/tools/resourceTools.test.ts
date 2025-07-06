@@ -8,9 +8,9 @@ import {
   GetSnippetCommand,
   GetInstructCommand,
   ListMetadataTypesCommand,
-} from "../../tools/resourceTools";
-import { ResourceLoader, ResourceType } from "../../utils/resourceLoader";
-import { getProjectRootPath } from "../../config";
+} from "../../src/tools/resourceTools.js";
+import { ResourceLoader, ResourceType } from "../../src/utils/resourceLoader.js";
+import { getProjectRootPath } from "../../src/config.js";
 
 // Mock the file system operations for tests
 jest.mock("node:fs", () => {

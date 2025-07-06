@@ -1,9 +1,9 @@
-import { CommandResult } from "../../utils/types";
-import { CLIExecutor } from "../../tools/cliCommandTools";
-import { AuthCommand } from "../../tools/commands/authCommand";
+import { CommandResult } from "../../src/utils/types.js";
+import { CLIExecutor } from "../../src/tools/cliCommandTools.js";
+import { AuthCommand } from "../../src/tools/commands/authCommand.js";
 
 // Mock the session manager
-jest.mock("../../utils/sessionManager", () => ({
+jest.mock("../../src/utils/sessionManager.js", () => ({
   SessionManager: {
     getInstance: jest.fn().mockReturnValue({
       getWorkingDirectory: jest.fn().mockReturnValue(undefined),

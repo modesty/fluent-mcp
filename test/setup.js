@@ -4,7 +4,7 @@
  */
 
 // Automatically mock the config module
-jest.mock('../config', () => ({
+jest.mock('../src/config.js', () => ({
   getProjectRootPath: jest.fn(() => process.cwd()),
   getConfig: jest.fn().mockReturnValue({
     name: "test",
