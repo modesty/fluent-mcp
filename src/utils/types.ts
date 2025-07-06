@@ -64,11 +64,15 @@ export interface CommandExecutor {
 }
 
 /**
- * Metadata annotations for commands
+ * Metadata annotations for tools: https://modelcontextprotocol.io/docs/concepts/tools
  */
 export interface CommandAnnotations {
-  title?: string;
+  title?: string;      // Human-readable title for the tool
   [key: string]: any;
+  // readOnlyHint?: boolean;    // If true, the tool does not modify its environment
+  // destructiveHint?: boolean; // If true, the tool may perform destructive updates
+  // idempotentHint?: boolean;  // If true, repeated calls with same args have no additional effect
+  // openWorldHint?: boolean;   // If true, tool interacts with external entities
 }
 
 export interface CommandMetadata {
@@ -76,6 +80,7 @@ export interface CommandMetadata {
   description: string;
   arguments: CommandArgument[];
   annotations?: CommandAnnotations;
+  _meta?: { [key: string]: any };
 }
 
 export interface CLICommand extends CommandExecutor, CommandMetadata {

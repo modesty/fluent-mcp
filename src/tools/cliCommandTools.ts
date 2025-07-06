@@ -179,12 +179,12 @@ export class CommandRegistry {
 
   // Convert to MCP Tool format
   toMCPTools(): Tool[] {
-    return this.getAllCommands().map((command) => {
-      // Create the tool with standard properties and optional annotations
+    return this.getAllCommands().map((command) => {      
       const tool: Tool = {
         name: command.name,
         description: command.description,
         ...(command.annotations && { annotations: command.annotations }),
+        ...(command._meta && { _meta: command._meta }),
         inputSchema: {
           type: "object",
           properties: command.arguments.reduce(
@@ -202,6 +202,18 @@ export class CommandRegistry {
             .map((arg) => arg.name),
         }
       };
+      
+      // Add annotations if they exist
+      if (command.annotations) {
+        // MCP SDK expects annotations to be a direct object with properties
+        tool.annotations = {
+          title: command.annotations.title,
+          readOnlyHint: command.annotations.readOnlyHint,
+          destructiveHint: command.annotations.destructiveHint,
+          idempotentHint: command.annotations.idempotentHint,
+          openWorldHint: command.annotations.openWorldHint
+        };
+      }
       
       return tool;
     });
