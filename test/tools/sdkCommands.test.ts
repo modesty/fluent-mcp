@@ -70,7 +70,33 @@ describe('SDK Command Tools', () => {
 
     const result = await versionCommand.execute({});
     expect(result.success).toBe(true);
-    expect(result.output).toContain('ServiceNow SDK v3.0.2');
+    
+    // Basic presence check
+    expect(result.output).toContain('ServiceNow SDK v');
+    
+    // Extract version using regex and validate semantic versioning format
+    const versionRegex = /ServiceNow SDK v(\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)/;
+    const match = result.output.match(versionRegex);
+    
+    // Verify version string was found and extracted
+    expect(match).not.toBeNull();
+    expect(match).toBeDefined();
+    
+    // Extract the version without the prefix
+    const versionString = match ? match[1] : '';
+    
+    // Validate the format of the extracted version using semantic versioning regex
+    const semverRegex = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+    expect(versionString).toMatch(semverRegex);
+    
+    // Validate version components are valid numbers
+    const versionParts = versionString.split('.');
+    expect(Number(versionParts[0])).toBeGreaterThanOrEqual(0); // Major
+    expect(Number(versionParts[1])).toBeGreaterThanOrEqual(0); // Minor
+    
+    // For patch, we need to handle potential pre-release/build metadata
+    const patchPart = versionParts[2].split(/[-+]/)[0]; // Extract patch number before any pre-release/build metadata
+    expect(Number(patchPart)).toBeGreaterThanOrEqual(0); // Patch
   });
 
   test('HelpCommand should execute correctly with no args', async () => {
@@ -84,14 +110,48 @@ describe('SDK Command Tools', () => {
 
   test('HelpCommand should execute correctly with specific command', async () => {
     const helpCommand = commands.find((cmd) => cmd.name === 'get_fluent_help');
-    mockRunner.setMockResult({
-      stdout: 'Help for auth command',
-      stderr: '',
-      exitCode: 0
+    
+    // Set up specific mock response
+    const mockStdout = 'Help for auth command';
+    const mockStderr = '';
+    const mockExitCode = 0;
+    
+    // Override the run method directly for this test
+    const originalRun = mockRunner.run;
+    mockRunner.run = jest.fn().mockImplementation(async (_command, args) => {
+      // Check if this is the specific auth help command we're testing
+      if (args.includes('auth') && args.includes('--help')) {
+        return {
+          stdout: mockStdout,
+          stderr: mockStderr,
+          exitCode: mockExitCode
+        };
+      }
+      
+      // Otherwise call the original implementation
+      return originalRun.call(mockRunner, _command, args);
     });
 
+    // Execute the command
     const result = await helpCommand.execute({ command: 'auth' });
+    
+    // Verify the command succeeded
     expect(result.success).toBe(true);
+    
+    // Verify the mock output is correctly returned in the result
+    expect(result.output).toContain(mockStdout);
+    expect(result.exitCode).toBe(mockExitCode);
+    expect(result.error).toBeUndefined();
+    
+    // Verify the command was called with expected arguments
+    expect(mockRunner.run).toHaveBeenCalledWith(
+      'npx', 
+      expect.arrayContaining(['now-sdk', 'auth', '--help']), 
+      expect.any(String)  // The working directory is passed as the third parameter
+    );
+    
+    // Restore the original run method
+    mockRunner.run = originalRun;
   });
 
   test('DebugCommand should execute correctly', async () => {

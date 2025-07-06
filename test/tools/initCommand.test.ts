@@ -6,6 +6,50 @@ import { SessionManager } from "../../src/utils/sessionManager.js";
 import fs from "node:fs";
 import os from "node:os";
 
+// Create a virtual filesystem helper
+interface FluentAppInfo {
+  hasApp: boolean;
+  scopeName?: string;
+  packageName?: string;
+}
+
+class VirtualFileSystem {
+  private existingDirs: Set<string> = new Set<string>();
+  private fluentApps: Map<string, FluentAppInfo> = new Map();
+
+  reset(): void {
+    this.existingDirs.clear();
+    this.fluentApps.clear();
+  }
+
+  addExistingDirectory(path: string): void {
+    this.existingDirs.add(path);
+  }
+
+  markAsFluentApp(path: string, scopeName: string, packageName: string): void {
+    this.addExistingDirectory(path);
+    this.fluentApps.set(path, {
+      hasApp: true,
+      scopeName,
+      packageName
+    });
+  }
+
+  directoryExists(path: string): boolean {
+    return this.existingDirs.has(path);
+  }
+
+  createDirectory(path: string): void {
+    this.existingDirs.add(path);
+  }
+
+  getFluentAppInfo(path: string): FluentAppInfo {
+    return this.fluentApps.get(path) || { hasApp: false };
+  }
+}
+
+const mockFs = new VirtualFileSystem();
+
 jest.mock("../../src/utils/sessionManager.js", () => {
   return {
     SessionManager: {
@@ -24,6 +68,12 @@ describe("InitCommand", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     
+    // Reset the virtual filesystem
+    mockFs.reset();
+    // Setup initial filesystem state
+    mockFs.addExistingDirectory('/valid-dir');
+    mockFs.markAsFluentApp('/existing-app-dir', 'x_test_scope', 'test-package');
+    
     // Create a mock executor
     mockExecutor = {
       execute: jest.fn().mockImplementation((command, args, useMcpCwd, workingDir) => {
@@ -38,22 +88,25 @@ describe("InitCommand", () => {
 
     // Mock file system - must be done BEFORE creating the command
     jest.spyOn(fs, 'existsSync').mockImplementation((path) => {
-      if (String(path) === '/valid-dir' || String(path) === '/existing-app-dir') return true;
-      return false;
+      return mockFs.directoryExists(String(path));
     });
     
-    jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined);
+    jest.spyOn(fs, 'mkdirSync').mockImplementation((path) => {
+      mockFs.createDirectory(String(path));
+      return undefined;
+    });
     
     // Mock os.homedir
     jest.spyOn(os, 'homedir').mockReturnValue('/mock-home');
     
     // Mock FluentAppValidator
     jest.spyOn(FluentAppValidator, 'checkFluentAppExists').mockImplementation(async (directory) => {
-      if (directory === '/existing-app-dir') {
+      const info = mockFs.getFluentAppInfo(directory);
+      if (info.hasApp) {
         return { 
           hasApp: true, 
-          scopeName: 'x_test_scope', 
-          packageName: 'test-package' 
+          scopeName: info.scopeName, 
+          packageName: info.packageName 
         };
       }
       return { hasApp: false };
@@ -92,6 +145,7 @@ describe("InitCommand", () => {
   });
 
   test('should handle existing directory with no Fluent app', async () => {
+    mockFs.addExistingDirectory('/valid-dir');
     await initCommand.execute({ workingDirectory: '/valid-dir' });
     
     // Should not create directory
@@ -103,6 +157,7 @@ describe("InitCommand", () => {
   });
   
   test('should handle existing directory with Fluent app', async () => {
+    mockFs.markAsFluentApp('/existing-app-dir', 'x_test_scope', 'test-package');
     const result = await initCommand.execute({ workingDirectory: '/existing-app-dir' });
     
     expect(result.success).toBe(true);  // Changed to true since we're returning success now

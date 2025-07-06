@@ -8,15 +8,16 @@ export function patchLoggerForTests(): void {
     const mcpMock = jest.requireMock('@modelcontextprotocol/sdk/server/mcp.js');
     
     // Ensure McpServer mock has proper shape
-    if (mcpMock && mcpMock.McpServer && mcpMock.McpServer.mock) {
+    if (mcpMock?.McpServer?.mock) {
       // Get all mock results (there might be multiple instances)
       const mockResults = mcpMock.McpServer.mock.results;
       
       // Apply patch to all instances
       mockResults.forEach((result: {value?: any}) => {
-        if (result && result.value && result.value.server) {
-          // Ensure notification function exists
-          result.value.server.notification = result.value.server.notification || jest.fn();
+        // Use optional chaining for safer property access
+        if (result?.value?.server) {
+          // Ensure notification function exists with nullish coalescing
+          result.value.server.notification ??= jest.fn();
         }
       });
     }
@@ -24,10 +25,12 @@ export function patchLoggerForTests(): void {
     // Mock LoggingManager if it's being used in the test
     try {
       const LoggingManagerMock = jest.requireMock('../../src/utils/loggingManager.js');
-      if (LoggingManagerMock && LoggingManagerMock.loggingManager) {
+      // Use optional chaining for safer property access
+      if (LoggingManagerMock?.loggingManager) {
         // Make sure any methods that need the MCP server are patched
         const mockLoggingManager = LoggingManagerMock.loggingManager;
-        mockLoggingManager.configure = mockLoggingManager.configure || jest.fn();
+        // Use nullish coalescing for default assignment
+        mockLoggingManager.configure ??= jest.fn();
       }
     } catch (err) {
       // LoggingManager might not be used in all tests, so silently ignore

@@ -2,6 +2,40 @@ import { CommandResult } from "../../src/utils/types.js";
 import { CLIExecutor } from "../../src/tools/cliCommandTools.js";
 import { AuthCommand } from "../../src/tools/commands/authCommand.js";
 
+/**
+ * Helper function to create a mock CLIExecutor with configurable response
+ * @param options Configuration options for the mock executor
+ * @returns A mock CLIExecutor instance
+ */
+function createMockExecutor(options?: {
+  success?: boolean;
+  output?: string;
+  exitCode?: number;
+  error?: Error;
+}): CLIExecutor {
+  const {
+    success = true,
+    output = "Mock command executed successfully",
+    exitCode = 0,
+    error = undefined,
+  } = options || {};
+
+  return {
+    execute: jest.fn().mockImplementation(() => {
+      if (!success && error) {
+        return Promise.reject(error);
+      }
+
+      return Promise.resolve({
+        success,
+        output,
+        exitCode,
+        error: error?.message,
+      } as CommandResult);
+    }),
+  } as unknown as CLIExecutor;
+}
+
 // Mock the session manager
 jest.mock("../../src/utils/sessionManager.js", () => ({
   SessionManager: {
@@ -17,16 +51,9 @@ describe("AuthCommand", () => {
 
   beforeEach(() => {
     // Create a mock executor
-    mockExecutor = {
-      execute: jest.fn().mockImplementation((command, args, useMcpCwd) => {
-        // Default mock implementation for successful execution
-        return Promise.resolve({
-          success: true,
-          output: "Mock auth command executed successfully",
-          exitCode: 0,
-        } as CommandResult);
-      }),
-    } as unknown as CLIExecutor;
+    mockExecutor = createMockExecutor({
+      output: "Mock auth command executed successfully"
+    });
 
     authCommand = new AuthCommand(mockExecutor);
   });
