@@ -20,6 +20,12 @@ export class TransformCommand extends SessionAwareCLICommand {
       type: "string",
       required: false,
       description: "Destination file or directory for transformed output",
+    },
+    {
+      name: "debug",
+      type: "boolean",
+      required: false,
+      description: "Print debug output",
     }
   ];
 
@@ -33,6 +39,11 @@ export class TransformCommand extends SessionAwareCLICommand {
     
     if (args.destination) {
       sdkArgs.push("--destination", args.destination as string);
+    }
+
+    // Add debug flag if specified
+    if (args.debug) {
+      sdkArgs.push("--debug");
     }
 
     return this.executeWithSessionWorkingDirectory("npx", sdkArgs);

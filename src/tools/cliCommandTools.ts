@@ -11,7 +11,6 @@ import { getProjectRootPath } from "../config.js";
 import {
   VersionCommand,
   HelpCommand,
-  DebugCommand,
   UpgradeCommand,
   AuthCommand,
   InitCommand,
@@ -216,7 +215,6 @@ export class CommandFactory {
     return [
       new VersionCommand(cliExecutor),
       new HelpCommand(cliExecutor),
-      new DebugCommand(cliExecutor),
       new UpgradeCommand(cliExecutor),
       new AuthCommand(cliExecutor),
       new InitCommand(cliExecutor),

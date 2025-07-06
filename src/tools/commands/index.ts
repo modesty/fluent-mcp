@@ -3,7 +3,7 @@ export * from './sessionAwareCommand.js';
 export * from './sessionFallbackCommand.js';
 export * from './versionCommand.js';
 export * from './helpCommand.js';
-export * from './debugCommand.js';
+
 export * from './upgradeCommand.js';
 export * from './authCommand.js';
 export * from './initCommand.js';

@@ -154,14 +154,7 @@ describe('SDK Command Tools', () => {
     mockRunner.run = originalRun;
   });
 
-  test('DebugCommand should execute correctly', async () => {
-    const debugCommand = commands.find((cmd) => cmd.name === 'enable_fluent_debug');
-    expect(debugCommand).toBeDefined();
 
-    const result = await debugCommand.execute({ command: 'version' });
-    expect(result.success).toBe(true);
-    expect(result.output).toContain('Debug logs');
-  });
 
   test('UpgradeCommand should execute correctly with basic upgrade', async () => {
     const upgradeCommand = commands.find((cmd) => cmd.name === 'upgrade_fluent');

@@ -54,6 +54,12 @@ export class AuthCommand extends SessionFallbackCommand {
       required: false,
       description: "Use the specified authentication profile",
     },
+    {
+      name: "debug",
+      type: "boolean",
+      required: false,
+      description: "Print debug output",
+    },
   ];
 
   constructor(cliExecutor: CLIExecutor) {
@@ -92,6 +98,11 @@ export class AuthCommand extends SessionFallbackCommand {
       sdkArgs.push("--delete", args.delete as string);
     } else if (args.use) {
       sdkArgs.push("--use", args.use as string);
+    }
+
+    // Add debug flag if specified
+    if (args.debug) {
+      sdkArgs.push("--debug");
     }
 
     return await this.executeWithFallback("npx", sdkArgs);

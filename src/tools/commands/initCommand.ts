@@ -52,6 +52,12 @@ export class InitCommand extends BaseCLICommand {
       required: false,
       description: "The directory where the Fluent (ServiceNow SDK) application will be created. If not provided, a new directory will be created in the user's home directory.",
     },
+    {
+      name: "debug",
+      type: "boolean",
+      required: false,
+      description: "Print debug output",
+    },
   ];
 
   constructor(cliExecutor: CLIExecutor) {
@@ -176,6 +182,11 @@ export class InitCommand extends BaseCLICommand {
     
     if (args.auth) {
       sdkArgs.push("--auth", args.auth as string);
+    }
+
+    // Add debug flag if specified
+    if (args.debug) {
+      sdkArgs.push("--debug");
     }
 
     // Execute the command in the specified working directory

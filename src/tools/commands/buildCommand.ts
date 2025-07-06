@@ -8,10 +8,22 @@ import { SessionAwareCLICommand } from "./sessionAwareCommand.js";
 export class BuildCommand extends SessionAwareCLICommand {
   name = "fluent_build";
   description = "Build the Fluent (ServiceNow SDK) application in the current session's working directory";
-  arguments: CommandArgument[] = [];
+  arguments: CommandArgument[] = [
+    {
+      name: "debug",
+      type: "boolean",
+      required: false,
+      description: "Print debug output",
+    }
+  ];
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
     const sdkArgs = ["now-sdk", "build"];
+    
+    // Add debug flag if specified
+    if (args.debug) {
+      sdkArgs.push("--debug");
+    }
 
     return this.executeWithSessionWorkingDirectory("npx", sdkArgs);
   }

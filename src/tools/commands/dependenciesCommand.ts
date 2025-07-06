@@ -38,6 +38,12 @@ export class DependenciesCommand extends SessionAwareCLICommand {
       type: "string",
       required: false,
       description: "The authentication alias to use",
+    },
+    {
+      name: "debug",
+      type: "boolean",
+      required: false,
+      description: "Print debug output",
     }
   ];
 
@@ -59,6 +65,11 @@ export class DependenciesCommand extends SessionAwareCLICommand {
     
     if (args.auth) {
       sdkArgs.push("--auth", args.auth as string);
+    }
+
+    // Add debug flag if specified
+    if (args.debug) {
+      sdkArgs.push("--debug");
     }
 
     return this.executeWithSessionWorkingDirectory("npx", sdkArgs);
