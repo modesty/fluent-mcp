@@ -9,7 +9,7 @@ import {
   GetInstructCommand,
   ListMetadataTypesCommand
 } from "./resourceTools.js";
-import { CLIExecutor, NodeProcessRunner } from "./cliCommandTools.js";
+import { CLIExecutor, CLICmdWriter, NodeProcessRunner } from "./cliCommandTools.js";
 
 /**
  * Manager for handling MCP tools registration and execution
@@ -36,8 +36,14 @@ export class ToolsManager {
   private initializeTools(): void {
     // Register CLI commands
     const processRunner = new NodeProcessRunner();
+    
+    // Create both types of command processors
     const cliExecutor = new CLIExecutor(processRunner);
-    const commands = CommandFactory.createCommands(cliExecutor);
+    const cliCmdWriter = new CLICmdWriter(processRunner);
+    
+    // Create commands with appropriate processors for each type
+    // AuthCommand and InitCommand will use CLICmdWriter, others will use CLIExecutor
+    const commands = CommandFactory.createCommands(cliExecutor, cliCmdWriter);
 
     commands.forEach((command) => {
       this.commandRegistry.register(command);

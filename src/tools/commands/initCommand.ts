@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { CommandArgument, CommandResult } from "../../utils/types.js";
-import { CLIExecutor } from "../cliCommandTools.js";
+import { CommandArgument, CommandProcessor, CommandResult } from "../../utils/types.js";
+
 import { BaseCLICommand } from "./baseCommand.js";
 import { FluentAppValidator } from "../../utils/fluentAppValidator.js";
 import { SessionManager } from "../../utils/sessionManager.js";
@@ -13,8 +13,8 @@ import logger from "../../utils/logger.js";
  * Implements the init command with validation of prerequisites
  */
 export class InitCommand extends BaseCLICommand {
-  name = "fluent_init";
-  description = "Initialize a Fluent (ServiceNow SDK) application: If specified directory has no Fluent (ServiceNow SDK) application, it will create a new one. If it has a Fluent (ServiceNow SDK) application, it will save the directory as the working directory for future commands, including build, install, transform and dependencies.";
+  name = "prepare_fluent_init";
+  description = "Prepare the shell command to initialize a Fluent (ServiceNow SDK) application: If specified directory has no Fluent (ServiceNow SDK) application, it will create a new one. If it has a Fluent (ServiceNow SDK) application, it will save the directory as the working directory for future commands, including build, install, transform and dependencies.\nWhen converting an existing ServiceNow application, use the 'from' argument to specify the system ID or path to initialize from. \nNote, if the specified directory has no package-lock.json file, run `npm install` first.\nNote, This command will not execute the initialization but prepare the shell command to be run later.";
   arguments: CommandArgument[] = [
     {
       name: "from",
@@ -60,8 +60,8 @@ export class InitCommand extends BaseCLICommand {
     },
   ];
 
-  constructor(cliExecutor: CLIExecutor) {
-    super(cliExecutor);
+  constructor(commandProcessor: CommandProcessor) {
+    super(commandProcessor);
   }
 
   // Using FluentAppValidator.checkFluentAppExists() instead
@@ -191,7 +191,7 @@ export class InitCommand extends BaseCLICommand {
 
     // Execute the command in the specified working directory
     try {
-      const result = await this.cliExecutor.execute("npx", sdkArgs, false, workingDirectory);
+      const result = await this.commandProcessor.process("npx", sdkArgs, false, workingDirectory);
       logger.info(`Executed init command in directory: ${workingDirectory} - ${JSON.stringify(result)}`);
       // Add confirmation that the working directory has been saved
       if (result.success) {

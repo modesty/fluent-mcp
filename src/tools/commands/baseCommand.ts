@@ -1,5 +1,4 @@
-import { CLICommand, CommandArgument, CommandResult } from "../../utils/types";
-import { CLIExecutor } from "../cliCommandTools.js";
+import { CLICommand, CommandArgument, CommandProcessor, CommandResult } from "../../utils/types";
 
 /**
  * Base abstract class for all CLI commands
@@ -10,7 +9,7 @@ export abstract class BaseCLICommand implements CLICommand {
   abstract description: string;
   abstract arguments: CommandArgument[];
 
-  constructor(protected cliExecutor: CLIExecutor) {}
+  constructor(protected commandProcessor: CommandProcessor) {}
 
   abstract execute(args: Record<string, unknown>): Promise<CommandResult>;
 

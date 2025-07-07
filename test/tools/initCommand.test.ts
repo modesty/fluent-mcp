@@ -1,5 +1,4 @@
-import { CommandResult } from "../../src/utils/types.js";
-import { CLIExecutor } from "../../src/tools/cliCommandTools.js";
+import { CommandProcessor, CommandResult } from "../../src/utils/types.js";
 import { InitCommand } from "../../src/tools/commands/initCommand.js";
 import { FluentAppValidator } from "../../src/utils/fluentAppValidator.js";
 import { SessionManager } from "../../src/utils/sessionManager.js";
@@ -63,7 +62,7 @@ jest.mock("../../src/utils/sessionManager.js", () => {
 
 describe("InitCommand", () => {
   let initCommand: InitCommand;
-  let mockExecutor: CLIExecutor;
+  let mockExecutor: CommandProcessor;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -74,8 +73,16 @@ describe("InitCommand", () => {
     mockFs.addExistingDirectory('/valid-dir');
     mockFs.markAsFluentApp('/existing-app-dir', 'x_test_scope', 'test-package');
     
-    // Create a mock executor
+    // Create a mock processor
     mockExecutor = {
+      process: jest.fn().mockImplementation((command, args, useMcpCwd, workingDir) => {
+        // Default mock implementation for successful execution
+        return Promise.resolve({
+          success: true,
+          output: "Mock init command executed successfully",
+          exitCode: 0,
+        } as CommandResult);
+      }),
       execute: jest.fn().mockImplementation((command, args, useMcpCwd, workingDir) => {
         // Default mock implementation for successful execution
         return Promise.resolve({
@@ -84,7 +91,7 @@ describe("InitCommand", () => {
           exitCode: 0,
         } as CommandResult);
       }),
-    } as unknown as CLIExecutor;
+    } as CommandProcessor;
 
     // Mock file system - must be done BEFORE creating the command
     jest.spyOn(fs, 'existsSync').mockImplementation((path) => {
@@ -116,9 +123,9 @@ describe("InitCommand", () => {
   });
 
   test("should have correct properties", () => {
-    expect(initCommand.name).toBe("fluent_init");
-    expect(initCommand.description).toBe(
-      "Initialize a Fluent (ServiceNow SDK) application: If specified directory has no Fluent (ServiceNow SDK) application, it will create a new one. If it has a Fluent (ServiceNow SDK) application, it will save the directory as the working directory for future commands, including build, install, transform and dependencies."
+    expect(initCommand.name).toBe("prepare_fluent_init");
+    expect(initCommand.description).toContain(
+      "a Fluent (ServiceNow SDK) application: If specified directory has no Fluent (ServiceNow SDK) application, it will create a new one. If it has a Fluent (ServiceNow SDK) application, it will save the directory as the working directory for future commands, including build, install, transform and dependencies."
     );
     expect(initCommand.arguments.length).toBeGreaterThan(0);
     
@@ -141,7 +148,7 @@ describe("InitCommand", () => {
     
     expect(fs.mkdirSync).toHaveBeenCalledWith('/non-existent-dir', { recursive: true });
     expect(SessionManager.getInstance().setWorkingDirectory).toHaveBeenCalledWith('/non-existent-dir');
-    expect(mockExecutor.execute).toHaveBeenCalled();
+    expect(mockExecutor.process).toHaveBeenCalled();
   });
 
   test('should handle existing directory with no Fluent app', async () => {
@@ -153,7 +160,7 @@ describe("InitCommand", () => {
     // Should save working directory
     expect(SessionManager.getInstance().setWorkingDirectory).toHaveBeenCalledWith('/valid-dir');
     // Should execute command
-    expect(mockExecutor.execute).toHaveBeenCalled();
+    expect(mockExecutor.process).toHaveBeenCalled();
   });
   
   test('should handle existing directory with Fluent app', async () => {
@@ -166,7 +173,7 @@ describe("InitCommand", () => {
     // Should save working directory
     expect(SessionManager.getInstance().setWorkingDirectory).toHaveBeenCalledWith('/existing-app-dir');
     // Should not execute command
-    expect(mockExecutor.execute).not.toHaveBeenCalled();
+    expect(mockExecutor.process).not.toHaveBeenCalled();
   });
 
   test('should create default directory if working directory not provided', async () => {
@@ -179,7 +186,7 @@ describe("InitCommand", () => {
     const expectedDir = '/mock-home/fluent-app-2025-06-14T12-00-00-000Z';
     expect(fs.mkdirSync).toHaveBeenCalledWith(expectedDir, { recursive: true });
     expect(SessionManager.getInstance().setWorkingDirectory).toHaveBeenCalledWith(expectedDir);
-    expect(mockExecutor.execute).toHaveBeenCalled();
+    expect(mockExecutor.process).toHaveBeenCalled();
   });
 
   test('should execute init command with correct arguments', async () => {
@@ -194,7 +201,7 @@ describe("InitCommand", () => {
 
     await initCommand.execute(args);
     
-    expect(mockExecutor.execute).toHaveBeenCalledWith(
+    expect(mockExecutor.process).toHaveBeenCalledWith(
       'npx',
       [
         '-y',

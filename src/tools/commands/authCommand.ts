@@ -1,15 +1,15 @@
 import logger from "../../utils/logger.js";
-import { CommandArgument, CommandResult } from "../../utils/types.js";
-import { CLIExecutor } from "../cliCommandTools.js";
+import { CommandArgument, CommandProcessor, CommandResult } from "../../utils/types.js";
+
 import { SessionFallbackCommand } from "./sessionFallbackCommand.js";
 
 /**
- * Command to manage ServiceNow SDK authentication
+ * Command to prepare shell command for ServiceNow SDK authentication
  * Handles adding, listing, deleting, and selecting auth profiles
  */
 export class AuthCommand extends SessionFallbackCommand {
-  name = "manage_fluent_auth";
-  description = "Manage Fluent (ServiceNow SDK) authentication to <instance_url> with credential profiles";
+  name = "prepare_fluent_auth";
+  description = "Prepare shell command for Fluent (ServiceNow SDK) authentication to <instance_url> with credential profiles";
   arguments: CommandArgument[] = [
     {
       name: "add",
@@ -28,7 +28,7 @@ export class AuthCommand extends SessionFallbackCommand {
       type: "string",
       required: false,
       description:
-        'Authentication type (e.g., "oauth", "basic"). Default is "oauth"',
+        'Authentication type (e.g., "oauth", "basic"). Default for localhost is "basic", for other hosts is "oauth"',
     },
     {
       name: "alias",
@@ -40,7 +40,7 @@ export class AuthCommand extends SessionFallbackCommand {
       name: "list",
       type: "boolean",
       required: false,
-      description: "List all stored authentication profiles",
+      description: "List all existing stored authentication profiles",
     },
     {
       name: "delete",
@@ -62,8 +62,8 @@ export class AuthCommand extends SessionFallbackCommand {
     },
   ];
 
-  constructor(cliExecutor: CLIExecutor) {
-    super(cliExecutor);
+  constructor(commandProcessor: CommandProcessor) {
+    super(commandProcessor);
   }
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {

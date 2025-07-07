@@ -3,6 +3,7 @@ import { Tool } from "@modelcontextprotocol/sdk/types.js";
 
 import {
   CLICommand,
+  CommandProcessor,
   CommandResult,
   ProcessResult,
   ProcessRunner,
@@ -102,7 +103,7 @@ export class NodeProcessRunner implements ProcessRunner {
 }
 
 // Application Layer
-export class CLIExecutor {
+export class CLIExecutor implements CommandProcessor {
   private mcpCwd: string | undefined;
 
   constructor(private processRunner: ProcessRunner) {}
@@ -118,6 +119,19 @@ export class CLIExecutor {
     }
 
     return this.mcpCwd;
+  }
+
+  /**
+   * Process a command by executing it and returning the result
+   * Implements the CommandProcessor interface
+   */
+  async process(
+    command: string,
+    args: string[],
+    useMcpCwd: boolean = false,
+    customWorkingDir?: string
+  ): Promise<CommandResult> {
+    return this.execute(command, args, useMcpCwd, customWorkingDir);
   }
 
   async execute(
@@ -147,6 +161,104 @@ export class CLIExecutor {
         output: result.stdout,
         error: result.stderr ? new Error(result.stderr) : undefined,
         exitCode: result.exitCode,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        output: "",
+        error: error instanceof Error ? error : new Error(String(error)),
+        exitCode: 1,
+      };
+    }
+  }
+}
+
+// Command Writer - generates command text instead of executing
+export class CLICmdWriter implements CommandProcessor {
+  private mcpCwd: string | undefined;
+
+  // Add a processRunner property for compatibility with code expecting CLIExecutor
+  constructor(private processRunner?: ProcessRunner) {}
+
+  /**
+   * Gets the MCP root directory path (calculated once and cached)
+   * @returns The absolute path to the MCP root directory
+   */
+  private getMcpCwd(): string {
+    if (!this.mcpCwd) {
+      // Use the utility function that returns the project root path
+      this.mcpCwd = getProjectRootPath();
+    }
+
+    return this.mcpCwd;
+  }
+
+  /**
+   * Process a command by generating its text representation without executing it
+   * Implements the CommandProcessor interface
+   */
+  async process(
+    command: string,
+    args: string[],
+    useMcpCwd: boolean = false,
+    customWorkingDir?: string
+  ): Promise<CommandResult> {
+    return this.execute(command, args, useMcpCwd, customWorkingDir);
+  }
+
+  /**
+   * For compatibility with the CLIExecutor interface - allows this class
+   * to be used as a drop-in replacement in tests and existing code
+   */
+  async execute(
+    command: string,
+    args: string[],
+    useMcpCwd: boolean = false,
+    customWorkingDir?: string
+  ): Promise<CommandResult> {
+    return this.getCommandText(command, args, useMcpCwd, customWorkingDir);
+  }
+
+  /**
+   * Returns the text representation of a CLI command without executing it
+   * @param command The command to generate
+   * @param args Array of command arguments
+   * @param useMcpCwd Whether to include the MCP working directory in the command text
+   * @param customWorkingDir Custom working directory to use instead of MCP directory
+   * @returns CommandResult with the command text in the output field
+   */
+  private getCommandText(
+    command: string,
+    args: string[],
+    useMcpCwd: boolean = false,
+    customWorkingDir?: string
+  ): CommandResult {
+    try {
+      let cwd = customWorkingDir;
+      if (!cwd && useMcpCwd) {
+        cwd = this.getMcpCwd();
+      }
+      
+      // Sanity check on working directory - warn if it's the system root
+      if (cwd === "/" || cwd === "\\") {
+        throw new Error(`ERROR: Command should never use system root (/) as working directory`);
+      }
+
+      // Format the command string
+      const argsText = args.join(" ");
+      const commandText = `${command} ${argsText}`;
+      
+      // Add working directory context if available
+      const cwdInfo = cwd ? `(in directory: ${cwd})` : "";
+      const fullCommandText = cwdInfo ? `${commandText} ${cwdInfo}` : commandText;
+      
+      logger.info(`Generated command text: ${fullCommandText}`);
+            
+      return {
+        success: true,
+        output: fullCommandText,
+        error: undefined,
+        exitCode: 0,
       };
     } catch (error) {
       return {
@@ -225,21 +337,25 @@ export class CommandRegistry {
 // Factory Pattern for Command Creation
 export class CommandFactory {
   /**
-   * Creates all CLI command instances
-   * @param cliExecutor The CLI executor to use for command execution
+   * Creates all CLI command instances with appropriate processors
+   * @param executor The command processor to use for most commands that require execution
+   * @param writer The command processor to use for commands that should return text (AuthCommand, InitCommand)
    * @returns An array of command instances
    */
-  static createCommands(cliExecutor: CLIExecutor): CLICommand[] {
+  static createCommands(executor: CommandProcessor, writer?: CommandProcessor): CLICommand[] {
+    // If no writer is provided, use the executor for all commands
+    const textProcessor = writer || executor;
+    
     return [
-      new VersionCommand(cliExecutor),
-      new HelpCommand(cliExecutor),
-      new UpgradeCommand(cliExecutor),
-      new AuthCommand(cliExecutor),
-      new InitCommand(cliExecutor),
-      new BuildCommand(cliExecutor),
-      new InstallCommand(cliExecutor),
-      new TransformCommand(cliExecutor),
-      new DependenciesCommand(cliExecutor),
+      new VersionCommand(executor),
+      new HelpCommand(executor),
+      // new UpgradeCommand(executor), // disable for now, it for globally installed now-sdk
+      new AuthCommand(textProcessor), // Uses writer to generate text instead of executing
+      new InitCommand(textProcessor), // Uses writer to generate text instead of executing
+      new BuildCommand(executor),
+      new InstallCommand(executor),
+      new TransformCommand(executor),
+      new DependenciesCommand(textProcessor), // Uses writer to generate text instead of executing
     ];
   }
 }

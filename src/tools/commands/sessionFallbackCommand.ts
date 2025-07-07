@@ -62,14 +62,14 @@ export abstract class SessionFallbackCommand extends BaseCLICommand {
   ): Promise<CommandResult> {
     // If useMcpCwd is true, we use the MCPs CWD and ignore session working directory
     if (useMcpCwd) {
-      return await this.cliExecutor.execute(command, args, true);
+      return await this.commandProcessor.process(command, args, true);
     }
     
     // Otherwise, get working directory from session or fallback to project root
     const workingDirectory = this.getWorkingDirectoryWithFallback();
     
     try {
-      return await this.cliExecutor.execute(command, args, false, workingDirectory);
+      return await this.commandProcessor.process(command, args, false, workingDirectory);
     } catch (error) {
       return {
         exitCode: 1,

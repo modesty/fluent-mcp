@@ -1,5 +1,4 @@
-import { CommandResult } from "../../src/utils/types.js";
-import { CLIExecutor } from "../../src/tools/cliCommandTools.js";
+import { CommandProcessor, CommandResult } from "../../src/utils/types.js";
 import { SessionFallbackCommand } from "../../src/tools/commands/sessionFallbackCommand.js";
 import { SessionManager } from "../../src/utils/sessionManager.js";
 
@@ -48,12 +47,19 @@ class TestFallbackCommand extends SessionFallbackCommand {
 
 describe("SessionFallbackCommand", () => {
   let command: TestFallbackCommand;
-  let mockExecutor: CLIExecutor;
+  let mockExecutor: CommandProcessor;
 
   beforeEach(() => {
     jest.clearAllMocks();
 
     mockExecutor = {
+      process: jest.fn().mockImplementation(() => {
+        return Promise.resolve({
+          success: true,
+          output: "Mock command executed successfully",
+          exitCode: 0,
+        } as CommandResult);
+      }),
       execute: jest.fn().mockImplementation(() => {
         return Promise.resolve({
           success: true,
@@ -61,7 +67,7 @@ describe("SessionFallbackCommand", () => {
           exitCode: 0,
         } as CommandResult);
       }),
-    } as unknown as CLIExecutor;
+    } as CommandProcessor;
 
     command = new TestFallbackCommand(mockExecutor);
   });
@@ -73,7 +79,7 @@ describe("SessionFallbackCommand", () => {
     await command.execute({});
 
     expect(SessionManager.getInstance().getWorkingDirectory).toHaveBeenCalled();
-    expect(mockExecutor.execute).toHaveBeenCalledWith(
+    expect(mockExecutor.process).toHaveBeenCalledWith(
       "test", 
       ["arg1", "arg2"], 
       false, // useMcpCwd
@@ -89,7 +95,7 @@ describe("SessionFallbackCommand", () => {
 
     expect(SessionManager.getInstance().getWorkingDirectory).toHaveBeenCalled();
     // The config module is already mocked via Jest setup
-    expect(mockExecutor.execute).toHaveBeenCalledWith(
+    expect(mockExecutor.process).toHaveBeenCalledWith(
       "test", 
       ["arg1", "arg2"], 
       false, // useMcpCwd

@@ -35,8 +35,9 @@ jest.mock("../../src/tools/cliCommandTools.js", () => {
   
   return {
     CLIExecutor: jest.fn(),
+    CLICmdWriter: jest.fn(),
     CommandFactory: {
-      createCommands: jest.fn().mockReturnValue([
+      createCommands: jest.fn().mockImplementation((executor, writer) => [
         {
           name: "mock-command",
           description: "A mock command for testing",

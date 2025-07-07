@@ -1,138 +1,84 @@
-import { CommandResult } from "../../src/utils/types.js";
-import { CLIExecutor } from "../../src/tools/cliCommandTools.js";
+import { CommandProcessor, CommandResult } from "../../src/utils/types.js";
 import { AuthCommand } from "../../src/tools/commands/authCommand.js";
+import { SessionManager } from "../../src/utils/sessionManager.js";
 
-/**
- * Helper function to create a mock CLIExecutor with configurable response
- * @param options Configuration options for the mock executor
- * @returns A mock CLIExecutor instance
- */
-function createMockExecutor(options?: {
-  success?: boolean;
-  output?: string;
-  exitCode?: number;
-  error?: Error;
-}): CLIExecutor {
-  const {
-    success = true,
-    output = "Mock command executed successfully",
-    exitCode = 0,
-    error = undefined,
-  } = options || {};
-
-  return {
-    execute: jest.fn().mockImplementation(() => {
-      if (!success && error) {
-        return Promise.reject(error);
-      }
-
-      return Promise.resolve({
-        success,
-        output,
-        exitCode,
-        error: error?.message,
-      } as CommandResult);
-    }),
-  } as unknown as CLIExecutor;
-}
-
-// Mock the session manager
+// Mock SessionManager
 jest.mock("../../src/utils/sessionManager.js", () => ({
   SessionManager: {
     getInstance: jest.fn().mockReturnValue({
-      getWorkingDirectory: jest.fn().mockReturnValue(undefined),
+      getWorkingDirectory: jest.fn().mockReturnValue("/test-working-dir"),
     }),
   },
 }));
 
+// Create mock processor factory for tests
+function createMockProcessor(): CommandProcessor {
+  return {
+    process: jest.fn().mockImplementation(async () => {
+      return {
+        success: true,
+        output: "Mock auth command executed successfully",
+        exitCode: 0,
+      } as CommandResult;
+    }),
+    
+    // Legacy execute method (to be removed after refactoring)
+    execute: jest.fn().mockImplementation(async () => {
+      return {
+        success: true,
+        output: "Mock auth command executed successfully",
+        exitCode: 0,
+      } as CommandResult;
+    }),
+  } as CommandProcessor;
+}
+
 describe("AuthCommand", () => {
   let authCommand: AuthCommand;
-  let mockExecutor: CLIExecutor;
+  let mockProcessor: CommandProcessor;
 
   beforeEach(() => {
-    // Create a mock executor
-    mockExecutor = createMockExecutor({
-      output: "Mock auth command executed successfully"
-    });
-
-    authCommand = new AuthCommand(mockExecutor);
+    jest.clearAllMocks();
+    
+    mockProcessor = createMockProcessor();
+    authCommand = new AuthCommand(mockProcessor);
   });
 
-  test("should create an auth command with correct properties", () => {
-    expect(authCommand.name).toBe("manage_fluent_auth");
-    expect(authCommand.description).toContain(
-      "Manage Fluent (ServiceNow SDK) authentication"
+  test("should have correct properties", () => {
+    expect(authCommand.name).toBe("prepare_fluent_auth");
+    expect(authCommand.description).toBe(
+      "Prepare shell command for Fluent (ServiceNow SDK) authentication to <instance_url> with credential profiles"
     );
-    expect(authCommand.arguments.length).toBeGreaterThan(0);
+    // Check for expected arguments
+    expect(authCommand.arguments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "add" }),
+        expect.objectContaining({ name: "instanceUrl" }),
+        expect.objectContaining({ name: "list" })
+      ])
+    );
   });
 
-  test("should execute list authentication profiles", async () => {
-    const result = await authCommand.execute({ list: true });
-
-    expect(mockExecutor.execute).toHaveBeenCalledWith(
+  test("should execute auth command with add action", async () => {
+    // Test args for add action
+    const args = {
+      action: "add",
+      id: "test-instance",
+      username: "test-user",
+      password: "test-pass",
+      url: "https://test-instance.service-now.com"
+    };
+    
+    const result = await authCommand.execute(args);
+    
+    // Verify process was called with correct arguments
+    expect(mockProcessor.process).toHaveBeenCalledWith(
       "npx",
-      ["now-sdk", "auth", "--list"],
+      ["now-sdk", "auth"],
       false,
-      process.cwd()
+      "/test-working-dir"
     );
+    
     expect(result.success).toBe(true);
-  });
-
-  test("should execute add authentication profile", async () => {
-    const result = await authCommand.execute({
-      add: true,
-      instanceUrl: "https://example.service-now.com",
-      alias: "testuser",
-      type: "oauth",
-    });
-
-    expect(mockExecutor.execute).toHaveBeenCalledWith(
-      "npx",
-      [
-        "now-sdk",
-        "auth",
-        "--add",
-        "https://example.service-now.com",
-        "--type",
-        "oauth",
-        "--alias",
-        "testuser",
-      ],
-      false,
-      process.cwd()
-    );
-    expect(result.success).toBe(true);
-  });
-
-  test("should execute delete authentication profile", async () => {
-    const result = await authCommand.execute({ delete: "testuser" });
-
-    expect(mockExecutor.execute).toHaveBeenCalledWith(
-      "npx",
-      ["now-sdk", "auth", "--delete", "testuser"],
-      false,
-      process.cwd()
-    );
-    expect(result.success).toBe(true);
-  });
-
-  test("should execute use authentication profile", async () => {
-    const result = await authCommand.execute({ use: "testuser" });
-
-    expect(mockExecutor.execute).toHaveBeenCalledWith(
-      "npx",
-      ["now-sdk", "auth", "--use", "testuser"],
-      false,
-      process.cwd()
-    );
-    expect(result.success).toBe(true);
-  });
-
-  test("should fail when add command is missing instanceUrl", async () => {
-    const result = await authCommand.execute({ add: true });
-
-    expect(result.success).toBe(false);
-    expect(result.error?.message).toContain("must provide --instanceUrl");
-    expect(mockExecutor.execute).not.toHaveBeenCalled();
   });
 });

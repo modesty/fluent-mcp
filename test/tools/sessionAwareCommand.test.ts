@@ -1,5 +1,4 @@
-import { CommandResult } from "../../src/utils/types.js";
-import { CLIExecutor } from "../../src/tools/cliCommandTools.js";
+import { CommandProcessor, CommandResult } from "../../src/utils/types.js";
 import { SessionAwareCLICommand } from "../../src/tools/commands/sessionAwareCommand.js";
 import { SessionManager } from "../../src/utils/sessionManager.js";
 
@@ -28,21 +27,28 @@ class TestSessionAwareCommand extends SessionAwareCLICommand {
 
 describe("SessionAwareCommand", () => {
   let sessionAwareCommand: TestSessionAwareCommand;
-  let mockExecutor: CLIExecutor;
+  let mockExecutor: CommandProcessor;
 
   beforeEach(() => {
     jest.clearAllMocks();
     
-    // Create a mock executor
+    // Create a mock processor
     mockExecutor = {
-      execute: jest.fn().mockImplementation(() => {
+      process: jest.fn().mockImplementation(() => {
         return Promise.resolve({
           success: true,
           output: "Mock command executed successfully",
           exitCode: 0,
         } as CommandResult);
       }),
-    } as unknown as CLIExecutor;
+      execute: jest.fn().mockImplementation(() => {
+        return Promise.resolve({
+          success: true,
+          output: "Mock command executed successfully",
+          exitCode: 0,
+        } as CommandResult);
+      })
+    } as CommandProcessor;
 
     sessionAwareCommand = new TestSessionAwareCommand(mockExecutor);
   });
@@ -51,7 +57,7 @@ describe("SessionAwareCommand", () => {
     const result = await sessionAwareCommand.execute({});
     
     expect(SessionManager.getInstance().getWorkingDirectory).toHaveBeenCalled();
-    expect(mockExecutor.execute).toHaveBeenCalledWith(
+    expect(mockExecutor.process).toHaveBeenCalledWith(
       "test-command",
       ["test", "command", "args"],
       false,
@@ -67,14 +73,14 @@ describe("SessionAwareCommand", () => {
     const result = await sessionAwareCommand.execute({});
     
     expect(SessionManager.getInstance().getWorkingDirectory).toHaveBeenCalled();
-    expect(mockExecutor.execute).not.toHaveBeenCalled();
+    expect(mockExecutor.process).not.toHaveBeenCalled();
     expect(result.success).toBe(false);
     expect(result.error?.message).toContain("No working directory found");
   });
 
   test("should handle errors from executor", async () => {
     // Override the mock to throw an error
-    (mockExecutor.execute as jest.Mock).mockImplementationOnce(() => {
+    (mockExecutor.process as jest.Mock).mockImplementationOnce(() => {
       throw new Error("Test execution error");
     });
     

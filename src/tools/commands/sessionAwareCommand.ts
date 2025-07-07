@@ -1,4 +1,4 @@
-import { CommandResult } from "../../utils/types.js";
+import { CommandProcessor, CommandResult } from "../../utils/types.js";
 import { BaseCLICommand } from "./baseCommand.js";
 import { SessionManager } from "../../utils/sessionManager.js";
 import logger from "../../utils/logger.js";
@@ -51,7 +51,7 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
     }
     
     try {
-      return await this.cliExecutor.execute(command, args, useMcpCwd, workingDirectory);
+      return await this.commandProcessor.process(command, args, useMcpCwd, workingDirectory);
     } catch (error) {
       return {
         exitCode: 1,

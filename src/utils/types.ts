@@ -59,6 +59,18 @@ export interface ProcessRunner {
   run(command: string, args: string[], cwd?: string): Promise<ProcessResult>;
 }
 
+/**
+ * Common interface for command processing (execution or text generation)
+ */
+export interface CommandProcessor {
+  process(
+    command: string,
+    args: string[],
+    useMcpCwd?: boolean,
+    customWorkingDir?: string
+  ): Promise<CommandResult>;
+}
+
 export interface CommandExecutor {
   execute(args: Record<string, unknown>): Promise<CommandResult>;
 }

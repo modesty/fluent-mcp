@@ -1,5 +1,5 @@
-import { CommandArgument, CommandResult } from "../../utils/types";
-import { CLIExecutor } from "../cliCommandTools.js";
+import { CommandArgument, CommandProcessor, CommandResult } from "../../utils/types";
+
 import { SessionFallbackCommand } from "./sessionFallbackCommand.js";
 
 /**
@@ -17,8 +17,8 @@ export class HelpCommand extends SessionFallbackCommand {
     },
   ];
 
-  constructor(cliExecutor: CLIExecutor) {
-    super(cliExecutor);
+  constructor(commandProcessor: CommandProcessor) {
+    super(commandProcessor);
   }
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
