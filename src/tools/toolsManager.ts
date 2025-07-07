@@ -39,7 +39,7 @@ export class ToolsManager {
     
     // Create both types of command processors
     const cliExecutor = new CLIExecutor(processRunner);
-    const cliCmdWriter = new CLICmdWriter(processRunner);
+    const cliCmdWriter = new CLICmdWriter(); // CLICmdWriter doesn't need processRunner
     
     // Create commands with appropriate processors for each type
     // AuthCommand and InitCommand will use CLICmdWriter, others will use CLIExecutor

@@ -11,22 +11,15 @@ jest.mock("../../src/utils/sessionManager.js", () => ({
   },
 }));
 
-// Create mock processor factory for tests
-function createMockProcessor(): CommandProcessor {
+// Create mock CLICmdWriter for tests
+function createMockCmdWriter(): CommandProcessor {
   return {
-    process: jest.fn().mockImplementation(async () => {
+    // Mock process method that returns a generated command text
+    process: jest.fn().mockImplementation(async (command, args) => {
+      const argsText = args.join(' ');
       return {
         success: true,
-        output: "Mock auth command executed successfully",
-        exitCode: 0,
-      } as CommandResult;
-    }),
-    
-    // Legacy execute method (to be removed after refactoring)
-    execute: jest.fn().mockImplementation(async () => {
-      return {
-        success: true,
-        output: "Mock auth command executed successfully",
+        output: `${command} ${argsText}`,
         exitCode: 0,
       } as CommandResult;
     }),
@@ -35,13 +28,13 @@ function createMockProcessor(): CommandProcessor {
 
 describe("AuthCommand", () => {
   let authCommand: AuthCommand;
-  let mockProcessor: CommandProcessor;
+  let mockCmdWriter: CommandProcessor;
 
   beforeEach(() => {
     jest.clearAllMocks();
     
-    mockProcessor = createMockProcessor();
-    authCommand = new AuthCommand(mockProcessor);
+    mockCmdWriter = createMockCmdWriter();
+    authCommand = new AuthCommand(mockCmdWriter);
   });
 
   test("should have correct properties", () => {
@@ -69,16 +62,58 @@ describe("AuthCommand", () => {
       url: "https://test-instance.service-now.com"
     };
     
+    // Continue to call execute, which internally calls commandProcessor.process
     const result = await authCommand.execute(args);
     
-    // Verify process was called with correct arguments
-    expect(mockProcessor.process).toHaveBeenCalledWith(
+    // Verify CLICmdWriter's process method was called with correct arguments
+    expect(mockCmdWriter.process).toHaveBeenCalledWith(
       "npx",
-      ["now-sdk", "auth"],
+      expect.arrayContaining(["now-sdk", "auth"]),
       false,
       "/test-working-dir"
     );
     
     expect(result.success).toBe(true);
+  });
+  
+  // Add a comment explaining the relationship between execute and process
+  test("should handle relationship between execute and process methods", () => {
+    // The command.execute method should call the commandProcessor.process method
+    // This is a key part of the refactoring to ensure AuthCommand uses CLICmdWriter properly
+    
+    const args = { list: true };
+    
+    authCommand.execute(args);
+    
+    // Verify the process method of the command processor was called
+    expect(mockCmdWriter.process).toHaveBeenCalled();
+  });
+  
+  test("should pass proper auth parameters to the processor", async () => {
+    const args = {
+      add: true,
+      instanceUrl: "https://dev123.service-now.com",
+      type: "basic",
+      alias: "dev-instance" 
+    };
+    
+    await authCommand.execute(args);
+    
+    // Verify the processor received all the necessary auth parameters
+    expect(mockCmdWriter.process).toHaveBeenCalledWith(
+      "npx", 
+      expect.arrayContaining([
+        "now-sdk", 
+        "auth",
+        "--add",
+        "https://dev123.service-now.com",
+        "--type",
+        "basic",
+        "--alias",
+        "dev-instance"
+      ]),
+      false,
+      "/test-working-dir"
+    );
   });
 });

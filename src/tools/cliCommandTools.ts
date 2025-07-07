@@ -177,8 +177,7 @@ export class CLIExecutor implements CommandProcessor {
 export class CLICmdWriter implements CommandProcessor {
   private mcpCwd: string | undefined;
 
-  // Add a processRunner property for compatibility with code expecting CLIExecutor
-  constructor(private processRunner?: ProcessRunner) {}
+  constructor() {}
 
   /**
    * Gets the MCP root directory path (calculated once and cached)
