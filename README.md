@@ -153,9 +153,7 @@ This prompt is particularly useful for developers new to Fluent or those looking
 - Node.js 22.15.1 or later
 - npm 11.4.1 or later
 
-## Configuration with AI Tools
-
-### Get Started with a Fluent Project
+## Get Started with a Fluent Project
 
 1. **Authenticate to your ServiceNow instance**  
    a. Create a new auth alias: `create Fluent auth to <instanceUrl>, add the credential alias as myFluentMcpAuth`  
@@ -171,7 +169,7 @@ This prompt is particularly useful for developers new to Fluent or those looking
 
 After the MCP server is configured in your preferred client, refer back to this section for everyday commands.
 
----
+## Configuration with AI Tools
 
 ### Claude Desktop / Claude on macOS
 
@@ -289,14 +287,8 @@ Think of this as building a full-stack application with proper CI/CD pipeline - 
       "fluent-mcp": {
         "type": "stdio",
         "command": "npx",
-        "args": ["-y", "@modesty/fluent-mcp"],
-        /* Configure NOW_* environment variables globally or via your client settings */
-        /* "env": {
-          "NOW_INSTANCE_URL": "https://your-instance.service-now.com",
-          "NOW_USERNAME": "your-username",
-          "NOW_PASSWORD": "your-password"
-        } */
-      } */
+        "args": ["-y", "@modesty/fluent-mcp"]
+      }
     }
   }
 }
@@ -344,12 +336,7 @@ To configure the Fluent MCP Server for Cursor:
   "mcpServers": {
     "fluent-mcp": {
       "command": "npx",
-      "args": ["-y", "@modesty/fluent-mcp"],
-      "env": {
-          "NOW_INSTANCE_URL": "https://your-instance.service-now.com",
-          "NOW_USERNAME": "your-username",
-          "NOW_PASSWORD": "your-password"
-        } */
+      "args": ["-y", "@modesty/fluent-mcp"]
     }
   }
 }
@@ -375,14 +362,8 @@ To configure the Fluent MCP Server for Windsurf:
      "mcpServers": {
        "fluent-mcp": {
          "command": "npx",
-         "args": ["-y", "@modesty/fluent-mcp"],
-        /* Configure NOW_* environment variables globally or via your client settings */
-        /* "env": {
-          "NOW_INSTANCE_URL": "https://your-instance.service-now.com",
-          "NOW_USERNAME": "your-username",
-          "NOW_PASSWORD": "your-password"
-        } */
-       } */
+         "args": ["-y", "@modesty/fluent-mcp"]
+       }
      }
    }
    ```
@@ -414,12 +395,7 @@ To configure the Fluent MCP Server for Gemini CLI:
       "args": [
         "-y",
         "@modesty/fluent-mcp"
-      ],
-      "env": {
-        "NOW_INSTANCE_URL": "https://your-instance.service-now.com",
-        "NOW_USERNAME": "your-username",
-        "NOW_PASSWORD": "your-password"
-      } */
+      ]
     }
   }
 }
