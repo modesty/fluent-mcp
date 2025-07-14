@@ -62,7 +62,10 @@ describe("LoggingManager", () => {
     loggingManager.logServerStarting();
     
     // Assert
-    expect(logger.info).toHaveBeenCalledWith("Starting MCP server...");
+    expect(logger.info).toHaveBeenCalledWith(
+      "Starting MCP server...",
+      expect.objectContaining({ version: expect.any(String) })
+    );
   });
 
   test("should log server started", () => {

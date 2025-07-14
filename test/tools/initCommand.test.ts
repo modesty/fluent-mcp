@@ -125,7 +125,7 @@ describe("InitCommand", () => {
   test("should have correct properties", () => {
     expect(initCommand.name).toBe("prepare_fluent_init");
     expect(initCommand.description).toContain(
-      "a Fluent (ServiceNow SDK) application: If specified directory has no Fluent (ServiceNow SDK) application, it will create a new one. If it has a Fluent (ServiceNow SDK) application, it will save the directory as the working directory for future commands, including build, install, transform and dependencies."
+      "Fluent (ServiceNow SDK) application"
     );
     expect(initCommand.arguments.length).toBeGreaterThan(0);
     

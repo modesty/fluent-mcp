@@ -14,13 +14,13 @@ import logger from "../../utils/logger.js";
  */
 export class InitCommand extends BaseCLICommand {
   name = "prepare_fluent_init";
-  description = "Prepare the shell command to initialize a Fluent (ServiceNow SDK) application: If specified directory has no Fluent (ServiceNow SDK) application, it will create a new one. If it has a Fluent (ServiceNow SDK) application, it will save the directory as the working directory for future commands, including build, install, transform and dependencies.\nWhen converting an existing ServiceNow application, use the 'from' argument to specify the system ID or path to initialize from. \nNote, if the specified directory has no package-lock.json file, run `npm install` first.\nNote, This command will not execute the initialization but prepare the shell command to be run later.";
+  description = "Generate the Shell command to initialize a Fluent (ServiceNow SDK) application: If specified working directory has no Fluent (ServiceNow SDK) application, it will create a new one. If it has a Fluent (ServiceNow SDK) application, it will save the directory as the working directory for future commands, including build, install, transform and dependencies.\nWhen converting an existing ServiceNow application, use the 'from' argument to specify the system ID or path to initialize from. \nNote, if the specified directory has no package-lock.json file, run `npm install` first.\nNote, This command will not execute the initialization but prepare the shell command to be run later.";
   arguments: CommandArgument[] = [
     {
       name: "from",
       type: "string",
       required: false,
-      description: "System ID or path to initialize from",
+      description: "convert existing scoped app to Fluent by sys_id or path to initialize from",
     },
     {
       name: "appName",

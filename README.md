@@ -155,6 +155,24 @@ This prompt is particularly useful for developers new to Fluent or those looking
 
 ## Configuration with AI Tools
 
+### Get Started with a Fluent Project
+
+1. **Authenticate to your ServiceNow instance**  
+   a. Create a new auth alias: `create Fluent auth to <instanceUrl>, add the credential alias as myFluentMcpAuth`  
+   b. List existing aliases: `show all Fluent auth profiles`  
+   c. Switch default alias: `use the alias <myFluentMcpAuth> as the default Fluent auth`
+
+2. **Create or open a Fluent project**  
+   a. Create a brand-new project: `Create a Fluent project to <what_you_want_the_app_to_do> under directory <cwd>`  
+   b. Convert an existing scoped app to Fluent:  
+      • By sys_id: `Create a Fluent project by converting the existing scoped app whose sys_id is <xxx> under directory <cwd>`  
+      • By local path: `Create a Fluent project by converting the existing scoped app from <scoped_app_path>, new Fluent project should be stored in directory <cwd>`  
+   c. Continue an existing project: `Initialize Fluent project in <cwd>` or `Set Fluent working directory to <cwd>`
+
+After the MCP server is configured in your preferred client, refer back to this section for everyday commands.
+
+---
+
 ### Claude Desktop / Claude on macOS
 
 To configure the Fluent MCP Server for Claude Desktop:
@@ -265,17 +283,22 @@ Think of this as building a full-stack application with proper CI/CD pipeline - 
 5. If any issues arise, ensure the `~/Library/Application Support/Code/User/settings.json` file is correctly configured.
 
 ```json
-"mcp": {
-  "servers": {
-			"fluent-mcp": {
-				"command": "npx",
-				"args": [
-					"-y",
-					"@modesty/fluent-mcp"
-				],
-				"cwd": "${input:cwd}"
-			}
-		}
+{
+  "mcp": {
+    "servers": {
+      "fluent-mcp": {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "@modesty/fluent-mcp"],
+        /* Configure NOW_* environment variables globally or via your client settings */
+        /* "env": {
+          "NOW_INSTANCE_URL": "https://your-instance.service-now.com",
+          "NOW_USERNAME": "your-username",
+          "NOW_PASSWORD": "your-password"
+        } */
+      } */
+    }
+  }
 }
 ```
 
@@ -321,7 +344,12 @@ To configure the Fluent MCP Server for Cursor:
   "mcpServers": {
     "fluent-mcp": {
       "command": "npx",
-      "args": ["-y", "@modesty/fluent-mcp"]
+      "args": ["-y", "@modesty/fluent-mcp"],
+      "env": {
+          "NOW_INSTANCE_URL": "https://your-instance.service-now.com",
+          "NOW_USERNAME": "your-username",
+          "NOW_PASSWORD": "your-password"
+        } */
     }
   }
 }
@@ -347,8 +375,14 @@ To configure the Fluent MCP Server for Windsurf:
      "mcpServers": {
        "fluent-mcp": {
          "command": "npx",
-         "args": ["-y", "@modesty/fluent-mcp"]
-       }
+         "args": ["-y", "@modesty/fluent-mcp"],
+        /* Configure NOW_* environment variables globally or via your client settings */
+        /* "env": {
+          "NOW_INSTANCE_URL": "https://your-instance.service-now.com",
+          "NOW_USERNAME": "your-username",
+          "NOW_PASSWORD": "your-password"
+        } */
+       } */
      }
    }
    ```
@@ -380,7 +414,12 @@ To configure the Fluent MCP Server for Gemini CLI:
       "args": [
         "-y",
         "@modesty/fluent-mcp"
-      ]
+      ],
+      "env": {
+        "NOW_INSTANCE_URL": "https://your-instance.service-now.com",
+        "NOW_USERNAME": "your-username",
+        "NOW_PASSWORD": "your-password"
+      } */
     }
   }
 }

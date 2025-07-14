@@ -6,6 +6,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import logger from "./logger.js";
 import { ServerStatus } from "../types.js";
+import { getConfig } from "../config.js";
 
 export class LoggingManager {
   private mcpServer?: McpServer;
@@ -35,7 +36,8 @@ export class LoggingManager {
    * Log server startup
    */
   logServerStarting(): void {
-    logger.info("Starting MCP server...");
+    const config = getConfig();
+    logger.info("Starting MCP server...", {version: config.version});
   }
 
   /**

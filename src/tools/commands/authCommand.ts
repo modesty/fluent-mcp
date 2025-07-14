@@ -9,19 +9,19 @@ import { SessionFallbackCommand } from "./sessionFallbackCommand.js";
  */
 export class AuthCommand extends SessionFallbackCommand {
   name = "prepare_fluent_auth";
-  description = "Prepare shell command for Fluent (ServiceNow SDK) authentication to <instance_url> with credential profiles";
+  description = "Generate shell command to manage Fluent (ServiceNow SDK) authentication to <instance_url> with credential profiles, including create new auth alias, list /show existing ones, delete or use an existing one";
   arguments: CommandArgument[] = [
     {
       name: "add",
       type: "boolean",
       required: false,
-      description: "Add a new authentication profile",
+      description: "Add / Create a new authentication profile",
     },
     {
       name: "instanceUrl",
       type: "string",
       required: false,
-      description: "URL of the ServiceNow instance (required when using --add)",
+      description: "URL of the ServiceNow instance (required when using --add). Required for new auth alias.",
     },
     {
       name: "type",
@@ -34,7 +34,7 @@ export class AuthCommand extends SessionFallbackCommand {
       name: "alias",
       type: "string",
       required: false,
-      description: "Name for the authentication profile",
+      description: "Name for the authentication profile (required when using --add, --delete, --use)",
     },
     {
       name: "list",
