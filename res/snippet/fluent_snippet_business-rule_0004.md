@@ -26,7 +26,7 @@ BusinessRule({
         }
     }
 })(current, previous);`,
-    table: get_table_name('em_alert'),
+    table: 'em_alert',
     name: 'Billing Alerts',
     order: 100,
     when: 'after',

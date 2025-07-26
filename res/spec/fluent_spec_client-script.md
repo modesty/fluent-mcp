@@ -4,7 +4,7 @@
 ClientScript({
     $id: '', // string | guid, mandatory
     name: '', // string, name of the client script
-    table: get_table_name(''), // string, name of the table on which the client script runs
+    table: '', // string, name of the table on which the client script runs
     ui_type: 'desktop', // string, user interface to which the client script applies: `desktop`|`mobile_or_service_portal`|`all`. Default is `desktop`.
     type: '', // string, optional, type of client script, which defines when it runs: `onCellEdit`|`onChange`|`onLoad`|`onSubmit`
     field: '', // string, optional, field on the table that the client script applies to. This property applies only when the type property is set to `onChange` or `onCellEdit`.

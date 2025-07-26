@@ -28,7 +28,7 @@ atf.server.log({
 // Perform a database query to verify if a record matching the conditions set in this step are met
 atf.server.recordQuery({ // all props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
-  table: get_table_name(''), // table name
+  table: '', // table name
   fieldValues: '', // string, servicenow encoded query
   enforceSecurity: false, // boolean;
   assert: 'records_match_query', // 'records_match_query' | 'no_records_match_query';

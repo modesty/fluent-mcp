@@ -29,7 +29,7 @@ const applicationSubMenu = Record({
         map_page: get_sys_id('cmn_map_page', ''), // String, guid, second paramemter as per user instructions or prompts or devrequest
         mobile_title: '', // String, max length is 80 characters
         mobile_view_name: '', // String, max length is 40 characters
-        name: get_table_name(''), // table name
+        name: '', // table name
         order: 100, // number
         override_menu_roles: false, // boolean, default false
         query: '', // String, max length is 3500 characters, is link type arguments

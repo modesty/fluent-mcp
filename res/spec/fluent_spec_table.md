@@ -2,9 +2,9 @@
 ```typescript
 // Creates a new Table (`sys_db_object`)
 Table({ 
-    name: get_table_name(''), // string, table name
+    name: '', // string, table name
     schema: {},// object, snake_case name values pairs, ex. { column_name1: Column object, column_name2: Column object } see Column spec
-    extends: get_table_name(''), // undefined | string
+    extends: '', // undefined | string
     label: '', // string or array of Documentation object
 	licensing_config: {}, // LicensingConfig object
     display: '', // string

@@ -10,7 +10,7 @@ const uiAction = Record({
         	/*
         		function onClickFunction(g_form) {}
         	*/
-        table: get_table_name(''), // string, mandatory
+        table: '', // string, mandatory
         action_name: '', // string, mandatory , should always begin with 'sysverb_'
         active: true, //boolean
         client: false, //boolean. Default is false. Set to true only when onclick function specified

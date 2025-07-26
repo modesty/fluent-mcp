@@ -3,7 +3,7 @@
 // spec to configure a List in Fluent
 List({
     $id: '', // string, unique id for the record, typically using Now.ID["value"]
-    table: get_table_name(''), // string, name of the table the list is for
+    table: '', // string, name of the table the list is for
     view: get_sys_id('sys_ui_view', ''), // Record<'sys_ui_view'>, The UI view (sys_ui_view) to apply to the list. Can import and use default_view, or can define a custom view using Record plugin.
     columns: [ // array of {element, position} objects representing the columns to be displayed in the List and their order
         { 

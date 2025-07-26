@@ -3,7 +3,7 @@
 // Opens a new form for the selected table and FormUI.
 atf.form.openNewForm({ // all props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
-  table: get_table_name(''), // table name
+  table: '', // table name
   formUI: 'standard_ui', // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace',
   view: '', // string
 }): void;
@@ -12,7 +12,7 @@ atf.form.openNewForm({ // all props are mandatory
 // follow this step after a submitForm step to open the record that was just created
 atf.form.openExistingRecord({ // all props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
-  table: get_table_name(''), // table name
+  table: '', // table name
   recordId: '', // sys_id of the record
   formUI: 'standard_ui', // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace' 
   view: '', // string
@@ -48,7 +48,7 @@ atf.form.setFieldValue({ // all props are mandatory
 // Validates field values on the current form after a call to atf.form.openNewForm or atf.form.openExistingRecord
 atf.form.fieldValueValidation({ // all props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
-  table: get_table_name(''), // table name
+  table: '', // table name
   conditions: '', // servicenow encoded query
   formUI: 'standard_ui' // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace' 
 }): void
@@ -56,7 +56,7 @@ atf.form.fieldValueValidation({ // all props are mandatory
 // Clicks a UI Action button on the current form and asserts the form submission results
 atf.form.clickUIAction({ // all props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
-  table: get_table_name(''), // table name
+  table: '', // table name
   formUI: 'standard_ui', // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace'
   actionType: '' // 'ui_action' | 'declarative_action'
   uiAction: get_sys_id('sys_ui_action', ''), // sys_id | Record&lt;'sys_ui_action'&gt;

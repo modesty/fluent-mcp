@@ -7,7 +7,7 @@ const example_form = Record({
     $id: Now.ID['ex_form'],
     table: 'sys_ui_form',
     data: {
-        name: get_table_name('incident'),
+        name: 'incident',
         view: default_view, // using the default_view
     }
 })
@@ -18,8 +18,8 @@ const example_section_1 = Record({ // create a first section to store the standa
     $id: Now.ID['section_1'],
     table: 'sys_ui_section',
     data: {
-        name: get_table_name('incident'),
-        table: get_table_name('incident'),
+        name: 'incident',
+        table: 'incident',
         view: default_view,
         caption: '' // no caption for the first section
     }
@@ -29,8 +29,8 @@ const example_section_2 = Record({ // create a second section to store some addi
     $id: Now.ID['section_2'],
     table: 'sys_ui_section',
     data: {
-        name: get_table_name('incident'),
-        table: get_table_name('incident'),
+        name: 'incident',
+        table: 'incident',
         view: default_view,
         caption: 'Additional fields'
     }

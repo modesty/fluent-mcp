@@ -34,7 +34,7 @@ const example3 = dynamic_value_definitions: {
 
 const example4 = dynamic_value_definitions: {
    type: "choices_from_other_table", // constant, mandatory
-   table: get_table_name(""), // undefined | string, mandatory
+   table: '', // undefined | string, mandatory
    field: get_column_name("") // string, column name from the specified table, mandatory
 },
 

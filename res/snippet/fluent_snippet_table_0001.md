@@ -4,9 +4,9 @@ import { Table, StringColumn } from "@servicenow/sdk/core";
 
 // Define a new table named 'x_snc_example_to_do'
 export const x_snc_example_to_do = Table({
-    name: get_table_name('x_snc_example_to_do'), // string, table name
+    name: 'x_snc_example_to_do', // string, table name
     label: 'My To Do Table', // Display label for the table
-    extends: get_table_name('task'), // Extends the 'task' table
+    extends: 'task', // Extends the 'task' table
     schema: {
         status: StringColumn({ label: 'status' }), // String column for status
         deadline: StringColumn({

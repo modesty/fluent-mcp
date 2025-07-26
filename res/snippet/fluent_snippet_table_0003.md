@@ -3,9 +3,9 @@
 import { Table, TableNameColumn, FieldNameColumn, BooleanColumn, DateTimeColumn } from "@servicenow/sdk/core";
 
 export const sys_data_ob_configuration = Table({
-    name: get_table_name('sys_data_ob_configuration'),
+    name: 'sys_data_ob_configuration',
     label: 'Access Observer Configuration',
-    extends: get_table_name('sys_metadata'),
+    extends: 'sys_metadata',
     schema: {
         table: TableNameColumn({
             attributes: { tableChoicesScript: 'DataObserverChoiceTables', show_table_names_on_label: true },

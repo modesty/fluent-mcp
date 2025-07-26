@@ -5,7 +5,7 @@ import { BusinessRule } from '@servicenow/sdk/core'
 BusinessRule({
 	$id: Now.ID['abort_field_not_belong_business_rule'],
     name: "Abort if field doesn't belong to table",
-    table: get_table_name('sn_access_analyzer_request'),
+    table: 'sn_access_analyzer_request',
     order: 100,
     when: 'before',
     active: true,

@@ -3,7 +3,7 @@
 // Validates field values on the current form after a call to atf.form.openNewForm or atf.form.openExistingRecord
 atf.form.fieldValueValidation({ // all props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
-  table: get_table_name(''), // table name
+  table: '', // table name
   conditions: '', // servicenow encoded query
   formUI: 'standard_ui' // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace' 
 }): void
@@ -19,7 +19,7 @@ atf.form.setFieldValue({ // all props are mandatory
 // Validates states of the desired fields on the current form after a call to atf.form.openNewForm or atf.form.openExistingRecord
 atf.form.fieldStateValidation({ // all props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
-  table: get_table_name(''), // table name
+  table: '', // table name
   visible: [''], // array of field names
   notVisible: [''], // array of field names
   readOnly: [''], // array of field names

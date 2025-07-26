@@ -4,12 +4,12 @@ import { Table, StringColumn, IntegerColumn, BooleanColumn, TranslatedTextColumn
 
 export const sys_formula_function = Table({
     index: [{ name: 'qualified_name', element: 'internal_name', unique: false }],
-    name: get_table_name('sys_formula_function'),
+    name: 'sys_formula_function',
     label: 'Formula Function',
     attributes: {
         update_synch: true,
     },
-    extends: get_table_name('sys_metadata'),
+    extends: 'sys_metadata',
     display: 'name',
     schema: {
         name: StringColumn({ label: 'Name', mandatory: true, maxLength: 255 }),

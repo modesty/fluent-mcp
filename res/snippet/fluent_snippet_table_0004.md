@@ -3,10 +3,10 @@
 import { Table, StringColumn, TableNameColumn, ReferenceColumn, FieldNameColumn,  } from "@servicenow/sdk/core";
 
 export const fx_configuration = Table({
-    name: get_table_name('fx_configuration'),
+    name: 'fx_configuration',
     label: 'FX Currency Configuration',
     audit: true,
-    extends: get_table_name('sys_metadata'),
+    extends: 'sys_metadata',
     schema: {
         display_digits: StringColumn({
             label: 'Display Digits',

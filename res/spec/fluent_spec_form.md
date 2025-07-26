@@ -5,7 +5,7 @@ const example_form = Record({
     $id: '', // string, unique id for the record, typically using Now.ID["value"]
     table: 'sys_ui_form', // string, must always leave as 'sys_ui_form'
 	data: {
-        name: get_table_name(''), // string, name of the table the form is for
+        name: '', // string, name of the table the form is for
         view: get_sys_id('sys_ui_view', ''), // Record<'sys_ui_view'>, The UI view (`sys_ui_view`) to contain the form. Can create a new view using Record plugin, use the sys_id of an existing view, or import and use `default_view`
         sys_user: '' // String, optional, the user to apply the form view to
     }
@@ -16,8 +16,8 @@ const example_section = Record({
     $id: '', // string, unique id for the record, typically using Now.ID["value"]
     table: 'sys_ui_section', // string, must always leave as 'sys_ui_section'
     data: {
-        name: get_table_name(''), // string, name of the table the section is for
-        table: get_table_name(''), // string, table name the section is for
+        name: '', // string, name of the table the section is for
+        table: '', // string, table name the section is for
         view: get_sys_id('sys_ui_view', ''), // Record<'sys_ui_view'>, The UI view (`sys_ui_view`) to contain the section. Can create a new view using Record plugin, use the sys_id of an existing view, or import and use `default_view`
         caption: '' // string, optional, the title of the section
     }

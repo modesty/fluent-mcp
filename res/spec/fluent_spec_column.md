@@ -48,13 +48,13 @@ ReferenceColumn({
 	attributes: {}, // object, snake_case name value pairs, see attribute list
 	audit: false, // boolean
 	cascadeRule: 'none', // "none" | "cascade" | "delete_no_workflow" | "delete" | "restrict" | "clear"
-	default: get_table_name(""), // undefined | string
+	default: '', // undefined | string
 	function_definition: `glidefunction:${""}`, // string, definition of a function that the field performs, such as a mathematical operation, field length computation, or day of the week calculation
 	label: '', // string or array of Documentation object
 	mandatory: false, // boolean
 	maxLength: 0, // number
 	read_only: false // boolean
-	referenceTable?: get_table_name(""), // undefined | string
+	referenceTable?: '', // undefined | string
 }): ReferenceColumn // returns a ReferenceColumn object
 
 DateTimeColumn({
@@ -114,13 +114,13 @@ ListColumn({
 	active: false, // boolean
 	attributes: {}, // object, snake_case name value pairs, see attribute list
 	audit: false, // boolean
-	default: get_table_name(""), // undefined | string
+	default: '', // undefined | string
 	function_definition: `glidefunction:${""}`, // string, definition of a function that the field performs, such as a mathematical operation, field length computation, or day of the week calculation
 	label: '', // string or array of Documentation object
 	mandatory: false, // boolean
 	maxLength: 0, // number
 	read_only: false // boolean
-	referenceTable?: get_table_name(""), // undefined | string
+	referenceTable?: '', // undefined | string
 }): ListColumn // returns a ListColumn object
 
 FieldNameColumn({
@@ -182,7 +182,7 @@ ConditionsColumn({
 	active: false, // boolean
 	attributes: {}, // object, snake_case name value pairs, see attribute list
 	audit: false, // boolean
-	default: get_table_name(""), // undefined | string
+	default: '', // undefined | string
 	function_definition: `glidefunction:${""}`, // string, definition of a function that the field performs, such as a mathematical operation, field length computation, or day of the week calculation
 	label: '', // string or array of Documentation object
 	mandatory: false, // boolean

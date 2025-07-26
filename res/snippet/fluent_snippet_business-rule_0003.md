@@ -16,7 +16,7 @@ export default BusinessRule({
         gs.log('RCA updated for record ' + current.number + ' by ' + gs.getUserName(), 'RCA_Update_BR');
     }
 })(current, previous);`,
-    table: get_table_name('x_ap4_scm_rca_why'),
+    table: 'x_ap4_scm_rca_why',
     name: 'AP4 - Update RCA when updated',
     order: 100,
     when: 'after',

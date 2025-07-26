@@ -4,7 +4,7 @@
 BusinessRule({
 	$id: '', // string | guid, mandatory
 	name: '', // string, mandatory
-	table: get_table_name(''), // string, mandatory
+	table: '', // string, mandatory
 	condition: '', // string, condition string that must be true for BusinessRule to run, for example: `current.parent !== 'NULL'`
 	when: 'before', // 'before' | 'after' | 'async' | 'display', mandatory
 	abort_action: false, // boolean

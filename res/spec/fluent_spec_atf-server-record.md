@@ -3,7 +3,7 @@
 // Perform a database query to verify if a record matching the conditions set in this step are met
 atf.server.recordQuery({ // all props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
-  table: get_table_name(''), // table name
+  table: '', // table name
   fieldValues: '', // string, servicenow encoded query
   enforceSecurity: false, // boolean;
   assert: 'records_match_query', // 'records_match_query' | 'no_records_match_query';
@@ -14,7 +14,7 @@ atf.server.recordQuery({ // all props are mandatory
 // Validates that a given record meets the specified conditions on the server-side.
 atf.server.recordValidation({ // all props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
-  table: get_table_name(''), // table name
+  table: '', // table name
   fieldValues: '', // string, servicenow encoded query
   recordId: '', // sys_id of the record
   enforceSecurity: false, // boolean
@@ -46,7 +46,7 @@ atf.server.recordUpdate({ // all props are mandatory
 // Deletes a record of a table.
 atf.server.recordDelete({ // all props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
-  table: get_table_name(''), // table name
+  table: '', // table name
   recordId: '', // sys_id of the record
   enforceSecurity: false, // boolean
   assert: 'record_successfully_deleted', // 'record_successfully_deleted' | 'record_not_deleted';

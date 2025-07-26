@@ -16,8 +16,8 @@ const new_section = Record({
     $id: Now.ID['new_section'],
     table: 'sys_ui_section',
     data: {
-        name: get_table_name('ex_table'),
-        table: get_table_name('ex_table'),
+        name: 'ex_table',
+        table: 'ex_table',
         view: get_sys_id('sys_ui_view', 'name=exampleview^ORtitle=exampleview'), // find the sys_id of an existing view
         caption: 'Additional details'
     }

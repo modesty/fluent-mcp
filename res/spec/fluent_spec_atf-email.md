@@ -32,7 +32,7 @@ atf.email.generateInboundEmail({
 // generates an Email [sys_email] record that looks like an email sent in reply to a system notification. This step also creates an email.read event upon step completion.
 atf.email.generateInboundReplyEmail({
   $id: Now.ID[''], // string | guid, mandatory
-  targetTable: get_table_name(''), 
+  targetTable: '', 
   targetRecord: '', // string | Record&lt;'targetTable'&gt;;
   subject: '',
   body: '',

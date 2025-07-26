@@ -27,7 +27,7 @@ export default BusinessRule({
         }
     }
 })(current, previous);`,
-    table: get_table_name('sn_ap_cm_ap_task'),
+    table: 'sn_ap_cm_ap_task',
     name: 'Set case state when task is in progress',
     order: 100,
     when: 'async',

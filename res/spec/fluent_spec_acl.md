@@ -7,7 +7,7 @@ const specAcl = Acl({
     name: '', // string, mandatory
     type: 'record', // mandatory, typed string: `record`, `rest_endpoint`, `ui_page`, `processor`, `graphql`, `pd_action`, `ux_data_broker`, `ux_page`, `ux_route`, `client_callable_flow_object`, `client_callable_script_include`
     operation: 'read', // mandatory, typed string: `execute`, `create`, `read`, `write`, `delete`, `edit_task_relations`, `edit_ci_relations`, `save_as_template`, `add_to_list`, `report_on`, `list_edit`, `report_view`, `personalize_choices`
-    table: get_table_name(''), // mandatory if `type` is `record`
+    table: '', // mandatory if `type` is `record`
     field: '*', // mandatory if `type` is `record`: `*` or comma delimited list of field names
     applies_to: '', // ServiceNow encoded query, only applicable if `type` is `record`
     roles: [get_sys_id('sys_user_role', '')], // array of Record<'sys_user_role'>, either sys_id for existing roles or Role object for new roles
