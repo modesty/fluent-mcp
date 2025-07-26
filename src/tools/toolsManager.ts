@@ -133,6 +133,7 @@ export class ToolsManager {
       {
         title: command.name,
         description: command.description,
+        // @ts-expect-error zod v4 type incompatibility - schema is correct at runtime
         inputSchema: schema
       },
       async (params: Record<string, unknown>) => {
