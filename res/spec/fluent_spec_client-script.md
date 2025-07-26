@@ -11,11 +11,7 @@ ClientScript({
     description: '', // string, optional, description of the functionality and purpose of the client script
     messages: '', // string, optional, strings that are available to the client script as localized messages using `getmessage('[message]')`.
     active: true, // boolean, optional, whether the record is enabled, default true
-    script: get_glide_script(
-        'sys_client_script', // string, always 'sys_client_script'
-        '', // string, requested change from devrequest
-        '', // string, extracted ServiceNow script code from devrequest
-    ),
+    script: '', // ServiceNow script to fullfil the functional request in scripting,
     applies_extended: false, // boolean, optional, indicates whether the client script applies to tables extended from the specified table, default false
     global: true, // boolean, optional, indicates whether the client script runs on all views of the table or only on specific views. Default is true.
     view: '', // string, optional, views of the table on which the client script runs. This property applies only when the `global` property is set to `false`

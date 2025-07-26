@@ -19,11 +19,7 @@ BusinessRule({
 	message: '', // string
 	order: 100, // number
 	role_conditions: [], // array of string | array of Role objects indicating that the user needs to have all Roles listed to execute this Business Rule, see Role spec
-	script: get_glide_script(
-		'sys_script', // string, always 'sys_script'
-		'', // string, requested change from devrequest
-		'', // string, extracted ServiceNow script code from devrequest
-	),
+	script: '', // ServiceNow script to fullfil the functional request in scripting,
 	set_field_value: '', // string, sets a field name to a value, for example `name='new_name'`
 }): BusinessRule // returns a BusinessRule object
 ```

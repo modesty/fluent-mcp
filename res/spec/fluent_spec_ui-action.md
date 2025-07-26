@@ -6,11 +6,7 @@ const uiAction = Record({
     table: 'sys_ui_action', // string, mandatory, should always be 'sys_ui_action'
     data: {
         name: '', // string, mandatory
-        script: get_glide_script(
-            'sys_ui_action', // string, always 'sys_ui_action'
-            '', // string, extracted user instructions for the script generation from devrequest
-            '', // string, extracted ServiceNow script code from devrequest
-        ), // string, inline ServiceNow client side scripting, function to be referenced for onClick action for workspace form button and workspace form menu. The script is based on devrequest. Example of function definition
+        script: '', // ServiceNow script to fullfil the functional request in scripting, // string, inline ServiceNow client side scripting, function to be referenced for onClick action for workspace form button and workspace form menu. The script is based on devrequest. Example of function definition
         	/*
         		function onClickFunction(g_form) {}
         	*/
@@ -38,11 +34,7 @@ const uiAction = Record({
         show_query: false, // boolean
         show_update: false, // boolean
         ui16_compatible: false, // boolean
-        client_script_v2: get_glide_script(
-            'sys_ui_action', // string, always 'sys_ui_action'
-            '', // string, extracted user instructions for the script generation from devrequest
-            '', // string, extracted ServiceNow script code from devrequest
-        ), // string, inline ServiceNow client side scripting, function to be referenced for onClick action. The script is based on devrequest. Example of function deinifition
+        client_script_v2: '', // ServiceNow script to fullfil the functional request in scripting, // string, inline ServiceNow client side scripting, function to be referenced for onClick action. The script is based on devrequest. Example of function deinifition
             /*
                 function onClickFunction(g_form) {}
             */

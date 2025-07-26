@@ -19,11 +19,7 @@ const specAcl = Acl({
         '', // string, requested change from devrequest
          '' // string, table name
 	),
-    script: get_glide_script( // optional, only for advanced ACLs
-        'sys_security_acl', // string, always 'sys_security_acl'
-        '', // string, requested change from devrequest
-        '', // string, extracted ServiceNow script code from devrequest
-    ),
+    script: '', // ServiceNow script to fullfil the functional request in scripting,
     admin_overrides: true, // boolean, default is true
     security_attribute: 'user_is_authenticated', // typed string, `user_is_authenticated`|`has_admin_role`,
     local_or_existing: 'Local', // typed string, 'Local'|'Exisiting': if `Local`: A security attribute based on the `condition` property that is saved only for the ACL it is created in; if `Exisiting`: An existing security attribute to reference in the `security_attribute` property

@@ -12,11 +12,15 @@ Record({
 		run_type: 'periodically',
 		run_start: '2025-03-13 00:00:00',
 		run_period: '1970-01-02 12:00:00',
-		script: get_glide_script(
-			'sysauto_script', 
-			'update inline script to log a message of "started scheduled job six" using glide system (gs) api: gs.log("ran scheduled job 6");', 
-			''
-		)
+		script: `// Log the message when the job runs
+gs.log("started scheduled job six", "ScheduledJobSix");
+
+// Add an info message
+gs.info("ran scheduled job 6");
+
+// Record the execution timestamp
+var currentTime = new GlideDateTime();
+gs.setProperty("last_run_scheduled_job_6", currentTime.getDisplayValue());`
 	}
 })
 ```

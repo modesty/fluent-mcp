@@ -13,11 +13,12 @@ Record({
 		run_type: 'daily',
 		time_zone: 'US/Pacific',
 		run_time: '2025-03-13 08:00:00',
-		script: get_glide_script(
-			'sysauto_script',
-			'Update script info message to Hello from Fluent Scheduled Job',
-			'sn_cs.VASystemObject.generateEmailNotifications();'
-		)
+		script: `// Display info message
+gs.info("Hello from Fluent Scheduled Job");
+
+// Log the execution time
+var currentTime = new GlideDateTime();
+gs.log("Daily Hello Job executed at " + currentTime.getDisplayValue(), "DailyHelloJob");`
 	}
 });
 ```

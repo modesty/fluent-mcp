@@ -9,11 +9,7 @@ Record({
         sys_name: '', // string, optional, the system name of the script include. Default is same as name
         api_name: '', // string, optional, the API path to call the script include. Default is [app_name].[sys_name]
         description: '', // string, optional, short description of the script include
-        script: get_glide_script(
-            'sys_script_include', // string, always 'sys_script_include'
-            '', // string, requested change from devrequest
-            '', // string, extracted ServiceNow script code from devrequest
-        ),
+        script: '', // ServiceNow script to fullfil the functional request in scripting,
         access: 'package_private', // string, optional, 'public'|'package_private', 'public' if the script include is accessible from all application scopes, 'package_private' if accessible from this application scope only
         caller_access: '', // string, optional, '1' for caller tracking, '2' for caller restriction, '' for none
         active: true, // boolean, optional, default true

@@ -13,37 +13,94 @@ RestApi({
             $id: Now.ID['restapi-hello-get'],
             name: 'get',
             method: 'GET',
-            script: get_glide_script(
-                    'sys_ws_operation', 
-                    'create script to set body message Hello, World.', 
-                    ''),
+            script: `(function process(request, response) {
+    // Set response content type
+    response.setContentType('application/json');
+    
+    // Set response status
+    response.setStatus(200);
+    
+    // Return the response body
+    return {
+        "message": "Hello, World."
+    };
+})(request, response);`,
         },
         {
             $id: Now.ID['restapi-hello-post'],
             name: 'post',
             method: 'POST',
-            script: get_glide_script(
-                    'sys_ws_operation', 
-                    'create script toa Scripted REST API script that reads the incoming JSON request body, parses it, and returns it in the response.', 
-                    ''),
+            script: `(function process(request, response) {
+    try {
+        // Read and parse the incoming JSON request body
+        var requestBody = request.body ? request.body.data : {};
+        
+        // Set response content type
+        response.setContentType('application/json');
+        
+        // Set response status
+        response.setStatus(201);
+        
+        // Return the parsed request body in the response
+        return {
+            "received": requestBody,
+            "status": "success"
+        };
+    } catch (e) {
+        response.setStatus(400);
+        return {
+            "error": e.message,
+            "status": "error"
+        };
+    }
+})(request, response);`,
         },
         {
             $id: Now.ID['restapi-hello-put'],
             name: 'put',
             method: 'PUT',
-            script: get_glide_script(
-                    'sys_ws_operation', 
-                    'Create a Scripted REST API that parses the request body JSON and returns', 
-                    ''),
+            script: `(function process(request, response) {
+    try {
+        // Parse the request body JSON
+        var requestBody = request.body ? request.body.data : {};
+        
+        // Set response content type
+        response.setContentType('application/json');
+        
+        // Set response status
+        response.setStatus(200);
+        
+        // Return the parsed request body
+        return {
+            "updated": true,
+            "data": requestBody
+        };
+    } catch (e) {
+        response.setStatus(400);
+        return {
+            "updated": false,
+            "error": e.message
+        };
+    }
+})(request, response);`,
         },
         {
             $id: Now.ID['restapi-hello-delete'],
             name: 'delete',
             method: 'DELETE',
-            script: get_glide_script(
-                    'sys_ws_operation', 
-                    'Create a Scripted REST API that that responds with delete and msg DELETED', 
-                    ''),
+            script: `(function process(request, response) {
+    // Set response content type
+    response.setContentType('application/json');
+    
+    // Set response status for successful deletion
+    response.setStatus(200);
+    
+    // Return success response
+    return {
+        "status": "success",
+        "msg": "DELETED"
+    };
+})(request, response);`,
         },
     ],
 })

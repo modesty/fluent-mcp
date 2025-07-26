@@ -12,11 +12,11 @@ Record({
 		condition: `gs.getProperty('scheduled_job_2_ran') === 'false'`,
 		run_type: 'once',
 		run_start: '2025-03-13 12:00:00',
-		script: get_glide_script(
-			'sysauto_script',
-			'update inline script to set a property using glide system (gs) api: gs.setProperty("scheduled_job_ran_2", "true");',
-			''
-		);
+		script: `// Set the property to indicate the job has run
+gs.setProperty("scheduled_job_ran_2", "true");
+
+// Log that the job has run
+gs.log("Scheduled job 2 has run at " + new GlideDateTime().getDisplayValue(), "ScheduledJob2");`
 	}
 })
 ```

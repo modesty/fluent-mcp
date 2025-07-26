@@ -10,10 +10,19 @@ ClientScript({
     type: 'onSubmit',
     description: 'Example with multiple messages',
     messages: 'Task has been submitted.\nWarning: approval may take several days.\nAn error has occured.',
-    script: get_glide_script(
-            'sys_client_script', 
-            'onSubmit client script that displays info message "Task has been submitted.", warning message "Warning: approval may take several days.", and error message "An error has occured."', 
-            ''),
+    script: `function onSubmit() {
+    // Display an info message
+    g_form.addInfoMessage("Task has been submitted.");
+    
+    // Display a warning message
+    g_form.addWarningMessage("Warning: approval may take several days.");
+    
+    // Display an error message
+    g_form.addErrorMessage("An error has occured.");
+    
+    // Allow the form to be submitted
+    return true;
+}`,
     active: true,
     applies_extended: true, // applies to the task table as well as any tables that extend it, e.g. incident and problem
     global: true,

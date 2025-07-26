@@ -13,11 +13,18 @@ Record({
 		run_dayofweek: 4,
 		time_zone: 'US/Mountain',
 		run_time: '2025-03-13 21:00:00',
-		script: get_glide_script(
-			'sysauto_script', 
-			'Write a function to create a new priorty 1 incident using glide record (GlideRecord) api: var gr = new GlideRecord("incident"); gr.setValue("priority", 1); gr.setValue("name", "weekly incident report"); gr.insert();', 
-			''
-		),
+		script: `// Create a new priority 1 incident
+var gr = new GlideRecord("incident");
+gr.initialize();
+gr.setValue("priority", 1);
+gr.setValue("short_description", "Weekly Incident Report");
+gr.setValue("description", "This is an automatically generated weekly incident report from a scheduled job.");
+gr.setValue("impact", "2"); // High impact
+gr.setValue("urgency", "1"); // Critical urgency
+var incidentId = gr.insert();
+
+// Log the incident creation
+gs.log("Created new priority 1 incident with sys_id: " + incidentId, "WeeklyIncidentReport");`,
 	}
 })
 ```

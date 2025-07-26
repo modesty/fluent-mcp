@@ -10,10 +10,16 @@ ClientScript({
     type: 'onChange', // the client script is triggered when the specified field is changed in the form view
     field: 'category',
     messages: 'If you want users to be able to search for this Item, add it to a Category',
-    script: get_glide_script(
-            'sys_client_script', 
-            'onChange client script that shows message "If you want users to be able to search for this Item, add it to a Category" when value is changed to empty', 
-            ''),
+    script: `function onChange(control, oldValue, newValue, isLoading) {
+    if (isLoading || newValue === oldValue) {
+        return;
+    }
+    
+    // Show message when the category is cleared/empty
+    if (!newValue) {
+        g_form.addInfoMessage("If you want users to be able to search for this Item, add it to a Category");
+    }
+}`,
     active: true,
     applies_extended: true,
     global: true,

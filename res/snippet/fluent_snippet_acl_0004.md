@@ -4,11 +4,10 @@ import { Acl } from "@servicenow/sdk/core";
 
 export default Acl({
     $id: "02712f3437ac621002e674e8f2924b0a",
-    script: get_glide_script(
-            'sys_security_acl', 
-            'Update existing script to set answer to false.', 
-            'var answer = true;')
-            ,
+    script: `function executeRule() {
+    var answer = false; // Set answer to false
+    return answer;
+}`,
     active: true,
     admin_overrides: true,
     decision_type: "allow",

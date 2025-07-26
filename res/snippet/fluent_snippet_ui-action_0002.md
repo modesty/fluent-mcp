@@ -7,7 +7,12 @@ Record({
     table: 'sys_ui_action',
     data: {
         name: 'Submit',
-        script: get_glide_script('sys_ui_action', 'create an onClick function named "onClickFunction", to display info message "Dummy function call for onlick action from workspace"', ''),
+        script: `function onClickFunction() {
+    // Display info message
+    g_form.addInfoMessage("Dummy function call for onlick action from workspace");
+    // Return false to prevent default action
+    return false;
+}`,
         table: 'incident',
         action_name: 'sysverb_insert',
         active: true,

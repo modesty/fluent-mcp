@@ -1,38 +1,30 @@
 # MCP Server for Fluent (ServiceNow SDK)
 
-A stdio MCP Server for [Fluent (ServiceNow SDK)](https://www.servicenow.com/docs/bundle/yokohama-application-development/page/build/servicenow-sdk/concept/servicenow-fluent.html), a TypeScript-based declarative domain-specific language for creating and managing metadata, modules, records and tests in ServiceNow platform. It support all commands available in the ServiceNow SDK CLI, and provides access to primary Fluent Plugin's API specifications, code snippets, and instructions for various metadata types. It can be configured for any MCP client, such as VSCode Agent mode, Claude Desktop, Cursor, or Windsurf, for either development or learning purposes.
+A stdio MCP Server for [Fluent (ServiceNow SDK)](https://www.servicenow.com/docs/bundle/yokohama-application-development/page/build/servicenow-sdk/concept/servicenow-fluent.html), a TypeScript-based declarative domain-specific language for creating and managing metadata, modules, records and tests in ServiceNow platform. It supports all commands available in the ServiceNow SDK CLI and provides access to Fluent Plugin's API specifications, code snippets, and instructions for various metadata types. It can be configured for any MCP client, such as VSCode Agent mode, Claude Desktop, Cursor, or Windsurf, for either development or learning purposes.
 
-## Description
+## Overview
 
-Fluent (ServiceNow SDK) MCP bridges ServiceNow development tools with modern AI-assisted development environments by implementing the [Model Context Protocol](https://github.com/modelcontextprotocol). It enables developers and AI assistants to interact with Fluent (ServiceNow SDK) commands and access resources like API specifications, code snippets, and instructions through natural language.
+Fluent (ServiceNow SDK) MCP bridges ServiceNow development tools with modern AI-assisted development environments by implementing the [Model Context Protocol](https://github.com/modelcontextprotocol). It enables developers and AI assistants to interact with Fluent commands and access resources like API specifications, code snippets, and instructions through natural language.
 
-## Usage
+Key capabilities include:
 
-### Using with an MCP Client
-
-The MCP server communicates via stdio according to the MCP specification, allowing any compatible MCP client to interact with it.
-
-## Features
-
-- Access to all ServiceNow SDK CLI commands, including:`version`,`help`,`debug`,`upgrade`,`auth`,`init`,`build`,`install`,`transform`,`dependencies`
+- All ServiceNow SDK CLI commands: `version`, `help`, `debug`, `upgrade`, `auth`, `init`, `build`, `install`, `transform`, `dependencies`
 - ServiceNow authentication via `@servicenow/sdk auth --add <instance>`
-- Access to API specifications for different metadata types, including `acl`, `application-menu`, `business-rule`, `client-script`, `cross-scope-privilege`, `form`, `list`, `property`, `role`, `scheduled-script`, `script-include`, `scripted-rest`, `table`, `ui-action`, `user-preference` and more to come
-- Access to code snippets and examples for different metadata types
-- Access to instructions for creating and modifying different metadata types
+- API specifications for metadata types like `acl`, `business-rule`, `client-script`, `table`, `ui-action` and more
+- Code snippets and examples for different metadata types
+- Instructions for creating and modifying metadata types
 
-Example of prompt to create a new Fluent application:
+Example prompt:
 
 ```text
 Create a new Fluent app under ~/Downloads/fluent-app to track employee time off requests
 ```
 
-Watch how the MCP server responds to help LLM create auth credential alias, tables (i.e., dictionary, or data model) for time off requests, business rules to handle request approvals, ACLs to control access, Form view to access time off request info, UI Actions to enhance user experience, and more.
+## Tools
 
-## Available MCP Tools
+### ServiceNow SDK Commands
 
-### ServiceNow SDK Command Tools
-
-Note, use `init` command to switch to a working directory for existing Fluent (ServiceNow SDK) project, or to create a new one.
+Note: Use `init` command to switch to a working directory for existing Fluent projects or to create a new one.
 
 | Tool Name      | Description                                         | Parameters                                                                                                                                                                                                                  |
 | -------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -47,15 +39,25 @@ Note, use `init` command to switch to a working directory for existing Fluent (S
 | `transform`    | Transform ServiceNow metadata to Fluent source code | `from`: (Optional) Path to metadata, `directory`: (Optional) Package path, `preview`: (Optional) Preview only, `auth`: (Optional) Authentication alias                                                                      |
 | `dependencies` | Download application dependencies                   | `directory`: (Optional) Package path, `auth`: (Optional) Authentication alias                                                                                                                                               |
 
-### Resource Tools
+## Resources
 
-| Tool Name             | Description                                               | Parameters                                                                                              |
-| --------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `get-api-spec`        | Get API specification for a ServiceNow metadata type      | `metadataType`: The metadata type to get specifications for                                             |
-| `get-snippet`         | Get code snippet for a ServiceNow metadata type           | `metadataType`: The metadata type to get snippets for, `id`: (Optional) Specific snippet ID to retrieve |
-| `get-instruct`        | Get instructions for a ServiceNow metadata type           | `metadataType`: The metadata type to get instructions for                                               |
-| `get-prompt`          | Get specialized prompts for ServiceNow Fluent development | `promptId`: The ID of the prompt to retrieve (e.g., `coding_in_fluent`)                                 |
-| `list-metadata-types` | List all available ServiceNow metadata types              | None                                                                                                    |
+All resources follow standardized URI patterns according to the MCP specification:
+
+1. **API Specifications**: `sn-spec://{metadataType}`
+   - Example: `sn-spec://business-rule`
+   - Contains API documentation with parameter descriptions
+
+2. **Instructions**: `sn-instruct://{metadataType}`
+   - Example: `sn-instruct://script-include`
+   - Offers guidance and best practices
+
+3. **Code Snippets**: `sn-snippet://{metadataType}/{snippetId}`
+   - Example: `sn-snippet://acl/0001`
+   - Provides practical examples
+
+4. **Prompts**: `sn-prompt://{promptId}`
+   - Example: `sn-prompt://coding_in_fluent`
+   - Contains development guides and best practices
 
 ### Supported Metadata Types
 
@@ -74,111 +76,18 @@ Note, use `init` command to switch to a working directory for existing Fluent (S
 - `table`: Tables
 - `ui-action`: UI Actions
 - `user-preference`: User Preferences
-- `atf`: Automated Test Framework, including 'atf-appnav', 'atf-catalog-action','atf-catalog-validation','atf-catalog-variable','atf-email','atf-form','atf-form-action','atf-form-declarative-action','atf-form-field','atf-reporting','atf-rest-api','atf-rest-assert-payload','atf-server','atf-server-catalog-item','atf-server-record',
+- `atf`: Automated Test Framework, including various ATF components
 
-## Resources Capabilities
-
-The MCP server provides access to various resources that enhance the development experience with ServiceNow Fluent SDK. These resources are designed to assist developers and AI models in understanding and implementing ServiceNow features effectively:
-
-### Resource URI Formats
-
-All resources follow standardized URI patterns according to the [MCP specification](https://modelcontextprotocol.io/specification/2025-06-18/server):
-
-1. **API Specifications**: `sn-spec://{metadataType}`
-
-   - Example: `sn-spec://business-rule`
-   - Provides detailed technical specifications for ServiceNow metadata types
-   - Contains complete API documentation with parameter descriptions and usage guidelines
-
-2. **Instructions**: `sn-instruct://{metadataType}`
-
-   - Example: `sn-instruct://script-include`
-   - Offers guidance and best practices for working with specific metadata types
-   - Includes implementation notes and considerations
-
-3. **Code Snippets**: `sn-snippet://{metadataType}/{snippetId}`
-
-   - Example: `sn-snippet://acl/0001`
-   - Presents practical examples of how to implement various ServiceNow features
-   - Multiple snippets may be available for each metadata type (with different IDs)
-   - Supports auto-completion for available snippet IDs
-
-4. **Prompts**: `sn-prompt://{promptId}`
-   - Example: `sn-prompt://coding_in_fluent`
-   - Provides comprehensive guides and best practices for Fluent development
-   - Contains detailed information on coding patterns, standards, and recommendations
-
-### Resource Navigation
-
-Resources can be discovered and accessed in two ways:
-
-1. **Direct URI access**: Use the URI formats above to directly access a specific resource
-2. **Resource listing**: Query available resources using the `resources/list` method
-   - Returns all available resources with their URIs, titles, and MIME types
-   - Resources can be filtered by metadata type
-
-### Resource Content
-
-All resources are returned as Markdown text, which includes:
-
-- Detailed technical documentation for API specifications
-- Implementation guidelines for instructions
-- Well-commented code examples for snippets
-
-### Prompt Capabilities
-
-The MCP server also provides access to specialized prompts that enhance the development experience with ServiceNow Fluent SDK:
-
-#### Available Prompts
-
-| Prompt Name        | Description                                   | URI Format                     |
-| ------------------ | --------------------------------------------- | ------------------------------ |
-| `Coding in Fluent` | General guide for coding in ServiceNow Fluent | `sn-prompt://coding_in_fluent` |
-
-#### Prompt Content
-
-The `Coding in Fluent` prompt includes:
-
-- Introduction to Fluent (ServiceNow SDK) features and benefits
-- Key concepts in Fluent development
-- Syntax guidelines and best practices
-- Tips for working with specific metadata types
-- Examples of proper Fluent code patterns
-- Common pitfalls to avoid
-
-This prompt is particularly useful for developers new to Fluent or those looking for a quick reference on Fluent coding standards.
+Resources can be accessed by direct URI or through the `resources/list` method.
 
 ## Requirements
 
 - Node.js 22.15.1 or later
 - npm 11.4.1 or later
 
-## Get Started with a Fluent Project
+### Client Integration
 
-1. **Authenticate to your ServiceNow instance**  
-   a. Create a new auth alias: `create Fluent auth to <instanceUrl>, add the credential alias as myFluentMcpAuth`  
-   b. List existing aliases: `show all Fluent auth profiles`  
-   c. Switch default alias: `use the alias <myFluentMcpAuth> as the default Fluent auth`
-
-2. **Create or open a Fluent project**  
-   a. Create a brand-new project: `Create a Fluent project to <what_you_want_the_app_to_do> under directory <cwd>`  
-   b. Convert an existing scoped app to Fluent:  
-      • By sys_id: `Create a Fluent project by converting the existing scoped app whose sys_id is <xxx> under directory <cwd>`  
-      • By local path: `Create a Fluent project by converting the existing scoped app from <scoped_app_path>, new Fluent project should be stored in directory <cwd>`  
-   c. Continue an existing project: `Initialize Fluent project in <cwd>` or `Set Fluent working directory to <cwd>`
-
-After the MCP server is configured in your preferred client, refer back to this section for everyday commands.
-
-## Configuration with AI Tools
-
-### Claude Desktop / Claude on macOS
-
-To configure the Fluent MCP Server for Claude Desktop:
-
-1. Configure Claude Desktop to use the MCP server:
-
-   - Settings > Developers
-   - Add a new MCP Server with configuration:
+#### Claude Desktop / Claude on macOS
 
 ```json
 {
@@ -191,9 +100,82 @@ To configure the Fluent MCP Server for Claude Desktop:
 }
 ```
 
-When testing with Claude Desktop, check the MCP server logs (typically in `~/Library/Logs/Claude/mcp-server-fluent-mcp.log`) to see the actual resource requests being processed.
+#### VSCode GitHub Copilot Agent Mode
 
-Example usage in Clause Desktop Chat:
+1. `Shift + CMD + p` to open command palette, search for `MCP: Add Server...`
+2. Select `NPM Package. (Model Assisted)` as server type.
+3. Fill in package name as `@modesty/fluent-mcp` and follow prompts.
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "fluent-mcp": {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "@modesty/fluent-mcp"]
+      }
+    }
+  }
+}
+```
+
+#### Cursor
+
+Add MCP server configuration in Cursor settings:
+
+```json
+{
+  "mcpServers": {
+    "fluent-mcp": {
+      "command": "npx",
+      "args": ["-y", "@modesty/fluent-mcp"]
+    }
+  }
+}
+```
+
+#### Windsurf
+
+1. `CMD + ,` to open settings, navigate to Cascade section.
+2. Click `Add Server` in `Model Context Protocol (MCP) Servers` section.
+3. Select `Add Custom MCP Server +` and add configuration.
+
+#### Gemini CLI
+
+Configure in `~/.gemini/settings.json` or `./.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "fluent-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modesty/fluent-mcp"
+      ]
+    }
+  }
+}
+```
+
+## Getting Started
+
+1. **Authentication**  
+   a. Create a new auth alias: `create Fluent auth to <instanceUrl>, add the credential alias as myFluentMcpAuth`  
+   b. List existing aliases: `show all Fluent auth profiles`  
+   c. Switch default alias: `use the alias <myFluentMcpAuth> as the default Fluent auth`
+
+2. **Project Setup**  
+   a. Create a new project: `Create a Fluent project to <what_you_want_the_app_to_do> under directory <cwd>`  
+   b. Convert an existing app:  
+      • By sys_id: `Create a Fluent project by converting the existing scoped app whose sys_id is <xxx> under directory <cwd>`  
+      • By local path: `Create a Fluent project by converting the existing scoped app from <scoped_app_path>, new Fluent project should be stored in directory <cwd>`  
+   c. Continue an existing project: `Initialize Fluent project in <cwd>` or `Set Fluent working directory to <cwd>`
+
+### Example Prompts
+
+When testing with Claude Desktop, check the MCP server logs (typically in `~/Library/Logs/Claude/mcp-server-fluent-mcp.log`) to see the actual resource requests being processed.
 
 #### Domain-Driven Business Rule
 
@@ -272,30 +254,6 @@ Build and deploy to a development instance
 
 Think of this as building a full-stack application with proper CI/CD pipeline - what would be the ServiceNow equivalent using Fluent SDK?"
 
-### VSCode GitHub Copilot Agent Mode
-
-1. `Shift + CMD + p` to open VS Code command palette, search for `MCP: Add Server...`
-2. Select `NPM Package.  (Model Assisted)` as the server type.
-3. Fill in package name as `@modesty/fluent-mcp` and follow the prompts to complete the setup.
-4. Restart VS Code and the agent will now have access to ServiceNow Fluent SDK tools.
-5. If any issues arise, ensure the `~/Library/Application Support/Code/User/settings.json` file is correctly configured.
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "fluent-mcp": {
-        "type": "stdio",
-        "command": "npx",
-        "args": ["-y", "@modesty/fluent-mcp"]
-      }
-    }
-  }
-}
-```
-
-### Example usage in VS Code Agent Chat
-
 #### Script Include Dependency Pattern
 
 Prompt:
@@ -321,92 +279,7 @@ Prompt:
 Prompt:
 "Create before/after/async business rules for incident creation with proper error handling, logging, and transaction rollback. Show how to coordinate execution order and handle failures gracefully."
 
-### Cursor
-
-To configure the Fluent MCP Server for Cursor:
-
-1. Add a new MCP Server with the following configuration:
-
-   - Open Cursor settings
-   - Navigate to MCP Servers
-   - Add a new MCP Server with the following configuration:
-
-```json
-{
-  "mcpServers": {
-    "fluent-mcp": {
-      "command": "npx",
-      "args": ["-y", "@modesty/fluent-mcp"]
-    }
-  }
-}
-```
-
-Example usage in Cursor:
-
-```text
-I'm working on a ServiceNow app. Can you show me how to create a UI Action?
-```
-
-### Windsurf
-
-To configure the Fluent MCP Server for Windsurf:
-
-1. `CMD + ,` to open Windsurf settings, and navigate to the Cascade section.
-2. Click `Add Server` in `Model Context Protocol (MCP) Servers` section.
-3. Select `Add Custom MCP Server +` in the `Model Context Protocol (MCP) Servers Templates` popup.
-4. Paste in the following to `mcp_config.json`:
-
-   ```json
-   {
-     "mcpServers": {
-       "fluent-mcp": {
-         "command": "npx",
-         "args": ["-y", "@modesty/fluent-mcp"]
-       }
-     }
-   }
-   ```
-
-5. After closing the `mcp_config.json` edit tab, click `Refresh` in the `Model Context Protocol (MCP) Servers` section to apply the changes. All tools under `fluent-mcp` will be listed and available when refreshing is complete.
-
-6. Example usage
-   in Windsurf:
-
-```text
-* Show the help on how to authenticate to ServiceNow instance using Fluent
-* Authenticate me to http://localhost:8080 with my credentials
-```
-
-### Gemini CLI
-
-To configure the Fluent MCP Server for Gemini CLI:
-
-1. Open the Gemini CLI configuration file
-    - User's setting: `~/.gemini/settings.json`
-    - Project's setting: `./.gemini/settings.json`
-2. Add the following MCP server configuration:
-
-```json
-{
-  "mcpServers": {
-    "fluent-mcp": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modesty/fluent-mcp"
-      ]
-    }
-  }
-}
-```
-
-Example usage in Gemini CLI:
-
-```text
-show me an example of creating a table with 3 columns, String, Boolean and Reference in Fluent ;
-create a business rule to ensure the assigned_to is not null when insert and update for the table created above 
-```
+"I'm working on a ServiceNow app. Can you show me how to create a UI Action?"
 
 ## License
 

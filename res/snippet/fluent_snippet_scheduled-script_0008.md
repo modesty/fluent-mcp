@@ -13,11 +13,14 @@ Record({
 		run_type: 'daily',
 		time_zone: 'US/Pacific',
 		run_time: '2025-01-12 23:23:23',
-		script: get_glide_script(
-			'sysauto_script',
-			'Update script to set system property named test_property to false',
-			'sn_cs.VASystemObject.generateEmailNotifications();'
-		)
+		script: `// Set the system property 'test_property' to false
+gs.setProperty("test_property", "false");
+
+// Log the property update
+gs.log("System property 'test_property' has been set to 'false'", "PropertyUpdate");
+
+// Add information message for admins
+gs.info("Daily job has updated test_property to false");`
 	}
 });
 ```

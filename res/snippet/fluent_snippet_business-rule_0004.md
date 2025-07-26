@@ -8,10 +8,25 @@ BusinessRule({
     action: ['insert'],
     filter_condition: get_encoded_query(
         'cmdb_ci is not empty and is_sample is false', 'em_alert'),
-    script:  get_glide_script(
-            'sys_script', 
-            'set billable service using cmdb_ci name and assign current domain ID', 
-            '(function executeRule(current, previous /*null when async*/ ) { gs.include("CMDBItem"); var chg = new CMDBItem(null);chg.changeCategory(previous, current);  })(current, previous);'),
+    script: `(function executeRule(current, previous /*null when async*/) {
+    // Check if we have a CMDB CI
+    if (current.cmdb_ci) {
+        var ciGr = new GlideRecord('cmdb_ci');
+        if (ciGr.get(current.cmdb_ci)) {
+            // Set billable service using CMDB CI name
+            current.billable_service = ciGr.name;
+            
+            // Assign current domain ID
+            current.domain = gs.getCurrentDomainID();
+            
+            // Update the record
+            current.update();
+            
+            // Log the update
+            gs.log('Updated alert ' + current.number + ' with billable service: ' + ciGr.name + ' and domain: ' + gs.getCurrentDomainID(), 'BillingAlertsBusinessRule');
+        }
+    }
+})(current, previous);`,
     table: get_table_name('em_alert'),
     name: 'Billing Alerts',
     order: 100,

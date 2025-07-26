@@ -15,11 +15,25 @@ RestApi({
 	routes: [
 		{
 			$id: '73894e2837ac221112e674e8f2924b53',
-			script: get_glide_script(
-				'sys_ws_operation',
-				'update a script to echoes back parsed JSON from request body via PUT',
-				'var jsonString = "{"name":"John", "age":30, "city":"New York"}";gs.info(jsonString); '
-			),
+			script: `(function process(request, response) {
+    try {
+        // Parse the JSON from the request body
+        var requestBody = request.body ? request.body.data : {};
+        
+        // Echo back the parsed JSON
+        response.setContentType('application/json');
+        response.setStatus(200);
+        return requestBody;
+    } catch (e) {
+        // Handle any errors
+        response.setContentType('application/json');
+        response.setStatus(500);
+        return { 
+            error: e.message,
+            message: "Failed to process JSON"
+        };
+    }
+})(request, response);`,
 			parameters: [],
 			headers: [],
 			name: 'Echo PUT',

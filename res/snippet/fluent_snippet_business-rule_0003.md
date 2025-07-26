@@ -8,10 +8,16 @@ export default BusinessRule({
     filter_condition: get_encoded_query(
         'when rca is not empty', 
         'x_ap4_scm_rca_why'),
-    script: get_glide_script(
-            'sys_script', 
-            'Create a script to display an info message to admin users when the RCA is updated', 
-            ''),
+    script: `(function executeRule(current, previous /*null when async*/) {
+    // Check if the user is an admin
+    if (gs.hasRole('admin')) {
+        // Display info message to admin users
+        gs.addInfoMessage('RCA has been updated for record: ' + current.number);
+        
+        // Log the update
+        gs.log('RCA updated for record ' + current.number + ' by ' + gs.getUserName(), 'RCA_Update_BR');
+    }
+})(current, previous);`,
     table: get_table_name('x_ap4_scm_rca_why'),
     name: 'AP4 - Update RCA when updated',
     order: 100,

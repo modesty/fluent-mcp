@@ -13,7 +13,12 @@ Record({
         client: true,
         ui16_compatible: true,
         format_for_configurable_workspace: true,
-        client_script_v2: get_glide_script('sys_ui_action', 'create an onClick function named "onClickFunction", to display info message "Dummy function call for onlick action"', ''),
+        client_script_v2: `function onClickFunction() {
+    // Display info message
+    g_form.addInfoMessage("Dummy function call for onlick action");
+    // Return false to prevent default action
+    return false;
+}`,
         comments: 'test comment',
         condition: 'gs.hasRole("admin");',
         hint: 'Test hint on mouse hover',

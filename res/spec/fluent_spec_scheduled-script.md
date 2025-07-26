@@ -17,11 +17,7 @@ Record({
 		run_start: '', // string, job starting time, default value should be the user's current time, mandatory if `run_type` is `periodically` or `once`
 		run_time: '1970-01-01 00:00:00', // string, the execution time per job occurence, mandatory only if `run_type` is `daily`, `weekly`, or `monthly`
 		business_calendar: get_sys_id('business_calendar', ''), // string, mandatory only if `run_type` is `business_calendar_start` or `business_calendar_end`
-		script: get_glide_script(
-			'sysauto_script', // string, always 'sysauto_script'
-			'', // string, same as devrequest
-			'' // string, extracted ServiceNow script code from devrequest
-		),
+		script: '', // ServiceNow script to fullfil the functional request in scripting,
 	}
 })
 ```

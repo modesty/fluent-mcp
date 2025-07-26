@@ -27,9 +27,12 @@ Acl({
   condition: get_encoded_query(
     'when a task’s priority is 2 and active is true',
      'task'),
-  script: get_glide_script(
-        'sys_security_acl',
-        'create a record type ACL that allows user to delete a task if the record is new.',
-        '')
+  script: `function executeRule() {
+    // Check if the record is new
+    if (current.isNewRecord()) {
+        return true; // Allow deletion for new records
+    }
+    return false; // Don't allow deletion for existing records
+}`
 });
 ```

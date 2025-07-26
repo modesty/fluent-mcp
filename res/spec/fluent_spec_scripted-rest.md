@@ -19,11 +19,7 @@ const specRestApi = RestApi({
 // spec to create Routes in Fluent
 const Route = {
 	$id: '', // string | guid, mandatory
-	script: get_glide_script(
-		'sys_ws_operation', // string, always 'sys_ws_operation'
-		'', // string, requested change from devrequest
-		'', // string, extracted ServiceNow script code from devrequest
-	),
+	script: '', // ServiceNow script to fullfil the functional request in scripting,
 	parameters: [], // array of Parameters, see the ParameterAndHeader spec
 	headers: [], // array of Headers, see the ParameterAndHeader spec
 	name: '', // string, defaults to the value of the path property
