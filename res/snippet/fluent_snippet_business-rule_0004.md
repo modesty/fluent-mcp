@@ -6,8 +6,7 @@ import { BusinessRule } from '@servicenow/sdk/core'
 BusinessRule({
     $id: '1a9b33736be23010bc5bffcd1e44af2e',
     action: ['insert'],
-    filter_condition: get_encoded_query(
-        'cmdb_ci is not empty and is_sample is false', 'em_alert'),
+    filter_condition: 'cmdb_ci!=NULL^is_sample=false',
     script: `(function executeRule(current, previous /*null when async*/) {
     // Check if we have a CMDB CI
     if (current.cmdb_ci) {

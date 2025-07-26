@@ -12,10 +12,7 @@ BusinessRule({
 	active: false, // boolean
 	add_message: false, // boolean
 	description: '', // string
-	filter_condition: get_encoded_query(
-		'', // string, requested change from devrequest
-		'' // string, table name
-	),
+	filter_condition: '', // ServiceNow encoded query
 	message: '', // string
 	order: 100, // number
 	role_conditions: [], // array of string | array of Role objects indicating that the user needs to have all Roles listed to execute this Business Rule, see Role spec

@@ -24,9 +24,7 @@ Acl({
   type: 'record',
   table: 'task',
   roles: [get_sys_id('sys_user_role', 'name=admin'), managerRole],
-  condition: get_encoded_query(
-    'when a task’s priority is 2 and active is true',
-     'task'),
+  condition: 'priority=2^active=true',
   script: `function executeRule() {
     // Check if the record is new
     if (current.isNewRecord()) {

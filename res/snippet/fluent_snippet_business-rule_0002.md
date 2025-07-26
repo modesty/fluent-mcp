@@ -6,9 +6,7 @@ import { BusinessRule } from '@servicenow/sdk/core'
 export default BusinessRule({
     $id:  Now.ID['set_state_business_rule'],
     action: ['update'],
-    filter_condition: get_encoded_query(
-        'when a task's state changes to In Progress, and the parent case has category = invoice_automation and sub_category = invoice_exceptions.', 
-        'sn_ap_cm_ap_task'),
+    filter_condition: 'state=3^parent.category=invoice_automation^parent.sub_category=invoice_exceptions',
     script: `(function executeRule(current, previous /*null when async*/) {
     // Check if there's a parent case
     if (current.parent) {

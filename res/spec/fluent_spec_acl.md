@@ -9,16 +9,10 @@ const specAcl = Acl({
     operation: 'read', // mandatory, typed string: `execute`, `create`, `read`, `write`, `delete`, `edit_task_relations`, `edit_ci_relations`, `save_as_template`, `add_to_list`, `report_on`, `list_edit`, `report_view`, `personalize_choices`
     table: get_table_name(''), // mandatory if `type` is `record`
     field: '*', // mandatory if `type` is `record`: `*` or comma delimited list of field names
-    applies_to:get_encoded_query(
-        '', // string, requested change from devrequest
-        '' // string, table name
-	),	// only applicable if `type` is `record`
+    applies_to: '', // ServiceNow encoded query, only applicable if `type` is `record`
     roles: [get_sys_id('sys_user_role', '')], // array of Record<'sys_user_role'>, either sys_id for existing roles or Role object for new roles
     decision_type: 'allow', // typed string, `allow`|`deny`
-    condition: get_encoded_query(
-        '', // string, requested change from devrequest
-         '' // string, table name
-	),
+    condition: '', // ServiceNow encoded query
     script: '', // ServiceNow script to fullfil the functional request in scripting,
     admin_overrides: true, // boolean, default is true
     security_attribute: 'user_is_authenticated', // typed string, `user_is_authenticated`|`has_admin_role`,
