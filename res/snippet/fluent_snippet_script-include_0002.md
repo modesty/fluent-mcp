@@ -8,10 +8,50 @@ Record({
     data: {
         name: "TestAppConstants",
         description: "Constants for TestApp",
-        script: get_glide_script(
-                'sys_script_include', 
-                'Write a TestAppConstants script include that defines table and schema constants for TestApp', 
-                ''),
+        script: `var TestAppConstants = Class.create();
+
+TestAppConstants.prototype = {
+    initialize: function() {
+        // Constructor - nothing to initialize
+    },
+    
+    // Tables
+    TABLE: {
+        USER: 'sys_user',
+        GROUP: 'sys_user_group',
+        ROLE: 'sys_user_role',
+        TESTAPP_CONFIG: 'x_testapp_config',
+        TESTAPP_RECORD: 'x_testapp_record',
+        TESTAPP_LOG: 'x_testapp_log'
+    },
+    
+    // Schema Constants
+    SCHEMA: {
+        STATUS: {
+            ACTIVE: 'active',
+            INACTIVE: 'inactive',
+            PENDING: 'pending',
+            PROCESSING: 'processing',
+            COMPLETE: 'complete',
+            ERROR: 'error'
+        },
+        PRIORITY: {
+            CRITICAL: '1',
+            HIGH: '2',
+            MODERATE: '3',
+            LOW: '4'
+        }
+    },
+    
+    // Configuration Constants
+    CONFIG: {
+        DEFAULT_BATCH_SIZE: 1000,
+        MAX_RETRY_ATTEMPTS: 3,
+        PROCESS_TIMEOUT_MS: 300000 // 5 minutes
+    },
+    
+    type: 'TestAppConstants'
+};`,
         access: "public", // accessible from all application scopes
         caller_access: '1', // keep track of the caller through cross-scope privileges
         active: true,

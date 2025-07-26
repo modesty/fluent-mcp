@@ -12,10 +12,30 @@ RestApi({
         {
             $id: Now.ID['route1'],
             path: '/api/sn_aes_notificatio/notifications/guid',
-            script: get_glide_script(
-                    'sys_ws_operation', 
-                    'create script to set new sys id to response body notificationGuid.', 
-                    ''),
+            script: `(function process(request, response) {
+    try {
+        // Generate a new sys_id (GUID)
+        var newGuid = gs.generateGUID();
+        
+        // Set response content type
+        response.setContentType('application/json');
+        
+        // Set response status
+        response.setStatus(200);
+        
+        // Return the new GUID in the response body
+        return {
+            "notificationGuid": newGuid,
+            "timestamp": new GlideDateTime().getDisplayValue()
+        };
+    } catch (e) {
+        response.setStatus(500);
+        return {
+            "error": e.message,
+            "status": "error"
+        };
+    }
+})(request, response);`,
             parameters: [],
             headers: [],
 			authorization: true,

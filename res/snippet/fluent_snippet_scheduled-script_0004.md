@@ -13,11 +13,15 @@ Record({
 		run_dayofweek: 21,
 		time_zone: 'Europe/Amsterdam',
 		run_time: '1970-01-01 15:00:00',
-		script: get_glide_script(
-			'sysauto_script', 
-			'update inline script to log a message of "started scheduled job four" using glide system (gs) api: gs.log("ran scheduled job 4");',
-			''
-		)
+		script: `// Log the message that the job has started
+gs.log("started scheduled job four", "ScheduledJobFour");
+
+// Add an info message
+gs.info("ran scheduled job 4");
+
+// Record the execution time
+var currentDateTime = new GlideDateTime();
+gs.setProperty("last_run_scheduled_job_4", currentDateTime.getDisplayValue());`
 	}
 })
 ```

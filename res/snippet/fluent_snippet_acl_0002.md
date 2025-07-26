@@ -4,10 +4,20 @@ import { Acl } from '@servicenow/sdk/core'
 
 export default Acl({
     $id: Now.ID['example_record_acl'],
-    script: get_glide_script(
-        'sys_security_acl', 
-        'create a record type ACL that allows write for sn_table_bldr_wzd_attachment_helper table if record is new and user is the one who created the record', 
-        ''),
+    script: `function executeRule() {
+    // Check if the record is new
+    if (current.isNewRecord()) {
+        return true; // Allow write access for new records
+    }
+    
+    // Check if the current user is the creator of the record
+    var currentUser = gs.getUserID();
+    if (current.sys_created_by == currentUser) {
+        return true; // Allow write access if the current user created the record
+    }
+    
+    return false; // Deny write access in all other cases
+}`,
     active: true,
     admin_overrides: false,
     description: 'Allow write for records in sn_table_bldr_wzd_attachment_helper, if the ACL script returns true.',

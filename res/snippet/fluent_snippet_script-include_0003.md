@@ -8,10 +8,31 @@ Record({
     data: {
         name: "TestAppConstants",
         description: "Constants for TestApp",
-        script: get_glide_script(
-                'sys_script_include', 
-                'Update the script add a function to log caller name', 
-                'var TestAppConstants = Class.create(); TestAppConstants.prototype = {initialize: function() {}, type:TestAppConstants};'),
+        script: `var TestAppConstants = Class.create();
+
+TestAppConstants.prototype = {
+    initialize: function() {
+        // Constructor - nothing to initialize
+    },
+    
+    /**
+     * Log the name of the caller
+     * @param {String} functionName - The name of the function being called
+     * @return {String} The caller's name
+     */
+    logCallerName: function(functionName) {
+        var callerName = gs.getCallerScopeName();
+        var userName = gs.getUserName();
+        
+        gs.log("Function '" + functionName + "' called by user '" + 
+               userName + "' from application scope '" + callerName + "'", 
+               "TestAppConstants");
+               
+        return callerName;
+    },
+    
+    type: 'TestAppConstants'
+};`,
         access: "public", // accessible from all application scopes
         caller_access: '1', // keep track of the caller through cross-scope privileges
         active: true,

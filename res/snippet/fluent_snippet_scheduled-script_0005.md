@@ -11,11 +11,19 @@ Record({
 		conditional: false,
 		run_type: 'business_calendar_start',
 		business_calendar: get_sys_id('business_calendar', 'calendar_name=Quarter^ORlabel=Quarter'),
-		script: get_glide_script(
-			'sysauto_script', 
-			'update inline script to log a message of "started scheduled job five" using glide system (gs) api: gs.log("ran scheduled job 5");',
-			''
-		)
+		script: `// Log the message that the job has started
+gs.log("started scheduled job five", "ScheduledJobFive");
+
+// Add an info message
+gs.info("ran scheduled job 5");
+
+// Record execution timestamp in a system property
+var currentDateTime = new GlideDateTime();
+gs.setProperty("last_quarterly_job_run", currentDateTime.getDisplayValue());
+
+// Log the quarter start date
+var quarterCal = new GlideCalendarEntry.getStartDate('Quarter', currentDateTime);
+gs.log("Quarter start date: " + quarterCal, "QuarterlyJob");`
 	}
 })
 ```

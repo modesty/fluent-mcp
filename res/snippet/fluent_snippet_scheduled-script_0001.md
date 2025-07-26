@@ -12,11 +12,15 @@ Record({
 		run_type: 'daily',
 		time_zone: 'GMT',
 		run_time: '1970-01-01 15:00:00',
-		script: get_glide_script(
-			'sysauto_script',
-			'update inline script to set a property using glide system (gs) api: gs.setProperty("scheduled_job_ran_1", "true");',
-			''
-		);
+		script: `// Set the property to indicate the job has run
+gs.setProperty("scheduled_job_ran_1", "true");
+
+// Log that the job has been executed
+gs.log("Daily scheduled script execution completed", "DailyScheduledScript");
+
+// Get the current date/time
+var currentTime = new GlideDateTime();
+gs.info("Job executed at: " + currentTime.getDisplayValue());`
 	}
 })
 ```

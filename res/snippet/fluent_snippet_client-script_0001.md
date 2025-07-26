@@ -9,10 +9,13 @@ ClientScript({
     ui_type: 'all',
     type: 'onLoad',
     description: 'Displays hello world on load',
-    script: get_glide_script(
-            'sys_client_script', 
-            'onLoad client script that displays "Hello world"', 
-            ''),
+    script: `function onLoad() {
+    // Display "Hello world" message when the form loads
+    g_form.addInfoMessage("Hello world");
+    
+    // Log to console for debugging
+    console.log("Hello world client script executed");
+}`,
     active: true,
     applies_extended: false,
     global: true,
