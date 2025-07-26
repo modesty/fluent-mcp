@@ -41,13 +41,13 @@ Test({
     })
     atf.form.fieldValueValidation({
         $id: Now.ID['0005'],
-        table: 'incident', // function resolve_table_fields has one parameter: table name hints
+        table: 'incident', 
         conditions: `problem_statement=Email server is down`, // string, servicenow encoded query
         formUI: 'standard_ui' // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace'
     })
     atf.server.recordValidation({
         $id: Now.ID['0006'],
-        table: 'incident', // function resolve_table_fields has one parameter: table name hints
+        table: 'incident', 
         fieldValues: `problem_id=${outputOfCreateProblem.record_id}`, // string, servicenow encoded query
         recordId: outputOfSave.record_id, // sys_id of the record
         enforceSecurity: false, // boolean

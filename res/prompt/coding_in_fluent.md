@@ -27,8 +27,8 @@ Fluent (ServiceNow SDK) is a TypeScript-based domain-specific language that allo
 1. **Use Fluent Syntax**
     - Fluent syntax is TypeScript WITHOUT imperative coding constructs such as loops, if-else statements, promises, nor '+' operator for string  concatenation.
     - ALWAYS use template literals for string interpolation and concatenation. Incorrect Example: {conditions: 'priority=3^assignment_group=' + get_sys_id('sys_user_group', 'name=CAB Approval^ORlabel=CAB Approval')} ; Correct Example: {conditions: `priority=3^assignment_group=${get_sys_id('sys_user_group', 'name=CAB Approval^ORlabel=CAB Approval')}`}
-    - Write TypeScript code with direct assignments for property values, avoiding any function calls EXCEPT get_sys_id, resolve_table_fields, and declared return variables
-    - Do NOT put get_sys_id, resolve_table_fields in the import statement, they are helper functions that are already available in the generated code
+    - Write TypeScript code with direct assignments for property values, avoiding any function calls EXCEPT get_sys_id and declared return variables
+    - Do NOT put get_sys_id in the import statement, they are helper functions that are already available in the generated code
     - Always import from '@servicenow/sdk/core' for all Fluent (ServiceNow SDK) APIs
 2. **Utilize tools**: Utilize the the tools to get metadata API spec, snippets, and instructs to help you write better Fluent (ServiceNow SDK)
    - tools also include now-sdk CLI commands for init a project, build, and deploy

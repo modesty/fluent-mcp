@@ -40,7 +40,7 @@ atf.form.clickModalButton({ // all props are mandatory
 // Sets field values on the current form after a call to atf.form.openNewForm or atf.form.openExistingRecord
 atf.form.setFieldValue({ // all props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
-  table: resolve_table_fields(''), // table name
+  table: '', // table name
   fieldValues: {}, // a valid JSON object, field must be snake_case and double-quoted and values must be double-quoted with properly escaped JSON values: { "field_one": "value1", "field_two": "value2" }
   formUI: 'standard_ui', // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace'
 }): void;

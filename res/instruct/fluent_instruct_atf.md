@@ -52,5 +52,4 @@ You must follow these instructions carefully:
 2. ALWAYS use template literals for string interpolation and concatenation. Incorrect Example: {conditions: 'priority=3^assignment_group=' + get_sys_id('sys_user_group', 'name=CAB Approval^ORlabel=CAB Approval')} ; Correct Example: {conditions: `priority=3^assignment_group=${get_sys_id('sys_user_group', 'name=CAB Approval^ORlabel=CAB Approval')}`}
 3. Ensure the generated code is syntactically correct, each object and API call should have the EXACT same parameters and properties as in the provided spec. Do NOT generate variable whose value is not used
 4. Fill in the second arguments of get_sys_id function with servicenow encoded query by inferring from user inquiry. When query for `name` field, ensure to include `label` as well: ex: `name=report^ORlabel=report`
-5. Fill in the argument of resolve_table_fields functions with the table name hint by inferring from user inquiry.
-6. Write code in TypeScript with direct assignments for property values, avoiding any function calls EXCEPT get_sys_id, resolve_table_fields and declared return variables
+5. Write code in TypeScript with direct assignments for property values, avoiding any function calls EXCEPT get_sys_id and declared return variables

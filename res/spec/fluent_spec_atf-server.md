@@ -39,7 +39,7 @@ atf.server.recordQuery({ // all props are mandatory
 // Inserts a record into a table. Specify the field values to set on the new record, outputs the table and the sys_id of the new record.
 atf.server.recordInsert({ // all props are mandatory
     $id: Now.ID[''], // string | guid, mandatory
-    table: resolve_table_fields(''), // table name
+    table: '', // table name
     fieldValues: {}, // a valid JSON object, field must be snake_case and double-quoted and values must be double-quoted with properly escaped JSON values, example: { "field_one": "value1", "field_two": "value2" }
     assert: '', // 'record_successfully_inserted' | 'record_not_inserted';
     enforceSecurity: false, // boolean;
