@@ -37,8 +37,10 @@ async function findFile(filename: string): Promise<string | null> {
       await fs.access(tryPath);
       logger.debug(`- File found at: ${tryPath}`);
       return tryPath;
-    } catch (err) {
+    } catch (error) {
       // File not found at this location
+      logger.debug(`${error}- Not found at: ${tryPath}`);
+      return null;
     }
   }
   

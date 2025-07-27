@@ -38,8 +38,8 @@ let packageInfo: {
 try {
   const packageData = fs.readFileSync(packageJsonPath, 'utf-8');
   packageInfo = JSON.parse(packageData);
-} catch (err) {
-//   console.error(`Failed to load package.json: ${err}`);
+} catch (error) {
+  console.error(`Failed to load package.json: ${error}`);
 }
 
 /**
@@ -180,7 +180,8 @@ export function validateConfig(config: McpServerConfig): boolean {
   const resourcePathExists = (path: string): boolean => {
     try {
       return fs.existsSync(path) && fs.statSync(path).isDirectory();
-    } catch (err) {
+    } catch (error) {
+      console.error('Error checking resource path', error);
       return false;
     }
   };

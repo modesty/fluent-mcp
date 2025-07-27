@@ -57,6 +57,7 @@ export class ResourceLoader {
 
         return metadataTypes;
       } catch (dirError) {
+        logger.warn(`Failed to read spec directory: ${dirError}. fall back to enum values`);
         // If directory access fails, fall back to enum values
         return Object.values(ServiceNowMetadataType);
       }
