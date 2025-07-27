@@ -1,6 +1,6 @@
-import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { ResourceLoader, ResourceType } from "../utils/resourceLoader.js";
-import logger from "../utils/logger.js";
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { ResourceLoader, ResourceType } from '../utils/resourceLoader.js';
+import logger from '../utils/logger.js';
 
 /**
  * Manager for handling MCP resources registration and access
@@ -28,7 +28,7 @@ export class ResourceManager {
       this.metadataTypes = await this.resourceLoader.getAvailableMetadataTypes();
       logger.debug(`Loaded ${this.metadataTypes.length} metadata types for resources`);
     } catch (error) {
-      logger.error("Error loading metadata types",
+      logger.error('Error loading metadata types',
         error instanceof Error ? error : new Error(String(error))
       );
       throw error;
@@ -58,7 +58,7 @@ export class ResourceManager {
         {
           title: `${type} API Specification for Fluent (ServiceNow SDK)`,
           description: `API specification for Fluent (ServiceNow SDK) ${type}`,
-          mimeType: "text/markdown"
+          mimeType: 'text/markdown'
         },
         async (uri: URL) => {
           try {
@@ -115,7 +115,7 @@ export class ResourceManager {
         list: undefined,
         complete: {
           // Provide completions for snippet IDs
-          snippetId: async (value: string) => {
+          snippetId: async (value: string): Promise<string[]> => {
             try {
               const snippets = await this.resourceLoader.listSnippets(type);
               return snippets.filter(id => id.startsWith(value || ''));
@@ -135,9 +135,9 @@ export class ResourceManager {
         {
           title: `${type} Code Snippets for Fluent (ServiceNow SDK)`,
           description: `Example code snippets for Fluent (ServiceNow SDK) ${type}`,
-          mimeType: "text/markdown"
+          mimeType: 'text/markdown'
         },
-        async (uri: URL, extra: any) => {
+        async (uri: URL, extra: { arguments?: { snippetId?: string } }) => {
           try {
             // Extract metadata type from URI and snippet ID from template params
             const metadataType = uri.host;
@@ -198,7 +198,7 @@ export class ResourceManager {
         {
           title: `${type} Instructions for Fluent (ServiceNow SDK)`,
           description: `Development instructions for Fluent (ServiceNow SDK) ${type}`,
-          mimeType: "text/markdown"
+          mimeType: 'text/markdown'
         },
         async (uri: URL) => {
           try {
@@ -263,7 +263,7 @@ export class ResourceManager {
         resources.push({
           uri: `sn-spec://${type}`,
           title: `${type} API Specification for Fluent (ServiceNow SDK) `,
-          mimeType: "text/markdown"
+          mimeType: 'text/markdown'
         });
       }
       
@@ -272,7 +272,7 @@ export class ResourceManager {
         resources.push({
           uri: `sn-instruct://${type}`,
           title: `${type} Instructions for Fluent (ServiceNow SDK)`,
-          mimeType: "text/markdown"
+          mimeType: 'text/markdown'
         });
       }
       
@@ -284,7 +284,7 @@ export class ResourceManager {
             resources.push({
               uri: `sn-snippet://${type}/${snippetIds[0]}`,
               title: `${type} Code Snippet for Fluent (ServiceNow SDK)`,
-              mimeType: "text/markdown"
+              mimeType: 'text/markdown'
             });
           }
         } catch (error) {
@@ -296,7 +296,7 @@ export class ResourceManager {
       
       return resources;
     } catch (error) {
-      logger.error("Error listing resources", 
+      logger.error('Error listing resources', 
         error instanceof Error ? error : new Error(String(error))
       );
       return [];

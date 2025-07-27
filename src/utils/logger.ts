@@ -4,23 +4,23 @@
  * Also supports sending logs as MCP notifications according to the protocol
  */
 
-import fs from "fs";
-import path from "path";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import fs from 'fs';
+import path from 'path';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import { getConfig } from "../config.js";
+import { getConfig } from '../config.js';
 
 // Log levels enum
 export enum LogLevel {
-  DEBUG = "debug",
-  INFO = "info",
-  NOTICE = "notice",
-  WARN = "warn",
-  WARNING = "warning", // MCP protocol alias for warn
-  ERROR = "error",
-  CRITICAL = "critical",
-  ALERT = "alert",
-  EMERGENCY = "emergency",
+  DEBUG = 'debug',
+  INFO = 'info',
+  NOTICE = 'notice',
+  WARN = 'warn',
+  WARNING = 'warning', // MCP protocol alias for warn
+  ERROR = 'error',
+  CRITICAL = 'critical',
+  ALERT = 'alert',
+  EMERGENCY = 'emergency',
 }
 
 // Level priorities - higher number means more severe
@@ -80,11 +80,11 @@ export class Logger {
       }
 
       this.logFilePath = logFilePath;
-      this.logStream = fs.createWriteStream(logFilePath, { flags: "a" });
+      this.logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
       this.useStderr = false;
 
       // Handle process exit to close log file
-      process.on("exit", () => {
+      process.on('exit', () => {
         this.logStream?.end();
       });
     } catch (err) {
@@ -184,14 +184,14 @@ export class Logger {
     // Construct notification params according to MCP protocol
     const params = {
       level,
-      logger: "fluent-mcp",
+      logger: 'fluent-mcp',
       message,
       ...(data ? { data } : {}),
     };
 
     try {
       // Send notification via MCP
-      this.mcpServer.server.notification({ method: "logging/message", params });
+      this.mcpServer.server.notification({ method: 'logging/message', params });
     } catch (err) {
       // If notification fails, fallback to stderr
       this.writeToStderr(`Failed to send MCP notification: ${err}`);
@@ -213,7 +213,7 @@ export class Logger {
     // No manual handler registration needed
     
     // Log the status
-    this.debug("Logging capability enabled with current level: " + this.logLevel);
+    this.debug('Logging capability enabled with current level: ' + this.logLevel);
   }
 
   /**
@@ -290,13 +290,13 @@ export class Logger {
     if (!this.shouldLog(LogLevel.ERROR)) return;
     const errorContext = error
       ? {
-          ...context,
-          error: {
-            name: error.name,
-            message: error.message,
-            stack: error.stack,
-          },
-        }
+        ...context,
+        error: {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        },
+      }
       : context;
 
     const entry = this.formatLogEntry(LogLevel.ERROR, message, errorContext);

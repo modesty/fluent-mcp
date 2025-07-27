@@ -1,5 +1,5 @@
-import { spawn, SpawnOptionsWithoutStdio } from "node:child_process";
-import { Tool } from "@modelcontextprotocol/sdk/types.js";
+import { spawn, SpawnOptionsWithoutStdio } from 'node:child_process';
+import { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 import {
   CLICommand,
@@ -7,20 +7,20 @@ import {
   CommandResult,
   ProcessResult,
   ProcessRunner,
-} from "../utils/types.js";
-import { getProjectRootPath } from "../config.js";
+} from '../utils/types.js';
+import { getProjectRootPath } from '../config.js';
 import {
   VersionCommand,
   HelpCommand,
-  UpgradeCommand,
+  // UpgradeCommand, // Commented out as it's not used
   AuthCommand,
   InitCommand,
   BuildCommand,
   InstallCommand,
   TransformCommand,
   DependenciesCommand,
-} from "./commands/index.js";
-import logger from "../utils/logger.js";
+} from './commands/index.js';
+import logger from '../utils/logger.js';
 
 // Infrastructure Layer
 export class NodeProcessRunner implements ProcessRunner {
@@ -37,15 +37,15 @@ export class NodeProcessRunner implements ProcessRunner {
       // Set timeout to automatically abort if process hangs
       const timeoutId = setTimeout(() => {
         controller.abort();
-        logger.warn(`Command execution timed out after 12000ms: ${command} ${args.join(" ")}`);
+        logger.warn(`Command execution timed out after 12000ms: ${command} ${args.join(' ')}`);
       }, 12000); // 12 seconds timeout
 
       const options: SpawnOptionsWithoutStdio = {
-        stdio: "pipe",
+        stdio: 'pipe',
         shell: true,
         cwd, env, signal
       };
-      logger.info(`Spawning child process: ${command} ${args.join(" ")}`, { cwd });
+      logger.info(`Spawning child process: ${command} ${args.join(' ')}`, { cwd });
 
       let child;
       try {
@@ -56,26 +56,26 @@ export class NodeProcessRunner implements ProcessRunner {
         return;
       }
 
-      let stdout = "";
-      let stderr = "";
+      let stdout = '';
+      let stderr = '';
 
-      child.stdout?.on("data", (data: Buffer) => {
+      child.stdout?.on('data', (data: Buffer) => {
         const text = data.toString();
         stdout += text;
         // Log real-time output for debugging
         logger.info(`[STDOUT] ${text.trim()}`);
       });
 
-      child.stderr?.on("data", (data: Buffer) => {
+      child.stderr?.on('data', (data: Buffer) => {
         const text = data.toString();
         stderr += text;
         // Log real-time errors for debugging
         logger.info(`[STDERR] ${text.trim()}`);
       });
 
-      child.on("close", (code: number | null) => {
+      child.on('close', (code: number | null) => {
         clearTimeout(timeoutId);
-        logger.info(`Process exited with code ${code}: ${command} ${args.join(" ")}`);
+        logger.info(`Process exited with code ${code}: ${command} ${args.join(' ')}`);
         resolve({
           stdout: stdout.trim(),
           stderr: stderr.trim(),
@@ -83,7 +83,7 @@ export class NodeProcessRunner implements ProcessRunner {
         });
       });
 
-      child.on("error", (error: Error) => {
+      child.on('error', (error: Error) => {
         clearTimeout(timeoutId);
         logger.error(`Process error: ${error.message}`);
         reject(error);
@@ -94,7 +94,7 @@ export class NodeProcessRunner implements ProcessRunner {
         if (child && !child.killed) {
           // Force kill the process that's hanging
           child.kill('SIGKILL');
-          reject(new Error(`Process killed after timeout (12000ms): ${command} ${args.join(" ")}`));
+          reject(new Error(`Process killed after timeout (12000ms): ${command} ${args.join(' ')}`));
         }
       });
 
@@ -147,12 +147,12 @@ export class CLIExecutor implements CommandProcessor {
       }
       
       // Sanity check on working directory - warn if it's the system root
-      if (cwd === "/" || cwd === "\\") {
-        throw new Error(`ERROR: Command should never be executed with system root (/) as working directory`);
+      if (cwd === '/' || cwd === '\\') {
+        throw new Error('ERROR: Command should never be executed with system root (/) as working directory');
       }
 
       // Better logging with clear working directory information
-      logger.info(`Executing command: ${command} ${args.join(" ")}`, { cwd });
+      logger.info(`Executing command: ${command} ${args.join(' ')}`, { cwd });
             
       const result = await this.processRunner.run(command, args, cwd);
 
@@ -165,7 +165,7 @@ export class CLIExecutor implements CommandProcessor {
     } catch (error) {
       return {
         success: false,
-        output: "",
+        output: '',
         error: error instanceof Error ? error : new Error(String(error)),
         exitCode: 1,
       };
@@ -239,16 +239,16 @@ export class CLICmdWriter implements CommandProcessor {
       }
       
       // Sanity check on working directory - warn if it's the system root
-      if (cwd === "/" || cwd === "\\") {
-        throw new Error(`ERROR: Command should never use system root (/) as working directory`);
+      if (cwd === '/' || cwd === '\\') {
+        throw new Error('ERROR: Command should never use system root (/) as working directory');
       }
 
       // Format the command string
-      const argsText = args.join(" ");
+      const argsText = args.join(' ');
       const commandText = `${command} ${argsText}`;
       
       // Add working directory context if available
-      const cwdInfo = cwd ? `(in directory: ${cwd})` : "";
+      const cwdInfo = cwd ? `(in directory: ${cwd})` : '';
       const fullCommandText = cwdInfo ? `${commandText} ${cwdInfo}` : commandText;
       
       logger.info(`Generated command text: ${fullCommandText}`);
@@ -262,7 +262,7 @@ export class CLICmdWriter implements CommandProcessor {
     } catch (error) {
       return {
         success: false,
-        output: "",
+        output: '',
         error: error instanceof Error ? error : new Error(String(error)),
         exitCode: 1,
       };
@@ -297,16 +297,16 @@ export class CommandRegistry {
         ...(command.annotations && { annotations: command.annotations }),
         ...(command._meta && { _meta: command._meta }),
         inputSchema: {
-          type: "object",
+          type: 'object',
           properties: command.arguments.reduce(
             (props, arg) => {
               props[arg.name] = {
-                type: arg.type === "array" ? "array" : arg.type,
+                type: arg.type === 'array' ? 'array' : arg.type,
                 description: arg.description,
               };
               return props;
             },
-            {} as Record<string, any>
+            {} as Record<string, { type: string; description: string }>
           ),
           required: command.arguments
             .filter((arg) => arg.required)

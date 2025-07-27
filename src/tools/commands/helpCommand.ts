@@ -1,6 +1,6 @@
-import { CommandArgument, CommandProcessor, CommandResult } from "../../utils/types";
+import { CommandArgument, CommandProcessor, CommandResult } from '../../utils/types';
 
-import { SessionFallbackCommand } from "./sessionFallbackCommand.js";
+import { SessionFallbackCommand } from './sessionFallbackCommand.js';
 
 /**
  * Command to get help information about Fluent (ServiceNow SDK) commands

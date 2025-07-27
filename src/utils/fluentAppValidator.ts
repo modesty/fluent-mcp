@@ -1,6 +1,6 @@
-import fs from "node:fs";
-import path from "node:path";
-import logger from "./logger.js";
+import fs from 'node:fs';
+import path from 'node:path';
+import logger from './logger.js';
 
 /**
  * Interface for the result of checking if a directory contains a Fluent (ServiceNow SDK) application
@@ -28,43 +28,43 @@ export class FluentAppValidator {
   public static async checkFluentAppExists(directory: string): Promise<FluentAppCheckResult> {
     try {
       // Check for now.config.json
-      const configPath = path.join(directory, "now.config.json");
+      const configPath = path.join(directory, 'now.config.json');
       if (fs.existsSync(configPath)) {
         // Parse the config to extract the scope name
         try {
-          const configContent = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-          const scopeName = configContent.scope || "unknown";
-          const packageName = configContent.name || "unknown";
+          const configContent = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+          const scopeName = configContent.scope || 'unknown';
+          const packageName = configContent.name || 'unknown';
           return { hasApp: true, scopeName, packageName };
         } catch (error) {
-          logger.error("Failed to parse now.config.json", error as Error);
-          return { hasApp: true, scopeName: "unknown", packageName: "unknown" };
+          logger.error('Failed to parse now.config.json', error as Error);
+          return { hasApp: true, scopeName: 'unknown', packageName: 'unknown' };
         }
       }
 
       // Check for package.json with ServiceNow dependencies
-      const packageJsonPath = path.join(directory, "package.json");
+      const packageJsonPath = path.join(directory, 'package.json');
       if (fs.existsSync(packageJsonPath)) {
         try {
-          const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
+          const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
           const dependencies = { ...packageJson.dependencies, ...packageJson.devDependencies };
           
-          if (dependencies["@servicenow/now-sdk"] || dependencies["@servicenow/now-sdk-cli"]) {
+          if (dependencies['@servicenow/now-sdk'] || dependencies['@servicenow/now-sdk-cli']) {
             return { 
               hasApp: true, 
-              packageName: packageJson.name || "unknown",
-              scopeName: "unknown" // Can't determine scope from package.json
+              packageName: packageJson.name || 'unknown',
+              scopeName: 'unknown' // Can't determine scope from package.json
             };
           }
         } catch (error) {
-          logger.error("Failed to parse package.json", error as Error);
+          logger.error('Failed to parse package.json', error as Error);
         }
       }
 
       // No ServiceNow app detected
       return { hasApp: false };
     } catch (error) {
-      logger.error("Error checking for ServiceNow app", error as Error);
+      logger.error('Error checking for ServiceNow app', error as Error);
       return { 
         hasApp: false, 
         errorMessage: `Failed to check directory: ${error instanceof Error ? error.message : String(error)}`

@@ -3,10 +3,10 @@
  * and abstracts logging operations from the server implementation
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import logger from "./logger.js";
-import { ServerStatus } from "../types.js";
-import { getConfig } from "../config.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import logger from './logger.js';
+import { ServerStatus } from '../types.js';
+import { getConfig } from '../config.js';
 
 export class LoggingManager {
   private mcpServer?: McpServer;
@@ -37,21 +37,21 @@ export class LoggingManager {
    */
   logServerStarting(): void {
     const config = getConfig();
-    logger.info("Starting MCP server...", {version: config.version});
+    logger.info('Starting MCP server...', {version: config.version});
   }
 
   /**
    * Log server successfully started
    */
   logServerStarted(): void {
-    logger.info("MCP server initialized and connected via stdio");
+    logger.info('MCP server initialized and connected via stdio');
   }
 
   /**
    * Log server already running
    */
   logServerAlreadyRunning(): void {
-    logger.info("MCP server is already running");
+    logger.info('MCP server is already running');
   }
 
   /**
@@ -59,21 +59,21 @@ export class LoggingManager {
    * @param status Current server status
    */
   logServerNotRunning(status: ServerStatus): void {
-    logger.info("MCP server is not running", { status });
+    logger.info('MCP server is not running', { status });
   }
 
   /**
    * Log server stopping
    */
   logServerStopping(): void {
-    logger.info("Stopping MCP server...");
+    logger.info('Stopping MCP server...');
   }
 
   /**
    * Log server stopped
    */
   logServerStopped(): void {
-    logger.info("MCP server stopped");
+    logger.info('MCP server stopped');
   }
 
   /**
@@ -83,7 +83,7 @@ export class LoggingManager {
    */
   logServerStartFailed(error: Error | unknown, status: ServerStatus): void {
     logger.error(
-      "Failed to start MCP server",
+      'Failed to start MCP server',
       error instanceof Error ? error : new Error(String(error)),
       { status }
     );
@@ -96,7 +96,7 @@ export class LoggingManager {
    */
   logServerStopFailed(error: Error | unknown, status: ServerStatus): void {
     logger.error(
-      "Error stopping MCP server",
+      'Error stopping MCP server',
       error instanceof Error ? error : new Error(String(error)),
       { status }
     );
@@ -108,7 +108,7 @@ export class LoggingManager {
    */
   logResourceListingFailed(error: Error | unknown): void {
     logger.error(
-      "Error listing resources", 
+      'Error listing resources', 
       error instanceof Error ? error : new Error(String(error))
     );
   }
@@ -119,7 +119,7 @@ export class LoggingManager {
    */
   logPromptListingFailed(error: unknown): void {
     logger.error(
-      "Failed to list prompts",
+      'Failed to list prompts',
       error instanceof Error ? error : new Error(String(error))
     );
   }

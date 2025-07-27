@@ -1,62 +1,62 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { CommandArgument, CommandProcessor, CommandResult } from "../../utils/types.js";
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { CommandArgument, CommandProcessor, CommandResult } from '../../utils/types.js';
 
-import { BaseCLICommand } from "./baseCommand.js";
-import { FluentAppValidator } from "../../utils/fluentAppValidator.js";
-import { SessionManager } from "../../utils/sessionManager.js";
-import logger from "../../utils/logger.js";
+import { BaseCLICommand } from './baseCommand.js';
+import { FluentAppValidator } from '../../utils/fluentAppValidator.js';
+import { SessionManager } from '../../utils/sessionManager.js';
+import logger from '../../utils/logger.js';
 
 /**
  * Command to initialize a new ServiceNow application
  * Implements the init command with validation of prerequisites
  */
 export class InitCommand extends BaseCLICommand {
-  name = "prepare_fluent_init";
+  name = 'prepare_fluent_init';
   description = "Generate the Shell command to initialize a Fluent (ServiceNow SDK) application: If specified working directory has no Fluent (ServiceNow SDK) application, it will create a new one. If it has a Fluent (ServiceNow SDK) application, it will save the directory as the working directory for future commands, including build, install, transform and dependencies.\nWhen converting an existing ServiceNow application, use the 'from' argument to specify the system ID or path to initialize from. \nNote, if the specified directory has no package-lock.json file, run `npm install` first.\nNote, This command will not execute the initialization but prepare the shell command to be run later.";
   arguments: CommandArgument[] = [
     {
-      name: "from",
-      type: "string",
+      name: 'from',
+      type: 'string',
       required: false,
-      description: "convert existing scoped app to Fluent by sys_id or path to initialize from",
+      description: 'convert existing scoped app to Fluent by sys_id or path to initialize from',
     },
     {
-      name: "appName",
-      type: "string",
+      name: 'appName',
+      type: 'string',
       required: true,
-      description: "The name of the application, this is the user friendly name that will be displayed in ServiceNow UI.",
+      description: 'The name of the application, this is the user friendly name that will be displayed in ServiceNow UI.',
     },
     {
-      name: "packageName",
-      type: "string",
+      name: 'packageName',
+      type: 'string',
       required: true,
       description: "The NPM package name for the application, usually it's the snake-case of appName in lowercase.",
     },
     {
-      name: "scopeName",
-      type: "string",
+      name: 'scopeName',
+      type: 'string',
       required: true,
       description: "The scope name for the application in <prefix>_<scope_name> format. For localhost development, it should be in the format of 'sn_<scope_name>'. This is required to create a new Fluent (ServiceNow SDK) application, no spaces allowed.",
     },
     {
-      name: "auth",
-      type: "string",
+      name: 'auth',
+      type: 'string',
       required: false,
       description: "The authentication alias to use. If not provided, the default authentication alias will be used. You can set up authentication using the 'auth' command.",
     },
     {
-      name: "workingDirectory",
-      type: "string",
+      name: 'workingDirectory',
+      type: 'string',
       required: false,
       description: "The directory where the Fluent (ServiceNow SDK) application will be created. If not provided, a new directory will be created in the user's home directory.",
     },
     {
-      name: "debug",
-      type: "boolean",
+      name: 'debug',
+      type: 'boolean',
       required: false,
-      description: "Print debug output",
+      description: 'Print debug output',
     },
   ];
 
@@ -71,7 +71,7 @@ export class InitCommand extends BaseCLICommand {
    * @returns Path to the newly created directory
    */
   private createDefaultWorkingDirectory(): string {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const dirName = `fluent-app-${timestamp}`;
     const dirPath = path.join(os.homedir(), dirName);
     
@@ -90,14 +90,14 @@ export class InitCommand extends BaseCLICommand {
     
     const sessionManager = SessionManager.getInstance();
     let workingDirectory: string;
-    let shouldExecuteCommand = true;
+    // const shouldExecuteCommand = true; // Uncomment if needed later
 
     // Handle working directory logic
     if (args.workingDirectory) {
       // If working directory is provided
       let inputDir = args.workingDirectory as string;
       // Normalize ~ to home directory on Mac/Linux
-      if (inputDir.startsWith("~/")) {
+      if (inputDir.startsWith('~/')) {
         inputDir = path.join(os.homedir(), inputDir.slice(2));
       }
       workingDirectory = path.resolve(inputDir);
@@ -111,7 +111,7 @@ export class InitCommand extends BaseCLICommand {
           return {
             exitCode: 1,
             success: false,
-            output: "",
+            output: '',
             error: new Error(`Failed to create working directory ${workingDirectory}: ${error instanceof Error ? error.message : String(error)}`),
           };
         }
@@ -127,7 +127,7 @@ export class InitCommand extends BaseCLICommand {
           success: true,
           output: `The directory ${workingDirectory} already contains a Fluent (ServiceNow SDK) application.\n` +
                  `Package name: ${appCheck.packageName}\nScope name: ${appCheck.scopeName}\n` +
-                 `This directory has been saved as your working directory for future commands.`,
+                 'This directory has been saved as your working directory for future commands.',
           error: undefined,
         };
       }
@@ -136,7 +136,7 @@ export class InitCommand extends BaseCLICommand {
         return {
           exitCode: 1,
           success: false,
-          output: "",
+          output: '',
           error: new Error(appCheck.errorMessage),
         };
       }
@@ -148,7 +148,7 @@ export class InitCommand extends BaseCLICommand {
         return {
           exitCode: 1,
           success: false,
-          output: "",
+          output: '',
           error: error instanceof Error ? error : new Error(String(error)),
         };
       }
@@ -158,40 +158,40 @@ export class InitCommand extends BaseCLICommand {
     sessionManager.setWorkingDirectory(workingDirectory);
 
     // Prepare the init command
-    const sdkArgs = ["-y", "@servicenow/sdk", "init"];
+    const sdkArgs = ['-y', '@servicenow/sdk', 'init'];
     
     // Add optional arguments if provided
     if (args.from) {
-      sdkArgs.push("--from", args.from as string);
+      sdkArgs.push('--from', args.from as string);
     }
     
     if (args.appName) {
-      const appNameArg = typeof args.appName === "string" && !/^".*"$/.test(args.appName)
+      const appNameArg = typeof args.appName === 'string' && !/^".*"$/.test(args.appName)
         ? `"${args.appName}"`
         : args.appName as string;
-      sdkArgs.push("--appName", appNameArg);
+      sdkArgs.push('--appName', appNameArg);
     }
     
     if (args.packageName) {
-      sdkArgs.push("--packageName", args.packageName as string);
+      sdkArgs.push('--packageName', args.packageName as string);
     }
     
     if (args.scopeName) {
-      sdkArgs.push("--scopeName", args.scopeName as string);
+      sdkArgs.push('--scopeName', args.scopeName as string);
     }
     
     if (args.auth) {
-      sdkArgs.push("--auth", args.auth as string);
+      sdkArgs.push('--auth', args.auth as string);
     }
 
     // Add debug flag if specified
     if (args.debug) {
-      sdkArgs.push("--debug");
+      sdkArgs.push('--debug');
     }
 
     // Execute the command in the specified working directory
     try {
-      const result = await this.commandProcessor.process("npx", sdkArgs, false, workingDirectory);
+      const result = await this.commandProcessor.process('npx', sdkArgs, false, workingDirectory);
       logger.info(`Executed init command in directory: ${workingDirectory} - ${JSON.stringify(result)}`);
       // Add confirmation that the working directory has been saved
       if (result.success) {
@@ -203,7 +203,7 @@ export class InitCommand extends BaseCLICommand {
       return {
         exitCode: 1,
         success: false,
-        output: "",
+        output: '',
         error: error instanceof Error ? error : new Error(String(error)),
       };
     }

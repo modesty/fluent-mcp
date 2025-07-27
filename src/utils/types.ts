@@ -5,7 +5,7 @@
 // Domain Models
 export interface CommandArgument {
   name: string;
-  type: "string" | "number" | "boolean" | "array";
+  type: 'string' | 'number' | 'boolean' | 'array';
   required: boolean;
   description: string;
   defaultValue?: unknown;
@@ -27,9 +27,9 @@ export interface CommandResult {
  * Resource types supported by the loader
  */
 export enum ResourceTypeEnum {
-  SPEC = "spec",
-  SNIPPET = "snippet",
-  INSTRUCT = "instruct",
+  SPEC = 'spec',
+  SNIPPET = 'snippet',
+  INSTRUCT = 'instruct',
 }
 
 /**
@@ -79,10 +79,12 @@ export interface CommandExecutor {
  * Metadata annotations for tools: https://modelcontextprotocol.io/docs/concepts/tools
  */
 export interface CommandAnnotations {
-  title?: string;      // Human-readable title for the tool
-  [key: string]: any;
-  // readOnlyHint?: boolean;    // If true, the tool does not modify its environment
-  // destructiveHint?: boolean; // If true, the tool may perform destructive updates
+  title?: string;             // Human-readable title for the tool
+  readOnlyHint?: boolean;     // If true, the tool does not modify its environment
+  destructiveHint?: boolean;  // If true, the tool may perform destructive updates
+  idempotentHint?: boolean;   // If true, the tool can be run multiple times with the same result
+  openWorldHint?: boolean;    // If true, the tool is open-world and can interact with external systems
+  [key: string]: unknown;
   // idempotentHint?: boolean;  // If true, repeated calls with same args have no additional effect
   // openWorldHint?: boolean;   // If true, tool interacts with external entities
 }
@@ -92,7 +94,7 @@ export interface CommandMetadata {
   description: string;
   arguments: CommandArgument[];
   annotations?: CommandAnnotations;
-  _meta?: { [key: string]: any };
+  _meta?: { [key: string]: unknown };
 }
 
 export interface CLICommand extends CommandExecutor, CommandMetadata {

@@ -1,4 +1,4 @@
-import { CLICommand, CommandArgument, CommandProcessor, CommandResult } from "../../utils/types";
+import { CLICommand, CommandArgument, CommandProcessor, CommandResult } from '../../utils/types';
 
 /**
  * Base abstract class for all CLI commands

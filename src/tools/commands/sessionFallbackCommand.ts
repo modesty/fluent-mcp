@@ -1,9 +1,9 @@
-import fs from "node:fs";
-import { CommandResult } from "../../utils/types.js";
-import { BaseCLICommand } from "./baseCommand.js";
-import { SessionManager } from "../../utils/sessionManager.js";
-import logger from "../../utils/logger.js";
-import { getProjectRootPath } from "../../config.js";
+import fs from 'node:fs';
+import { CommandResult } from '../../utils/types.js';
+import { BaseCLICommand } from './baseCommand.js';
+import { SessionManager } from '../../utils/sessionManager.js';
+import logger from '../../utils/logger.js';
+import { getProjectRootPath } from '../../config.js';
 
 /**
  * Base class for commands that use the session working directory with fallback to project root
@@ -37,7 +37,7 @@ export abstract class SessionFallbackCommand extends BaseCLICommand {
     logger.info(`Project root determined as: ${projectRoot}`);
     
     // Ensure we have a valid project root path that's not the system root
-    if (!projectRoot || projectRoot === "/" || projectRoot === "\\" || 
+    if (!projectRoot || projectRoot === '/' || projectRoot === '\\' || 
         (process.env.NODE_ENV !== 'test' && !fs.existsSync(projectRoot))) {
       const cwd = process.cwd();
       logger.info(`Invalid project root: ${projectRoot}, falling back to current working directory: ${cwd}`);
@@ -74,7 +74,7 @@ export abstract class SessionFallbackCommand extends BaseCLICommand {
       return {
         exitCode: 1,
         success: false,
-        output: "",
+        output: '',
         error: error instanceof Error ? error : new Error(String(error)),
       };
     }

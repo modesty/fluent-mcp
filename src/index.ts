@@ -29,14 +29,14 @@ process.on('uncaughtException', (error) => {
   handleShutdown();
 });
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason, _promise) => {
   logger.error('Unhandled promise rejection',
     reason instanceof Error ? reason : new Error(String(reason)),
     { type: 'unhandledRejection', processId: process.pid }
   );
 });
 
-async function handleShutdown() {
+async function handleShutdown(): Promise<void> {
   logger.info('Shutting down server...', { processId: process.pid });
   try {
     await server.stop();
@@ -48,7 +48,7 @@ async function handleShutdown() {
 }
 
 // Start the server
-async function main() {
+async function main(): Promise<void> {
   try {
     logger.info('Initializing Fluent MCP server...', {
       name: config.name,

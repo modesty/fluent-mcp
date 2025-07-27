@@ -1,21 +1,21 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
   CallToolResult,
   ListResourcesRequestSchema,
-  ListPromptsRequestSchema,
-  GetPromptRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+  // ListPromptsRequestSchema, - Unused import
+  // GetPromptRequestSchema, - Unused import
+} from '@modelcontextprotocol/sdk/types.js';
 
-import { getConfig } from "../config.js";
-import { ServerStatus } from "../types.js";
-import { CommandResult } from "../utils/types.js";
-import loggingManager from "../utils/loggingManager.js";
-import { ToolsManager } from "../tools/toolsManager.js";
-import { ResourceManager } from "../res/resourceManager.js";
-import { PromptManager } from "../prompts/promptManager.js";
+import { getConfig } from '../config.js';
+import { ServerStatus } from '../types.js';
+import { CommandResult } from '../utils/types.js';
+import loggingManager from '../utils/loggingManager.js';
+import { ToolsManager } from '../tools/toolsManager.js';
+import { ResourceManager } from '../res/resourceManager.js';
+import { PromptManager } from '../prompts/promptManager.js';
 
 /**
  * Implementation of the Model Context Protocol server for Fluent (ServiceNow SDK) 
@@ -80,7 +80,7 @@ export class FluentMcpServer {
     if (result.success) {
       return `✅ Output:\n${result.output}`;
     } else {
-      return `❌ Error:\n${result.error || "Unknown error"}\n(exit code: ${result.exitCode})\n${result.output}`;
+      return `❌ Error:\n${result.error || 'Unknown error'}\n(exit code: ${result.exitCode})\n${result.output}`;
     }
   }
 
@@ -127,7 +127,7 @@ export class FluentMcpServer {
         return {
           content: [
             {
-              type: "text",
+              type: 'text',
               text: this.formatResult(result),
             },
           ],
@@ -139,7 +139,7 @@ export class FluentMcpServer {
         return {
           content: [
             {
-              type: "text",
+              type: 'text',
               text: `Error: ${errorMessage}`,
             },
           ],
@@ -163,7 +163,7 @@ export class FluentMcpServer {
       loggingManager.logServerStarting();
 
       if (!this.mcpServer) {
-        throw new Error("MCP server not properly initialized");
+        throw new Error('MCP server not properly initialized');
       }
 
       // Create stdio transport for communication

@@ -1,11 +1,12 @@
 {
   "name": "@modesty/fluent-mcp",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "MCP server for Fluent (ServiceNow SDK)",
   "keywords": [
     "Servicenow SDK",
     "Fluent",
-    "mcp", "MCP Server",
+    "mcp",
+    "MCP Server",
     "sdk",
     "model-context-protocol",
     "DSL",
@@ -29,10 +30,12 @@
     "fluent-mcp": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "rollup -c rollup.config.mjs",
+    "build:dev": "rollup -c rollup.config.mjs --environment NODE_ENV:development",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "lint": "eslint src/**/*.ts",
+    "lint": "eslint 'src/**/*.ts'",
+    "lint:fix": "eslint 'src/**/*.ts' --fix",
     "test": "jest"
   },
   "type": "module",
@@ -48,12 +51,24 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.17.0",
     "@servicenow/sdk": "3.0.3",
-    "zod": "^4.0.10"
+    "zod": "^3.25.74"
   },
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^28.0.6",
+    "@rollup/plugin-eslint": "^9.0.5",
+    "@rollup/plugin-json": "^6.0.1",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^11.1.5",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.1.0",
+    "@typescript-eslint/eslint-plugin": "^7.1.0",
+    "@typescript-eslint/parser": "^7.1.0",
+    "eslint": "^8.57.0",
     "jest": "^30.0.5",
+    "rollup": "^4.9.0",
+    "rollup-plugin-node-builtins": "^2.1.2",
+    "rollup-plugin-sourcemaps": "^0.6.3",
     "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2",
     "tslib": "^2.8.1",
@@ -65,8 +80,6 @@
   "license": "MIT",
   "files": [
     "dist",
-    "res",
-    "README.md",
-    "license.txt"
+    "res"
   ]
 }

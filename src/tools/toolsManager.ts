@@ -1,15 +1,15 @@
-import { z } from "zod";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { CommandFactory, CommandRegistry } from "./cliCommandTools.js";
-import { CLICommand } from "../utils/types.js";
-import logger from "../utils/logger.js";
+import { z } from 'zod';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { CommandFactory, CommandRegistry } from './cliCommandTools.js';
+import { CLICommand } from '../utils/types.js';
+import logger from '../utils/logger.js';
 import { 
   GetApiSpecCommand,
   GetSnippetCommand,
   GetInstructCommand,
   ListMetadataTypesCommand
-} from "./resourceTools.js";
-import { CLIExecutor, CLICmdWriter, NodeProcessRunner } from "./cliCommandTools.js";
+} from './resourceTools.js';
+import { CLIExecutor, CLICmdWriter, NodeProcessRunner } from './cliCommandTools.js';
 
 /**
  * Manager for handling MCP tools registration and execution
@@ -78,9 +78,9 @@ export class ToolsManager {
       this.commandRegistry.register(getInstructCommand);
       this.registerToolFromCommand(getInstructCommand);
 
-      logger.debug("Resource tools registered successfully");
+      logger.debug('Resource tools registered successfully');
     } catch (error) {
-      logger.error("Error registering resource tools",
+      logger.error('Error registering resource tools',
         error instanceof Error ? error : new Error(String(error))
       );
       throw error;
@@ -133,7 +133,6 @@ export class ToolsManager {
       {
         title: command.name,
         description: command.description,
-        // @ts-expect-error zod v4 type incompatibility - schema is correct at runtime
         inputSchema: schema
       },
       async (params: Record<string, unknown>) => {
@@ -156,7 +155,7 @@ export class ToolsManager {
       return `✅ Command executed successfully\n\nOutput:\n${result.output}`;
     } else {
       return `❌ Command failed (exit code: ${result.exitCode})\n\nError:\n${
-        result.error || "Unknown error"
+        result.error || 'Unknown error'
       }\n\nOutput:\n${result.output}`;
     }
   }
@@ -174,7 +173,7 @@ export class ToolsManager {
    * Get all commands as MCP tools
    * @returns List of MCP tools
    */
-  getMCPTools(): any[] {
+  getMCPTools(): Record<string, unknown>[] {
     return this.commandRegistry.toMCPTools();
   }
 

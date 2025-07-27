@@ -37,6 +37,7 @@ Fluent (ServiceNow SDK) is a TypeScript-based domain-specific language that allo
    - to create `/src/fluent/server/*.js` file, use ServiceNow Scripting API to create JavaScript file, *not* TypeScript
 4. **Validate Early**: Test your code locally before deploying to instances
 5. **Use SDK Commands**: Utilize the ServiceNow SDK CLI for efficient workflows
+6. **ServiceNow Glide Script**: ServiceNow scripting are usually used in `script` properties in Fluent APIs, write them inline in ServiceNow Scripting in ES5 syntax, not TypeScript
 
 ## Working with Specific Metadata Types
 

@@ -36,6 +36,9 @@ yarn-error.log*
 # TypeScript
 *.tsbuildinfo
 
+# Rollup
+.rollup.cache/
+
 # Jest
 jest-coverage/
 

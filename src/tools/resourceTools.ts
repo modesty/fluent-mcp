@@ -1,9 +1,9 @@
 /**
  * MCP tools for accessing ServiceNow metadata resources (API specs, snippets, instructions)
  */
-import { ResourceLoader, ResourceType } from "../utils/resourceLoader.js";
-import { CLICommand, CommandArgument, CommandResult, ResourceResult } from "../utils/types.js";
-import logger from "../utils/logger.js";
+import { ResourceLoader, ResourceType } from '../utils/resourceLoader.js';
+import { CLICommand, CommandArgument, CommandResult, ResourceResult } from '../utils/types.js';
+import logger from '../utils/logger.js';
 
 /**
  * Base class for resource access commands
@@ -21,16 +21,16 @@ export abstract class BaseResourceCommand implements CLICommand {
 
   arguments: CommandArgument[] = [
     {
-      name: "metadataType",
-      type: "string",
+      name: 'metadataType',
+      type: 'string',
       required: true,
-      description: "ServiceNow metadata type (e.g., business-rule, script-include)",
+      description: 'ServiceNow metadata type (e.g., business-rule, script-include)',
     },
     {
-      name: "id",
-      type: "string",
+      name: 'id',
+      type: 'string',
       required: false,
-      description: "Optional identifier for specific resource (only for snippets)",
+      description: 'Optional identifier for specific resource (only for snippets)',
     }
   ];
 
@@ -92,7 +92,7 @@ export abstract class BaseResourceCommand implements CLICommand {
    */
   protected validateArgs(args: Record<string, unknown>): void {
     if (!args.metadataType) {
-      throw new Error("Missing required argument: metadataType");
+      throw new Error('Missing required argument: metadataType');
     }
     
     // For snippets, we don't validate ID as it can be null (will default to the first snippet)
@@ -103,8 +103,8 @@ export abstract class BaseResourceCommand implements CLICommand {
  * Command for accessing API specifications
  */
 export class GetApiSpecCommand extends BaseResourceCommand {
-  name = "get-api-spec";
-  description = "Get API specification for a ServiceNow metadata type";
+  name = 'get-api-spec';
+  description = 'Get API specification for a ServiceNow metadata type';
   resourceType = ResourceType.SPEC;
 }
 
@@ -112,8 +112,8 @@ export class GetApiSpecCommand extends BaseResourceCommand {
  * Command for accessing code snippets
  */
 export class GetSnippetCommand extends BaseResourceCommand {
-  name = "get-snippet";
-  description = "Get code snippet for a ServiceNow metadata type";
+  name = 'get-snippet';
+  description = 'Get code snippet for a ServiceNow metadata type';
   resourceType = ResourceType.SNIPPET;
   
   /**
@@ -190,8 +190,8 @@ export class GetSnippetCommand extends BaseResourceCommand {
  * Command for accessing instructions
  */
 export class GetInstructCommand extends BaseResourceCommand {
-  name = "get-instruct";
-  description = "Get instructions for a ServiceNow metadata type";
+  name = 'get-instruct';
+  description = 'Get instructions for a ServiceNow metadata type';
   resourceType = ResourceType.INSTRUCT;
 }
 
@@ -199,8 +199,8 @@ export class GetInstructCommand extends BaseResourceCommand {
  * Command for listing available metadata types
  */
 export class ListMetadataTypesCommand implements CLICommand {
-  name = "list-metadata-types";
-  description = "List all available ServiceNow metadata types";
+  name = 'list-metadata-types';
+  description = 'List all available ServiceNow metadata types';
   arguments: CommandArgument[] = [];
   
   private resourceLoader: ResourceLoader;
@@ -221,7 +221,7 @@ export class ListMetadataTypesCommand implements CLICommand {
         return {
           exitCode: 0,
           success: true,
-          output: "No metadata types found.",
+          output: 'No metadata types found.',
         };
       }
       
@@ -231,7 +231,7 @@ export class ListMetadataTypesCommand implements CLICommand {
         output: `Available metadata types:\n${metadataTypes.join('\n')}`,
       };
     } catch (error) {
-      logger.error("Error listing metadata types", 
+      logger.error('Error listing metadata types', 
         error instanceof Error ? error : new Error(String(error))
       );
       

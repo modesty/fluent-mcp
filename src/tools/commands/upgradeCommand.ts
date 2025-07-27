@@ -1,6 +1,6 @@
-import { CommandArgument, CommandProcessor, CommandResult } from "../../utils/types";
+import { CommandArgument, CommandProcessor, CommandResult } from '../../utils/types';
 
-import { BaseCLICommand } from "./baseCommand.js";
+import { BaseCLICommand } from './baseCommand.js';
 
 /**
  * Command to upgrade Fluent (ServiceNow SDK) to the latest version

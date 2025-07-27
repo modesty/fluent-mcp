@@ -1,7 +1,7 @@
-import { CommandProcessor, CommandResult } from "../../utils/types.js";
-import { BaseCLICommand } from "./baseCommand.js";
-import { SessionManager } from "../../utils/sessionManager.js";
-import logger from "../../utils/logger.js";
+import { CommandResult } from '../../utils/types.js';
+import { BaseCLICommand } from './baseCommand.js';
+import { SessionManager } from '../../utils/sessionManager.js';
+import logger from '../../utils/logger.js';
 
 /**
  * Base class for commands that use the session working directory
@@ -19,7 +19,7 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
     if (workingDirectory) {
       logger.debug(`Using session working directory: ${workingDirectory}`);
     } else {
-      logger.debug("No working directory found in session");
+      logger.debug('No working directory found in session');
     }
     
     return workingDirectory;
@@ -43,9 +43,9 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
       return {
         exitCode: 1,
         success: false,
-        output: "",
+        output: '',
         error: new Error(
-          "No working directory found. Please run the init command first to set up a working directory."
+          'No working directory found. Please run the init command first to set up a working directory.'
         ),
       };
     }
@@ -56,7 +56,7 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
       return {
         exitCode: 1,
         success: false,
-        output: "",
+        output: '',
         error: error instanceof Error ? error : new Error(String(error)),
       };
     }

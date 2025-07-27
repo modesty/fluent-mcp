@@ -1,41 +1,41 @@
-import { CommandArgument, CommandResult } from "../../utils/types.js";
-import { SessionAwareCLICommand } from "./sessionAwareCommand.js";
+import { CommandArgument, CommandResult } from '../../utils/types.js';
+import { SessionAwareCLICommand } from './sessionAwareCommand.js';
 
 /**
  * Command to install a Fluent (ServiceNow SDK) application to a ServiceNow instance
  * Uses the session's working directory
  */
 export class InstallCommand extends SessionAwareCLICommand {
-  name = "install_fluent_app";
+  name = 'install_fluent_app';
   description = "Install / Deploy the Fluent (ServiceNow SDK) application in the current session's working directory to a ServiceNow instance";
   arguments: CommandArgument[] = [
     {
-      name: "auth",
-      type: "string",
+      name: 'auth',
+      type: 'string',
       required: false,
-      description: "The authentication alias to use",
+      description: 'The authentication alias to use',
     },
     {
-      name: "debug",
-      type: "boolean",
+      name: 'debug',
+      type: 'boolean',
       required: false,
-      description: "Print debug output",
+      description: 'Print debug output',
     }
   ];
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
-    const sdkArgs = ["now-sdk", "install"];
+    const sdkArgs = ['now-sdk', 'install'];
 
     // Add optional arguments if provided
     if (args.auth) {
-      sdkArgs.push("--auth", args.auth as string);
+      sdkArgs.push('--auth', args.auth as string);
     }
 
     // Add debug flag if specified
     if (args.debug) {
-      sdkArgs.push("--debug");
+      sdkArgs.push('--debug');
     }
 
-    return this.executeWithSessionWorkingDirectory("npx", sdkArgs);
+    return this.executeWithSessionWorkingDirectory('npx', sdkArgs);
   }
 }

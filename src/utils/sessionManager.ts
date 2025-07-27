@@ -1,4 +1,4 @@
-import logger from "./logger.js";
+import logger from './logger.js';
 
 /**
  * Interface for session data
@@ -22,7 +22,7 @@ export class SessionManager {
   private constructor() {
     // Initialize with empty session data - in-memory only
     this.resetSession();
-    logger.debug("Session manager initialized with in-memory storage");
+    logger.debug('Session manager initialized with in-memory storage');
   }
 
   /**
@@ -41,7 +41,7 @@ export class SessionManager {
    */
   private resetSession(): void {
     this.sessionData = {};
-    logger.debug("Session data reset");
+    logger.debug('Session data reset');
   }
 
   /**
@@ -66,6 +66,6 @@ export class SessionManager {
    */
   public clearSession(): void {
     this.resetSession();
-    logger.debug("Session data cleared");
+    logger.debug('Session data cleared');
   }
 }

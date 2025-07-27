@@ -1,12 +1,12 @@
 /**
  * Resource loader utility for accessing API specifications, snippets, and instructions
  */
-import fs from "node:fs";
-import path from "node:path";
-import { ResourceResult, ResourceTypeEnum } from "./types.js";
-import logger from "./logger.js";
-import { getConfig } from "../config.js";
-import { ServiceNowMetadataType } from "../types/index.js";
+import fs from 'node:fs';
+import path from 'node:path';
+import { ResourceResult, ResourceTypeEnum } from './types.js';
+import logger from './logger.js';
+import { getConfig } from '../config.js';
+import { ServiceNowMetadataType } from '../types/index.js';
 
 // Re-export ResourceTypeEnum as ResourceType for backward compatibility
 export import ResourceType = ResourceTypeEnum;
@@ -47,7 +47,7 @@ export class ResourceLoader {
         // Use instruct directory as reference for available metadata types (for test compatibility)
         const files = await fs.promises.readdir(this.resourcePaths[ResourceType.SPEC]);
         const metadataTypes = files
-          .filter((file) => file.startsWith("fluent_spec_") && file.endsWith(".md"))
+          .filter((file) => file.startsWith('fluent_spec_') && file.endsWith('.md'))
           .map((file) => {
             // Extract metadata type from file name (fluent_instruct_TYPE.md)
             const match = file.match(/fluent_spec_(.+)\.md/);
@@ -61,7 +61,7 @@ export class ResourceLoader {
         return Object.values(ServiceNowMetadataType);
       }
     } catch (error) {
-      logger.error("Failed to get available metadata types", 
+      logger.error('Failed to get available metadata types', 
         error instanceof Error ? error : new Error(String(error))
       );
       return [];
@@ -114,7 +114,7 @@ export class ResourceLoader {
       if (!fs.existsSync(filePath)) {
         logger.warn(`Resource file not found: ${filePath}`);
         return {
-          content: "",
+          content: '',
           path: filePath,
           metadataType,
           resourceType: resourceType,
@@ -123,7 +123,7 @@ export class ResourceLoader {
       }
 
       // Read file content
-      const content = await fs.promises.readFile(filePath, "utf-8");
+      const content = await fs.promises.readFile(filePath, 'utf-8');
 
       return {
         content,
@@ -138,8 +138,8 @@ export class ResourceLoader {
       );
       
       return {
-        content: "",
-        path: "",
+        content: '',
+        path: '',
         metadataType,
         resourceType: resourceType,
         found: false,
@@ -158,7 +158,7 @@ export class ResourceLoader {
       const files = await fs.promises.readdir(resourcePath);
       
       const snippetIds = files
-        .filter((file) => file.startsWith(`fluent_snippet_${metadataType}_`) && file.endsWith(".md"))
+        .filter((file) => file.startsWith(`fluent_snippet_${metadataType}_`) && file.endsWith('.md'))
         .map((file) => {
           // Extract ID from file name (fluent_snippet_TYPE_ID.md)
           const match = file.match(/fluent_snippet_[^_]+_(\d+)\.md/);
