@@ -1,6 +1,6 @@
 // rollup.config.mjs - Using .mjs extension to force ES modules mode
 import json from '@rollup/plugin-json';
-import eslint from '@rollup/plugin-eslint';
+// import eslint from '@rollup/plugin-eslint';
 import nodeResolve from '@rollup/plugin-node-resolve';
 import builtins from 'rollup-plugin-node-builtins';
 import terser from '@rollup/plugin-terser';
@@ -39,10 +39,16 @@ export default [
     plugins: [
       typescript({ tsconfig: './tsconfig.json' }),
       json(),
-      eslint({
-        throwOnError: true, 
-        useEslintrc: true
-      }),
+      // comment out the eslint plugin till @rollup/plugin-eslint starts to support ESLint v9+ flat config 
+      // eslint({
+      //   throwOnError: true, 
+      //   useEslintrc: false,
+      //   overrideConfig: {
+      //     parserOptions: {
+      //       project: './tsconfig.json',
+      //     },
+      //   },
+      // }),
       nodeResolve({
         preferBuiltins: true,
         exportConditions: ['node'], // Add node export condition

@@ -38,7 +38,7 @@
     - [x] 1.4 Set up configuration management for the MCP server, create `src/config.ts` to manage server settings and environment variables, also incorporate package.json for version, name, and description exposure and reference
     - [x] 1.5 Implement error handling and logging mechanism, create `src/utils/logger.ts` that wraps console log, info, warn, error, and debug methods and ensure the output is formatted as JSON with a timestamp
 
-- [ ] 2.0 Implement MCP tools for ServiceNow SDK CLI commands
+- [x] 2.0 Implement MCP tools for ServiceNow SDK CLI commands
     - [x] 2.1 Create command execution helper in `tools/cliCommandTools.ts` for running ServiceNow SDK CLI commands
     - [x] 2.2 Implement MCP tool for basic SDK commands (version, help, debug, upgrade)
     - [x] 2.3 Implement MCP tool for authentication commands
@@ -48,27 +48,27 @@
     - [x] 2.7 Implement MCP tool for transform commands
     - [x] 2.8 Implement MCP tool for dependencies commands
 
-- [ ] 3.0 Implement MCP tools for accessing resources
-    - [ ] 3.1 Develop resource loading utility to access files in the res/ directory
-    - [ ] 3.2 Implement MCP tool for accessing API specifications from res/spec/
-    - [ ] 3.3 Implement MCP tool for accessing code snippets from res/snippet/
-    - [ ] 3.4 Implement MCP tool for accessing instructions from res/instruct/
-    - [ ] 3.5 Create query functionality to filter resources by metadata type
-    - [ ] 3.6 Implement caching mechanism for improved performance
+- [x] 3.0 Implement MCP tools for accessing resources
+    - [x] 3.1 Develop resource loading utility to access files in the res/ directory
+    - [x] 3.2 Implement MCP tool for accessing API specifications from res/spec/
+    - [x] 3.3 Implement MCP tool for accessing code snippets from res/snippet/
+    - [x] 3.4 Implement MCP tool for accessing instructions from res/instruct/
+    - [x] 3.5 Create query functionality to filter resources by metadata type
+    - [x] 3.6 Implement caching mechanism for improved performance
 
 - [ ] 4.0 Create package structure and documentation
     - [ ] 4.1 Organize code structure according to npm package best practices
     - [ ] 4.2 Create TypeScript type definitions for all modules
     - [ ] 4.3 Generate API documentation using TypeDoc
-    - [ ] 4.4 Write README.md with installation and usage instructions
-    - [ ] 4.5 Create example configurations and usage scenarios
-    - [ ] 4.6 Set up npm package configuration for publishing
+    - [x] 4.4 Write README.md with installation and usage instructions
+    - [x] 4.5 Create example configurations and usage scenarios
+    - [x] 4.6 Set up npm package configuration for publishing
 
-- [ ] 5.0 Implement testing and quality assurance measures
-    - [ ] 5.1 Set up Jest testing framework with TypeScript support
-    - [ ] 5.2 Write unit tests for MCP server implementation
-    - [ ] 5.3 Write unit tests for SDK command tools
-    - [ ] 5.4 Write unit tests for resource tools
-    - [ ] 5.5 Implement integration tests with mock ServiceNow SDK
-    - [ ] 5.6 Set up GitHub Actions workflow for continuous integration
-    - [ ] 5.7 Add code quality tools (ESLint, Prettier) with appropriate configuration
+- [x] 5.0 Implement testing and quality assurance measures
+    - [x] 5.1 Set up Jest testing framework with TypeScript support
+    - [x] 5.2 Write unit tests for MCP server implementation
+    - [x] 5.3 Write unit tests for SDK command tools
+    - [x] 5.4 Write unit tests for resource tools
+    - [x] 5.5 Implement integration tests with mock ServiceNow SDK
+    - [x] 5.6 Set up GitHub Actions workflow for continuous integration
+    - [x] 5.7 Add code quality tools (ESLint, Prettier) with appropriate configuration

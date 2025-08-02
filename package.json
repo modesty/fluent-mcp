@@ -34,8 +34,8 @@
     "build:dev": "rollup -c rollup.config.mjs --environment NODE_ENV:development",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "lint": "eslint 'src/**/*.ts'",
-    "lint:fix": "eslint 'src/**/*.ts' --fix",
+    "lint": "eslint 'src/**/*.ts' --config eslint.config.js",
+    "lint:fix": "eslint 'src/**/*.ts' --config eslint.config.js --fix",
     "test": "jest"
   },
   "type": "module",
@@ -49,11 +49,12 @@
     }
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.17.0",
+    "@modelcontextprotocol/sdk": "1.17.1",
     "@servicenow/sdk": "3.0.3",
     "zod": "^3.25.74"
   },
   "devDependencies": {
+    "@eslint/js": "^9.32.0",
     "@rollup/plugin-commonjs": "^28.0.6",
     "@rollup/plugin-eslint": "^9.0.5",
     "@rollup/plugin-json": "^6.0.1",
@@ -64,9 +65,9 @@
     "@types/node": "^24.1.0",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "@typescript-eslint/parser": "^8.38.0",
-    "eslint": "^8.57.0",
+    "eslint": "^9.32.0",
     "jest": "^30.0.5",
-    "rollup": "^4.9.0",
+    "rollup": "^4.46.2",
     "rollup-plugin-node-builtins": "^2.1.2",
     "rollup-plugin-sourcemaps": "^0.6.3",
     "ts-jest": "^29.4.0",
