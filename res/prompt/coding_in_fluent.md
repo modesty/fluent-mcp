@@ -32,6 +32,7 @@ Fluent (ServiceNow SDK) is a TypeScript-based domain-specific language that allo
     - Always import from '@servicenow/sdk/core' for all Fluent (ServiceNow SDK) APIs
 2. **Utilize tools**: Utilize the the tools to get metadata API spec, snippets, and instructs to help you write better Fluent (ServiceNow SDK)
    - tools also include now-sdk CLI commands for init a project, build, and deploy
+   - when working with a Fluent project locally, ensure to start the conversation with the `working directory` set to the root of the Fluent project
 3. **Modularize Code**: Split complex configurations into smaller, reusable modules
    - for `script` properties, create separate `/src/fluent/server/*.js` files and import them
    - to create `/src/fluent/server/*.js` file, use ServiceNow Scripting API to create JavaScript file, *not* TypeScript

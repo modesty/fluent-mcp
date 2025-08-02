@@ -31,13 +31,17 @@ Note: Use `init` command to switch to a working directory for existing Fluent pr
 | `version`      | Get ServiceNow SDK version information              | None                                                                                                                                                                                                                        |
 | `help`         | Get help information about ServiceNow SDK commands  | `command`: (Optional) The specific command to get help for                                                                                                                                                                  |
 | `debug`        | Enable debug mode for ServiceNow SDK commands       | `command`: The command to run with debug mode enabled                                                                                                                                                                       |
-| `upgrade`      | Upgrade ServiceNow SDK to the latest version        | `check`: (Optional) Only check for updates without upgrading, `debug`: (Optional) Enable debug mode                                                                                                                         |
+| `upgrade`      | Upgrade ServiceNow SDK to the latest version        | `check`: (Optional) Only check for updates without upgrading, `debug`: (Optional) Enable debug - **disabled for now**                                                                                                                         |
 | `auth`         | Authenticate to a ServiceNow instance               | `add`: (Optional) Instance URL to add, `type`: (Optional) Authentication method, `alias`: (Optional) Alias for the instance                                                                                                 |
 | `init`         | Initialize a new ServiceNow application             | `from`: (Optional) sys_id or path, `appName`: App name, `packageName`: Package name, `scopeName`: Scope name, `auth`: (Optional) Authentication alias                                                                       |
 | `build`        | Build a ServiceNow application package              | `source`: Path to source files, `frozenKeys`: (Optional) Whether to use frozen keys                                                                                                                                         |
 | `install`      | Install a ServiceNow application to an instance     | `source`: (Optional) Package path, `reinstall`: (Optional) Whether to reinstall, `auth`: (Optional) Authentication alias, `open-browser`: (Optional) Open browser after install, `info`: (Optional) Show info after install |
 | `transform`    | Transform ServiceNow metadata to Fluent source code | `from`: (Optional) Path to metadata, `directory`: (Optional) Package path, `preview`: (Optional) Preview only, `auth`: (Optional) Authentication alias                                                                      |
 | `dependencies` | Download application dependencies                   | `directory`: (Optional) Package path, `auth`: (Optional) Authentication alias                                                                                                                                               |
+
+### auth, init and dependencies commands
+
+All these three commands are interactive CLI commands that require user input. The easier way to use them is to have Fluent MCP generate the shell command then run them in a terminal. Preferably, whenever you start a session with Fluent MCP, specify the working directory please.
 
 ## Resources
 
