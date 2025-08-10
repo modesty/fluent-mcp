@@ -72,3 +72,24 @@
     - [x] 5.5 Implement integration tests with mock ServiceNow SDK
     - [x] 5.6 Set up GitHub Actions workflow for continuous integration
     - [x] 5.7 Add code quality tools (ESLint, Prettier) with appropriate configuration
+
+- [ ] 6.0 Enhance MCP Server capabilities
+    - [ ] 6.1 Implement support for **Root** capability to replace the cwd in session: 
+        - [ ] 6.1.1. send roots/list requests to retrieve available roots and handle responses.
+        - [ ] 6.1.2. listen for notifications/roots/list_changed to re-query roots when notified, using the SDK’s event-driven message handling.
+    - [ ] 6.2 Implement support for **Elicitation** capability or gathering context or user decisions mid-task, such as confirming actions or providing missing data
+        - [ ] 6.2.1. Identify cmd commands that needs user approval to execute
+        - [ ] 6.2.2. Identify interactive commands and incorporate user inputs for missing information
+    - [ ] 6.3. Plan the use cases and implementation details for the **Sampling** capability
+        - [ ] 6.3.1. Any scenarios where the server needs the LLM to process data or make decisions autonomously
+        - [ ] 6.3.2. Any scenarios where the server needs to trigger LLM sampling (e.g., generating text or making decisions) by requesting the client to invoke the LLM with specific prompts (`coding_in_fluent`) or parameters.
+    - [ ] 6.4 Enhancements to Existing Capabilities per 2025-06-18 specification
+        - [ ] 6.4.1. Review use cases for `Structured Tool Output` by utilizing SDK's `UseStructuredContent` option in tool definitions
+        - [ ] 6.4.2. Review all tools' metadata and capabilities to ensure alignment with the latest specifications.
+        - [ ] 6.4.3. Review use cases for `resource links` in tool's results for better resource discovery by utilizing SDK's `ResourceLinkBlock` return type.
+        - [ ] 6.4.4. Review on how to improve the authentication process for accessing instance, not only for Fluent transform and install, but also record access and running background scripts
+
+
+
+
+
