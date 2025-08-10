@@ -31,50 +31,51 @@
 
 ## Epics and Stories
 
-- [x] 1.0 Set up project infrastructure and MCP server
-    - [x] 1.1 Initialize a new Node.js/TypeScript project with package.json, tsconfig.json, and initial folder structure
-    - [x] 1.2 Install required dependencies including MCP TypeScript SDK and ServiceNow SDK
-    - [x] 1.3 Create base MCP server implementation using stdio transport
-    - [x] 1.4 Set up configuration management for the MCP server, create `src/config.ts` to manage server settings and environment variables, also incorporate package.json for version, name, and description exposure and reference
-    - [x] 1.5 Implement error handling and logging mechanism, create `src/utils/logger.ts` that wraps console log, info, warn, error, and debug methods and ensure the output is formatted as JSON with a timestamp
+- [✅] 1.0 Set up project infrastructure and MCP server
+    - [✅] 1.1 Initialize a new Node.js/TypeScript project with package.json, tsconfig.json, and initial folder structure
+    - [✅] 1.2 Install required dependencies including MCP TypeScript SDK and ServiceNow SDK
+    - [✅] 1.3 Create base MCP server implementation using stdio transport
+    - [✅] 1.4 Set up configuration management for the MCP server, create `src/config.ts` to manage server settings and environment variables, also incorporate package.json for version, name, and description exposure and reference
+    - [✅] 1.5 Implement error handling and logging mechanism, create `src/utils/logger.ts` that wraps console log, info, warn, error, and debug methods and ensure the output is formatted as JSON with a timestamp
 
-- [x] 2.0 Implement MCP tools for ServiceNow SDK CLI commands
-    - [x] 2.1 Create command execution helper in `tools/cliCommandTools.ts` for running ServiceNow SDK CLI commands
-    - [x] 2.2 Implement MCP tool for basic SDK commands (version, help, debug, upgrade)
-    - [x] 2.3 Implement MCP tool for authentication commands
-    - [x] 2.4 Implement MCP tool for initialization commands
-    - [x] 2.5 Implement MCP tool for build commands
-    - [x] 2.6 Implement MCP tool for install commands
-    - [x] 2.7 Implement MCP tool for transform commands
-    - [x] 2.8 Implement MCP tool for dependencies commands
+- [✅] 2.0 Implement MCP tools for ServiceNow SDK CLI commands
+    - [✅] 2.1 Create command execution helper in `tools/cliCommandTools.ts` for running ServiceNow SDK CLI commands
+    - [✅] 2.2 Implement MCP tool for basic SDK commands (version, help, debug, upgrade)
+    - [✅] 2.3 Implement MCP tool for authentication commands
+    - [✅] 2.4 Implement MCP tool for initialization commands
+    - [✅] 2.5 Implement MCP tool for build commands
+    - [✅] 2.6 Implement MCP tool for install commands
+    - [✅] 2.7 Implement MCP tool for transform commands
+    - [✅] 2.8 Implement MCP tool for dependencies commands
 
-- [x] 3.0 Implement MCP tools for accessing resources
-    - [x] 3.1 Develop resource loading utility to access files in the res/ directory
-    - [x] 3.2 Implement MCP tool for accessing API specifications from res/spec/
-    - [x] 3.3 Implement MCP tool for accessing code snippets from res/snippet/
-    - [x] 3.4 Implement MCP tool for accessing instructions from res/instruct/
-    - [x] 3.5 Create query functionality to filter resources by metadata type
-    - [x] 3.6 Implement caching mechanism for improved performance
+- [✅] 3.0 Implement MCP tools for accessing resources
+    - [✅] 3.1 Develop resource loading utility to access files in the res/ directory
+    - [✅] 3.2 Implement MCP tool for accessing API specifications from res/spec/
+    - [✅] 3.3 Implement MCP tool for accessing code snippets from res/snippet/
+    - [✅] 3.4 Implement MCP tool for accessing instructions from res/instruct/
+    - [✅] 3.5 Create query functionality to filter resources by metadata type
+    - [✅] 3.6 Implement caching mechanism for improved performance
 
 - [ ] 4.0 Create package structure and documentation
-    - [ ] 4.1 Organize code structure according to npm package best practices
+    - [✅] 4.1 Organize code structure according to npm package best practices
     - [ ] 4.2 Create TypeScript type definitions for all modules
     - [ ] 4.3 Generate API documentation using TypeDoc
-    - [x] 4.4 Write README.md with installation and usage instructions
-    - [x] 4.5 Create example configurations and usage scenarios
-    - [x] 4.6 Set up npm package configuration for publishing
+    - [✅] 4.4 Write README.md with installation and usage instructions
+    - [✅] 4.5 Create example configurations and usage scenarios
+    - [✅] 4.6 Set up npm package configuration for publishing
 
-- [x] 5.0 Implement testing and quality assurance measures
-    - [x] 5.1 Set up Jest testing framework with TypeScript support
-    - [x] 5.2 Write unit tests for MCP server implementation
-    - [x] 5.3 Write unit tests for SDK command tools
-    - [x] 5.4 Write unit tests for resource tools
-    - [x] 5.5 Implement integration tests with mock ServiceNow SDK
-    - [x] 5.6 Set up GitHub Actions workflow for continuous integration
-    - [x] 5.7 Add code quality tools (ESLint, Prettier) with appropriate configuration
+- [✅] 5.0 Implement testing and quality assurance measures
+    - [✅] 5.1 Set up Jest testing framework with TypeScript support
+    - [✅] 5.2 Write unit tests for MCP server implementation
+    - [✅] 5.3 Write unit tests for SDK command tools
+    - [✅] 5.4 Write unit tests for resource tools
+    - [✅] 5.5 Implement integration tests with mock ServiceNow SDK
+    - [✅] 5.6 Set up GitHub Actions workflow for continuous integration
+    - [✅] 5.7 Add code quality tools (ESLint, Prettier) with appropriate configuration
 
 - [ ] 6.0 Enhance MCP Server capabilities
-    - [ ] 6.1 Implement support for **Root** capability to replace the cwd in session: 
+    - [✅] Complete the server functionalities with primitive capabilities per MCP specification, including prompt, resource and tool together with text (shell cmd in text) and executed shell commands completion
+    - [ ] 6.1 Implement support for **Root** capability to replace the cwd in session:
         - [ ] 6.1.1. send roots/list requests to retrieve available roots and handle responses.
         - [ ] 6.1.2. listen for notifications/roots/list_changed to re-query roots when notified, using the SDK’s event-driven message handling.
     - [ ] 6.2 Implement support for **Elicitation** capability or gathering context or user decisions mid-task, such as confirming actions or providing missing data
