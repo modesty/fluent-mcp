@@ -94,17 +94,23 @@ jest.mock("../../src/tools/cliCommandTools.js", () => {
   const mockRegister = jest.fn();
   const mockGetCommand = jest.fn();
   const mockToMCPTools = jest.fn().mockReturnValue([]);
+  const mockGetAllCommands = jest.fn().mockReturnValue([]);
   
   return {
-    CLIExecutor: jest.fn(),
-    CLICmdWriter: jest.fn(),
+    CLIExecutor: jest.fn().mockImplementation(() => ({
+      setRoots: jest.fn()
+    })),
+    CLICmdWriter: jest.fn().mockImplementation(() => ({
+      setRoots: jest.fn()
+    })),
     CommandFactory: {
       createCommands: jest.fn().mockImplementation((executor, writer) => [])
     },
     CommandRegistry: jest.fn().mockImplementation(() => ({
       register: mockRegister,
       getCommand: mockGetCommand,
-      toMCPTools: mockToMCPTools
+      toMCPTools: mockToMCPTools,
+      getAllCommands: mockGetAllCommands
     })),
     NodeProcessRunner: jest.fn()
   };

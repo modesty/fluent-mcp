@@ -141,9 +141,20 @@ Add MCP server configuration in Cursor settings:
 
 #### Windsurf
 
-1. `CMD + ,` to open settings, navigate to Cascade section.
-2. Click `Add Server` in `Model Context Protocol (MCP) Servers` section.
-3. Select `Add Custom MCP Server +` and add configuration.
+1. `CMD + ,` to open settings, navigate to Cascade => MCP Servers => Manage MCPs => View raw config
+2. Add configuration.
+```json
+{
+  "mcpServers": {
+    "fluent-mcp": {
+      "command": "npx",
+      "args": ["-y", "@modesty/fluent-mcp"]
+    }
+  }
+}
+```
+3. Refresh when back to Manage MCPs page.
+
 
 #### Gemini CLI
 

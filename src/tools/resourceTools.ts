@@ -2,7 +2,7 @@
  * MCP tools for accessing ServiceNow metadata resources (API specs, snippets, instructions)
  */
 import { ResourceLoader, ResourceType } from '../utils/resourceLoader.js';
-import { CLICommand, CommandArgument, CommandResult, ResourceResult } from '../utils/types.js';
+import { CLICommand, CommandArgument, CommandProcessor, CommandResult, ResourceResult } from '../utils/types.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -14,9 +14,18 @@ export abstract class BaseResourceCommand implements CLICommand {
   abstract resourceType: ResourceType;
   
   protected resourceLoader: ResourceLoader;
+  protected commandProcessor?: CommandProcessor;
 
   constructor() {
     this.resourceLoader = new ResourceLoader();
+  }
+  
+  /**
+   * Get the command processor instance
+   * @returns The command processor instance
+   */
+  getCommandProcessor(): CommandProcessor {
+    return this.commandProcessor as CommandProcessor;
   }
 
   arguments: CommandArgument[] = [
@@ -204,9 +213,18 @@ export class ListMetadataTypesCommand implements CLICommand {
   arguments: CommandArgument[] = [];
   
   private resourceLoader: ResourceLoader;
+  private commandProcessor?: CommandProcessor;
   
   constructor() {
     this.resourceLoader = new ResourceLoader();
+  }
+  
+  /**
+   * Get the command processor instance
+   * @returns The command processor instance
+   */
+  getCommandProcessor(): CommandProcessor {
+    return this.commandProcessor as CommandProcessor;
   }
   
   /**

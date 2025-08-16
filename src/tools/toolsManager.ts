@@ -184,4 +184,30 @@ export class ToolsManager {
   getCommandRegistry(): CommandRegistry {
     return this.commandRegistry;
   }
+  
+  /**
+   * Update the roots in CLI tools
+   * @param roots Array of root URIs and optional names
+   */
+  updateRoots(roots: { uri: string; name?: string }[]): void {
+    // Get the CLI executor and writer instances
+    const commands = this.commandRegistry.getAllCommands();
+    
+    // Find commands that use CLIExecutor or CLICmdWriter
+    for (const command of commands) {
+      const processor = command.getCommandProcessor();
+      
+      // Update roots in CLIExecutor
+      if (processor instanceof CLIExecutor) {
+        processor.setRoots(roots);
+      }
+      
+      // Update roots in CLICmdWriter
+      if (processor instanceof CLICmdWriter) {
+        processor.setRoots(roots);
+      }
+    }
+    
+    logger.info('Updated roots in all CLI tools', { roots });
+  }
 }

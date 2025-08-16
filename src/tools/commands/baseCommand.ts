@@ -13,6 +13,14 @@ export abstract class BaseCLICommand implements CLICommand {
 
   abstract execute(args: Record<string, unknown>): Promise<CommandResult>;
 
+  /**
+   * Get the command processor used by this command
+   * @returns The command processor instance
+   */
+  getCommandProcessor(): CommandProcessor {
+    return this.commandProcessor;
+  }
+
   // Template method for common validation
   protected validateArgs(args: Record<string, unknown>): void {
     for (const arg of this.arguments) {

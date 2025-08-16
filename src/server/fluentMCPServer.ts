@@ -5,11 +5,13 @@ import {
   ListToolsRequestSchema,
   CallToolResult,
   ListResourcesRequestSchema,
+  ListRootsRequestSchema,
+  RootsListChangedNotificationSchema,
   // ListPromptsRequestSchema, - Unused import
   // GetPromptRequestSchema, - Unused import
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { getConfig } from '../config.js';
+import { getConfig, getProjectRootPath } from '../config.js';
 import { ServerStatus } from '../types.js';
 import { CommandResult } from '../utils/types.js';
 import loggingManager from '../utils/loggingManager.js';
@@ -29,6 +31,7 @@ export class FluentMcpServer {
   private resourceManager: ResourceManager;
   private promptManager: PromptManager;
   private status: ServerStatus = ServerStatus.STOPPED;
+  private roots: { uri: string; name?: string }[] = [];
 
   /**
    * Create a new MCP server instance
@@ -51,6 +54,9 @@ export class FluentMcpServer {
           logging: {},   // Enable logging capability
           prompts: {
             listChanged: true, // Enable prompt list change notifications
+          },
+          roots: {
+            listChanged: true, // Enable root list change notifications
           },
         },
       }
@@ -112,6 +118,13 @@ export class FluentMcpServer {
     // Set up prompts handlers
     this.promptManager.setupHandlers();
     
+    // Set up roots/list handler
+    server.setRequestHandler(ListRootsRequestSchema, async () => {
+      return {
+        roots: this.roots,
+      };
+    });
+    
     // Execute tool calls handler
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
@@ -150,6 +163,76 @@ export class FluentMcpServer {
   }
 
   /**
+   * Update the list of roots and notify clients if changed
+   * @param roots The new list of roots
+   */
+  async updateRoots(roots: { uri: string; name?: string }[]): Promise<void> {
+    // Check if roots have changed
+    const hasChanged = this.roots.length !== roots.length ||
+      this.roots.some((root, index) => 
+        root.uri !== roots[index]?.uri || 
+        root.name !== roots[index]?.name
+      );
+    
+    if (hasChanged) {
+      this.roots = [...roots];
+      
+      // Update roots in tools manager
+      this.toolsManager.updateRoots(this.roots);
+      
+      // Notify clients if server is running
+      if (this.status === ServerStatus.RUNNING && this.mcpServer?.server) {
+        await this.mcpServer.server.notification({
+          method: 'notifications/roots/list_changed'
+        });
+        loggingManager.logRootsChanged(this.roots);
+      }
+    }
+  }
+  
+  /**
+   * Add a new root to the list of roots
+   * @param uri The URI of the root
+   * @param name Optional name for the root
+   */
+  async addRoot(uri: string, name?: string): Promise<void> {
+    // Check if root already exists
+    const existingIndex = this.roots.findIndex(root => root.uri === uri);
+    
+    if (existingIndex >= 0) {
+      // Update existing root if name has changed
+      if (this.roots[existingIndex].name !== name) {
+        const updatedRoots = [...this.roots];
+        updatedRoots[existingIndex] = { uri, name };
+        await this.updateRoots(updatedRoots);
+      }
+    } else {
+      // Add new root
+      await this.updateRoots([...this.roots, { uri, name }]);
+    }
+  }
+  
+  /**
+   * Remove a root from the list of roots
+   * @param uri The URI of the root to remove
+   */
+  async removeRoot(uri: string): Promise<void> {
+    const updatedRoots = this.roots.filter(root => root.uri !== uri);
+    
+    if (updatedRoots.length !== this.roots.length) {
+      await this.updateRoots(updatedRoots);
+    }
+  }
+  
+  /**
+   * Get the current list of roots
+   * @returns The list of roots
+   */
+  getRoots(): { uri: string; name?: string }[] {
+    return [...this.roots];
+  }
+  
+  /**
    * Start the MCP server
    */
   async start(): Promise<void> {
@@ -178,6 +261,12 @@ export class FluentMcpServer {
       // Now that we're connected and have set up handlers, register resources
       // The prompt handlers are already registered by setupHandlers
       this.resourceManager.registerAll();
+      
+      // Initialize roots with project root path if not already set
+      if (this.roots.length === 0) {
+        const projectRoot = getProjectRootPath();
+        await this.addRoot(projectRoot, 'Project Root');
+      }
 
       loggingManager.logServerStarted();
       this.status = ServerStatus.RUNNING;

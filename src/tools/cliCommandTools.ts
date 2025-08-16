@@ -104,21 +104,31 @@ export class NodeProcessRunner implements ProcessRunner {
 
 // Application Layer
 export class CLIExecutor implements CommandProcessor {
-  private mcpCwd: string | undefined;
+  private roots: { uri: string; name?: string }[] = [];
 
   constructor(private processRunner: ProcessRunner) {}
 
   /**
-   * Gets the MCP root directory path (calculated once and cached)
-   * @returns The absolute path to the MCP root directory
+   * Sets the roots from the MCP server
+   * @param roots Array of root URIs and optional names
    */
-  private getMcpCwd(): string {
-    if (!this.mcpCwd) {
-      // Use the utility function that returns the project root path
-      this.mcpCwd = getProjectRootPath();
-    }
+  setRoots(roots: { uri: string; name?: string }[]): void {
+    this.roots = [...roots];
+    logger.info('Updated roots in CLIExecutor', { roots });
+  }
 
-    return this.mcpCwd;
+  /**
+   * Gets the primary root URI or falls back to project root path
+   * @returns The URI of the primary root or project root path
+   */
+  private getPrimaryRoot(): string {
+    // Use the first root if available, otherwise fall back to project root
+    if (this.roots.length > 0) {
+      return this.roots[0].uri;
+    }
+    
+    // Fall back to project root path if no roots are set
+    return getProjectRootPath();
   }
 
   /**
@@ -143,7 +153,7 @@ export class CLIExecutor implements CommandProcessor {
     try {
       let cwd = customWorkingDir;
       if (!cwd && useMcpCwd) {
-        cwd = this.getMcpCwd();
+        cwd = this.getPrimaryRoot();
       }
       
       // Sanity check on working directory - warn if it's the system root
@@ -175,21 +185,31 @@ export class CLIExecutor implements CommandProcessor {
 
 // Command Writer - generates command text instead of executing
 export class CLICmdWriter implements CommandProcessor {
-  private mcpCwd: string | undefined;
+  private roots: { uri: string; name?: string }[] = [];
 
   constructor() {}
 
   /**
-   * Gets the MCP root directory path (calculated once and cached)
-   * @returns The absolute path to the MCP root directory
+   * Sets the roots from the MCP server
+   * @param roots Array of root URIs and optional names
    */
-  private getMcpCwd(): string {
-    if (!this.mcpCwd) {
-      // Use the utility function that returns the project root path
-      this.mcpCwd = getProjectRootPath();
-    }
+  setRoots(roots: { uri: string; name?: string }[]): void {
+    this.roots = [...roots];
+    logger.info('Updated roots in CLICmdWriter', { roots });
+  }
 
-    return this.mcpCwd;
+  /**
+   * Gets the primary root URI or falls back to project root path
+   * @returns The URI of the primary root or project root path
+   */
+  private getPrimaryRoot(): string {
+    // Use the first root if available, otherwise fall back to project root
+    if (this.roots.length > 0) {
+      return this.roots[0].uri;
+    }
+    
+    // Fall back to project root path if no roots are set
+    return getProjectRootPath();
   }
 
   /**
@@ -235,7 +255,7 @@ export class CLICmdWriter implements CommandProcessor {
     try {
       let cwd = customWorkingDir;
       if (!cwd && useMcpCwd) {
-        cwd = this.getMcpCwd();
+        cwd = this.getPrimaryRoot();
       }
       
       // Sanity check on working directory - warn if it's the system root

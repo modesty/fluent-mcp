@@ -59,6 +59,8 @@ jest.mock('../../src/config.js', () => ({
 
 // Mock the ToolsManager
 jest.mock("../../src/tools/toolsManager.js", () => {
+  const mockUpdateRoots = jest.fn();
+  
   return {
     ToolsManager: jest.fn().mockImplementation(() => ({
       getMCPTools: jest.fn().mockReturnValue([
@@ -82,8 +84,10 @@ jest.mock("../../src/tools/toolsManager.js", () => {
             result.error || "Unknown error"
           }\n\nOutput:\n${result.output}`;
         }
-      })
-    }))
+      }),
+      updateRoots: mockUpdateRoots
+    })),
+    mockUpdateRoots
   };
 });
 
@@ -160,5 +164,58 @@ describe("FluentMcpServer with Modular Design", () => {
     await server.start();
     await server.stop();
     expect(server.getStatus()).toBe(ServerStatus.STOPPED);
+  });
+  
+  describe("Root capability", () => {
+    const { mockUpdateRoots } = require("../../src/tools/toolsManager.js");
+    
+    test("should initialize with project root on start", async () => {
+      await server.start();
+      const roots = server.getRoots();
+      expect(roots).toHaveLength(1);
+      expect(roots[0].uri).toBe("/mock/project/root");
+      expect(roots[0].name).toBe("Project Root");
+      expect(mockUpdateRoots).toHaveBeenCalledWith(roots);
+    });
+    
+    test("should add a new root", async () => {
+      await server.addRoot("/test/path", "Test Root");
+      const roots = server.getRoots();
+      expect(roots).toHaveLength(1);
+      expect(roots[0].uri).toBe("/test/path");
+      expect(roots[0].name).toBe("Test Root");
+      expect(mockUpdateRoots).toHaveBeenCalledWith(roots);
+    });
+    
+    test("should update an existing root", async () => {
+      await server.addRoot("/test/path", "Test Root");
+      await server.addRoot("/test/path", "Updated Root Name");
+      const roots = server.getRoots();
+      expect(roots).toHaveLength(1);
+      expect(roots[0].uri).toBe("/test/path");
+      expect(roots[0].name).toBe("Updated Root Name");
+      expect(mockUpdateRoots).toHaveBeenCalledTimes(2);
+    });
+    
+    test("should remove a root", async () => {
+      await server.addRoot("/test/path", "Test Root");
+      await server.removeRoot("/test/path");
+      const roots = server.getRoots();
+      expect(roots).toHaveLength(0);
+      expect(mockUpdateRoots).toHaveBeenCalledTimes(2);
+    });
+    
+    test("should update multiple roots", async () => {
+      const newRoots = [
+        { uri: "/root1", name: "Root 1" },
+        { uri: "/root2", name: "Root 2" }
+      ];
+      await server.updateRoots(newRoots);
+      const roots = server.getRoots();
+      expect(roots).toHaveLength(2);
+      expect(roots[0].uri).toBe("/root1");
+      expect(roots[1].uri).toBe("/root2");
+      expect(mockUpdateRoots).toHaveBeenCalledWith(newRoots);
+    });
   });
 });

@@ -98,4 +98,9 @@ export interface CommandMetadata {
 }
 
 export interface CLICommand extends CommandExecutor, CommandMetadata {
+  /**
+   * Get the command processor used by this command
+   * @returns The command processor instance
+   */
+  getCommandProcessor(): CommandProcessor;
 }

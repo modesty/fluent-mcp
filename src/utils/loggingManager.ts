@@ -135,6 +135,14 @@ export class LoggingManager {
       error instanceof Error ? error : new Error(String(error))
     );
   }
+
+  /**
+   * Log when roots have changed
+   * @param roots The updated list of roots
+   */
+  logRootsChanged(roots: { uri: string; name?: string }[]): void {
+    logger.info('Roots list changed', { roots });
+  }
 }
 
 // Create and export a singleton instance

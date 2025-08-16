@@ -49,49 +49,11 @@ export interface LogEntry {
  */
 export class Logger {
   private logLevel: LogLevel;
-  private useStderr: boolean;
-  private logFilePath?: string;
-  private logStream?: fs.WriteStream;
   private mcpServer?: McpServer; // Add McpServer reference
 
   constructor() {
     const config = getConfig();
     this.logLevel = (config.logLevel as LogLevel) || LogLevel.INFO;
-
-    // By default, use stderr to avoid conflicting with stdio transport
-    this.useStderr = true;
-
-    // Check if log file path is specified in config
-    if (config.logFilePath) {
-      this.setupFileLogging(config.logFilePath);
-    }
-  }
-
-  /**
-   * Set up file logging
-   * @param logFilePath Path to the log file
-   */
-  private setupFileLogging(logFilePath: string): void {
-    try {
-      // Ensure the directory exists
-      const logDir = path.dirname(logFilePath);
-      if (!fs.existsSync(logDir)) {
-        fs.mkdirSync(logDir, { recursive: true });
-      }
-
-      this.logFilePath = logFilePath;
-      this.logStream = fs.createWriteStream(logFilePath, { flags: 'a' });
-      this.useStderr = false;
-
-      // Handle process exit to close log file
-      process.on('exit', () => {
-        this.logStream?.end();
-      });
-    } catch (err) {
-      // Fall back to stderr if file logging setup fails
-      this.useStderr = true;
-      this.writeToStderr(`Failed to set up file logging: ${err}`);
-    }
   }
 
   /**
@@ -148,16 +110,16 @@ export class Logger {
   /**
    * Write a log entry to the configured output (stderr or file)
    */
-  private writeLogEntry(entry: LogEntry): void {
+  private writeLogEntry(level: LogLevel, entry: LogEntry): void {
     const logJson = `[${entry.timestamp}] [${entry.level.toUpperCase()}]: ${
       entry.message
     } ${JSON.stringify(entry.context || {})}`;
 
-    if (this.useStderr) {
-      process.stderr.write(`${logJson}\n`);
-    } else if (this.logStream) {
-      this.logStream.write(`${logJson}\n`);
-    }
+    // all human readable logs go to stderr
+    // process.stderr.write(`${logJson}\n`);
+    
+    // send log notifications to MCP server if available
+    this.sendMcpNotification(level, entry.message, entry.context);
   }
 
   /**
@@ -190,7 +152,8 @@ export class Logger {
     };
 
     try {
-      // Send notification via MCP
+      // Send notification via MCP - this goes to stdout via the MCP server
+      // We don't need to write to stderr here as that's handled separately
       this.mcpServer.server.notification({ method: 'logging/message', params });
     } catch (err) {
       // If notification fails, fallback to stderr
@@ -224,8 +187,8 @@ export class Logger {
   public debug(message: string, context?: Record<string, unknown>): void {
     if (!this.shouldLog(LogLevel.DEBUG)) return;
     const entry = this.formatLogEntry(LogLevel.DEBUG, message, context);
-    this.writeLogEntry(entry);
-    this.sendMcpNotification(LogLevel.DEBUG, message, context);
+    // Only write to stderr, not stdout
+    this.writeLogEntry(LogLevel.DEBUG, entry);
   }
 
   /**
@@ -236,8 +199,8 @@ export class Logger {
   public info(message: string, context?: Record<string, unknown>): void {
     if (!this.shouldLog(LogLevel.INFO)) return;
     const entry = this.formatLogEntry(LogLevel.INFO, message, context);
-    this.writeLogEntry(entry);
-    this.sendMcpNotification(LogLevel.INFO, message, context);
+    // Only write to stderr, not stdout
+    this.writeLogEntry(LogLevel.INFO, entry);
   }
 
   /**
@@ -248,8 +211,8 @@ export class Logger {
   public notice(message: string, context?: Record<string, unknown>): void {
     if (!this.shouldLog(LogLevel.NOTICE)) return;
     const entry = this.formatLogEntry(LogLevel.NOTICE, message, context);
-    this.writeLogEntry(entry);
-    this.sendMcpNotification(LogLevel.NOTICE, message, context);
+    // Only write to stderr, not stdout
+    this.writeLogEntry(LogLevel.NOTICE, entry);
   }
 
   /**
@@ -260,8 +223,8 @@ export class Logger {
   public warn(message: string, context?: Record<string, unknown>): void {
     if (!this.shouldLog(LogLevel.WARN)) return;
     const entry = this.formatLogEntry(LogLevel.WARN, message, context);
-    this.writeLogEntry(entry);
-    this.sendMcpNotification(LogLevel.WARN, message, context);
+    // Only write to stderr, not stdout
+    this.writeLogEntry(LogLevel.WARN, entry);
   }
 
   /**
@@ -272,8 +235,8 @@ export class Logger {
   public warning(message: string, context?: Record<string, unknown>): void {
     if (!this.shouldLog(LogLevel.WARNING)) return;
     const entry = this.formatLogEntry(LogLevel.WARNING, message, context);
-    this.writeLogEntry(entry);
-    this.sendMcpNotification(LogLevel.WARNING, message, context);
+    // Only write to stderr, not stdout
+    this.writeLogEntry(LogLevel.WARNING, entry);
   }
 
   /**
@@ -287,33 +250,29 @@ export class Logger {
     error?: Error,
     context?: Record<string, unknown>
   ): void {
-    if (!this.shouldLog(LogLevel.ERROR)) return;
-    const errorContext = error
-      ? {
-        ...context,
-        error: {
-          name: error.name,
-          message: error.message,
-          stack: error.stack,
-        },
-      }
-      : context;
+    // Always log errors regardless of log level
+    // Prepare error context
+    const errorContext: Record<string, unknown> = {
+      ...(context || {}),
+    };
+
+    if (error) {
+      errorContext.error = {
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+      };
+    }
 
     const entry = this.formatLogEntry(LogLevel.ERROR, message, errorContext);
-    this.writeLogEntry(entry);
-    this.sendMcpNotification(LogLevel.ERROR, message, errorContext);
+    // Only write to stderr, not stdout
+    this.writeLogEntry(LogLevel.ERROR, entry);
   }
-
-  /**
-   * Log a message at the critical level
-   * @param message The message to log
-   * @param context Optional context object
-   */
   public critical(message: string, context?: Record<string, unknown>): void {
     if (!this.shouldLog(LogLevel.CRITICAL)) return;
     const entry = this.formatLogEntry(LogLevel.CRITICAL, message, context);
-    this.writeLogEntry(entry);
-    this.sendMcpNotification(LogLevel.CRITICAL, message, context);
+    // Only write to stderr, not stdout
+    this.writeLogEntry(LogLevel.CRITICAL, entry);
   }
 
   /**
@@ -324,8 +283,8 @@ export class Logger {
   public alert(message: string, context?: Record<string, unknown>): void {
     if (!this.shouldLog(LogLevel.ALERT)) return;
     const entry = this.formatLogEntry(LogLevel.ALERT, message, context);
-    this.writeLogEntry(entry);
-    this.sendMcpNotification(LogLevel.ALERT, message, context);
+    // Only write to stderr, not stdout
+    this.writeLogEntry(LogLevel.ALERT, entry);
   }
 
   /**
@@ -336,8 +295,8 @@ export class Logger {
   public emergency(message: string, context?: Record<string, unknown>): void {
     if (!this.shouldLog(LogLevel.EMERGENCY)) return;
     const entry = this.formatLogEntry(LogLevel.EMERGENCY, message, context);
-    this.writeLogEntry(entry);
-    this.sendMcpNotification(LogLevel.EMERGENCY, message, context);
+    // Only write to stderr, not stdout
+    this.writeLogEntry(LogLevel.EMERGENCY, entry);
   }
 
   /**

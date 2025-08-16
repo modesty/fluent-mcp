@@ -21,7 +21,8 @@ const external = [
   'stream',
   '@modelcontextprotocol/sdk',
   '@servicenow/sdk',
-  'zod'
+  'zod',
+  'zod-to-json-schema'
 ];
 
 export default [
