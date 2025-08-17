@@ -75,9 +75,9 @@
 
 - [ ] 6.0 Enhance MCP Server capabilities
     - [✅] 6.1 Complete the server functionalities with primitive capabilities per MCP specification, including prompt, resource and tool together with text (shell cmd in text) and executed shell commands completion
-    - [ ] 6.2 Implement support for **Root** capability to replace the cwd in session:
-        - [ ] 6.2.1. send roots/list requests to retrieve available roots and handle responses.
-        - [ ] 6.2.2. listen for notifications/roots/list_changed to re-query roots when notified, using the SDK’s event-driven message handling.
+    - [✅] 6.2 Implement support for **Root** capability to replace the cwd in session:
+        - [✅] 6.2.1. send roots/list requests to retrieve available roots and handle responses.
+        - [✅] 6.2.2. listen for notifications/roots/list_changed to re-query roots when notified, using the SDK’s event-driven message handling.
     - [ ] 6.3 Implement support for **Elicitation** capability or gathering context or user decisions mid-task, such as confirming actions or providing missing data
         - [ ] 6.3.1. Identify cmd commands that needs user approval to execute
         - [ ] 6.3.2. Identify interactive commands and incorporate user inputs for missing information
@@ -89,8 +89,3 @@
         - [ ] 6.5.2. Review all tools' metadata and capabilities to ensure alignment with the latest specifications.
         - [ ] 6.5.3. Review use cases for `resource links` in tool's results for better resource discovery by utilizing SDK's `ResourceLinkBlock` return type.
         - [ ] 6.5.4. Review on how to improve the authentication process for accessing instance, not only for Fluent transform and install, but also record access and running background scripts
-
-
-
-
-

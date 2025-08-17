@@ -4,9 +4,8 @@
  * Also supports sending logs as MCP notifications according to the protocol
  */
 
-import fs from 'fs';
-import path from 'path';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { SetLevelRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
 import { getConfig } from '../config.js';
 
@@ -111,13 +110,14 @@ export class Logger {
    * Write a log entry to the configured output (stderr or file)
    */
   private writeLogEntry(level: LogLevel, entry: LogEntry): void {
+    // Format the log entry as JSON for human readability
     const logJson = `[${entry.timestamp}] [${entry.level.toUpperCase()}]: ${
       entry.message
     } ${JSON.stringify(entry.context || {})}`;
 
     // all human readable logs go to stderr
-    // process.stderr.write(`${logJson}\n`);
-    
+    process.stderr.write(`${logJson}\n`);
+
     // send log notifications to MCP server if available
     this.sendMcpNotification(level, entry.message, entry.context);
   }
@@ -171,9 +171,13 @@ export class Logger {
   public setupLoggingHandlers(): void {
     if (!this.mcpServer) return;
 
-    // We're relying on the SDK's built-in handling for logging/setLevel
-    // which is enabled when we declare the logging capability
-    // No manual handler registration needed
+    // Explicitly register the logging/setLevel handler
+    this.mcpServer.server.setRequestHandler(SetLevelRequestSchema, async (request) => {
+      const level = request.params.level as LogLevel;
+      this.setLogLevel(level);
+      this.info(`Log level set to: ${level}`);
+      return {};
+    });
     
     // Log the status
     this.debug('Logging capability enabled with current level: ' + this.logLevel);

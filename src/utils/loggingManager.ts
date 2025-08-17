@@ -37,7 +37,7 @@ export class LoggingManager {
    */
   logServerStarting(): void {
     const config = getConfig();
-    logger.info('Starting MCP server...', {version: config.version});
+    logger.info('Starting MCP server...', { name: config.name, version: config.version });
   }
 
   /**
@@ -141,7 +141,16 @@ export class LoggingManager {
    * @param roots The updated list of roots
    */
   logRootsChanged(roots: { uri: string; name?: string }[]): void {
+    // Log summary of roots for normal log levels
     logger.info('Roots list changed', { roots });
+    
+    // Log detailed information at debug level
+    logger.debug('Roots list details', {
+      count: roots.length,
+      paths: roots.map(r => r.uri),
+      rootsWithNames: roots.filter(r => r.name).length,
+      timestamp: new Date().toISOString()
+    });
   }
 }
 

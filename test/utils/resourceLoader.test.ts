@@ -285,7 +285,7 @@ describe('ResourceLoader', () => {
       
       expect(result).toEqual({
         content: '',
-        path: '',
+        path: '', // The actual implementation clears the path on error
         metadataType: 'business-rule',
         resourceType: 'instruct',
         found: false,

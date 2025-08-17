@@ -163,13 +163,8 @@ describe("FluentMcpServer with Modular Design", () => {
   });
   
   test("should request roots from client and handle response", async () => {
-    // Get the direct reference to the mockRequest exported from the mock
-    const { mockRequest } = require('@modelcontextprotocol/sdk/server/mcp.js');
-    
-    // Clear any previous calls
-    mockRequest.mockClear();
-    
     // Mock the request response with roots
+    const mockRequest = require('@modelcontextprotocol/sdk/server/mcp.js').McpServer().server.request;
     mockRequest.mockImplementation((request: { method: string }, schema: any) => {
       if (request.method === 'roots/list') {
         return {
@@ -184,9 +179,19 @@ describe("FluentMcpServer with Modular Design", () => {
     
     await server.start();
     
-    // Instead of trying to trigger the notification handler, 
-    // directly call requestRootsFromClient method (it's private, but we can access it for testing)
-    await (server as any).requestRootsFromClient();
+    // Simulate client sending the initialized notification
+    const { InitializedNotificationSchema } = require('@modelcontextprotocol/sdk/types.js');
+    const { mockSetNotificationHandler } = require('@modelcontextprotocol/sdk/server/mcp.js');
+    
+    // Find the initialized notification handler and call it
+    const initializedHandlerCall = mockSetNotificationHandler.mock.calls.find(
+      (call: any) => call[0] === InitializedNotificationSchema
+    );
+    
+    if (initializedHandlerCall) {
+      // Call the handler to trigger the roots request
+      await initializedHandlerCall[1]();
+    }
     
     // Verify the request was made with correct parameters
     expect(mockRequest).toHaveBeenCalledWith(
@@ -215,9 +220,6 @@ describe("FluentMcpServer with Modular Design", () => {
     // Set up request mock
     const { mockRequest } = require('@modelcontextprotocol/sdk/server/mcp.js');
     
-    // Clear any previous calls
-    mockRequest.mockClear();
-    
     // Setup mock responses for roots/list
     mockRequest.mockImplementation((request: { method: string }, schema: any) => {
       if (request.method === 'roots/list') {
@@ -234,8 +236,19 @@ describe("FluentMcpServer with Modular Design", () => {
     // Start the server to initialize roots
     await server.start();
     
-    // Directly call requestRootsFromClient instead of trying to trigger the notification handler
-    await (server as any).requestRootsFromClient();
+    // Simulate client sending the initialized notification
+    const { InitializedNotificationSchema } = require('@modelcontextprotocol/sdk/types.js');
+    const { mockSetNotificationHandler } = require('@modelcontextprotocol/sdk/server/mcp.js');
+    
+    // Find the initialized notification handler and call it
+    const initializedHandlerCall = mockSetNotificationHandler.mock.calls.find(
+      (call: any) => call[0] === InitializedNotificationSchema
+    );
+    
+    if (initializedHandlerCall) {
+      // Call the handler to trigger the roots request
+      await initializedHandlerCall[1]();
+    }
     
     // Verify that requestRootsFromClient was called and roots were updated
     const roots = server.getRoots();
@@ -266,8 +279,19 @@ describe("FluentMcpServer with Modular Design", () => {
     
     await server.start();
     
-    // Directly call requestRootsFromClient instead of trying to trigger the notification handler
-    await (server as any).requestRootsFromClient();
+    // Simulate client sending the initialized notification
+    const { InitializedNotificationSchema } = require('@modelcontextprotocol/sdk/types.js');
+    const { mockSetNotificationHandler } = require('@modelcontextprotocol/sdk/server/mcp.js');
+    
+    // Find the initialized notification handler and call it
+    const initializedHandlerCall = mockSetNotificationHandler.mock.calls.find(
+      (call: any) => call[0] === InitializedNotificationSchema
+    );
+    
+    if (initializedHandlerCall) {
+      // Call the handler to trigger the roots request
+      await initializedHandlerCall[1]();
+    }
     
     // Should fallback to project root
     const roots = server.getRoots();
@@ -286,8 +310,19 @@ describe("FluentMcpServer with Modular Design", () => {
     test("should initialize with project root on start", async () => {
       await server.start();
       
-      // Directly call requestRootsFromClient instead of trying to trigger the notification handler
-      await (server as any).requestRootsFromClient();
+      // Simulate client sending the initialized notification
+      const { InitializedNotificationSchema } = require('@modelcontextprotocol/sdk/types.js');
+      const { mockSetNotificationHandler } = require('@modelcontextprotocol/sdk/server/mcp.js');
+      
+      // Find the initialized notification handler and call it
+      const initializedHandlerCall = mockSetNotificationHandler.mock.calls.find(
+        (call: any) => call[0] === InitializedNotificationSchema
+      );
+      
+      if (initializedHandlerCall) {
+        // Call the handler to trigger the roots request
+        await initializedHandlerCall[1]();
+      }
       
       const roots = server.getRoots();
       expect(roots).toHaveLength(1);
