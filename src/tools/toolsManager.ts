@@ -190,24 +190,50 @@ export class ToolsManager {
    * @param roots Array of root URIs and optional names
    */
   updateRoots(roots: { uri: string; name?: string }[]): void {
-    // Get the CLI executor and writer instances
+    // Skip empty root updates
+    if (!roots || roots.length === 0) {
+      return;
+    }
+    
+    // Get all the commands
     const commands = this.commandRegistry.getAllCommands();
+    
+    // Group processors by type to avoid duplicate setRoots calls on the same instance
+    const executors = new Set<CLIExecutor>();
+    const writers = new Set<CLICmdWriter>();
     
     // Find commands that use CLIExecutor or CLICmdWriter
     for (const command of commands) {
       const processor = command.getCommandProcessor();
       
-      // Update roots in CLIExecutor
+      // Add each processor to the appropriate set
       if (processor instanceof CLIExecutor) {
-        processor.setRoots(roots);
-      }
-      
-      // Update roots in CLICmdWriter
-      if (processor instanceof CLICmdWriter) {
-        processor.setRoots(roots);
+        executors.add(processor);
+      } else if (processor instanceof CLICmdWriter) {
+        writers.add(processor);
       }
     }
     
+    // Log details about the update process
+    logger.debug('Updating roots in CLI tools', { 
+      executorCount: executors.size, 
+      writerCount: writers.size,
+      commandCount: commands.length,
+      rootCount: roots.length,
+      rootPaths: roots.map(r => r.uri)
+    });
+    
+    // Update roots in each unique CLIExecutor instance
+    executors.forEach(executor => {
+      executor.setRoots(roots);
+    });
+    
+    // Update roots in each unique CLICmdWriter instance
+    writers.forEach(writer => {
+      writer.setRoots(roots);
+    });
+    
+    // Log only once at this level after all updates are complete
     logger.info('Updated roots in all CLI tools', { roots });
   }
 }

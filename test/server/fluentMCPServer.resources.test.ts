@@ -3,6 +3,7 @@
  */
 import { FluentMcpServer } from "../../src/server/fluentMCPServer.js";
 import { ResourceLoader, ResourceType } from "../../src/utils/resourceLoader.js";
+import { patchLoggerForTests } from "../utils/loggerPatch.js";
 
 // Mock the Model Context Protocol SDK
 jest.mock("@modelcontextprotocol/sdk/server/mcp.js", () => {
@@ -10,17 +11,32 @@ jest.mock("@modelcontextprotocol/sdk/server/mcp.js", () => {
   const mockRegisterResource = jest.fn();
   const mockRegisterTool = jest.fn();
   const mockSetRequestHandler = jest.fn();
+  const mockSetNotificationHandler = jest.fn();
+  const mockRequest = jest.fn().mockImplementation((request: { method: string }, schema: any) => {
+    // For roots/list requests, return an empty array
+    if (request.method === 'roots/list') {
+      return { roots: [] };
+    }
+    return {};
+  });
   const mockConnect = jest.fn();
   const mockClose = jest.fn();
+  const mockNotification = jest.fn();
   
   return {
+    __esModule: true,
+    mockSetNotificationHandler,
+    mockRequest,
     McpServer: jest.fn().mockImplementation(() => ({
       registerResource: mockRegisterResource,
       registerTool: mockRegisterTool,
       connect: mockConnect,
       close: mockClose,
       server: {
-        setRequestHandler: mockSetRequestHandler
+        setRequestHandler: mockSetRequestHandler,
+        setNotificationHandler: mockSetNotificationHandler,
+        notification: mockNotification,
+        request: mockRequest
       }
     })),
     ResourceTemplate: jest.fn().mockImplementation((template, options) => ({
@@ -154,6 +170,8 @@ describe("FluentMcpServer Resource Capability", () => {
   
   beforeEach(() => {
     jest.clearAllMocks();
+    // Patch the logger to handle missing notification function
+    patchLoggerForTests();
   });
 
   test("should initialize with resource capability", async () => {
@@ -232,12 +250,10 @@ describe("FluentMcpServer Resource Capability", () => {
 
     // Spy on setupHandlers to ensure it is called
     const setupHandlersSpy = jest.spyOn(server as any, "setupHandlers").mockImplementation(() => {
-      console.log("setupHandlers called");
       const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
       const mockInstance = McpServer.mock.results[0].value;
       const mockSetRequestHandler = mockInstance.server.setRequestHandler;
       mockSetRequestHandler();
-      console.log("setRequestHandler called");
     });
 
     // Mock resourceManager and promptManager initialization

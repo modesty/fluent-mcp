@@ -113,8 +113,17 @@ export class CLIExecutor implements CommandProcessor {
    * @param roots Array of root URIs and optional names
    */
   setRoots(roots: { uri: string; name?: string }[]): void {
-    this.roots = [...roots];
-    logger.info('Updated roots in CLIExecutor', { roots });
+    // Only update and log if roots have actually changed
+    const hasChanged = this.roots.length !== roots.length ||
+      this.roots.some((root, index) => 
+        root.uri !== roots[index]?.uri || 
+        root.name !== roots[index]?.name
+      );
+    
+    if (hasChanged) {
+      this.roots = [...roots];
+      logger.debug('Updated roots in CLIExecutor', { roots });
+    }
   }
 
   /**
@@ -194,8 +203,17 @@ export class CLICmdWriter implements CommandProcessor {
    * @param roots Array of root URIs and optional names
    */
   setRoots(roots: { uri: string; name?: string }[]): void {
-    this.roots = [...roots];
-    logger.info('Updated roots in CLICmdWriter', { roots });
+    // Only update and log if roots have actually changed
+    const hasChanged = this.roots.length !== roots.length ||
+      this.roots.some((root, index) => 
+        root.uri !== roots[index]?.uri || 
+        root.name !== roots[index]?.name
+      );
+    
+    if (hasChanged) {
+      this.roots = [...roots];
+      logger.debug('Updated roots in CLICmdWriter', { roots });
+    }
   }
 
   /**

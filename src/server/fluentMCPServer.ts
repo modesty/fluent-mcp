@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -7,6 +8,7 @@ import {
   ListResourcesRequestSchema,
   ListRootsRequestSchema,
   RootsListChangedNotificationSchema,
+  InitializedNotificationSchema,
   // ListPromptsRequestSchema, - Unused import
   // GetPromptRequestSchema, - Unused import
 } from '@modelcontextprotocol/sdk/types.js';
@@ -15,6 +17,7 @@ import { getConfig, getProjectRootPath } from '../config.js';
 import { ServerStatus } from '../types.js';
 import { CommandResult } from '../utils/types.js';
 import loggingManager from '../utils/loggingManager.js';
+import logger from '../utils/logger.js';
 import { ToolsManager } from '../tools/toolsManager.js';
 import { ResourceManager } from '../res/resourceManager.js';
 import { PromptManager } from '../prompts/promptManager.js';
@@ -91,6 +94,68 @@ export class FluentMcpServer {
   }
 
   /**
+   * Request the list of roots from the client
+   * This is called after the client sends the notifications/initialized notification
+   * or when a roots/list_changed notification is received
+   * @returns Promise that resolves when roots are updated
+   */
+  private async requestRootsFromClient(): Promise<void> {
+    if (!this.mcpServer?.server) {
+      logger.warn('Cannot request roots - MCP server not available');
+      return;
+    }
+
+    logger.info('Requesting roots from client via roots/list...');
+    
+    try {
+      // Create a schema for the response using the Zod library
+      // This is needed because the request method requires a result schema
+      const RootsResponseSchema = z.object({
+        roots: z.array(z.object({
+          uri: z.string(),
+          name: z.string().optional()
+        }))
+      });
+
+      // Using the correct request format with schema
+      const response = await this.mcpServer.server.request(
+        { method: 'roots/list' },
+        RootsResponseSchema
+      );
+      
+      // Since we provided a schema, response will be properly typed
+      const roots = response.roots;
+      
+      if (Array.isArray(roots) && roots.length > 0) {
+        logger.info('Received roots from client', { rootCount: roots.length });
+        
+        // Update roots with client-provided roots
+        await this.updateRoots(roots);
+      } else {
+        logger.warn('Client responded to roots/list but provided no roots');
+        
+        // Fall back to project root if no valid roots received
+        if (this.roots.length === 0) {
+          const projectRoot = getProjectRootPath();
+          logger.info('Using project root as fallback', { projectRoot });
+          await this.addRoot(projectRoot, 'Project Root');
+        }
+      }
+    } catch (error) {
+      logger.error('Error requesting roots from client', 
+        error instanceof Error ? error : new Error(String(error))
+      );
+      
+      // Fall back to project root if request fails
+      if (this.roots.length === 0) {
+        const projectRoot = getProjectRootPath();
+        logger.info('Using project root as fallback after error', { projectRoot });
+        await this.addRoot(projectRoot, 'Project Root');
+      }
+    }
+  }
+
+  /**
    * Set up MCP protocol handlers for tools, resources, prompts, and logging
    */
   private setupHandlers(): void {
@@ -120,9 +185,44 @@ export class FluentMcpServer {
     
     // Set up roots/list handler
     server.setRequestHandler(ListRootsRequestSchema, async () => {
+      logger.debug('Received roots/list request, returning current roots');
       return {
         roots: this.roots,
       };
+    });
+    
+    // Set up handler for roots/list_changed notification
+    server.setNotificationHandler(RootsListChangedNotificationSchema, async () => {
+      logger.info('Received notifications/roots/list_changed notification from client');
+      
+      // When a root list change notification is received, request the updated roots list
+      try {
+        await this.requestRootsFromClient();
+      } catch (error) {
+        logger.error('Failed to request updated roots after notification', 
+          error instanceof Error ? error : new Error(String(error))
+        );
+      }
+    });
+    
+    // Set up handler for notifications/initialized
+    server.setNotificationHandler(InitializedNotificationSchema, async () => {
+      logger.info('Received notifications/initialized notification from client');
+      
+      // Request the list of roots from the client now that initialization is complete
+      try {
+        await this.requestRootsFromClient();
+      } catch (error) {
+        logger.error('Failed to request roots after initialization notification', 
+          error instanceof Error ? error : new Error(String(error))
+        );
+      }
+    });
+    
+    // Set up handler for roots/list_changed notification
+    server.setNotificationHandler(RootsListChangedNotificationSchema, async () => {
+      logger.info('Received notifications/roots/list_changed notification');
+      await this.requestRootsFromClient();
     });
     
     // Execute tool calls handler
@@ -167,25 +267,41 @@ export class FluentMcpServer {
    * @param roots The new list of roots
    */
   async updateRoots(roots: { uri: string; name?: string }[]): Promise<void> {
+    // Validate roots - ensure all URIs exist and are valid
+    const validatedRoots = roots.filter(root => {
+      if (!root.uri) {
+        logger.warn('Ignoring root with empty URI');
+        return false;
+      }
+      return true;
+    });
+    
     // Check if roots have changed
-    const hasChanged = this.roots.length !== roots.length ||
+    const hasChanged = this.roots.length !== validatedRoots.length ||
       this.roots.some((root, index) => 
-        root.uri !== roots[index]?.uri || 
-        root.name !== roots[index]?.name
+        root.uri !== validatedRoots[index]?.uri || 
+        root.name !== validatedRoots[index]?.name
       );
     
     if (hasChanged) {
-      this.roots = [...roots];
+      this.roots = [...validatedRoots];
       
-      // Update roots in tools manager
-      this.toolsManager.updateRoots(this.roots);
-      
-      // Notify clients if server is running
-      if (this.status === ServerStatus.RUNNING && this.mcpServer?.server) {
-        await this.mcpServer.server.notification({
-          method: 'notifications/roots/list_changed'
-        });
-        loggingManager.logRootsChanged(this.roots);
+      // Only update tools manager with the roots if the server is running
+      // or if the status is INITIALIZING (for tests)
+      // This prevents unnecessary updates during initialization
+      if (this.status === ServerStatus.RUNNING || this.status === ServerStatus.INITIALIZING) {
+        // Update roots in tools manager
+        this.toolsManager.updateRoots(this.roots);
+        
+        // Notify clients if server is running
+        if (this.status === ServerStatus.RUNNING && this.mcpServer?.server) {
+          // Use the SDK's notification method for roots/list_changed
+          await this.mcpServer.server.notification({
+            method: 'notifications/roots/list_changed'
+          });
+          // Log the root change only once at this level
+          loggingManager.logRootsChanged(this.roots);
+        }
       }
     }
   }
@@ -196,18 +312,28 @@ export class FluentMcpServer {
    * @param name Optional name for the root
    */
   async addRoot(uri: string, name?: string): Promise<void> {
+    // Validate root URI
+    if (!uri) {
+      logger.warn('Attempted to add root with empty URI, ignoring');
+      return;
+    }
+    
     // Check if root already exists
     const existingIndex = this.roots.findIndex(root => root.uri === uri);
     
     if (existingIndex >= 0) {
       // Update existing root if name has changed
       if (this.roots[existingIndex].name !== name) {
+        logger.debug(`Updating existing root: ${uri} from name '${this.roots[existingIndex].name}' to '${name}'`);
         const updatedRoots = [...this.roots];
         updatedRoots[existingIndex] = { uri, name };
         await this.updateRoots(updatedRoots);
+      } else {
+        logger.debug(`Root already exists with same name, no update needed: ${uri} (${name})`);
       }
     } else {
       // Add new root
+      logger.debug(`Adding new root: ${uri}${name ? ` (${name})` : ''}, server status: ${this.status}`);
       await this.updateRoots([...this.roots, { uri, name }]);
     }
   }
@@ -262,14 +388,13 @@ export class FluentMcpServer {
       // The prompt handlers are already registered by setupHandlers
       this.resourceManager.registerAll();
       
-      // Initialize roots with project root path if not already set
-      if (this.roots.length === 0) {
-        const projectRoot = getProjectRootPath();
-        await this.addRoot(projectRoot, 'Project Root');
-      }
-
-      loggingManager.logServerStarted();
+      // Set the server status to running before initializing roots
+      // This ensures that client notifications will be sent correctly
       this.status = ServerStatus.RUNNING;
+      loggingManager.logServerStarted();
+      
+      // The root list will be requested when the client sends the notifications/initialized notification
+      // This ensures proper timing according to the MCP protocol
     } catch (error) {
       this.status = ServerStatus.STOPPED;
       loggingManager.logServerStartFailed(error, this.status);
