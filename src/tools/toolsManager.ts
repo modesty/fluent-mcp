@@ -47,6 +47,8 @@ export class ToolsManager {
 
     commands.forEach((command) => {
       this.commandRegistry.register(command);
+      // Register each CLI command as an MCP tool
+      this.registerToolFromCommand(command);
     });
     
     // Register resource tools
