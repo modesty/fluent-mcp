@@ -113,7 +113,7 @@ export abstract class BaseResourceCommand implements CLICommand {
  */
 export class GetApiSpecCommand extends BaseResourceCommand {
   name = 'get-api-spec';
-  description = 'Get API specification for a ServiceNow metadata type';
+  description = 'Fetches the Fluent API specification for a given ServiceNow metadata type (e.g., "business-rule", "acl", etc.).';
   resourceType = ResourceType.SPEC;
 }
 
@@ -122,7 +122,7 @@ export class GetApiSpecCommand extends BaseResourceCommand {
  */
 export class GetSnippetCommand extends BaseResourceCommand {
   name = 'get-snippet';
-  description = 'Get code snippet for a ServiceNow metadata type';
+  description = 'Fetches the Fluent code snippet for a given ServiceNow metadata type';
   resourceType = ResourceType.SNIPPET;
   
   /**
@@ -200,7 +200,7 @@ export class GetSnippetCommand extends BaseResourceCommand {
  */
 export class GetInstructCommand extends BaseResourceCommand {
   name = 'get-instruct';
-  description = 'Get instructions for a ServiceNow metadata type';
+  description = 'Retrieves instructions of Fluent API usage for a given ServiceNow metadata type';
   resourceType = ResourceType.INSTRUCT;
 }
 
@@ -209,7 +209,7 @@ export class GetInstructCommand extends BaseResourceCommand {
  */
 export class ListMetadataTypesCommand implements CLICommand {
   name = 'list-metadata-types';
-  description = 'List all available ServiceNow metadata types';
+  description = 'List all available ServiceNow metadata types that currently supported by Fluent (ServiceNow SDK)';
   arguments: CommandArgument[] = [];
   
   private resourceLoader: ResourceLoader;

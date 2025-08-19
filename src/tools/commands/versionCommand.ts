@@ -6,7 +6,7 @@ import { SessionFallbackCommand } from './sessionFallbackCommand.js';
  */
 export class VersionCommand extends SessionFallbackCommand {
   name = 'get_fluent_version';
-  description = 'Get Fluent (ServiceNow SDK) version information';
+  description = 'Retrieves the version number of the installed Fluent (ServiceNow SDK)';
   arguments: CommandArgument[] = [];
 
   constructor(commandProcessor: CommandProcessor) {

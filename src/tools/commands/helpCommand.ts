@@ -7,7 +7,7 @@ import { SessionFallbackCommand } from './sessionFallbackCommand.js';
  */
 export class HelpCommand extends SessionFallbackCommand {
   name = 'get_fluent_help';
-  description = 'Get help information about Fluent (ServiceNow SDK) commands';
+  description = 'Provides help and usage information for any Fluent (ServiceNow SDK) command.';
   arguments: CommandArgument[] = [
     {
       name: 'command',

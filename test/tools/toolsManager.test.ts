@@ -1,31 +1,24 @@
 /**
  * Tests for ToolsManager
+ * 
+ * Note: Resource tool tests are in fluentMCPServer.resources.test.ts
+ * This file only tests the ToolsManager-specific functionality
  */
 import { ToolsManager } from "../../src/tools/toolsManager.js";
 
 // Mock the Model Context Protocol SDK
 jest.mock("@modelcontextprotocol/sdk/server/mcp.js", () => {
   // Create mock implementation for the MCP Server
-  const mockRegisterResource = jest.fn();
   const mockRegisterTool = jest.fn();
-  const mockSetRequestHandler = jest.fn();
-  const mockConnect = jest.fn();
-  const mockClose = jest.fn();
   
   return {
     McpServer: jest.fn().mockImplementation(() => ({
-      registerResource: mockRegisterResource,
-      registerTool: mockRegisterTool,
-      connect: mockConnect,
-      close: mockClose,
-      server: {
-        setRequestHandler: mockSetRequestHandler
-      }
+      registerTool: mockRegisterTool
     }))
   };
 });
 
-// Mock command registry
+// Mock command registry with minimal functionality needed for these tests
 jest.mock("../../src/tools/cliCommandTools.js", () => {
   const mockRegister = jest.fn();
   const mockGetCommand = jest.fn();
@@ -37,14 +30,7 @@ jest.mock("../../src/tools/cliCommandTools.js", () => {
     CLIExecutor: jest.fn(),
     CLICmdWriter: jest.fn(),
     CommandFactory: {
-      createCommands: jest.fn().mockImplementation((executor, writer) => [
-        {
-          name: "mock-command",
-          description: "A mock command for testing",
-          arguments: [],
-          execute: jest.fn().mockResolvedValue({ success: true, output: "Mock output" })
-        }
-      ])
+      createCommands: jest.fn().mockImplementation(() => [])
     },
     CommandRegistry: jest.fn().mockImplementation(() => ({
       register: mockRegister,
@@ -55,8 +41,9 @@ jest.mock("../../src/tools/cliCommandTools.js", () => {
   };
 });
 
-// Mock the resource tools
+// Mock the resource tools module with proper arguments array
 jest.mock("../../src/tools/resourceTools.js", () => {
+  // Create commands with empty arguments arrays to satisfy iteration
   return {
     GetApiSpecCommand: jest.fn().mockImplementation(() => ({
       name: "get-api-spec",
@@ -80,10 +67,7 @@ jest.mock("../../src/tools/resourceTools.js", () => {
       name: "list-metadata-types",
       description: "List metadata types",
       arguments: [],
-      execute: jest.fn().mockResolvedValue({ 
-        success: true, 
-        output: "business-rule\nscript-include\ntable" 
-      })
+      execute: jest.fn().mockResolvedValue({ success: true, output: "Mock output" })
     }))
   };
 });

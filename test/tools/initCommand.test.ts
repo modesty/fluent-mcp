@@ -123,9 +123,9 @@ describe("InitCommand", () => {
   });
 
   test("should have correct properties", () => {
-    expect(initCommand.name).toBe("prepare_fluent_init");
+    expect(initCommand.name).toBe("init_fluent_app");
     expect(initCommand.description).toContain(
-      "Fluent (ServiceNow SDK) application"
+      "Initialize a new ServiceNow custom application"
     );
     expect(initCommand.arguments.length).toBeGreaterThan(0);
     

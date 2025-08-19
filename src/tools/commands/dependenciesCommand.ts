@@ -6,33 +6,9 @@ import { SessionAwareCLICommand } from './sessionAwareCommand.js';
  * Uses the session's working directory
  */
 export class DependenciesCommand extends SessionAwareCLICommand {
-  name = 'fluent_dependencies';
-  description = "Manage dependencies for the Fluent (ServiceNow SDK) application in the current session's working directory";
+  name = 'download_fluent_dependencies';
+  description = 'Download configured dependencies in now.config.json and TypeScript type definitions for use in the application';
   arguments: CommandArgument[] = [
-    {
-      name: 'add',
-      type: 'boolean',
-      required: false,
-      description: 'Add dependencies',
-    },
-    {
-      name: 'install',
-      type: 'boolean',
-      required: false,
-      description: 'Install dependencies',
-    },
-    {
-      name: 'list',
-      type: 'boolean',
-      required: false,
-      description: 'List dependencies',
-    },
-    {
-      name: 'packageName',
-      type: 'string',
-      required: false,
-      description: 'Name of the package to add',
-    },
     {
       name: 'auth',
       type: 'string',
@@ -51,23 +27,10 @@ export class DependenciesCommand extends SessionAwareCLICommand {
     const sdkArgs = ['now-sdk', 'dependencies'];
 
     // Add optional arguments if provided
-    if (args.add) {
-      sdkArgs.push('--add');
-      
-      if (args.packageName) {
-        sdkArgs.push(args.packageName as string);
-      }
-    } else if (args.install) {
-      sdkArgs.push('--install');
-    } else if (args.list) {
-      sdkArgs.push('--list');
-    }
-    
     if (args.auth) {
       sdkArgs.push('--auth', args.auth as string);
     }
 
-    // Add debug flag if specified
     if (args.debug) {
       sdkArgs.push('--debug');
     }
