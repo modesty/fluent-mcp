@@ -7,19 +7,25 @@ import { SessionAwareCLICommand } from './sessionAwareCommand.js';
  */
 export class TransformCommand extends SessionAwareCLICommand {
   name = 'fluent_transform';
-  description = "Transform files in the Fluent (ServiceNow SDK) application in the current session's working directory";
+  description = 'Download and convert XML records from instance or from a local path into Fluent source code';
   arguments: CommandArgument[] = [
     {
-      name: 'source',
+      name: 'from',
       type: 'string',
       required: false,
-      description: 'Source file or directory to transform',
+      description: 'Path to local XML file(s)/directory to transform',
     },
     {
-      name: 'destination',
+      name: 'directory',
       type: 'string',
       required: false,
-      description: 'Destination file or directory for transformed output',
+      description: 'Path to "package.json", default to current working directory',
+    },
+    {
+      name: 'preview',
+      type: 'boolean',
+      required: false,
+      description: 'Preview fluent output and any transform errors without saving, default false',
     },
     {
       name: 'debug',
@@ -33,14 +39,17 @@ export class TransformCommand extends SessionAwareCLICommand {
     const sdkArgs = ['now-sdk', 'transform'];
 
     // Add optional arguments if provided
-    if (args.source) {
-      sdkArgs.push('--source', args.source as string);
+    if (args.from) {
+      sdkArgs.push('--from', args.from as string);
     }
     
-    if (args.destination) {
-      sdkArgs.push('--destination', args.destination as string);
+    if (args.directory) {
+      sdkArgs.push('--directory', args.directory as string);
     }
 
+    if (args.preview) {
+      sdkArgs.push('--preview', args.preview as string);
+    }
     // Add debug flag if specified
     if (args.debug) {
       sdkArgs.push('--debug');

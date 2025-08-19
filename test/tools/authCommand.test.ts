@@ -38,9 +38,9 @@ describe("AuthCommand", () => {
   });
 
   test("should have correct properties", () => {
-    expect(authCommand.name).toBe("prepare_fluent_auth");
+    expect(authCommand.name).toBe("manage_fluent_auth");
     expect(authCommand.description).toContain(
-      "shell command to manage Fluent (ServiceNow SDK) authentication"
+      "Manage Fluent (ServiceNow SDK) authentication"
     );
     // Check for expected arguments
     expect(authCommand.arguments).toEqual(

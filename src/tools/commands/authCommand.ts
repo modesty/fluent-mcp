@@ -8,8 +8,8 @@ import { SessionFallbackCommand } from './sessionFallbackCommand.js';
  * Handles adding, listing, deleting, and selecting auth profiles
  */
 export class AuthCommand extends SessionFallbackCommand {
-  name = 'prepare_fluent_auth';
-  description = 'Generate shell command to manage Fluent (ServiceNow SDK) authentication to <instance_url> with credential profiles, including create new auth alias, list /show existing ones, delete or use an existing one';
+  name = 'manage_fluent_auth';
+  description = 'Manage Fluent (ServiceNow SDK) authentication to instance with credential profiles, use this to add, list, delete, or switch between authentication profiles';
   arguments: CommandArgument[] = [
     {
       name: 'add',

@@ -6,8 +6,8 @@ import { SessionAwareCLICommand } from './sessionAwareCommand.js';
  * Uses the session's working directory
  */
 export class InstallCommand extends SessionAwareCLICommand {
-  name = 'install_fluent_app';
-  description = "Install / Deploy the Fluent (ServiceNow SDK) application in the current session's working directory to a ServiceNow instance";
+  name = 'deploy_fluent_app';
+  description = 'Deploy the Fluent (ServiceNow SDK) application to a ServiceNow instance by auth alias or default auth';
   arguments: CommandArgument[] = [
     {
       name: 'auth',

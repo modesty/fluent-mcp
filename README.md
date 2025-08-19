@@ -8,8 +8,8 @@ Fluent (ServiceNow SDK) MCP bridges ServiceNow development tools with modern AI-
 
 Key capabilities include:
 
-- All ServiceNow SDK CLI commands: `version`, `help`, `debug`, `upgrade`, `auth`, `init`, `build`, `install`, `transform`, `dependencies`
-- ServiceNow authentication via `@servicenow/sdk auth --add <instance>`
+- All ServiceNow SDK CLI commands: `version`, `help`, `auth`, `init`, `build`, `install`, `upgrade`, `dependencies`, `transform`
+- ServiceNow instance authentication via `npx now-sdk auth --add <instance>`
 - API specifications for metadata types like `acl`, `business-rule`, `client-script`, `table`, `ui-action` and more
 - Code snippets and examples for different metadata types
 - Instructions for creating and modifying metadata types
@@ -30,7 +30,6 @@ Note: Use `init` command to switch to a working directory for existing Fluent pr
 | -------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `version`      | Get ServiceNow SDK version information              | None                                                                                                                                                                                                                        |
 | `help`         | Get help information about ServiceNow SDK commands  | `command`: (Optional) The specific command to get help for                                                                                                                                                                  |
-| `debug`        | Enable debug mode for ServiceNow SDK commands       | `command`: The command to run with debug mode enabled                                                                                                                                                                       |
 | `upgrade`      | Upgrade ServiceNow SDK to the latest version        | `check`: (Optional) Only check for updates without upgrading, `debug`: (Optional) Enable debug - **disabled for now**                                                                                                                         |
 | `auth`         | Authenticate to a ServiceNow instance               | `add`: (Optional) Instance URL to add, `type`: (Optional) Authentication method, `alias`: (Optional) Alias for the instance                                                                                                 |
 | `init`         | Initialize a new ServiceNow application             | `from`: (Optional) sys_id or path, `appName`: App name, `packageName`: Package name, `scopeName`: Scope name, `auth`: (Optional) Authentication alias                                                                       |

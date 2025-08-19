@@ -13,44 +13,44 @@ import logger from '../../utils/logger.js';
  * Implements the init command with validation of prerequisites
  */
 export class InitCommand extends BaseCLICommand {
-  name = 'prepare_fluent_init';
-  description = "Generate the Shell command to initialize a Fluent (ServiceNow SDK) application: If specified working directory has no Fluent (ServiceNow SDK) application, it will create a new one. If it has a Fluent (ServiceNow SDK) application, it will save the directory as the working directory for future commands, including build, install, transform and dependencies.\nWhen converting an existing ServiceNow application, use the 'from' argument to specify the system ID or path to initialize from. \nNote, if the specified directory has no package-lock.json file, run `npm install` first.\nNote, This command will not execute the initialization but prepare the shell command to be run later.";
+  name = 'init_fluent_app';
+  description = 'Initialize a new ServiceNow custom application or convert a legacy ServiceNow application from an instance or directory within the current directory';
   arguments: CommandArgument[] = [
     {
       name: 'from',
       type: 'string',
       required: false,
-      description: 'convert existing scoped app to Fluent by sys_id or path to initialize from',
+      description: 'convert existing scoped app to Fluent by sys_id or file path to initialize from',
     },
     {
       name: 'appName',
       type: 'string',
       required: true,
-      description: 'The name of the application, this is the user friendly name that will be displayed in ServiceNow UI.',
+      description: 'The name of the application.',
     },
     {
       name: 'packageName',
       type: 'string',
       required: true,
-      description: "The NPM package name for the application, usually it's the snake-case of appName in lowercase.",
+      description: "The NPM package name for the application, usually it's the snake-case of appName in lowercase with company prefix.",
     },
     {
       name: 'scopeName',
       type: 'string',
       required: true,
-      description: "The scope name for the application in <prefix>_<scope_name> format. For localhost development, it should be in the format of 'sn_<scope_name>'. This is required to create a new Fluent (ServiceNow SDK) application, no spaces allowed.",
+      description: "The scope name for the application in <prefix>_<scope_name> format. For localhost development, it should be in the format of 'sn_<scope_name>'. No spaces allowed, no greater than 18 characters.",
     },
     {
       name: 'auth',
       type: 'string',
       required: false,
-      description: "The authentication alias to use. If not provided, the default authentication alias will be used. You can set up authentication using the 'auth' command.",
+      description: "The authentication alias to use. If not provided, the default authentication alias will be used. You can set up authentication using the 'manage_fluent_auth' tool.",
     },
     {
       name: 'workingDirectory',
       type: 'string',
       required: false,
-      description: "The directory where the Fluent (ServiceNow SDK) application will be created. If not provided, a new directory will be created in the user's home directory.",
+      description: "The directory where the Fluent (ServiceNow SDK) application will be created. If not provided, a new directory will be created in the project root if exists or the user's home directory.",
     },
     {
       name: 'debug',
