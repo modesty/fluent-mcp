@@ -42,37 +42,45 @@ describe("AuthCommand", () => {
     expect(authCommand.description).toContain(
       "Manage Fluent (ServiceNow SDK) authentication"
     );
-    // Check for expected arguments
-    expect(authCommand.arguments).toEqual(
+    const argNames = authCommand.arguments.map(a => a.name);
+    expect(argNames).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ name: "add" }),
-        expect.objectContaining({ name: "instanceUrl" }),
-        expect.objectContaining({ name: "list" })
+        "add",
+        "type",
+        "alias",
+        "list",
+        "delete",
+        "use",
+        "debug"
       ])
     );
+    expect(argNames).not.toContain("instanceUrl");
   });
 
-  test("should execute auth command with add action", async () => {
-    // Test args for add action
+  test("should execute auth command with --add value and optional flags", async () => {
     const args = {
-      action: "add",
-      id: "test-instance",
-      username: "test-user",
-      password: "test-pass",
-      url: "https://test-instance.service-now.com"
+      add: "foo", // instance name or URL
+      type: "basic",
+      alias: "bar"
     };
-    
-    // Continue to call execute, which internally calls commandProcessor.process
+
     const result = await authCommand.execute(args);
-    
-    // Verify CLICmdWriter's process method was called with correct arguments
+
     expect(mockCmdWriter.process).toHaveBeenCalledWith(
       "npx",
-      expect.arrayContaining(["now-sdk", "auth"]),
+      expect.arrayContaining([
+        "now-sdk",
+        "auth",
+        "--add",
+        "foo",
+        "--type",
+        "basic",
+        "--alias",
+        "bar"
+      ]),
       false,
       "/test-working-dir"
     );
-    
     expect(result.success).toBe(true);
   });
   
@@ -89,31 +97,27 @@ describe("AuthCommand", () => {
     expect(mockCmdWriter.process).toHaveBeenCalled();
   });
   
-  test("should pass proper auth parameters to the processor", async () => {
-    const args = {
-      add: true,
-      instanceUrl: "https://dev123.service-now.com",
-      type: "basic",
-      alias: "dev-instance" 
-    };
-    
+  test("should pass through --list, --help and --version", async () => {
+    const args = { list: true, help: true, version: true };
     await authCommand.execute(args);
-    
-    // Verify the processor received all the necessary auth parameters
     expect(mockCmdWriter.process).toHaveBeenCalledWith(
-      "npx", 
-      expect.arrayContaining([
-        "now-sdk", 
-        "auth",
-        "--add",
-        "https://dev123.service-now.com",
-        "--type",
-        "basic",
-        "--alias",
-        "dev-instance"
-      ]),
+      "npx",
+      expect.arrayContaining(["now-sdk", "auth", "--list", "--help", "--version"]),
       false,
       "/test-working-dir"
     );
+  });
+
+  test("should error when multiple primary flags provided", async () => {
+    const result = await authCommand.execute({ list: true, use: "bar" });
+    expect(result.success).toBe(false);
+    expect(result.error).toBeInstanceOf(Error);
+    expect((result.error as Error).message).toContain("Provide only one of");
+  });
+
+  test("should validate --type choices", async () => {
+    const result = await authCommand.execute({ add: "foo", type: "invalid" });
+    expect(result.success).toBe(false);
+    expect((result.error as Error).message).toContain("Invalid --type");
   });
 });

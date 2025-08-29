@@ -13,22 +13,16 @@ export class AuthCommand extends SessionFallbackCommand {
   arguments: CommandArgument[] = [
     {
       name: 'add',
-      type: 'boolean',
-      required: false,
-      description: 'Add / Create a new authentication profile',
-    },
-    {
-      name: 'instanceUrl',
       type: 'string',
       required: false,
-      description: 'URL of the ServiceNow instance (required when using --add). Required for new auth alias.',
+      description: 'Instance name or URL to store authentication credentials for (now-sdk auth --add <value>)',
     },
     {
       name: 'type',
       type: 'string',
       required: false,
       description:
-        'Authentication type (e.g., "oauth", "basic"). Default for localhost is "basic", for other hosts is "oauth"',
+        'Type of authentication to use for new authentication credential. Choices: "basic", "oauth"',
     },
     {
       name: 'alias',
@@ -60,6 +54,18 @@ export class AuthCommand extends SessionFallbackCommand {
       required: false,
       description: 'Print debug output',
     },
+    {
+      name: 'help',
+      type: 'boolean',
+      required: false,
+      description: 'Show help',
+    },
+    {
+      name: 'version',
+      type: 'boolean',
+      required: false,
+      description: 'Show version number',
+    },
   ];
 
   constructor(commandProcessor: CommandProcessor) {
@@ -69,24 +75,49 @@ export class AuthCommand extends SessionFallbackCommand {
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
     this.validateArgs(args);
 
-    // Custom validation for add command - requires instanceUrl
-    if (args.add && !args.instanceUrl) {
+    // Validate mutually exclusive primary actions: add | list | delete | use
+    const primaryFlags = [
+      typeof args.add !== 'undefined',
+      Boolean(args.list),
+      typeof args.delete !== 'undefined',
+      typeof args.use !== 'undefined',
+    ].filter(Boolean).length;
+    if (primaryFlags > 1) {
       return {
         exitCode: 1,
         success: false,
         output: '',
-        error: new Error('When using --add, you must provide --instanceUrl'),
+        error: new Error('Provide only one of --add, --list, --delete, or --use'),
       };
     }
 
     const sdkArgs = ['now-sdk', 'auth'];
 
     // Handle different auth operations
-    if (args.add) {
-      sdkArgs.push('--add', args.instanceUrl as string);
+    if (typeof args.add === 'string') {
+      const addValue = args.add as string;
+      if (!addValue.trim()) {
+        return {
+          exitCode: 1,
+          success: false,
+          output: '',
+          error: new Error('When using --add, you must provide a non-empty instance name or URL'),
+        };
+      }
+      sdkArgs.push('--add', addValue);
 
       if (args.type) {
-        sdkArgs.push('--type', args.type as string);
+        const typeValue = String(args.type);
+        const allowed = ['basic', 'oauth'];
+        if (!allowed.includes(typeValue)) {
+          return {
+            exitCode: 1,
+            success: false,
+            output: '',
+            error: new Error(`Invalid --type '${typeValue}'. Allowed values: basic, oauth`),
+          };
+        }
+        sdkArgs.push('--type', typeValue);
       }
 
       if (args.alias) {
@@ -103,6 +134,14 @@ export class AuthCommand extends SessionFallbackCommand {
     // Add debug flag if specified
     if (args.debug) {
       sdkArgs.push('--debug');
+    }
+
+    // Pass-through help/version if requested
+    if (args.help) {
+      sdkArgs.push('--help');
+    }
+    if (args.version) {
+      sdkArgs.push('--version');
     }
 
     return await this.executeWithFallback('npx', sdkArgs);

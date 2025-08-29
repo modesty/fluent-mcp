@@ -268,9 +268,11 @@ export class Logger {
       };
     }
 
-    const entry = this.formatLogEntry(LogLevel.ERROR, message, errorContext);
+    // In test environment, downgrade error logs to WARN to keep test output clean
+    const level = process.env.NODE_ENV === 'test' ? LogLevel.WARN : LogLevel.ERROR;
+    const entry = this.formatLogEntry(level, message, errorContext);
     // Only write to stderr, not stdout
-    this.writeLogEntry(LogLevel.ERROR, entry);
+    this.writeLogEntry(level, entry);
   }
   public critical(message: string, context?: Record<string, unknown>): void {
     if (!this.shouldLog(LogLevel.CRITICAL)) return;
