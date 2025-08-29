@@ -97,7 +97,11 @@ Resources can be accessed by direct URI or through the `resources/list` method.
   "mcpServers": {
     "fluent-mcp": {
       "command": "npx",
-      "args": ["-y", "@modesty/fluent-mcp"]
+      "args": ["-y", "@modesty/fluent-mcp"],
+      "env": {
+        "SN_INSTANCE_URL": "http://localhost:8080",
+        "SN_AUTH_TYPE": "oauth"
+      }
     }
   }
 }
@@ -116,7 +120,11 @@ Resources can be accessed by direct URI or through the `resources/list` method.
       "fluent-mcp": {
         "type": "stdio",
         "command": "npx",
-        "args": ["-y", "@modesty/fluent-mcp"]
+        "args": ["-y", "@modesty/fluent-mcp"],
+        "env": {
+          "SN_INSTANCE_URL": "http://localhost:8080",
+          "SN_AUTH_TYPE": "oauth"
+        }
       }
     }
   }
@@ -132,7 +140,11 @@ Add MCP server configuration in Cursor settings:
   "mcpServers": {
     "fluent-mcp": {
       "command": "npx",
-      "args": ["-y", "@modesty/fluent-mcp"]
+      "args": ["-y", "@modesty/fluent-mcp"],
+      "env": {
+        "SN_INSTANCE_URL": "http://localhost:8080",
+        "SN_AUTH_TYPE": "oauth"
+      }
     }
   }
 }
@@ -147,7 +159,11 @@ Add MCP server configuration in Cursor settings:
   "mcpServers": {
     "fluent-mcp": {
       "command": "npx",
-      "args": ["-y", "@modesty/fluent-mcp"]
+      "args": ["-y", "@modesty/fluent-mcp"],
+      "env": {
+        "SN_INSTANCE_URL": "http://localhost:8080",
+        "SN_AUTH_TYPE": "oauth"
+      }
     }
   }
 }
@@ -167,7 +183,11 @@ Configure in `~/.gemini/settings.json` or `./.gemini/settings.json`:
       "args": [
         "-y",
         "@modesty/fluent-mcp"
-      ]
+      ],
+      "env": {
+        "SN_INSTANCE_URL": "http://localhost:8080",
+        "SN_AUTH_TYPE": "oauth"
+      }
     }
   }
 }
