@@ -74,7 +74,7 @@ describe("FluentAppValidator", () => {
         return JSON.stringify({
           name: "test-app",
           dependencies: {
-            "@servicenow/now-sdk": "^1.0.0",
+            "@servicenow/sdk": "3.0.3",
           },
         });
       }

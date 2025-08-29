@@ -49,7 +49,7 @@ export class FluentAppValidator {
           const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
           const dependencies = { ...packageJson.dependencies, ...packageJson.devDependencies };
           
-          if (dependencies['@servicenow/now-sdk'] || dependencies['@servicenow/now-sdk-cli']) {
+          if (dependencies['@servicenow/sdk']) {
             return { 
               hasApp: true, 
               packageName: packageJson.name || 'unknown',

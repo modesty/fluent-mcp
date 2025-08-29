@@ -52,7 +52,7 @@ Fluent MCP is a Model Context Protocol (MCP) server that provides ServiceNow SDK
 	2.3 Init command:
 		prerequisites:
 			- Change the current working directory to the directory where you want to create the ServiceNow application.
-			- The current working directory must not already contain a ServiceNow application, meaning it must not contain a `now.config.json` file, and it's package.json (if exists) must not have dependencies for `@servicenow/now-sdk` or `@servicenow/now-sdk-cli`. Otherwise, return a message indicating that the current directory already contains a Fluent (ServiceNow SDK) application, and tell the user current scope name and package name.
+			- The current working directory must not already contain a ServiceNow application, meaning it must not contain a `now.config.json` file, and it's package.json (if exists) must not have dependencies for `@servicenow/sdk`. Otherwise, return a message indicating that the current directory already contains a Fluent (ServiceNow SDK) application, and tell the user current scope name and package name.
 			- working directory handling:
 				- If working directory is provided
 					- If the provided working directory doesn't exist, create it, save it as the working directory for the session, then move onto command execution

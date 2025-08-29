@@ -21,6 +21,7 @@ import logger from '../utils/logger.js';
 import { ToolsManager } from '../tools/toolsManager.js';
 import { ResourceManager } from '../res/resourceManager.js';
 import { PromptManager } from '../prompts/promptManager.js';
+import { autoValidateAuthIfConfigured } from './fluentInstanceAuth.js';
 
 /**
  * Implementation of the Model Context Protocol server for Fluent (ServiceNow SDK) 
@@ -92,6 +93,8 @@ export class FluentMcpServer {
       return `❌ Error:\n${result.error || 'Unknown error'}\n(exit code: ${result.exitCode})\n${result.output}`;
     }
   }
+
+  // auto-auth code moved to fluentInstanceAuto.ts
 
   /**
    * Request the list of roots from the client
@@ -392,6 +395,9 @@ export class FluentMcpServer {
       // This ensures that client notifications will be sent correctly
       this.status = ServerStatus.RUNNING;
       loggingManager.logServerStarted();
+      
+      // Kick off auto-auth validation asynchronously (non-blocking)
+      await autoValidateAuthIfConfigured();
       
       // The root list will be requested when the client sends the notifications/initialized notification
       // This ensures proper timing according to the MCP protocol
