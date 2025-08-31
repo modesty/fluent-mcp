@@ -12,68 +12,68 @@ import { CLIExecutor, NodeProcessRunner } from '../tools/cliCommandTools.js';
  *      for basic type, interactively provide username/password
  */
 export async function autoValidateAuthIfConfigured(): Promise<void> {
-    const instUrl = process.env.SN_INSTANCE_URL?.trim();
-    const authType = process.env.SN_AUTH_TYPE?.trim() || 'oauth';
-    if (!instUrl) {
-      logger.info('Auto-auth skipped: SN_INSTANCE_URL is not set');
-      return;
-    }
+  const instUrl = process.env.SN_INSTANCE_URL?.trim();
+  const authType = process.env.SN_AUTH_TYPE?.trim() || 'oauth';
+  if (!instUrl) {
+    logger.info('Auto-auth skipped: SN_INSTANCE_URL is not set');
+    return;
+  }
 
-    // const username = process.env.SN_USERNAME?.trim();
-    // const password = process.env.SN_PASSWORD?.trim();
+  // const username = process.env.SN_USERNAME?.trim();
+  // const password = process.env.SN_PASSWORD?.trim();
 
-    // if (!username || !password) {
-    //   logger.info('Auto-auth skipped: SN_USERNAME/SN_PASSWORD/SN_AUTH_TYPE not fully set');
-    //   return;
-    // }
+  // if (!username || !password) {
+  //   logger.info('Auto-auth skipped: SN_USERNAME/SN_PASSWORD/SN_AUTH_TYPE not fully set');
+  //   return;
+  // }
 
-    try {
-      // Validate existing auth profiles
-      const listRes = await runNowSdk(['auth', '--list']);
-      const profiles = parseAuthListOutput(listRes.stdout);
+  try {
+    // Validate existing auth profiles
+    const listRes = await runNowSdk(['auth', '--list']);
+    const profiles = parseAuthListOutput(listRes.stdout);
 
-      const matched = profiles.find((p) => urlsEqual(p.host, instUrl));
-      if (matched) {
-        if (matched.defaultYes) {
-          logger.info('Auto-auth validated: default profile matches SN_INSTANCE_URL', {
-            alias: matched.alias,
-            host: matched.host,
-          });
-          return;
-        }
-
-        // Found matching host but not default, switch default
-        const useAlias = matched.alias;
-        const useRes = await runNowSdk(['auth', '--use', useAlias]);
-        if (useRes.exitCode === 0) {
-          logger.info('Auto-auth updated: switched default profile', { alias: useAlias, host: matched.host });
-        } else {
-          logger.warn('Auto-auth warning: failed to switch default profile with now-sdk auth --use', {
-            alias: useAlias,
-            stderr: useRes.stderr,
-          });
-        }
+    const matched = profiles.find((p) => urlsEqual(p.host, instUrl));
+    if (matched) {
+      if (matched.defaultYes) {
+        logger.info('Auto-auth validated: default profile matches SN_INSTANCE_URL', {
+          alias: matched.alias,
+          host: matched.host,
+        });
         return;
       }
 
-      // Not found -> attempt to add credentials (simplified)
-      const alias = deriveAliasFromInstance(instUrl);
-      // logger.info('Auto-auth attempting to add credentials', { alias, host: instUrl, type: authType });
-      
-      // const addRes = await runNowSdk(['auth', '--add', instUrl, '--type', authType, '--alias', alias]);
-      // if (addRes.exitCode === 0) {
-      //   logger.info('Auto-auth added credentials', { alias, host: instUrl, type: authType });
-        
-      //   // Try to set as default
-      //   const useRes = await runNowSdk(['auth', '--use', alias]);
-      //   if (useRes.exitCode === 0) {
-      //     logger.info('Auto-auth set as default', { alias });
-      //   }
-      // } else {
-        logger.notice('not authenticated, please run following shell command to login:', {
-          shellCommand: `npx @servicenow/sdk auth --add ${instUrl} --type ${authType} --alias ${alias}`
+      // Found matching host but not default, switch default
+      const useAlias = matched.alias;
+      const useRes = await runNowSdk(['auth', '--use', useAlias]);
+      if (useRes.exitCode === 0) {
+        logger.info('Auto-auth updated: switched default profile', { alias: useAlias, host: matched.host });
+      } else {
+        logger.warn('Auto-auth warning: failed to switch default profile with now-sdk auth --use', {
+          alias: useAlias,
+          stderr: useRes.stderr,
         });
-      // }
+      }
+      return;
+    }
+
+    // Not found -> attempt to add credentials (simplified)
+    const alias = deriveAliasFromInstance(instUrl);
+    // logger.info('Auto-auth attempting to add credentials', { alias, host: instUrl, type: authType });
+      
+    // const addRes = await runNowSdk(['auth', '--add', instUrl, '--type', authType, '--alias', alias]);
+    // if (addRes.exitCode === 0) {
+    //   logger.info('Auto-auth added credentials', { alias, host: instUrl, type: authType });
+        
+    //   // Try to set as default
+    //   const useRes = await runNowSdk(['auth', '--use', alias]);
+    //   if (useRes.exitCode === 0) {
+    //     logger.info('Auto-auth set as default', { alias });
+    //   }
+    // } else {
+    logger.notice('not authenticated, please run following shell command to login:', {
+      shellCommand: `npx @servicenow/sdk auth --add ${instUrl} --type ${authType} --alias ${alias}`
+    });
+    // }
   } catch (error) {
     logger.warn('Auto-auth failed to validate', { error: error instanceof Error ? error.message : String(error) });
     logger.notice('please run following shell command to login:', {
@@ -141,7 +141,7 @@ async function runNowSdk(subArgs: string[]): Promise<{ stdout: string; stderr: s
   // Try direct binary first, fallback to npx with ServiceNow SDK package
   // let result = await executor.execute('now-sdk', subArgs);
   // if (result.exitCode !== 0) {
-    const result = await executor.execute('npx', ['@servicenow/sdk', ...subArgs]);
+  const result = await executor.execute('npx', ['@servicenow/sdk', ...subArgs]);
   // }
   return { stdout: result.output, stderr: result.error?.message || '', exitCode: result.exitCode };
 }

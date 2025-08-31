@@ -1,16 +1,16 @@
 # MCP Server for Fluent (ServiceNow SDK)
 
-A stdio MCP Server for [Fluent (ServiceNow SDK)](https://www.servicenow.com/docs/bundle/yokohama-application-development/page/build/servicenow-sdk/concept/servicenow-fluent.html), a TypeScript-based declarative domain-specific language for creating and managing metadata, modules, records and tests in ServiceNow platform. It supports all commands available in the ServiceNow SDK CLI and provides access to Fluent Plugin's API specifications, code snippets, and instructions for various metadata types. It can be configured for any MCP client, such as VSCode Agent mode, Claude Desktop, Cursor, or Windsurf, for either development or learning purposes.
+MCP Server for [Fluent (ServiceNow SDK)](https://www.servicenow.com/docs/bundle/yokohama-application-development/page/build/servicenow-sdk/concept/servicenow-fluent.html), a TypeScript-based declarative domain-specific language for creating and managing metadata, modules, records and tests in ServiceNow platform. It supports all commands available in the ServiceNow SDK CLI and provides access to Fluent Plugin's API specifications, code snippets, and instructions for various metadata types. It can be configured for any MCP client with stdio, such as VSCode Agent mode, Claude Code, Cursor, or Windsurf, for either development or learning purposes.
 
 ## Overview
 
-Fluent (ServiceNow SDK) MCP bridges ServiceNow development tools with modern AI-assisted development environments by implementing the [Model Context Protocol](https://github.com/modelcontextprotocol). It enables developers and AI assistants to interact with Fluent commands and access resources like API specifications, code snippets, and instructions through natural language.
+Fluent (ServiceNow SDK) MCP bridges development tools with AI-assisted development environments by implementing the [Model Context Protocol](https://github.com/modelcontextprotocol). It enables developers and AI Agents to interact with Fluent commands and access resources like API specifications, code snippets, and instructions through natural language.
 
 Key capabilities include:
 
 - All ServiceNow SDK CLI commands: `version`, `help`, `auth`, `init`, `build`, `install`, `upgrade`, `dependencies`, `transform`
-- ServiceNow instance authentication via `npx now-sdk auth --add <instance>`
-- API specifications for metadata types like `acl`, `business-rule`, `client-script`, `table`, `ui-action` and more
+- ServiceNow instance `basic` or `oauth` authentication (optional, only needed for CLI commands, not for resources)
+- Resource capability of API specifications for metadata types like `acl`, `business-rule`, `client-script`, `table`, `ui-action` and more
 - Code snippets and examples for different metadata types
 - Instructions for creating and modifying metadata types
 
