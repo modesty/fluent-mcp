@@ -32,7 +32,7 @@ Note: Use `init` command to switch to a working directory for existing Fluent pr
 | `help`         | Get help information about ServiceNow SDK commands  | `command`: (Optional) The specific command to get help for                                                                                                                                                                  |
 | `upgrade`      | Upgrade ServiceNow SDK to the latest version        | `check`: (Optional) Only check for updates without upgrading, `debug`: (Optional) Enable debug - **disabled for now**                                                                                                                         |
 | `auth`         | Authenticate to a ServiceNow instance               | `add`: (Optional) Instance URL to add, `type`: (Optional) Authentication method, `alias`: (Optional) Alias for the instance                                                                                                 |
-| `init`         | Initialize a new ServiceNow application             | `from`: (Optional) sys_id or path, `appName`: App name, `packageName`: Package name, `scopeName`: Scope name, `auth`: (Optional) Authentication alias                                                                       |
+| `init`         | Initialize a new ServiceNow application             | `from`: (Optional) sys_id or path, `appName`: App name, `packageName`: Package name, `scopeName`: Scope name, `auth`: (Optional) Authentication alias, `template`: (Optional) Project template (base, javascript.react, typescript.basic, typescript.react, javascript.basic) [new in now-sdk@v4] Select a template that defines the default application structure: `Basic now-sdk boilerplate`: An application with only the basic structure necessary for development in source code. `JavaScript now-sdk + basic`: An application configured for development in ServiceNow Fluent and JavaScript. `JavaScript now-sdk + fullstack React`: An application configured for development in ServiceNow Fluent, JavaScript, and React. `TypeScript now-sdk + basic`: An application configured for development in ServiceNow Fluent and TypeScript. TypeScript source files in the src/server directory are transpiled into JavaScript modules. `TypeScript now-sdk + fullstack React`: An application configured for development in ServiceNow Fluent, TypeScript, and React. TypeScript source files in the src/server directory are transpiled into JavaScript modules.|
 | `build`        | Build a ServiceNow application package              | `source`: Path to source files, `frozenKeys`: (Optional) Whether to use frozen keys                                                                                                                                         |
 | `install`      | Install a ServiceNow application to an instance     | `source`: (Optional) Package path, `reinstall`: (Optional) Whether to reinstall, `auth`: (Optional) Authentication alias, `open-browser`: (Optional) Open browser after install, `info`: (Optional) Show info after install |
 | `transform`    | Transform ServiceNow metadata to Fluent source code | `from`: (Optional) Path to metadata, `directory`: (Optional) Package path, `preview`: (Optional) Preview only, `auth`: (Optional) Authentication alias                                                                      |
@@ -154,6 +154,7 @@ Add MCP server configuration in Cursor settings:
 
 1. `CMD + ,` to open settings, navigate to Cascade => MCP Servers => Manage MCPs => View raw config
 2. Add configuration.
+
 ```json
 {
   "mcpServers": {
@@ -168,8 +169,8 @@ Add MCP server configuration in Cursor settings:
   }
 }
 ```
-3. Refresh when back to Manage MCPs page.
 
+3. Refresh when back to Manage MCPs page.
 
 #### Gemini CLI
 

@@ -50,7 +50,7 @@ export class ToolsManager {
     
     // Create commands with appropriate processors for each type
     // AuthCommand and InitCommand will use CLICmdWriter, others will use CLIExecutor
-    const commands = CommandFactory.createCommands(cliExecutor, cliCmdWriter);
+    const commands = CommandFactory.createCommands(cliExecutor, cliCmdWriter, this.mcpServer);
 
     commands.forEach((command) => {
       this.commandRegistry.register(command);

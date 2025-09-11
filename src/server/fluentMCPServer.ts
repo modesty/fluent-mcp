@@ -57,6 +57,7 @@ export class FluentMcpServer {
           tools: {},
           resources: {}, // Enable resources capability
           logging: {},   // Enable logging capability
+          elicitation: {}, // Enable elicitation capability for structured data collection
           prompts: {
             listChanged: true, // Enable prompt list change notifications
           },
@@ -195,20 +196,6 @@ export class FluentMcpServer {
       };
     });
     
-    // Set up handler for roots/list_changed notification
-    server.setNotificationHandler(RootsListChangedNotificationSchema, async () => {
-      logger.info('Received notifications/roots/list_changed notification from client');
-      
-      // When a root list change notification is received, request the updated roots list
-      try {
-        await this.requestRootsFromClient();
-      } catch (error) {
-        logger.error('Failed to request updated roots after notification', 
-          error instanceof Error ? error : new Error(String(error))
-        );
-      }
-    });
-    
     // Set up handler for notifications/initialized
     server.setNotificationHandler(InitializedNotificationSchema, async () => {
       logger.info('Received notifications/initialized notification from client');
@@ -225,8 +212,16 @@ export class FluentMcpServer {
     
     // Set up handler for roots/list_changed notification
     server.setNotificationHandler(RootsListChangedNotificationSchema, async () => {
-      logger.info('Received notifications/roots/list_changed notification');
-      await this.requestRootsFromClient();
+      logger.info('Received notifications/roots/list_changed notification from client');
+      
+      // When a root list change notification is received, request the updated roots list
+      try {
+        await this.requestRootsFromClient();
+      } catch (error) {
+        logger.error('Failed to request updated roots after notification', 
+          error instanceof Error ? error : new Error(String(error))
+        );
+      }
     });
     
     // Execute tool calls handler

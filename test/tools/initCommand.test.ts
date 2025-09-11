@@ -2,6 +2,7 @@ import { CommandProcessor, CommandResult } from "../../src/utils/types.js";
 import { InitCommand } from "../../src/tools/commands/initCommand.js";
 import { FluentAppValidator } from "../../src/utils/fluentAppValidator.js";
 import { SessionManager } from "../../src/utils/sessionManager.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import fs from "node:fs";
 import os from "node:os";
 
@@ -45,6 +46,24 @@ class VirtualFileSystem {
   getFluentAppInfo(path: string): FluentAppInfo {
     return this.fluentApps.get(path) || { hasApp: false };
   }
+
+  exists(path: string): boolean {
+    return this.existingDirs.has(path);
+  }
+
+  isDirectory(path: string): boolean {
+    return this.existingDirs.has(path);
+  }
+
+  readdir(path: string): string[] {
+    if (path === '/dir-with-package') {
+      return ['package.json'];
+    }
+    if (path === '/dir-with-config') {
+      return ['now.config.json'];
+    }
+    return [];
+  }
 }
 
 const mockFs = new VirtualFileSystem();
@@ -63,6 +82,11 @@ jest.mock("../../src/utils/sessionManager.js", () => {
 describe("InitCommand", () => {
   let initCommand: InitCommand;
   let mockExecutor: CommandProcessor;
+  let mockMcpServer: Partial<McpServer>;
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -72,6 +96,30 @@ describe("InitCommand", () => {
     // Setup initial filesystem state
     mockFs.addExistingDirectory('/valid-dir');
     mockFs.markAsFluentApp('/existing-app-dir', 'x_test_scope', 'test-package');
+    
+    // Mock filesystem functions used by validation
+    jest.spyOn(fs, 'existsSync').mockImplementation((path: any) => {
+      const pathStr = path.toString();
+      return mockFs.exists(pathStr);
+    });
+    
+    jest.spyOn(fs, 'statSync').mockImplementation((path: any) => {
+      const pathStr = path.toString();
+      if (!mockFs.exists(pathStr)) {
+        throw new Error(`ENOENT: no such file or directory, stat '${pathStr}'`);
+      }
+      return {
+        isDirectory: () => mockFs.isDirectory(pathStr),
+        isFile: () => !mockFs.isDirectory(pathStr)
+      } as any;
+    });
+    
+    jest.spyOn(fs, 'readdirSync').mockImplementation((path: any) => {
+      const pathStr = path.toString();
+      return mockFs.readdir(pathStr) as any;
+    });
+    
+    jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
     
     // Create a mock processor
     mockExecutor = {
@@ -119,7 +167,14 @@ describe("InitCommand", () => {
       return { hasApp: false };
     });
     
-    initCommand = new InitCommand(mockExecutor);
+    // Create mock MCP server
+    mockMcpServer = {
+      server: {
+        elicitInput: jest.fn()
+      }
+    } as any;
+    
+    initCommand = new InitCommand(mockExecutor, mockMcpServer as McpServer);
   });
 
   test("should have correct properties", () => {
@@ -127,24 +182,104 @@ describe("InitCommand", () => {
     expect(initCommand.description).toContain(
       "Initialize a new ServiceNow custom application"
     );
+    expect(initCommand.description).toContain("MCP elicitation");
     expect(initCommand.arguments.length).toBeGreaterThan(0);
     
+    const intentArg = initCommand.arguments.find(arg => arg.name === "intent");
+    expect(intentArg?.required).toBe(false);
+    expect(intentArg?.description).toContain("conversion");
+    expect(intentArg?.description).toContain("creation");
+
     const workingDirArg = initCommand.arguments.find(arg => arg.name === "workingDirectory");
-    expect(workingDirArg?.required).toBe(false); // Changed to false since workingDirectory is now optional
+    expect(workingDirArg?.required).toBe(true);
+
+    const templateArg = initCommand.arguments.find(arg => arg.name === "template");
+    expect(templateArg?.required).toBe(true);
 
     const appNameArg = initCommand.arguments.find(arg => arg.name === "appName");
-    expect(appNameArg?.required).toBe(true);
+    expect(appNameArg?.required).toBe(false);
+    expect(appNameArg?.description).toContain("For creation");
 
     const scopeNameArg = initCommand.arguments.find(arg => arg.name === "scopeName");
-    expect(scopeNameArg?.required).toBe(true);
+    expect(scopeNameArg?.required).toBe(false);
+    expect(scopeNameArg?.description).toContain("x_");
 
-    const packageNameArg = initCommand.arguments.find(arg => arg.name === "packageName");
-    expect(packageNameArg?.required).toBe(true);
+    const fromArg = initCommand.arguments.find(arg => arg.name === "from");
+    expect(fromArg?.required).toBe(false);
+    expect(fromArg?.description).toContain("For conversion");
+  });
 
+  test('should use elicitation when no intent can be determined', async () => {
+    // Mock MCP server to return intent selection
+    (mockMcpServer.server!.elicitInput as jest.Mock).mockResolvedValueOnce({
+      action: 'accept',
+      content: { intent: 'creation' }
+    });
+
+    // Mock second elicitation for creation data
+    (mockMcpServer.server!.elicitInput as jest.Mock).mockResolvedValueOnce({
+      action: 'accept',
+      content: { 
+        appName: 'Test App',
+        packageName: 'test-app',
+        scopeName: 'x_test_scope',
+        workingDirectory: '/valid-dir',
+        template: 'javascript.react'
+      }
+    });
+
+    const result = await initCommand.execute({});
+    
+    expect(mockMcpServer.server!.elicitInput).toHaveBeenCalledTimes(2);
+    expect(result.success).toBe(true);
+  });
+
+  test('should handle elicitation rejection', async () => {
+    // Mock MCP server to return rejection
+    (mockMcpServer.server!.elicitInput as jest.Mock).mockResolvedValueOnce({
+      action: 'reject',
+      content: null
+    });
+
+    const result = await initCommand.execute({});
+    
+    expect(mockMcpServer.server!.elicitInput).toHaveBeenCalledTimes(1);
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toContain('Intent selection is required');
+  });
+
+  test('should use elicitation for conversion flow', async () => {
+    // Mock MCP server to return intent selection
+    (mockMcpServer.server!.elicitInput as jest.Mock).mockResolvedValueOnce({
+      action: 'accept',
+      content: { intent: 'conversion' }
+    });
+
+    // Mock second elicitation for conversion data
+    (mockMcpServer.server!.elicitInput as jest.Mock).mockResolvedValueOnce({
+      action: 'accept',
+      content: { 
+        from: 'a1b2c3d4e5f6789012345678901234ab',
+        workingDirectory: '/valid-dir',
+        auth: 'test-auth'
+      }
+    });
+
+    const result = await initCommand.execute({});
+    
+    expect(mockMcpServer.server!.elicitInput).toHaveBeenCalledTimes(2);
+    expect(result.success).toBe(true);
   });
 
   test('should create directory if it does not exist', async () => {
-    await initCommand.execute({ workingDirectory: '/non-existent-dir' });
+    const args = {
+      workingDirectory: '/non-existent-dir',
+      appName: 'Test App',
+      packageName: 'test-app',
+      scopeName: 'x_test_scope',
+      template: 'javascript.react'
+    };
+    await initCommand.execute(args);
     
     expect(fs.mkdirSync).toHaveBeenCalledWith('/non-existent-dir', { recursive: true });
     expect(SessionManager.getInstance().setWorkingDirectory).toHaveBeenCalledWith('/non-existent-dir');
@@ -153,7 +288,14 @@ describe("InitCommand", () => {
 
   test('should handle existing directory with no Fluent app', async () => {
     mockFs.addExistingDirectory('/valid-dir');
-    await initCommand.execute({ workingDirectory: '/valid-dir' });
+    const args = {
+      workingDirectory: '/valid-dir',
+      appName: 'Test App',
+      packageName: 'test-app',
+      scopeName: 'x_test_scope',
+      template: 'javascript.react'
+    };
+    await initCommand.execute(args);
     
     // Should not create directory
     expect(fs.mkdirSync).not.toHaveBeenCalled();
@@ -165,9 +307,16 @@ describe("InitCommand", () => {
   
   test('should handle existing directory with Fluent app', async () => {
     mockFs.markAsFluentApp('/existing-app-dir', 'x_test_scope', 'test-package');
-    const result = await initCommand.execute({ workingDirectory: '/existing-app-dir' });
+    const args = {
+      workingDirectory: '/existing-app-dir',
+      appName: 'Test App',
+      packageName: 'test-app',
+      scopeName: 'x_test_scope',
+      template: 'javascript.react'
+    };
+    const result = await initCommand.execute(args);
     
-    expect(result.success).toBe(true);  // Changed to true since we're returning success now
+    expect(result.success).toBe(true);
     expect(result.output).toContain('already contains');
     expect(result.output).toContain('x_test_scope');
     // Should save working directory
@@ -176,26 +325,27 @@ describe("InitCommand", () => {
     expect(mockExecutor.process).not.toHaveBeenCalled();
   });
 
-  test('should create default directory if working directory not provided', async () => {
-    // Mock the Date object for consistent test results
-    const mockDate = new Date('2025-06-14T12:00:00Z');
-    jest.spyOn(global, 'Date').mockImplementation(() => mockDate as any);
+  test('should fail when working directory not provided', async () => {
+    // Create InitCommand without MCP server to test error handling
+    const initCommandNoMcp = new InitCommand(mockExecutor);
     
-    await initCommand.execute({});
-    
-    const expectedDir = '/mock-home/fluent-app-2025-06-14T12-00-00-000Z';
-    expect(fs.mkdirSync).toHaveBeenCalledWith(expectedDir, { recursive: true });
-    expect(SessionManager.getInstance().setWorkingDirectory).toHaveBeenCalledWith(expectedDir);
-    expect(mockExecutor.process).toHaveBeenCalled();
-  });
-
-  test('should execute init command with correct arguments', async () => {
     const args = {
-      workingDirectory: '/valid-dir',
-      from: 'template-id',
       appName: 'Test App',
       packageName: 'test-app',
       scopeName: 'x_test_scope',
+      template: 'javascript.react'
+    };
+    
+    const result = await initCommandNoMcp.execute(args);
+    
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toContain('Required parameters for creation are missing: workingDirectory');
+  });
+
+  test('should execute conversion with from parameter', async () => {
+    const args = {
+      workingDirectory: '/valid-dir',
+      from: 'a1b2c3d4e5f6789012345678901234ab', // Valid sys_id
       auth: 'test-auth'
     };
 
@@ -207,10 +357,7 @@ describe("InitCommand", () => {
         '-y',
         '@servicenow/sdk', 
         'init', 
-        '--from', 'template-id',
-        '--appName', '"Test App"',
-        '--packageName', 'test-app',
-        '--scopeName', 'x_test_scope',
+        '--from', 'a1b2c3d4e5f6789012345678901234ab',
         '--auth', 'test-auth'
       ],
       false,
@@ -218,5 +365,249 @@ describe("InitCommand", () => {
     );
     
     expect(SessionManager.getInstance().setWorkingDirectory).toHaveBeenCalledWith('/valid-dir');
+  });
+
+  test('should execute creation with all required parameters', async () => {
+    const args = {
+      workingDirectory: '/valid-dir',
+      appName: 'Test App',
+      packageName: 'test-app',
+      scopeName: 'x_test_scope',
+      template: 'typescript.react',
+      auth: 'test-auth'
+    };
+
+    await initCommand.execute(args);
+    
+    expect(mockExecutor.process).toHaveBeenCalledWith(
+      'npx',
+      [
+        '-y',
+        '@servicenow/sdk', 
+        'init', 
+        '--appName', '"Test App"',
+        '--packageName', 'test-app',
+        '--scopeName', 'x_test_scope',
+        '--template', 'typescript.react',
+        '--auth', 'test-auth'
+      ],
+      false,
+      '/valid-dir'
+    );
+    
+    expect(SessionManager.getInstance().setWorkingDirectory).toHaveBeenCalledWith('/valid-dir');
+  });
+
+  test('should use elicitation when conversion missing required parameters', async () => {
+    // Mock MCP server to return conversion data
+    (mockMcpServer.server!.elicitInput as jest.Mock).mockResolvedValueOnce({
+      action: 'accept',
+      content: { 
+        from: 'a1b2c3d4e5f6789012345678901234ab',
+        workingDirectory: '/valid-dir',
+        auth: 'test-auth'
+      }
+    });
+
+    const args = { intent: 'conversion' };
+    const result = await initCommand.execute(args);
+    
+    expect(mockMcpServer.server!.elicitInput).toHaveBeenCalledTimes(1);
+    expect(result.success).toBe(true);
+  });
+
+  test('should use elicitation when creation missing required parameters', async () => {
+    // Mock MCP server to return creation data
+    (mockMcpServer.server!.elicitInput as jest.Mock).mockResolvedValueOnce({
+      action: 'accept',
+      content: { 
+        appName: 'Test App',
+        packageName: 'test-app',
+        scopeName: 'x_test_scope',
+        workingDirectory: '/valid-dir',
+        template: 'javascript.react'
+      }
+    });
+
+    const args = { intent: 'creation' };
+    const result = await initCommand.execute(args);
+    
+    expect(mockMcpServer.server!.elicitInput).toHaveBeenCalledTimes(1);
+    expect(result.success).toBe(true);
+  });
+
+
+  test('should validate sys_id format for conversion', async () => {
+    const args = {
+      workingDirectory: '/valid-dir',
+      from: 'invalid-sys-id'
+    };
+
+    const result = await initCommand.execute(args);
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toContain('sys_id must be a 32-character hexadecimal string');
+  });
+
+  test('should validate scopeName format for creation', async () => {
+    mockFs.addExistingDirectory('/valid-dir');
+    
+    const args = {
+      workingDirectory: '/valid-dir',
+      appName: 'Test App',
+      packageName: 'test-app',
+      scopeName: 'invalid_scope',
+      template: 'javascript.react'
+    };
+
+    const result = await initCommand.execute(args);
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toContain('scopeName must start with "x_" prefix');
+  });
+
+  test('should validate local path for conversion', async () => {
+    mockFs.markAsFluentApp('/existing-path', 'x_existing_scope', 'existing-package');
+    const args = {
+      workingDirectory: '/valid-dir',
+      from: '/existing-path'
+    };
+
+    await initCommand.execute(args);
+    expect(mockExecutor.process).toHaveBeenCalled();
+  });
+
+  test('should fail validation for non-existent local path', async () => {
+    const args = {
+      workingDirectory: '/valid-dir',
+      from: '/non-existent-path'
+    };
+
+    const result = await initCommand.execute(args);
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toContain('Local path does not exist');
+  });
+
+  test('should create working directory if it does not exist', async () => {
+    const args = {
+      workingDirectory: '/non-existent-working-dir',
+      appName: 'Test App',
+      packageName: 'test-app',
+      scopeName: 'x_test_scope',
+      template: 'javascript.react'
+    };
+
+    const result = await initCommand.execute(args);
+    
+    expect(result.success).toBe(true);
+    expect(fs.mkdirSync).toHaveBeenCalledWith('/non-existent-working-dir', { recursive: true });
+  });
+
+  test('should validate working directory is empty (no package.json)', async () => {
+    // Mock fs.readdirSync to return package.json
+    const mockReaddirSync = jest.spyOn(fs, 'readdirSync').mockImplementation((path: any) => {
+      if (path === '/dir-with-package') {
+        return ['package.json'] as any;
+      }
+      return [] as any;
+    });
+
+    mockFs.addExistingDirectory('/dir-with-package');
+
+    const args = {
+      workingDirectory: '/dir-with-package',
+      appName: 'Test App',
+      packageName: 'test-app',
+      scopeName: 'x_test_scope',
+      template: 'javascript.react'
+    };
+
+    const result = await initCommand.execute(args);
+    
+    // Restore original function
+    mockReaddirSync.mockRestore();
+    
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toContain('Working directory must not contain package.json');
+  });
+
+  test('should validate working directory is empty (no now.config.json)', async () => {
+    // Mock fs.readdirSync to return now.config.json
+    const mockReaddirSync = jest.spyOn(fs, 'readdirSync').mockImplementation((path: any) => {
+      if (path === '/dir-with-config') {
+        return ['now.config.json'] as any;
+      }
+      return [] as any;
+    });
+
+    mockFs.addExistingDirectory('/dir-with-config');
+
+    const args = {
+      workingDirectory: '/dir-with-config',
+      appName: 'Test App',
+      packageName: 'test-app',
+      scopeName: 'x_test_scope',
+      template: 'javascript.react'
+    };
+
+    const result = await initCommand.execute(args);
+    
+    // Restore original function
+    mockReaddirSync.mockRestore();
+    
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toContain('Working directory must not contain now.config.json');
+  });
+
+  test('should validate template parameter', async () => {
+    mockFs.addExistingDirectory('/valid-dir');
+    
+    const args = {
+      workingDirectory: '/valid-dir',
+      appName: 'Test App',
+      packageName: 'test-app',
+      scopeName: 'x_test_scope',
+      template: 'invalid-template'
+    };
+
+    const result = await initCommand.execute(args);
+    
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toContain('template must be one of:');
+  });
+
+  test('should determine intent from from parameter', async () => {
+    const args = {
+      workingDirectory: '/valid-dir',
+      from: 'a1b2c3d4e5f6789012345678901234ab'
+    };
+
+    await initCommand.execute(args);
+    
+    // Should execute conversion flow
+    expect(mockExecutor.process).toHaveBeenCalledWith(
+      'npx',
+      expect.arrayContaining(['--from', 'a1b2c3d4e5f6789012345678901234ab']),
+      false,
+      '/valid-dir'
+    );
+  });
+
+  test('should determine intent from creation parameters', async () => {
+    const args = {
+      workingDirectory: '/valid-dir',
+      appName: 'Test App',
+      packageName: 'test-app',
+      scopeName: 'x_test_scope',
+      template: 'javascript.react'
+    };
+
+    await initCommand.execute(args);
+    
+    // Should execute creation flow
+    expect(mockExecutor.process).toHaveBeenCalledWith(
+      'npx',
+      expect.arrayContaining(['--appName', '"Test App"']),
+      false,
+      '/valid-dir'
+    );
   });
 });
