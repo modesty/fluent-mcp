@@ -20,6 +20,7 @@ import {
   TransformCommand,
   DependenciesCommand,
 } from './commands/index.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import logger from '../utils/logger.js';
 
 // Infrastructure Layer
@@ -359,9 +360,10 @@ export class CommandFactory {
    * Creates all CLI command instances with appropriate processors
    * @param executor The command processor to use for most commands that require execution
    * @param writer The command processor to use for commands that should return text (AuthCommand, InitCommand)
+   * @param mcpServer Optional MCP server for commands that support elicitation
    * @returns An array of command instances
    */
-  static createCommands(executor: CommandProcessor, writer?: CommandProcessor): CLICommand[] {
+  static createCommands(executor: CommandProcessor, writer?: CommandProcessor, mcpServer?: McpServer): CLICommand[] {
     // If no writer is provided, use the executor for all commands
     const textProcessor = writer || executor;
     
@@ -370,7 +372,7 @@ export class CommandFactory {
       new HelpCommand(executor),
       // new UpgradeCommand(executor), // disable for now, it for globally installed now-sdk
       new AuthCommand(textProcessor), // Uses writer to generate text instead of executing
-      new InitCommand(textProcessor), // Uses writer to generate text instead of executing
+      new InitCommand(textProcessor, mcpServer), // Uses writer to generate text instead of executing
       new BuildCommand(executor),
       new InstallCommand(executor),
       new TransformCommand(executor),
