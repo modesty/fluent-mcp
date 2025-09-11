@@ -14,7 +14,7 @@ import logger from '../../utils/logger.js';
  */
 export class InitCommand extends BaseCLICommand {
   name = 'init_fluent_app';
-  description = 'Initialize a new ServiceNow custom application or convert a legacy ServiceNow application from an instance or directory within the current directory';
+  description = 'Initialize a new ServiceNow custom application or convert a legacy ServiceNow application from an instance or directory within the current directory.';
   arguments: CommandArgument[] = [
     {
       name: 'from',
@@ -25,26 +25,32 @@ export class InitCommand extends BaseCLICommand {
     {
       name: 'appName',
       type: 'string',
-      required: true,
+      required: false,
       description: 'The name of the application.',
     },
     {
       name: 'packageName',
       type: 'string',
-      required: true,
+      required: false,
       description: "The NPM package name for the application, usually it's the snake-case of appName in lowercase with company prefix.",
     },
     {
       name: 'scopeName',
       type: 'string',
-      required: true,
+      required: false,
       description: "The scope name for the application in <prefix>_<scope_name> format. For localhost development, it should be in the format of 'sn_<scope_name>'. No spaces allowed, no greater than 18 characters.",
     },
     {
       name: 'auth',
       type: 'string',
       required: false,
-      description: "The authentication alias to use. If not provided, the default authentication alias will be used. You can set up authentication using the 'manage_fluent_auth' tool.",
+      description: "Credential alias to use for authentication with instance. If not provided, the default authentication alias will be used. You can set up authentication using the 'manage_fluent_auth' tool.",
+    },
+    {
+      name: 'template',
+      type: 'string',
+      required: false,
+      description: 'Template to use for the project. Choices: "base", "javascript.react", "typescript.basic", "typescript.react", "javascript.basic"',
     },
     {
       name: 'workingDirectory',
@@ -182,6 +188,11 @@ export class InitCommand extends BaseCLICommand {
     
     if (args.auth) {
       sdkArgs.push('--auth', args.auth as string);
+    }
+
+    // Add template if provided (new in @servicenow/sdk v4)
+    if (args.template) {
+      sdkArgs.push('--template', args.template as string);
     }
 
     // Add debug flag if specified

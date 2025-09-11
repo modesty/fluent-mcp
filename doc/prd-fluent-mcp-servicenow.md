@@ -67,7 +67,7 @@ Fluent MCP is a Model Context Protocol (MCP) server that provides ServiceNow SDK
 					- `npx now-sdk transform`
 					- `npx now-sdk dependencies`
 
-		2.3.1 `npx now-sdk init [--from <sys_id or path>] [--appName <name>] [--packageName <name>] [--scopeName <name>] [--auth <alias>]`: Initialize a new ServiceNow application in the current directory. Details can be found by terminal command `npx now-sdk --help init`. Example: `npx now-sdk init --from dbce0f6a3b3fda107b45b5d355e45af6 --appName Example App --packageName example-app --scopeName x_snc_example --auth devuser1`
+		2.3.1 `npx now-sdk init [--from <sys_id or path>] [--appName <name>] [--packageName <name>] [--scopeName <name>] [--auth <alias>] [--template <template>]`: Initialize a new ServiceNow application in the current directory. In SDK v4, `appName`, `packageName`, and `scopeName` are optional and can be provided interactively. `--template` accepts one of: `base`, `javascript.react`, `typescript.basic`, `typescript.react`, `javascript.basic`. Details can be found by terminal command `npx now-sdk --help init`. Example: `npx now-sdk init --from dbce0f6a3b3fda107b45b5d355e45af6 --appName Example App --packageName example-app --scopeName x_snc_example --auth devuser1 --template typescript.react`
 	2.4 Build command:
 		2.4.1 `npx now-sdk build <source> [--frozenKeys <flag>]`: Compile source files and generate an installable package. Details can be found by terminal command `npx now-sdk --help build`. Example: `npx now-sdk build /path/to/package --frozenKeys true`
 	2.5 Install command:

@@ -133,13 +133,13 @@ describe("InitCommand", () => {
     expect(workingDirArg?.required).toBe(false); // Changed to false since workingDirectory is now optional
 
     const appNameArg = initCommand.arguments.find(arg => arg.name === "appName");
-    expect(appNameArg?.required).toBe(true);
+    expect(appNameArg?.required).toBe(false); // Optional in SDK v4 (interactive)
 
     const scopeNameArg = initCommand.arguments.find(arg => arg.name === "scopeName");
-    expect(scopeNameArg?.required).toBe(true);
+    expect(scopeNameArg?.required).toBe(false); // Optional in SDK v4 (interactive)
 
     const packageNameArg = initCommand.arguments.find(arg => arg.name === "packageName");
-    expect(packageNameArg?.required).toBe(true);
+    expect(packageNameArg?.required).toBe(false); // Optional in SDK v4 (interactive)
 
   });
 
@@ -196,7 +196,8 @@ describe("InitCommand", () => {
       appName: 'Test App',
       packageName: 'test-app',
       scopeName: 'x_test_scope',
-      auth: 'test-auth'
+      auth: 'test-auth',
+      template: 'typescript.react'
     };
 
     await initCommand.execute(args);
@@ -211,7 +212,8 @@ describe("InitCommand", () => {
         '--appName', '"Test App"',
         '--packageName', 'test-app',
         '--scopeName', 'x_test_scope',
-        '--auth', 'test-auth'
+        '--auth', 'test-auth',
+        '--template', 'typescript.react'
       ],
       false,
       '/valid-dir'
