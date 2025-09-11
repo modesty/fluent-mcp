@@ -8,7 +8,7 @@ import {
   ProcessResult,
   ProcessRunner,
 } from '../utils/types.js';
-import { getProjectRootPath } from '../config.js';
+import { getPrimaryRootPath as getRootContextPrimaryRootPath, getPrimaryRootPathFrom as getPrimaryRootPathFromArray } from '../utils/rootContext.js';
 import {
   VersionCommand,
   HelpCommand,
@@ -126,19 +126,7 @@ export class CLIExecutor implements CommandProcessor {
     }
   }
 
-  /**
-   * Gets the primary root URI or falls back to project root path
-   * @returns The URI of the primary root or project root path
-   */
-  private getPrimaryRoot(): string {
-    // Use the first root if available, otherwise fall back to project root
-    if (this.roots.length > 0) {
-      return this.roots[0].uri;
-    }
-    
-    // Fall back to project root path if no roots are set
-    return getProjectRootPath();
-  }
+  // Removed getPrimaryRoot(): use RootContext directly where needed
 
   /**
    * Process a command by executing it and returning the result
@@ -162,7 +150,9 @@ export class CLIExecutor implements CommandProcessor {
     try {
       let cwd = customWorkingDir;
       if (!cwd && useMcpCwd) {
-        cwd = this.getPrimaryRoot();
+        // Prefer instance roots when provided, fallback to RootContext
+        const resolved = getPrimaryRootPathFromArray(this.roots);
+        cwd = resolved || getRootContextPrimaryRootPath();
       }
       
       // Sanity check on working directory - warn if it's the system root
@@ -220,15 +210,7 @@ export class CLICmdWriter implements CommandProcessor {
    * Gets the primary root URI or falls back to project root path
    * @returns The URI of the primary root or project root path
    */
-  private getPrimaryRoot(): string {
-    // Use the first root if available, otherwise fall back to project root
-    if (this.roots.length > 0) {
-      return this.roots[0].uri;
-    }
-    
-    // Fall back to project root path if no roots are set
-    return getProjectRootPath();
-  }
+  // Removed getPrimaryRoot(): use RootContext directly where needed
 
   /**
    * Process a command by generating its text representation without executing it
@@ -273,7 +255,7 @@ export class CLICmdWriter implements CommandProcessor {
     try {
       let cwd = customWorkingDir;
       if (!cwd && useMcpCwd) {
-        cwd = this.getPrimaryRoot();
+        cwd = getPrimaryRootPathFromArray(this.roots) || getRootContextPrimaryRootPath();
       }
       
       // Sanity check on working directory - warn if it's the system root

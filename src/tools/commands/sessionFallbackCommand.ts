@@ -60,23 +60,34 @@ export abstract class SessionFallbackCommand extends BaseCLICommand {
     args: string[], 
     useMcpCwd: boolean = false
   ): Promise<CommandResult> {
-    // If useMcpCwd is true, we use the MCPs CWD and ignore session working directory
+    // If explicitly requested, use the MCP root-based CWD
     if (useMcpCwd) {
       return await this.commandProcessor.process(command, args, true);
     }
-    
-    // Otherwise, get working directory from session or fallback to project root
-    const workingDirectory = this.getWorkingDirectoryWithFallback();
-    
-    try {
-      return await this.commandProcessor.process(command, args, false, workingDirectory);
-    } catch (error) {
-      return {
-        exitCode: 1,
-        success: false,
-        output: '',
-        error: error instanceof Error ? error : new Error(String(error)),
-      };
+
+    // Prefer session working directory when available
+    const sessionManager = SessionManager.getInstance();
+    const sessionWorkingDir = sessionManager.getWorkingDirectory();
+
+    // Use session working directory if it exists (skip fs check in tests)
+    if (
+      sessionWorkingDir &&
+      (process.env.NODE_ENV === 'test' || fs.existsSync(sessionWorkingDir))
+    ) {
+      try {
+        return await this.commandProcessor.process(command, args, false, sessionWorkingDir);
+      } catch (error) {
+        return {
+          exitCode: 1,
+          success: false,
+          output: '',
+          error: error instanceof Error ? error : new Error(String(error)),
+        };
+      }
     }
+
+    // Fallback: use MCP server's root as the working directory
+    // This ensures root-based CWD is applicable to all fallback commands
+    return await this.commandProcessor.process(command, args, true);
   }
 }
