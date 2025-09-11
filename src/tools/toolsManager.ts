@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { CommandFactory, CommandRegistry } from './cliCommandTools.js';
-import { CLICommand } from '../utils/types.js';
+import { CLICommand, CommandProcessor, CommandResult } from '../utils/types.js';
 import logger from '../utils/logger.js';
 import { 
   GetApiSpecCommand,
@@ -10,6 +10,8 @@ import {
   ListMetadataTypesCommand
 } from './resourceTools.js';
 import { CLIExecutor, CLICmdWriter, NodeProcessRunner } from './cliCommandTools.js';
+import { AuthCommand } from './commands/authCommand.js';
+import { setRoots as setRootContextRoots } from '../utils/rootContext.js';
 
 /**
  * Manager for handling MCP tools registration and execution
@@ -17,6 +19,8 @@ import { CLIExecutor, CLICmdWriter, NodeProcessRunner } from './cliCommandTools.
 export class ToolsManager {
   private commandRegistry: CommandRegistry;
   private mcpServer: McpServer;
+  private cliExecutor!: CLIExecutor;
+  private cliCmdWriter!: CLICmdWriter;
 
   /**
    * Create a new ToolsManager
@@ -40,6 +44,9 @@ export class ToolsManager {
     // Create both types of command processors
     const cliExecutor = new CLIExecutor(processRunner);
     const cliCmdWriter = new CLICmdWriter(); // CLICmdWriter doesn't need processRunner
+    // Store shared processors for later use (e.g., server-internal invocations)
+    this.cliExecutor = cliExecutor;
+    this.cliCmdWriter = cliCmdWriter;
     
     // Create commands with appropriate processors for each type
     // AuthCommand and InitCommand will use CLICmdWriter, others will use CLIExecutor
@@ -235,7 +242,26 @@ export class ToolsManager {
       writer.setRoots(roots);
     });
     
+    // Also update global RootContext for modules that don't participate in the command registry
+    setRootContextRoots(roots);
+    
     // Log only once at this level after all updates are complete
     logger.info('Updated roots in all CLI tools', { roots });
+  }
+
+  /**
+   * Get the shared CLI executor used by registered commands
+   */
+  getExecutorProcessor(): CommandProcessor {
+    return this.cliExecutor;
+  }
+
+  /**
+   * Execute the AuthCommand using the shared executor (not the writer)
+   * Used by server-internal flows like auto auth validation
+   */
+  async runAuth(args: Record<string, unknown>): Promise<CommandResult> {
+    const cmd = new AuthCommand(this.cliExecutor);
+    return await cmd.execute(args);
   }
 }

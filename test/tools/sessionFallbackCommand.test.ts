@@ -87,7 +87,7 @@ describe("SessionFallbackCommand", () => {
     );
   });
 
-  test("should fall back to project root when no session working directory", async () => {
+  test("should fall back to MCP root when no session working directory", async () => {
     // Setup session to return no working directory
     (SessionManager.getInstance().getWorkingDirectory as jest.Mock).mockReturnValue(undefined);
 
@@ -96,10 +96,9 @@ describe("SessionFallbackCommand", () => {
     expect(SessionManager.getInstance().getWorkingDirectory).toHaveBeenCalled();
     // The config module is already mocked via Jest setup
     expect(mockExecutor.process).toHaveBeenCalledWith(
-      "test", 
-      ["arg1", "arg2"], 
-      false, // useMcpCwd
-      "/mock-project-root" // fallback to project root from mocked config
+      "test",
+      ["arg1", "arg2"],
+      true // use MCP root as working directory
     );
   });
 });

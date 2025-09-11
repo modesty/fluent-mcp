@@ -36,6 +36,7 @@ export class FluentMcpServer {
   private promptManager: PromptManager;
   private status: ServerStatus = ServerStatus.STOPPED;
   private roots: { uri: string; name?: string }[] = [];
+  private autoAuthTriggered = false;
 
   /**
    * Create a new MCP server instance
@@ -295,7 +296,6 @@ export class FluentMcpServer {
       if (this.status === ServerStatus.RUNNING || this.status === ServerStatus.INITIALIZING) {
         // Update roots in tools manager
         this.toolsManager.updateRoots(this.roots);
-        
         // Notify clients if server is running
         if (this.status === ServerStatus.RUNNING && this.mcpServer?.server) {
           // Use the SDK's notification method for roots/list_changed
@@ -304,6 +304,17 @@ export class FluentMcpServer {
           });
           // Log the root change only once at this level
           loggingManager.logRootsChanged(this.roots);
+        }
+
+        // Trigger auto-auth validation ONCE after roots are available
+        if (!this.autoAuthTriggered) {
+          this.autoAuthTriggered = true;
+          // Fire and forget; we don't want to block roots update
+          autoValidateAuthIfConfigured(this.toolsManager).catch((error) => {
+            logger.warn('Auto-auth validation failed after roots update', {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          });
         }
       }
     }
@@ -395,9 +406,6 @@ export class FluentMcpServer {
       // This ensures that client notifications will be sent correctly
       this.status = ServerStatus.RUNNING;
       loggingManager.logServerStarted();
-      
-      // Kick off auto-auth validation asynchronously (non-blocking)
-      await autoValidateAuthIfConfigured();
       
       // The root list will be requested when the client sends the notifications/initialized notification
       // This ensures proper timing according to the MCP protocol
