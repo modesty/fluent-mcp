@@ -18,6 +18,9 @@ import {
   InstallCommand,
   TransformCommand,
   DependenciesCommand,
+  DownloadCommand,
+  CleanCommand,
+  PackCommand,
 } from './commands/index.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import logger from '../utils/logger.js';
@@ -377,6 +380,9 @@ export class CommandFactory {
       new InstallCommand(executor),
       new TransformCommand(executor),
       new DependenciesCommand(textProcessor), // Uses writer to generate text instead of executing
+      new DownloadCommand(executor),
+      new CleanCommand(executor),
+      new PackCommand(executor),
     ];
   }
 }

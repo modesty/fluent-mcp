@@ -9,3 +9,6 @@ export * from './buildCommand.js';
 export * from './installCommand.js';
 export * from './transformCommand.js';
 export * from './dependenciesCommand.js';
+export * from './downloadCommand.js';
+export * from './cleanCommand.js';
+export * from './packCommand.js';

@@ -13,6 +13,13 @@ jest.mock("../../src/utils/sessionManager.js", () => {
   };
 });
 
+// Mock the rootContext
+jest.mock("../../src/utils/rootContext.js", () => {
+  return {
+    getPrimaryRootPath: jest.fn().mockReturnValue("/test-root-context"),
+  };
+});
+
 // Create a concrete implementation of SessionAwareCLICommand for testing
 class TestSessionAwareCommand extends SessionAwareCLICommand {
   name = "test_command";
@@ -69,6 +76,11 @@ describe("SessionAwareCommand", () => {
   test("should return error when no working directory is available", async () => {
     // Override the mock to return undefined working directory
     (SessionManager.getInstance().getWorkingDirectory as jest.Mock).mockReturnValueOnce(undefined);
+    // Mock rootContext to throw error
+    const { getPrimaryRootPath } = require("../../src/utils/rootContext.js");
+    (getPrimaryRootPath as jest.Mock).mockImplementationOnce(() => {
+      throw new Error("No root context available");
+    });
     
     const result = await sessionAwareCommand.execute({});
     

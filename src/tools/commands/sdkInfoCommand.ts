@@ -8,7 +8,7 @@ import { getProjectRootPath } from '../../config.js';
  */
 export class SdkInfoCommand extends BaseCLICommand {
   name = 'sdk_info';
-  description = 'Get ServiceNow SDK information using native SDK flags (-v, -h, -d)';
+  description = 'Get Fluent (ServiceNow SDK) information using native SDK flags (-v, -h, -d)';
   arguments: CommandArgument[] = [
     {
       name: 'flag',
