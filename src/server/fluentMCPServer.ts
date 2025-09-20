@@ -125,11 +125,11 @@ export class FluentMcpServer {
       // Using the correct request format with schema
       const response = await this.mcpServer.server.request(
         { method: 'roots/list' },
-        RootsResponseSchema
+        RootsResponseSchema as any
       );
-      
+
       // Since we provided a schema, response will be properly typed
-      const roots = response.roots;
+      const roots = (response as any).roots;
       
       if (Array.isArray(roots) && roots.length > 0) {
         logger.info('Received roots from client', { rootCount: roots.length });

@@ -142,12 +142,12 @@ export class ToolsManager {
       {
         title: command.name,
         description: command.description,
-        inputSchema: schema
+        inputSchema: Object.keys(schema).length > 0 ? schema as any : undefined
       },
-      async (params: Record<string, unknown>) => {
-        const result = await command.execute(params);
+      async (args: { [x: string]: any }, _extra) => {
+        const result = await command.execute(args);
         return {
-          content: [{ type: 'text', text: result.output }],
+          content: [{ type: 'text' as const, text: result.output }],
           structuredContent: { success: result.success }
         };
       }

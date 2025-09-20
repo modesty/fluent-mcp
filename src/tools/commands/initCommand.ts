@@ -87,7 +87,7 @@ export class InitCommand extends BaseCLICommand {
       name: 'workingDirectory',
       type: 'string',
       required: true,
-      description: "The directory where the Fluent (ServiceNow SDK) application will be created. Must be an empty local directory with no package.json or now.config.json files.",
+      description: 'The directory where the Fluent (ServiceNow SDK) application will be created. Must be an empty local directory with no package.json or now.config.json files.',
     },
     {
       name: 'debug',
@@ -451,7 +451,7 @@ export class InitCommand extends BaseCLICommand {
    * @param args Current arguments
    * @returns Promise resolving to the selected intent
    */
-  private async elicitIntent(args: Record<string, unknown>): Promise<InitIntent> {
+  private async elicitIntent(_args: Record<string, unknown>): Promise<InitIntent> {
     if (!this.mcpServer) {
       throw new Error('Intent selection is required but MCP server not available for elicitation');
     }
