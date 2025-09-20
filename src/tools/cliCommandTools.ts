@@ -10,8 +10,7 @@ import {
 } from '../utils/types.js';
 import { getPrimaryRootPath as getRootContextPrimaryRootPath, getPrimaryRootPathFrom as getPrimaryRootPathFromArray } from '../utils/rootContext.js';
 import {
-  VersionCommand,
-  HelpCommand,
+  SdkInfoCommand,
   // UpgradeCommand, // Commented out as it's not used
   AuthCommand,
   InitCommand,
@@ -368,9 +367,10 @@ export class CommandFactory {
     const textProcessor = writer || executor;
     
     return [
-      new VersionCommand(executor),
-      new HelpCommand(executor),
-      // new UpgradeCommand(executor), // disable for now, it for globally installed now-sdk
+      // SDK Information Tool (using SDK flags, not commands)
+      new SdkInfoCommand(executor),
+
+      // SDK Command Tools (actual SDK subcommands)
       new AuthCommand(textProcessor), // Uses writer to generate text instead of executing
       new InitCommand(textProcessor, mcpServer), // Uses writer to generate text instead of executing
       new BuildCommand(executor),
