@@ -10,8 +10,7 @@ import {
 } from '../utils/types.js';
 import { getPrimaryRootPath as getRootContextPrimaryRootPath, getPrimaryRootPathFrom as getPrimaryRootPathFromArray } from '../utils/rootContext.js';
 import {
-  VersionCommand,
-  HelpCommand,
+  SdkInfoCommand,
   // UpgradeCommand, // Commented out as it's not used
   AuthCommand,
   InitCommand,
@@ -19,6 +18,9 @@ import {
   InstallCommand,
   TransformCommand,
   DependenciesCommand,
+  DownloadCommand,
+  CleanCommand,
+  PackCommand,
 } from './commands/index.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import logger from '../utils/logger.js';
@@ -368,15 +370,19 @@ export class CommandFactory {
     const textProcessor = writer || executor;
     
     return [
-      new VersionCommand(executor),
-      new HelpCommand(executor),
-      // new UpgradeCommand(executor), // disable for now, it for globally installed now-sdk
+      // SDK Information Tool (using SDK flags, not commands)
+      new SdkInfoCommand(executor),
+
+      // SDK Command Tools (actual SDK subcommands)
       new AuthCommand(textProcessor), // Uses writer to generate text instead of executing
       new InitCommand(textProcessor, mcpServer), // Uses writer to generate text instead of executing
       new BuildCommand(executor),
       new InstallCommand(executor),
       new TransformCommand(executor),
       new DependenciesCommand(textProcessor), // Uses writer to generate text instead of executing
+      new DownloadCommand(executor),
+      new CleanCommand(executor),
+      new PackCommand(executor),
     ];
   }
 }

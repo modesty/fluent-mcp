@@ -99,6 +99,52 @@ export class FluentMcpServer {
   // auto-auth code moved to fluentInstanceAuto.ts
 
   /**
+   * Schedule a delayed initialization to ensure roots and auth are set up
+   * This provides a fallback if the client doesn't send proper notifications
+   */
+  private scheduleDelayedInitialization(): void {
+    // Give the client some time to send notifications, then fallback
+    setTimeout(async () => {
+      try {
+        // Only initialize if roots haven't been set up yet
+        if (this.roots.length === 0) {
+          logger.info('No roots received from client after delay, using fallback initialization...');
+          
+          // Try to request from client first, with short timeout
+          try {
+            await Promise.race([
+              this.requestRootsFromClient(),
+              new Promise<void>((_, reject) => 
+                setTimeout(() => reject(new Error('Client roots request timeout')), 2000)
+              )
+            ]);
+          } catch (error) {
+            // If client doesn't respond, use project root as fallback
+            logger.warn(`Client did not provide roots, using project root fallback: ${error}`);
+            const projectRoot = getProjectRootPath();
+            await this.addRoot(`file://${projectRoot}`, 'Project Root (Fallback)');
+          }
+        }
+        
+        // Trigger auth validation if not already triggered
+        if (!this.autoAuthTriggered) {
+          this.autoAuthTriggered = true;
+          logger.info('Triggering auto-auth validation...');
+          autoValidateAuthIfConfigured(this.toolsManager).catch((error) => {
+            logger.warn('Auto-auth validation failed', {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          });
+        }
+      } catch (error) {
+        logger.error('Error during delayed initialization', 
+          error instanceof Error ? error : new Error(String(error))
+        );
+      }
+    }, 1000); // Wait 1 second for proper client notifications
+  }
+
+  /**
    * Request the list of roots from the client
    * This is called after the client sends the notifications/initialized notification
    * or when a roots/list_changed notification is received
@@ -125,11 +171,11 @@ export class FluentMcpServer {
       // Using the correct request format with schema
       const response = await this.mcpServer.server.request(
         { method: 'roots/list' },
-        RootsResponseSchema
+        RootsResponseSchema as any
       );
-      
+
       // Since we provided a schema, response will be properly typed
-      const roots = response.roots;
+      const roots = (response as any).roots;
       
       if (Array.isArray(roots) && roots.length > 0) {
         logger.info('Received roots from client', { rootCount: roots.length });
@@ -169,9 +215,13 @@ export class FluentMcpServer {
     
     // Set up the tools/list handler
     server.setRequestHandler(ListToolsRequestSchema, async () => {
-      return {
-        tools: this.toolsManager.getMCPTools(),
-      };
+      const tools = this.toolsManager.getMCPTools();
+      
+      // Start a delayed initialization process to ensure roots and auth are set up
+      // even if the client doesn't send proper notifications
+      this.scheduleDelayedInitialization();
+      
+      return { tools };
     });
 
     // Set up the resources/list handler

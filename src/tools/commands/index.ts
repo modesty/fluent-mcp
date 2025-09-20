@@ -1,13 +1,14 @@
 export * from './baseCommand.js';
 export * from './sessionAwareCommand.js';
 export * from './sessionFallbackCommand.js';
-export * from './versionCommand.js';
-export * from './helpCommand.js';
+export * from './sdkInfoCommand.js';
 
-export * from './upgradeCommand.js';
 export * from './authCommand.js';
 export * from './initCommand.js';
 export * from './buildCommand.js';
 export * from './installCommand.js';
 export * from './transformCommand.js';
 export * from './dependenciesCommand.js';
+export * from './downloadCommand.js';
+export * from './cleanCommand.js';
+export * from './packCommand.js';

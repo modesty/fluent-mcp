@@ -8,7 +8,8 @@ Fluent (ServiceNow SDK) MCP bridges development tools with AI-assisted developme
 
 Key capabilities include:
 
-- All ServiceNow SDK CLI commands: `version`, `help`, `auth`, `init`, `build`, `install`, `upgrade`, `dependencies`, `transform`
+- **Complete ServiceNow SDK CLI coverage**: All native SDK commands are now available including `auth`, `init`, `build`, `install`, `dependencies`, `transform`, `download`, `clean`, and `pack`
+- **Enhanced SDK information access**: Get SDK version, help, and debug information with improved `sdk_info` command
 - ServiceNow instance `basic` or `oauth` authentication (optional, only needed for CLI commands, not for resources)
 - Resource capability of API specifications for metadata types like `acl`, `business-rule`, `client-script`, `table`, `ui-action` and more
 - Code snippets and examples for different metadata types
@@ -24,23 +25,34 @@ Create a new Fluent app under ~/Downloads/fluent-app to track employee time off 
 
 ### ServiceNow SDK Commands
 
-Note: Use `init` command to switch to a working directory for existing Fluent projects or to create a new one.
+Note: Use `init_fluent_app` command to switch to a working directory for existing Fluent projects or to create a new one.
 
-| Tool Name      | Description                                         | Parameters                                                                                                                                                                                                                  |
-| -------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `version`      | Get ServiceNow SDK version information              | None                                                                                                                                                                                                                        |
-| `help`         | Get help information about ServiceNow SDK commands  | `command`: (Optional) The specific command to get help for                                                                                                                                                                  |
-| `upgrade`      | Upgrade ServiceNow SDK to the latest version        | `check`: (Optional) Only check for updates without upgrading, `debug`: (Optional) Enable debug - **disabled for now**                                                                                                                         |
-| `auth`         | Authenticate to a ServiceNow instance               | `add`: (Optional) Instance URL to add, `type`: (Optional) Authentication method, `alias`: (Optional) Alias for the instance                                                                                                 |
-| `init`         | Initialize a new ServiceNow application             | `from`: (Optional) sys_id or path, `appName`: App name, `packageName`: Package name, `scopeName`: Scope name, `auth`: (Optional) Authentication alias, `template`: (Optional) Project template (base, javascript.react, typescript.basic, typescript.react, javascript.basic) [new in now-sdk@v4] Select a template that defines the default application structure: `Basic now-sdk boilerplate`: An application with only the basic structure necessary for development in source code. `JavaScript now-sdk + basic`: An application configured for development in ServiceNow Fluent and JavaScript. `JavaScript now-sdk + fullstack React`: An application configured for development in ServiceNow Fluent, JavaScript, and React. `TypeScript now-sdk + basic`: An application configured for development in ServiceNow Fluent and TypeScript. TypeScript source files in the src/server directory are transpiled into JavaScript modules. `TypeScript now-sdk + fullstack React`: An application configured for development in ServiceNow Fluent, TypeScript, and React. TypeScript source files in the src/server directory are transpiled into JavaScript modules.|
-| `build`        | Build a ServiceNow application package              | `source`: Path to source files, `frozenKeys`: (Optional) Whether to use frozen keys                                                                                                                                         |
-| `install`      | Install a ServiceNow application to an instance     | `source`: (Optional) Package path, `reinstall`: (Optional) Whether to reinstall, `auth`: (Optional) Authentication alias, `open-browser`: (Optional) Open browser after install, `info`: (Optional) Show info after install |
-| `transform`    | Transform ServiceNow metadata to Fluent source code | `from`: (Optional) Path to metadata, `directory`: (Optional) Package path, `preview`: (Optional) Preview only, `auth`: (Optional) Authentication alias                                                                      |
-| `dependencies` | Download application dependencies                   | `directory`: (Optional) Package path, `auth`: (Optional) Authentication alias                                                                                                                                               |
+| Tool Name                      | Description                                         | Parameters                                                                                                                                                                                                                  |
+| ------------------------------ | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sdk_info`                     | Get Fluent (ServiceNow SDK) information using native SDK flags | `flag`: SDK flag to execute (-v/--version, -h/--help, -d/--debug), `command`: (Optional) Specific command to get help for (only used with -h/--help flag)                                                               |
+| `manage_fluent_auth`           | Manage Fluent (ServiceNow SDK) authentication to instance | `add`: (Optional) Instance URL to add, `type`: (Optional) Authentication method, `alias`: (Optional) Alias for the instance, `list`: (Optional) List auth profiles, `delete`: (Optional) Delete auth profile, `use`: (Optional) Switch default auth |
+| `init_fluent_app`              | Initialize a new ServiceNow custom application or convert a legacy application | `from`: (Optional) sys_id or path, `appName`: App name, `packageName`: Package name, `scopeName`: Scope name, `workingDirectory`: Directory for the project, `template`: Project template (base, javascript.react, typescript.basic, typescript.react, javascript.basic), `intent`: (Optional) Creation or conversion intent |
+| `build_fluent_app`             | Build the Fluent (ServiceNow SDK) application      | `debug`: (Optional) Print debug output                                                                                                                                                                                     |
+| `deploy_fluent_app`            | Deploy the Fluent (ServiceNow SDK) application to a ServiceNow instance | `auth`: (Optional) Authentication alias to use, `debug`: (Optional) Print debug output                                                                                                                                     |
+| `fluent_transform`             | Download and convert XML records from instance or local path into Fluent source code | `from`: (Optional) Path to metadata, `directory`: (Optional) Package path, `preview`: (Optional) Preview only, `auth`: (Optional) Authentication alias, `debug`: (Optional) Print debug output                         |
+| `download_fluent_dependencies` | Download configured dependencies in now.config.json and TypeScript type definitions | `auth`: (Optional) Authentication alias to use, `debug`: (Optional) Print debug output                                                                                                                                     |
+| `download_fluent_app` **NEW**  | Download application metadata from instance        | `directory`: Path to expand application, `source`: (Optional) Path to directory containing package.json configuration, `incremental`: (Optional) Download in incremental mode, `debug`: (Optional) Print debug output   |
+| `clean_fluent_app` **NEW**     | Clean output directory                              | `source`: (Optional) Path to directory containing package.json configuration, `debug`: (Optional) Print debug output                                                                                                        |
+| `pack_fluent_app` **NEW**      | Zip built app into installable artifact            | `source`: (Optional) Path to directory containing package.json configuration, `debug`: (Optional) Print debug output                                                                                                        |
 
-### auth, init and dependencies commands
+### Recent Updates
 
-All these three commands are interactive CLI commands that require user input. The easier way to use them is to have Fluent MCP generate the shell command then run them in a terminal. Preferably, whenever you start a session with Fluent MCP, specify the working directory please.
+**Complete ServiceNow SDK Command Coverage** - fluent-mcp now provides 100% coverage of all native ServiceNow SDK commands:
+
+- **✅ Enhanced `sdk_info` command**: Get SDK version, help, and debug information with improved working directory resolution and error handling
+- **✅ New `download_fluent_app` command**: Download application metadata from instance with support for incremental downloads and custom source directories
+- **✅ New `clean_fluent_app` command**: Clean output directories with proper package.json configuration detection
+- **✅ New `pack_fluent_app` command**: Create installable application artifacts from built applications
+- **✅ All commands aligned**: Parameter descriptions and functionality match the native SDK specification exactly
+
+### Interactive Commands
+
+All `manage_fluent_auth`, `init_fluent_app` and `download_fluent_dependencies` commands are interactive CLI commands that require user input. The easier way to use them is to have Fluent MCP generate the shell command then run them in a terminal. Preferably, whenever you start a session with Fluent MCP, specify the working directory please.
 
 ## Resources
 
@@ -153,7 +165,7 @@ Add MCP server configuration in Cursor settings:
 #### Windsurf
 
 1. `CMD + ,` to open settings, navigate to Cascade => MCP Servers => Manage MCPs => View raw config
-2. Add configuration.
+1. Add configuration.
 
 ```json
 {
@@ -170,7 +182,7 @@ Add MCP server configuration in Cursor settings:
 }
 ```
 
-3. Refresh when back to Manage MCPs page.
+1. Refresh when back to Manage MCPs page.
 
 #### Gemini CLI
 
@@ -197,16 +209,16 @@ Configure in `~/.gemini/settings.json` or `./.gemini/settings.json`:
 ## Getting Started
 
 1. **Authentication**  
-   a. Create a new auth alias: `create Fluent auth to <instanceUrl>, add the credential alias as myFluentMcpAuth`  
-   b. List existing aliases: `show all Fluent auth profiles`  
-   c. Switch default alias: `use the alias <myFluentMcpAuth> as the default Fluent auth`
+   a. Create a new auth alias: `Use manage_fluent_auth to create a new auth profile for <instanceUrl> with alias myFluentMcpAuth`  
+   b. List existing aliases: `Use manage_fluent_auth to show all auth profiles`  
+   c. Switch default alias: `Use manage_fluent_auth to set myFluentMcpAuth as the default auth`
 
-2. **Project Setup**  
-   a. Create a new project: `Create a Fluent project to <what_you_want_the_app_to_do> under directory <cwd>`  
+1. **Project Setup**  
+   a. Create a new project: `Use init_fluent_app to create a new Fluent project for <what_you_want_the_app_to_do> in directory <cwd>`  
    b. Convert an existing app:  
-      • By sys_id: `Create a Fluent project by converting the existing scoped app whose sys_id is <xxx> under directory <cwd>`  
-      • By local path: `Create a Fluent project by converting the existing scoped app from <scoped_app_path>, new Fluent project should be stored in directory <cwd>`  
-   c. Continue an existing project: `Initialize Fluent project in <cwd>` or `Set Fluent working directory to <cwd>`
+      • By sys_id: `Use init_fluent_app to convert the existing scoped app with sys_id <xxx> to a Fluent project in directory <cwd>`  
+      • By local path: `Use init_fluent_app to convert the existing scoped app from <scoped_app_path> to a Fluent project in directory <cwd>`  
+   c. Continue an existing project: `Use init_fluent_app to initialize the Fluent project in <cwd>` or `Set working directory to <cwd> for the Fluent project`
 
 ### Example Prompts
 
@@ -297,7 +309,7 @@ Prompt:
 #### Multi-Environment Auth Setup
 
 Prompt:
-"Configure auth profiles for dev/test/prod environments, then create a build script that deploys to each sequentially. Handle auth failures with rollback. Show the exact manage_fluent_auth and fluent_install commands."
+"Configure auth profiles for dev/test/prod environments, then create a build script that deploys to each sequentially. Handle auth failures with rollback. Show the exact manage_fluent_auth and deploy_fluent_app commands."
 
 #### Form Field Validation Chain
 

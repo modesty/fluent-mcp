@@ -105,11 +105,11 @@ export class ToolsManager {
     
     // Convert command arguments to Zod schema
     const schema: Record<string, z.ZodTypeAny> = {};
-    
+
     // Build schema from command arguments
     for (const arg of command.arguments) {
       let zodType: z.ZodTypeAny;
-      
+
       // Map command argument types to Zod types
       switch (arg.type) {
         case 'string':
@@ -127,27 +127,35 @@ export class ToolsManager {
         default:
           zodType = z.any();
       }
-      
+
       // Make optional if not required
       if (!arg.required) {
         zodType = zodType.optional();
       }
-      
+
       schema[arg.name] = zodType;
     }
+
     
+    // Create schema for MCP - use raw schema object, let MCP handle the z.object() wrapping
+    let inputSchema: any = undefined;
+    if (Object.keys(schema).length > 0) {
+      // Pass raw schema object, MCP will wrap it properly
+      inputSchema = schema;
+    }
+
     // Register with MCP server
     this.mcpServer.registerTool(
       command.name,
       {
         title: command.name,
         description: command.description,
-        inputSchema: schema
+        inputSchema: inputSchema
       },
-      async (params: Record<string, unknown>) => {
-        const result = await command.execute(params);
+      async (args: { [x: string]: any }, _extra) => {
+        const result = await command.execute(args);
         return {
-          content: [{ type: 'text', text: result.output }],
+          content: [{ type: 'text' as const, text: result.output }],
           structuredContent: { success: result.success }
         };
       }
