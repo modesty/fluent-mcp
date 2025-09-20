@@ -9,7 +9,6 @@ export enum SdkCommandType {
   VERSION = 'version',
   HELP = 'help',
   DEBUG = 'debug',
-  UPGRADE = 'upgrade',
   AUTH = 'auth',
   INIT = 'init',
   BUILD = 'build',

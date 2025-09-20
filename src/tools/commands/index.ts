@@ -4,7 +4,6 @@ export * from './sessionFallbackCommand.js';
 export * from './versionCommand.js';
 export * from './helpCommand.js';
 
-export * from './upgradeCommand.js';
 export * from './authCommand.js';
 export * from './initCommand.js';
 export * from './buildCommand.js';

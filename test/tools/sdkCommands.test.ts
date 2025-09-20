@@ -34,19 +34,6 @@ class MockProcessRunner extends NodeProcessRunner {
         stderr: '',
         exitCode: 0
       };
-    } else if (args.includes('upgrade')) {
-      let output = 'ServiceNow SDK upgraded to latest version';
-      if (args.includes('--check')) {
-        output = 'ServiceNow SDK is up to date';
-      }
-      if (args.includes('--debug')) {
-        output += '\nDebug information: Upgrade process details';
-      }
-      return {
-        stdout: output,
-        stderr: '',
-        exitCode: 0
-      };
     }
 
     return this.mockResult;
@@ -153,24 +140,6 @@ describe('SDK Command Tools', () => {
     // Restore the original run method
     mockRunner.run = originalRun;
   });
-
-  // test('UpgradeCommand should execute correctly with basic upgrade', async () => {
-  //   const upgradeCommand = commands.find((cmd) => cmd.name === 'upgrade_fluent');
-  //   expect(upgradeCommand).toBeDefined();
-
-  //   const result = await upgradeCommand.execute({});
-  //   expect(result.success).toBe(true);
-  //   expect(result.output).toContain('upgraded to latest version');
-  // });
-
-
-  // test('UpgradeCommand should execute correctly with debug option', async () => {
-  //   const upgradeCommand = commands.find((cmd) => cmd.name === 'upgrade_fluent');
-
-  //   const result = await upgradeCommand.execute({ debug: true });
-  //   expect(result.success).toBe(true);
-  //   expect(result.output).toContain('Debug logs');
-  // });
 
   test('Command should handle errors correctly', async () => {
     const versionCommand = commands.find((cmd) => cmd.name === 'get_fluent_version');
