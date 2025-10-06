@@ -4,7 +4,7 @@ To generate ATF (Automated Test Framework) Test in Fluent, ALWAYS start respondi
 // Fluent ATF Test
 import { Test } from '@servicenow/sdk/core'
 import '@servicenow/sdk-core/global'
-  Test({ // all properties are mandatory
+Test({ // all properties are mandatory
   $id: Now.ID[''], // fill in a valid GUID string or the name of the test
   name: 'Fill in a name for the test', // string
   description: 'Fill in a description of the test', // string

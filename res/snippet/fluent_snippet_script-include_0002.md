@@ -1,14 +1,12 @@
 # create a script include to store constants for the app, accessible from all application scopes with caller tracking
 ```typescript
-import { Record } from '@servicenow/sdk/core'
+import { ScriptInclude } from '@servicenow/sdk/core'
 
-Record({
+ScriptInclude({
     $id: Now.ID["test_app_constants_si"],
-    table: "sys_script_include",
-    data: {
-        name: "TestAppConstants",
-        description: "Constants for TestApp",
-        script: `var TestAppConstants = Class.create();
+    name: "TestAppConstants",
+    description: "Constants for TestApp",
+    script: `var TestAppConstants = Class.create();
 
 TestAppConstants.prototype = {
     initialize: function() {
@@ -52,12 +50,11 @@ TestAppConstants.prototype = {
     
     type: 'TestAppConstants'
 };`,
-        access: "public", // accessible from all application scopes
-        callerAccess: '1', // keep track of the caller through cross-scope privileges
-        active: true,
-        clientCallable: false,
-        mobileCallable: false,
-        sandboxCallable: false,
-    }
+    accessibleFrom: "public", // accessible from all application scopes
+    callerAccess: 'tracking', // keep track of the caller through cross-scope privileges
+    active: true,
+    clientCallable: false,
+    mobileCallable: false,
+    sandboxCallable: false,
 })
 ```
