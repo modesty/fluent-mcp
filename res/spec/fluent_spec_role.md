@@ -2,7 +2,6 @@
 ```typescript
 // Creates a new Role (`sys_user_role`)
 Role({ 
-    $id: '', // string | guid, mandatory
     name: '', // string, mandatory
     description: '', // string, mandatory
     assignable_by: '', // string, mandatory

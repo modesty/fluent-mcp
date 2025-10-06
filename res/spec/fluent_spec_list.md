@@ -9,9 +9,6 @@ List({
             element: '', // string, column name of the table
             position: 0, // number, column order
         }
-    ],
-    $meta: { // optional, application metadata
-      installMethod: 'demo | first install ' // string, map the application metadata to an output directory that loads only in specific circumstances. *demo*: Outputs the application metadata to the metadata/unload.demo directory to be installed with the application when the Load demo data option is selected. *first install*: Outputs the application metadata to the metadata/unload directory to be installed only the first time an application is installed on an instance.
-    }
+    ]
 });
 ```
