@@ -16,5 +16,5 @@ atf.form.clickDeclarativeAction({ // all props are mandatory
   declarativeAction: get_sys_id('sys_declarative_action_assignment', ''), // sys_id | Record&lt;'sys_declarative_action_assignment'&gt;
   assert: 'form_submitted_to_server' //'form_submitted_to_server' | 'form_submission_canceled_in_browser' | 'page_reloaded_or_redirected'
   formUI: 'standard_ui', // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace'
-}): { record_id: string; table: string }
+}): { recordId: string; table: string }
 ```

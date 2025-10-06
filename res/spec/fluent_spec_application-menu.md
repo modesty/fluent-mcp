@@ -22,23 +22,23 @@ const applicationSubMenu = Record({
         active: true, //default is true, unless specified to make it inactive
         application: applicationMenu, // applicationMenu object
         assessment: get_sys_id('asmt_metric_type', ''), // String, guid, second paramemter as per user instructions or prompts or devrequest
-        device_type: '', // '' | 'any' | 'browser' | 'mobile'
+        deviceType: '', // '' | 'any' | 'browser' | 'mobile'
         filter: '', // String, conditions applied to list view for visibility in application navigator, Servicenow encoded query
         hint: '', // String, max length is 255 characters
-        link_type: '', // '' | 'SEPARATOR' | 'TIMELINE' | 'DETAIL' | 'HTML' | 'ASSESSMENT' | 'LIST' | 'FILTER' | 'SCRIPT' | 'CONTENT_PAGE' | 'SEARCH' | 'SURVEY' | 'DOC_LINK' | 'NEW' | 'MAP' | 'REPORT' | 'DIRECT'
-        map_page: get_sys_id('cmn_map_page', ''), // String, guid, second paramemter as per user instructions or prompts or devrequest
-        mobile_title: '', // String, max length is 80 characters
-        mobile_view_name: '', // String, max length is 40 characters
+        linkType: '', // '' | 'SEPARATOR' | 'TIMELINE' | 'DETAIL' | 'HTML' | 'ASSESSMENT' | 'LIST' | 'FILTER' | 'SCRIPT' | 'CONTENT_PAGE' | 'SEARCH' | 'SURVEY' | 'DOC_LINK' | 'NEW' | 'MAP' | 'REPORT' | 'DIRECT'
+        mapPage: get_sys_id('cmn_map_page', ''), // String, guid, second paramemter as per user instructions or prompts or devrequest
+        mobileTitle: '', // String, max length is 80 characters
+        mobileViewName: '', // String, max length is 40 characters
         name: '', // table name
         order: 100, // number
-        override_menu_roles: false, // boolean, default false
+        overrideMenuRoles: false, // boolean, default false
         query: '', // String, max length is 3500 characters, is link type arguments
-        require_confirmation: true, // boolean, default is true
+        requireConfirmation: true, // boolean, default is true
         uncancelable: false, // boolean, default is false
-        view_name: '', // String
-        window_name: '', // String
+        viewName: '', // String
+        windowName: '', // String
         report: '', // String
-        timeline_page: get_sys_id('cmn_timeline_page', ''), // String, guid, second paramemter as per user instructions or prompts or devrequest
+        timelinePage: get_sys_id('cmn_timeline_page', ''), // String, guid, second paramemter as per user instructions or prompts or devrequest
     }
 })
 ```

@@ -6,17 +6,17 @@ Record({
     table: 'sys_script_include', // string, must always leave as 'sys_script_include'
     data: {
         name: '', // string, the name of the script include
-        sys_name: '', // string, optional, the system name of the script include. Default is same as name
-        api_name: '', // string, optional, the API path to call the script include. Default is [app_name].[sys_name]
+        sysName: '', // string, optional, the system name of the script include. Default is same as name
+        apiName: '', // string, optional, the API path to call the script include. Default is [app_name].[sysName]
         description: '', // string, optional, short description of the script include
         script: '', // ServiceNow script to fullfil the functional request in scripting,
         access: 'package_private', // string, optional, 'public'|'package_private', 'public' if the script include is accessible from all application scopes, 'package_private' if accessible from this application scope only
-        caller_access: '', // string, optional, '1' for caller tracking, '2' for caller restriction, '' for none
+        callerAccess: '', // string, optional, '1' for caller tracking, '2' for caller restriction, '' for none
         active: true, // boolean, optional, default true
-        client_callable: false, // boolean, optional, whether Glide AJAX is enabled, default false
-        mobile_callable: false, // boolean, optional, whether the script include is callable from mobile, default false
-        sandbox_callable: false, // boolean, optional, whether the script include is callable from sandbox, default false
-        sys_policy: '', // string, optional, protection policy: ''|'read'|'protected', 'read' for read-only, 'protected' for protected
+        clientCallable: false, // boolean, optional, whether Glide AJAX is enabled, default false
+        mobileCallable: false, // boolean, optional, whether the script include is callable from mobile, default false
+        sandboxCallable: false, // boolean, optional, whether the script include is callable from sandbox, default false
+        sysPolicy: '', // string, optional, protection policy: ''|'read'|'protected', 'read' for read-only, 'protected' for protected
     },
 })
 ```

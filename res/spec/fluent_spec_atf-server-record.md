@@ -8,7 +8,7 @@ atf.server.recordQuery({ // all props are mandatory
   enforceSecurity: false, // boolean;
   assert: 'records_match_query', // 'records_match_query' | 'no_records_match_query';
 }): { table: string; 
-    first_record: string; // sys_id of the first record
+    firstRecord: string; // sys_id of the first record
 };
 
 // Validates that a given record meets the specified conditions on the server-side.
@@ -29,7 +29,7 @@ atf.server.recordInsert({ // all props are mandatory
   assert: '', // 'record_successfully_inserted' | 'record_not_inserted';
   enforceSecurity: false, // boolean;
 }): { table: string; 
-  record_id: string; // sys_id of the new record
+  recordId: string; // sys_id of the new record
 };
 
 // Changes field values of a record on the server.

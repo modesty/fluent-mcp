@@ -9,7 +9,7 @@ atf.server.searchForCatalogItem({ // all props are mandatory
     category: get_sys_id('sc_category', ''), // sys_id | Record&lt;'sc_category'&gt;;
     assertItem: get_sys_id('sc_cat_item', ''), // sys_id | Record&lt;'sc_cat_item'&gt;;
     assert: '', // 'assert_item_present' | 'assert_item_not_present';
-}): { catalog_item_id: string; };
+}): { catalogItemId: string; };
 
 // Checkout the Shopping Cart and generates a new request.
 atf.server.checkoutShoppingCart({ // all props are mandatory
@@ -18,14 +18,14 @@ atf.server.checkoutShoppingCart({ // all props are mandatory
     requestedFor: get_sys_id('sys_user', ''), // sys_id | Record&lt;'sys_user'&gt;
     deliveryAddress: '123 main st', // string
     specialInstructions: 'none', // string
-}): { request_id: string; };
+}): { requestId: string; };
 
 // Replays a previously created request item with the same values and options.
 atf.server.replayRequestItem({ 
     $id: Now.ID[''], // string | guid, mandatory
-    request_item: get_sys_id('sc_req_item', ''), // sys_id | Record&lt;'sc_req_item'&gt;;
-}): { 
-    table: string; 
-    req_item: sys_id | Record&lt;'sc_req_item'&gt;;
+    requestItem: get_sys_id('sc_req_item', ''), // sys_id | Record&lt;'sc_req_item'&gt;;
+}): {
+    table: string;
+    reqItem: sys_id | Record&lt;'sc_req_item'&gt;;
 };
 ```

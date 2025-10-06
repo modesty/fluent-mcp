@@ -27,7 +27,7 @@ atf.email.generateInboundEmail({
   to: '', 
   subject: '',
   body: '' 
-}): { output_email_record: ''};
+}): { outputEmailRecord: ''};
 
 // generates an Email [sys_email] record that looks like an email sent in reply to a system notification. This step also creates an email.read event upon step completion.
 atf.email.generateInboundReplyEmail({
@@ -38,11 +38,11 @@ atf.email.generateInboundReplyEmail({
   body: '',
   from: '',
   to: '',
-}): { output_reply_email_record: ''}; // recordId of the inbound reply email
+}): { outputReplyEmailRecord: ''}; // recordId of the inbound reply email
 
 // Generates a string that can be used as test data for another test step. By default, the string is 10 characters long. The maximum length of the string is 10,000 characters.
 atf.email.generateRandomString({ 
   $id: Now.ID[''], // string | guid, mandatory
   length: 1024, // number
-}): { random_string: '' };
+}): { randomString: '' };
 ```
