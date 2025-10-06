@@ -20,7 +20,7 @@ Test({
   })
   atf.server.log({
     $id: 'step_2_ghijkl',
-    log: `Found catalog item: ${searchResult.catalog_item_id}`
+    log: `Found catalog item: ${searchResult.catalogItemId}`
   })
 })
 ```

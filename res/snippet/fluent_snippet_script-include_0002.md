@@ -53,11 +53,11 @@ TestAppConstants.prototype = {
     type: 'TestAppConstants'
 };`,
         access: "public", // accessible from all application scopes
-        caller_access: '1', // keep track of the caller through cross-scope privileges
+        callerAccess: '1', // keep track of the caller through cross-scope privileges
         active: true,
-        client_callable: false,
-        mobile_callable: false,
-        sandbox_callable: false,
+        clientCallable: false,
+        mobileCallable: false,
+        sandboxCallable: false,
     }
 })
 ```

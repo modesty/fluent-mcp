@@ -8,12 +8,12 @@ Record({
     data: {
         name: 'Submit',
         table: 'incident',
-        action_name: 'sysverb_insert',
+        actionName: 'sysverb_insert',
         active: true,
         client: true,
-        ui16_compatible: true,
-        format_for_configurable_workspace: true,
-        client_script_v2: `function onClickFunction() {
+        ui16Compatible: true,
+        formatForConfigurableWorkspace: true,
+        clientScriptV2: `function onClickFunction() {
     // Display info message
     g_form.addInfoMessage("Dummy function call for onlick action");
     // Return false to prevent default action
@@ -24,8 +24,8 @@ Record({
         hint: 'Test hint on mouse hover',
         messages: 'Test message on mouse hover',
         onclick: 'onClickFunction()',
-        sys_overrides: '',
-        sys_policy: 'read',
+        sysOverrides: '',
+        sysPolicy: 'read',
     },
 })
 ```

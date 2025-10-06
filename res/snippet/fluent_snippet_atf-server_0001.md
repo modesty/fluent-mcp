@@ -28,14 +28,14 @@ Test({
     fieldValues: {
       "short_description": "test update field from text2fluent"
     },
-    recordId: newIncident.record_id,
+    recordId: newIncident.recordId,
     assert: 'record_successfully_updated',
     enforceSecurity: false,
   })
   atf.server.recordDelete({
     $id: 'step_4_def123',
     table: "incident",
-    recordId: newIncident.record_id,
+    recordId: newIncident.recordId,
     enforceSecurity: false,
     assert: 'record_successfully_deleted',
   })

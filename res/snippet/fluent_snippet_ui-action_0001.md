@@ -8,7 +8,7 @@ Record({
     data: {
         name: 'Submit',
         table: 'incident',
-        action_name: 'sysverb_insert',
+        actionName: 'sysverb_insert',
         comments: 'test comment',
         condition: 'gs.hasRole("admin");',
         hint: 'Test hint on mouse hover',

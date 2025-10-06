@@ -9,10 +9,10 @@ Record({
 		name: 'weekly scheduled script execution',
 		active: true,
 		conditional: false,
-		run_type: 'weekly',
-		run_dayofweek: 4,
-		time_zone: 'US/Mountain',
-		run_time: '2025-03-13 21:00:00',
+		runType: 'weekly',
+		runDayofweek: 4,
+		timeZone: 'US/Mountain',
+		runTime: '2025-03-13 21:00:00',
 		script: `// Create a new priority 1 incident
 var gr = new GlideRecord("incident");
 gr.initialize();

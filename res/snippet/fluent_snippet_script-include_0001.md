@@ -50,9 +50,9 @@ RoleChecker.prototype = {
 };`,
         access: "package_private", // accessible from this application scope only
         active: true,
-        client_callable: false,
-        mobile_callable: false,
-        sandbox_callable: false,
+        clientCallable: false,
+        mobileCallable: false,
+        sandboxCallable: false,
     }
 })
 ```

@@ -35,7 +35,7 @@ Test({
     atf.form.openExistingRecord({
         $id: Now.ID['006'],
         table: "incident",
-        recordId: outputOfSubmit.record_id,
+        recordId: outputOfSubmit.recordId,
         formUI: 'standard_ui',
         view: '',
         selectedTabIndex: 0

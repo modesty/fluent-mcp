@@ -14,18 +14,18 @@ Record({
     return false;
 }`,
         table: 'incident',
-        action_name: 'sysverb_insert',
+        actionName: 'sysverb_insert',
         active: true,
         client: true,
-        ui16_compatible: true,
-        format_for_configurable_workspace: true,
+        ui16Compatible: true,
+        formatForConfigurableWorkspace: true,
         comments: 'test comment',
         condition: 'gs.hasRole("admin");',
         hint: 'Test hint on mouse hover',
         messages: 'Test message on mouse hover',
         onclick: 'onClickFunction()',
-        sys_overrides: '',
-        sys_policy: 'read',
+        sysOverrides: '',
+        sysPolicy: 'read',
     },
 })
 ```

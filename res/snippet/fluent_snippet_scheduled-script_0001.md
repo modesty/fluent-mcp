@@ -9,9 +9,9 @@ Record({
 		name: 'daily scheduled script execution',
 		active: true,
 		conditional: false,
-		run_type: 'daily',
-		time_zone: 'GMT',
-		run_time: '1970-01-01 15:00:00',
+		runType: 'daily',
+		timeZone: 'GMT',
+		runTime: '1970-01-01 15:00:00',
 		script: `// Set the property to indicate the job has run
 gs.setProperty("scheduled_job_ran_1", "true");
 

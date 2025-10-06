@@ -10,7 +10,7 @@ export const business_calendar_group = Table({
         description: TranslatedTextColumn({}),
         sys_domain: DomainIdColumn({
             label: 'Domain',
-            read_only: true,
+            readOnly: true,
             plural: 'Domains',
             hint: 'Domain to which the Business Calendar Group belongs',
             default: 'global',

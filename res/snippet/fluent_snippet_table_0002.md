@@ -14,14 +14,14 @@ export const sys_formula_function = Table({
     schema: {
         name: StringColumn({ label: 'Name', mandatory: true, maxLength: 255 }),
         internal_name: StringColumn({
-            read_only: true,
+            readOnly: true,
             attributes: { update_exempt: true },
             mandatory: true,
             virtual_type: 'script',
             maxLength: 255,
-            dynamic_value_definitions: {
+            dynamicValueDefinitions: {
                 type: 'calculated_value',
-                calculated_value: script`
+                calculatedValue: script`
              answer = (function() {
               var scope = current.sys_scope.scope;
               if (scope.nil())
@@ -52,8 +52,8 @@ export const sys_formula_function = Table({
         }),
         short_description: StringColumn({ label: 'Short description', mandatory: true, maxLength: 255 }),
         description: TranslatedTextColumn({ label: 'Description' }),
-        system: BooleanColumn({ label: 'System Function', read_only: true, default: 'false' }),
-        script: GenericColumn({ label: 'Script', column_type: 'script_plain' }),
+        system: BooleanColumn({ label: 'System Function', readOnly: true, default: 'false' }),
+        script: GenericColumn({ label: 'Script', columnType: 'script_plain' }),
         access: ChoiceColumn({
             label: 'Accessible from',
             dropdown: 'dropdown_without_none',

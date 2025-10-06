@@ -6,28 +6,28 @@ import { CrossScopePrivilege } from '@servicenow/sdk/core'
 
 CrossScopePrivilege({
     $id: Now.ID['setValue'],
-    target_name: 'GlideRecord.setValue',
-    target_scope: 'global',
+    targetName: 'GlideRecord.setValue',
+    targetScope: 'global',
     status: 'allowed',
-    target_type: 'scriptable',
+    targetType: 'scriptable',
     operation: 'execute',
 })
 
 CrossScopePrivilege({
     $id: Now.ID['update'],
-    target_name: 'GlideRecord.update',
-    target_scope: 'global',
+    targetName: 'GlideRecord.update',
+    targetScope: 'global',
     status: 'allowed',
-    target_type: 'scriptable',
+    targetType: 'scriptable',
     operation: 'execute',
 })
 
 CrossScopePrivilege({
     $id: Now.ID['delete'],
-    target_name: 'GlideRecord.deleteRecord',
-    target_scope: 'global',
+    targetName: 'GlideRecord.deleteRecord',
+    targetScope: 'global',
     status: 'allowed',
-    target_type: 'scriptable',
+    targetType: 'scriptable',
     operation: 'execute',
 })
 ```

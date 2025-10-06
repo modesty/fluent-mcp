@@ -6,7 +6,7 @@ import { RestApi } from '@servicenow/sdk/core'
 RestApi({
     $id: Now.ID['fluent_sample_rest_api'],
     name: 'rest api fluent sample',
-    service_id: 'restapi_hello',
+    serviceId: 'restapi_hello',
     consumes: 'application/json',
     routes: [
         {
