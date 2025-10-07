@@ -24,8 +24,12 @@ jest.mock("../../src/utils/resourceLoader.js", () => {
   // Create a mock implementation with controlled behavior
   const mockGetAvailableMetadataTypes = jest.fn().mockResolvedValue([
     "business-rule",
+    "script-action",
     "script-include",
-    "table"
+    "service-portal",
+    "table",
+    "ui-action",
+    "ui-page"
   ]);
   
   const mockGetResource = jest.fn().mockImplementation((resourceType, metadataType, id) => {
@@ -72,8 +76,12 @@ describe("ResourceManager", () => {
     await resourceManager.initialize();
     expect(resourceManager.getMetadataTypes()).toEqual([
       "business-rule",
+      "script-action",
       "script-include",
-      "table"
+      "service-portal",
+      "table",
+      "ui-action",
+      "ui-page"
     ]);
   });
   
@@ -81,20 +89,20 @@ describe("ResourceManager", () => {
     await resourceManager.initialize();
     const resources = await resourceManager.listResources();
     
-    // Should have 3 metadata types * (1 spec + 1 instruct + 1 snippet) = 9 resources
-    expect(resources.length).toBe(9);
+    // Should have 7 metadata types * (1 spec + 1 instruct + 1 snippet) = 21 resources
+    expect(resources.length).toBe(21);
     
     // Check for spec resources
     const specResources = resources.filter(r => r.uri.startsWith('sn-spec://'));
-    expect(specResources.length).toBe(3);
+    expect(specResources.length).toBe(7);
     
     // Check for instruction resources
     const instructResources = resources.filter(r => r.uri.startsWith('sn-instruct://'));
-    expect(instructResources.length).toBe(3);
+    expect(instructResources.length).toBe(7);
     
     // Check for snippet resources
     const snippetResources = resources.filter(r => r.uri.startsWith('sn-snippet://'));
-    expect(snippetResources.length).toBe(3);
+    expect(snippetResources.length).toBe(7);
     
     // Check that each resource has the required properties
     resources.forEach(resource => {

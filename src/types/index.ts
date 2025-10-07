@@ -33,10 +33,13 @@ export enum ServiceNowMetadataType {
   PROPERTY = 'property',
   ROLE = 'role',
   SCHEDULED_SCRIPT = 'scheduled-script',
+  SCRIPT_ACTION = 'script-action',
   SCRIPT_INCLUDE = 'script-include',
   SCRIPTED_REST = 'scripted-rest',
+  SERVICE_PORTAL = 'service-portal',
   TABLE = 'table',
   UI_ACTION = 'ui-action',
+  UI_PAGE = 'ui-page',
   USER_PREFERENCE = 'user-preference',
 }
 
