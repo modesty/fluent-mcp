@@ -5,7 +5,7 @@ import { BusinessRule } from '@servicenow/sdk/core'
 export default BusinessRule({
     $id: Now.ID['update_rca_business_rule'],
     action: ['update', 'insert'],
-    filter_condition: 'rca!=NULL',
+    filterCondition: 'rca!=NULL',
     script: `(function executeRule(current, previous /*null when async*/) {
     // Check if the user is an admin
     if (gs.hasRole('admin')) {
@@ -21,8 +21,8 @@ export default BusinessRule({
     order: 100,
     when: 'after',
     active: true,
-    add_message: false,
-    abort_action: false,
+    addMessage: false,
+    abortAction: false,
 })
 
 ```

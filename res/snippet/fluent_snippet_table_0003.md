@@ -17,7 +17,7 @@ export const sys_data_ob_configuration = Table({
             attributes: { fieldChoicesScript: 'DataObserverChoiceFields', show_field_names_on_label: true },
             mandatory: true,
             hint: 'The field to observe',
-            dynamic_value_definitions: { type: 'dependent_field', column_name: 'table' },
+            dynamicValueDefinitions: { type: 'dependent_field', columnName: 'table' },
         }),
         active: BooleanColumn({ default: 'true' }),
         start_job_immediately: BooleanColumn({ label: 'Start job immediately', default: 'false' }),

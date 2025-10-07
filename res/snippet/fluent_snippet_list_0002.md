@@ -4,7 +4,6 @@ import { List, Record } from '@servicenow/sdk/core'
 
 // Define the custom view
 const app_task_view = Record({
-    $id: Now.ID['app_task_view'],
     table: 'sys_ui_view',
     data: {
          name: 'app_task_view',

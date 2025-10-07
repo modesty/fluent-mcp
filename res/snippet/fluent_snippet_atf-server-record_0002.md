@@ -80,7 +80,7 @@ Test({
   atf.form.openExistingRecord({
     $id: Now.ID['0008'],
     table: 'asmt_metric_type',
-    recordId: templateCategoryRecord.record_id,
+    recordId: templateCategoryRecord.recordId,
     formUI: 'standard_ui',
     view: '',
     selectedTabIndex: 0

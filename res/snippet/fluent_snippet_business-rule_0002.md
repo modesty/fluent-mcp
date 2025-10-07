@@ -6,7 +6,7 @@ import { BusinessRule } from '@servicenow/sdk/core'
 export default BusinessRule({
     $id:  Now.ID['set_state_business_rule'],
     action: ['update'],
-    filter_condition: 'state=3^parent.category=invoice_automation^parent.sub_category=invoice_exceptions',
+    filterCondition: 'state=3^parent.category=invoice_automation^parent.sub_category=invoice_exceptions',
     script: `(function executeRule(current, previous /*null when async*/) {
     // Check if there's a parent case
     if (current.parent) {
@@ -32,7 +32,7 @@ export default BusinessRule({
     order: 100,
     when: 'async',
     active: true,
-    add_message: false,
-    abort_action: false,
+    addMessage: false,
+    abortAction: false,
 })
 ```

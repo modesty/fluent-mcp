@@ -34,7 +34,7 @@ const applicationSubMenu = Record({
         title: 'Scheduled Notifications',
         application: applicationMenu,
         active: true,
-        link_type: 'DIRECT',
+        linkType: 'DIRECT',
         query: 'sys_trigger_list.do?sysparm_query=job_id.handler_classSTARTSWITHcom.snc.pa.%5EORsys_id%3Da51441d1d70022004cd2a3b20e61039a%5EORDERBYnext_action'
     },
 })

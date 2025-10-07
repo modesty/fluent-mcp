@@ -10,9 +10,9 @@ Record({
 		name: 'Daily Hello Job',
 		active: true,
 		conditional: false,
-		run_type: 'daily',
-		time_zone: 'US/Pacific',
-		run_time: '2025-03-13 08:00:00',
+		runType: 'daily',
+		timeZone: 'US/Pacific',
+		runTime: '2025-03-13 08:00:00',
 		script: `// Display info message
 gs.info("Hello from Fluent Scheduled Job");
 

@@ -35,10 +35,10 @@ const applicationSubMenu = Record({
         application: applicationMenu,
         active: true,
         hint: 'Sub menu under Application Security',
-        link_type: 'MAP',
-        map_page: 'get_sys_id("cmn_map_page", "Critical incidents")',
-        override_menu_roles: false,
-        require_confirmation: false,
+        linkType: 'MAP',
+        mapPage: 'get_sys_id("cmn_map_page", "Critical incidents")',
+        overrideMenuRoles: false,
+        requireConfirmation: false,
         uncancelable: false
     },
 })

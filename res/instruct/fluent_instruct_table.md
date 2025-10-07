@@ -7,7 +7,7 @@ Always reference the Table API to create Table (Dictionary) for more details.
 5. The `index` takes an array of column names to generate indexes in bootstrap.xml. To specify a composite index, add multiple column names to 'element' array.
 6. Columns are specified as additional function calls within the Table API on the `schema` key. The `name` field is taken from the variable name or object key provided to the Table API.
 7. For creating attributes refer to the provided attributes in the table spec.
-8. Here are valid `function_definition` functions that Column objects can use: [ 
+8. Here are valid `functionDefinition` functions that Column objects can use: [ 
     'add',
     'coalesce',
     'concat',

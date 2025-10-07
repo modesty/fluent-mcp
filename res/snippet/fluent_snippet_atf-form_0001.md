@@ -29,7 +29,7 @@ Test({
   atf.form.openExistingRecord({
     $id: 'step_4_fedcba',
     table: "incident",
-    recordId: outputOfSubmit.record_id,
+    recordId: outputOfSubmit.recordId,
     formUI: 'cmdb_workspace',
     view: '',
     selectedTabIndex: 0

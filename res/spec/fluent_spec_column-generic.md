@@ -1,35 +1,36 @@
-#**Context:** Generic Column API spec: Used to create a new Generic Column (`sys_dictionary`) in a Table schema at ServiceNow, Column is also referenced as Field in ServiceNow. This API is closely related to the Table API for its schema property definition.
+# **Context:** Generic Column API spec: Used to create a new Generic Column (`sys_dictionary`) in a Table schema at ServiceNow, Column is also referenced as Field in ServiceNow. This API is closely related to the Table API for its schema property definition.
+
 ```typescript
 GenericColumn({
-	active: false, // boolean
-	attributes: {}, // object, snake_case name value pairs, see attribute list
-	audit: false, // boolean
-	choices: {}, // object, snake_case name value pairs, for example { choice_1: { label: 'Choice1' }, choice_2: { label: 'Choice2' } }
-	column_type: '', // see internal_types list, mandatory
-	default: '', // string
-	dropdown: 'none', // 'none' | 'dropdown_with_none' | 'suggestion' | 'dropdown_without_none'
-	dynamic_value_definitions: {}, // object, see dynamic_value_definition examples  
-	function_definition: `glidefunction:${""}`, // string, definition of a function that the field performs, such as a mathematical operation, field length computation, or day of the week calculation
-	label: '', // string or array of Documentation object
-	mandatory: false, // boolean
-	maxLength: 0, // number
-	read_only: false // boolean
+ active: false, // boolean
+ attributes: {}, // object, snake_case name value pairs, see attribute list
+ audit: false, // boolean
+ choices: {}, // object, snake_case name value pairs, for example { choice_1: { label: 'Choice1' }, choice_2: { label: 'Choice2' } }
+ columnType: '', // see internal_types list, mandatory
+ default: '', // string
+ dropdown: 'none', // 'none' | 'dropdown_with_none' | 'suggestion' | 'dropdown_without_none'
+ dynamicValueDefinitions: {}, // object, see dynamic_value_definition examples  
+ functionDefinition: `glidefunction:${""}`, // string, definition of a function that the field performs, such as a mathematical operation, field length computation, or day of the week calculation
+ label: '', // string or array of Documentation object
+ mandatory: false, // boolean
+ maxLength: 0, // number
+ readOnly: false // boolean
 }): GenericColumn // returns a GenericColumn object
 
 // dynamic_value_definition examples
 const example1 = dynamic_value_definitions: {
    type: "dynamic_default", // constant, mandatory
-   dynamic_default: '' // string, function from sys_filter_option_dynamic table, mandatory
+   dynamicDefault: '' // string, function from sys_filter_option_dynamic table, mandatory
 };
 
 const example2 = dynamic_value_definitions: {
    type: "dependent_field", // constant, mandatory
-   column_name: get_column_name("") // string, column name from the same table, mandatory
+   columnName: get_column_name("") // string, column name from the same table, mandatory
 }
 
 const example3 = dynamic_value_definitions: {
    type: "calculated_value", // constant, mandatory
-   calculated_value: '' // string, function for calculating the value, mandatory
+   calculatedValue: '' // string, function for calculating the value, mandatory
 }
 
 const example4 = dynamic_value_definitions: {

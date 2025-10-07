@@ -4,7 +4,7 @@ To generate ATF (Automated Test Framework) Test in Fluent, ALWAYS start respondi
 // Fluent ATF Test
 import { Test } from '@servicenow/sdk/core'
 import '@servicenow/sdk-core/global'
-  Test({ // all properties are mandatory
+Test({ // all properties are mandatory
   $id: Now.ID[''], // fill in a valid GUID string or the name of the test
   name: 'Fill in a name for the test', // string
   description: 'Fill in a description of the test', // string
@@ -32,14 +32,14 @@ import '@servicenow/sdk-core/global'
   // atf.form.openExistingRecord({
   //   $id: Now.ID['0004'], // id the test step in the test suite
   //   table: 'incident',
-  //   recordId: outputOfSubmit.record_id, // use the declared variable to fill in value
+  //   recordId: outputOfSubmit.recordId, // use the declared variable to fill in value
   //   formUI: 'service_operations_workspace',
   //   view: '',
   //   selectedTabIndex: 0,
   // })
   // atf.server.log({
   //   $id: Now.ID['0005'], // id the test step in the test suite
-  //   log: `record opened: ${outputOfSubmit.record_id}` // explicitly use ${} for embedding function calls or variables in strings Template Literals
+  //   log: `record opened: ${outputOfSubmit.recordId}` // explicitly use ${} for embedding function calls or variables in strings Template Literals
   // })
   // Additional steps...
 })

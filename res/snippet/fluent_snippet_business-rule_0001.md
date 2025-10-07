@@ -9,8 +9,8 @@ BusinessRule({
     order: 100,
     when: 'before',
     active: true,
-    add_message: false,
-    abort_action: false,
+    addMessage: false,
+    abortAction: false,
     script: `(function executeRule(current, previous /*null when async*/) {
     // Get the field selected from the current record
     var selectedField = current.getValue('field');

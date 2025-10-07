@@ -10,8 +10,8 @@ Record({
 		active: true,
 		conditional: true,
 		condition: `gs.getProperty('scheduled_job_2_ran') === 'false'`,
-		run_type: 'once',
-		run_start: '2025-03-13 12:00:00',
+		runType: 'once',
+		runStart: '2025-03-13 12:00:00',
 		script: `// Set the property to indicate the job has run
 gs.setProperty("scheduled_job_ran_2", "true");
 

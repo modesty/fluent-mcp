@@ -9,8 +9,8 @@ Record({
 		name: 'quarterly scheduled script execution',
 		active: true,
 		conditional: false,
-		run_type: 'business_calendar_start',
-		business_calendar: get_sys_id('business_calendar', 'calendar_name=Quarter^ORlabel=Quarter'),
+		runType: 'business_calendar_start',
+		businessCalendar: get_sys_id('business_calendar', 'calendar_name=Quarter^ORlabel=Quarter'),
 		script: `// Log the message that the job has started
 gs.log("started scheduled job five", "ScheduledJobFive");
 

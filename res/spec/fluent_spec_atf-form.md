@@ -24,7 +24,7 @@ atf.form.submitForm({ // all props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
   assert: '', // '' | 'form_submitted_to_server' | 'form_submission_canceled_in_browser'
   formUI: 'standard_ui', // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace'
-}): { table: string; record_id: string };
+}): { table: string; recordId: string };
 
 // Clicks a button within a modal in the specified Form UI
 atf.form.clickModalButton({ // all props are mandatory
@@ -62,6 +62,6 @@ atf.form.clickUIAction({ // all props are mandatory
   uiAction: get_sys_id('sys_ui_action', ''), // sys_id | Record&lt;'sys_ui_action'&gt;
   declarativeAction: get_sys_id('sys_declarative_action_assignment', ''), // sys_id | Record&lt;'sys_declarative_action_assignment'&gt;
   assert: 'form_submitted_to_server' // 'form_submitted_to_server' | 'form_submission_canceled_in_browser' | 'page_reloaded_or_redirected'
-}): { record_id: string; table: string }
+}): { recordId: string; table: string }
 
 ```

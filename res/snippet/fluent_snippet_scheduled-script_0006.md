@@ -9,9 +9,9 @@ Record({
 		name: 'periodic scheduled script execution',
 		active: true,
 		conditional: false,
-		run_type: 'periodically',
-		run_start: '2025-03-13 00:00:00',
-		run_period: '1970-01-02 12:00:00',
+		runType: 'periodically',
+		runStart: '2025-03-13 00:00:00',
+		runPeriod: '1970-01-02 12:00:00',
 		script: `// Log the message when the job runs
 gs.log("started scheduled job six", "ScheduledJobSix");
 

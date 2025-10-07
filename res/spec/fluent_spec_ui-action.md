@@ -1,51 +1,72 @@
-#**Context:** UI Action spec: define UI Actions [sys_ui_action] to enhance interactivity and customization in user interfaces. UI Actions include buttons, context menu items and related links of forms.
+#**Context:** UI Action API spec: define UI Actions [sys_ui_action] to enhance interactivity and customization in user interfaces. UI Actions include buttons, context menu items and related links on forms and lists. Use the dedicated `UiAction` construct for cleaner, type-safe UI Action definitions.
+
 ```typescript
-// Creates a new UI Action (`sys_ui_action`)
-const uiAction = Record({
-    $id: '', // string | guid, mandatory
-    table: 'sys_ui_action', // string, mandatory, should always be 'sys_ui_action'
-    data: {
-        name: '', // string, mandatory
-        script: '', // ServiceNow script to fullfil the functional request in scripting, // string, inline ServiceNow client side scripting, function to be referenced for onClick action for workspace form button and workspace form menu. The script is based on devrequest. Example of function definition
-        	/*
-        		function onClickFunction(g_form) {}
-        	*/
-        table: '', // string, mandatory
-        action_name: '', // string, mandatory , should always begin with 'sysverb_'
-        active: true, //boolean
-        client: false, //boolean. Default is false. Set to true only when onclick function specified
-        form_action: false, // boolean
-        form_button: false, // boolean
-        form_button_v2: false, // boolean
-        form_context_menu: false, // boolean
-        form_link: false, // boolean
-        form_menu_button_v2: false, // boolean
-        format_for_configurable_workspace: false, // boolean
-        isolate_script: false, // boolean
-        list_action: false, // boolean
-        list_banner_button: false, // boolean
-        list_button: false, // boolean
-        list_choice: false, // boolean
-        list_context_menu: false, // boolean
-        list_link: false, // boolean
-        list_save_with_form_button: false, // boolean
-        show_insert: false, // boolean
-        show_multiple_update: false, // boolean
-        show_query: false, // boolean
-        show_update: false, // boolean
-        ui16_compatible: false, // boolean
-        client_script_v2: '', // ServiceNow script to fullfil the functional request in scripting, // string, inline ServiceNow client side scripting, function to be referenced for onClick action. The script is based on devrequest. Example of function deinifition
-            /*
-                function onClickFunction(g_form) {}
-            */
-        comments: '', // string, max length is 4000 characters
-        condition: '', // String, max length 254 characters, condition string is inline glide scripting expression or logic, ex: current.active == true && current.type == 'internal' && new sn_ais.StatusApi().isAisEnabled() 
-        hint: '', // string, max length is 254 characters
-        messages: '', //string, max length is 4000 characters
-        onclick: '', // a referenced function defined in current module under client_script_v2 or script, based on devrequest. eg. onClickFunction() 
-        sys_overrides: '', // string | guid
-        order: 100, // Integer, default is 100
-        sys_policy: '', //string, 'read' | 'protected'. This is the protection policy.
+import { UiAction } from '@servicenow/sdk/core';
+
+// Creates a new UI Action (`sys_ui_action`) using the UiAction construct
+UiAction({
+    $id: '', // string | guid, mandatory - Unique identifier for the UI Action
+    table: '', // string, mandatory - Table on which UI Action appears
+    name: '', // string, mandatory - Name of the UI Action. It must be unique within the table
+    actionName: '', // string, optional - Unique string that can be referenced in scripts
+    active: true, // boolean, optional - If true, the UI Action is enabled
+    
+    // UI action on form view and related properties
+    form: { // object, optional - UI action on form view and related properties
+        showButton: false, // boolean, optional - Display as form button
+        showLink: false, // boolean, optional - Display as form link
+        showContextMenu: false, // boolean, optional - Display in form context menu
+        style: '', // string, optional - 'primary' | 'destructive' | 'unstyled'
     },
-})
+    
+    // UI action on list view and related properties
+    list: { // object, optional - UI action on list view and related properties
+        showButton: false, // boolean, optional - Display as list button
+        showLink: false, // boolean, optional - Display as list link
+        showContextMenu: false, // boolean, optional - Display in list context menu
+        style: '', // string, optional - 'primary' | 'destructive' | 'unstyled'
+        showListChoice: false, // boolean, optional - Display in list choice menu
+        showBannerButton: false, // boolean, optional - Display as banner button on list
+        showSaveWithFormButton: false, // boolean, optional - Display as save with form button
+    },
+    
+    // Client side script and related properties
+    client: { // object, optional - Client side script and related properties
+        isClient: false, // boolean, optional - Set to true when using client-side script
+        isUi11Compatible: false, // boolean, optional - Compatible with UI11 (List V2)
+        isUi16Compatible: false, // boolean, optional - Compatible with UI16/Next Experience (List V3)
+        onClick: '', // string, optional - Client-side function to execute on click
+    },
+    
+    // UI action on workspace configuration and related properties
+    workspace: { // object, optional - UI action on workspace configuration and related properties
+        isConfigurableWorkspace: false, // boolean, optional - Enable for configurable workspace
+        showFormButtonV2: false, // boolean, optional - Display as workspace form button
+        showFormMenuButtonV2: false, // boolean, optional - Display as workspace form menu button
+        clientScriptV2: '', // string, optional - Client-side script for workspace
+    },
+    
+    // Display conditions - Control when UI Action is visible
+    showInsert: false, // boolean, optional - Checked, the UI Action appears in insert
+    showUpdate: false, // boolean, optional - Checked, the UI Action appears in update
+    showQuery: false, // boolean, optional - Checked, the UI Action appears in insert, update, query or update multiple(bulk edit) mode
+    showMultipleUpdate: false, // boolean, optional - Checked, the UI Action appears in insert, update, query or update multiple(bulk edit) mode
+    
+    // Scripts and conditions
+    condition: '', // string, optional - A script or condition that determines whether the UI Action is visible
+    script: '', // string | function, optional - Script runs automatically as part of the UI Action when the client calls it
+        // Note: server module scripts (sys_module) can only be used on server-side UI Actions
+        // Example: function(current) { gs.addInfoMessage('Action executed'); }
+    
+    // Additional properties
+    comments: '', // string, optional - Text field used by developers and admins to add internal notes
+    messages: [], // string[], optional - Messages field holds user facing messages or notification text that the UI Action may display when it executes
+    hint: '', // string, optional - A tooltip or hover text that appears when users hover their mouse pointer over
+    order: 100, // number, optional - Determines the order in which the UI Action appears. Lower values show first
+    isolateScript: false, // boolean, optional - Checked, script in a UI Action runs in an isolated script
+    overrides: '', // string | Record<'sys_ui_action'>, optional - Action being overridden by the current record
+    roles: [], // (string | Role)[], optional - Stores roles associated with a UI Action, defining which users can see or execute that UI Action based on their roles
+    includeInViews: [], // string[], optional - Specifies views in which UI action to be included
+    excludeFromViews: [], // string[], optional - Specifies views from which UI action to be excluded
+}): UiAction; // returns a UiAction object
 ```

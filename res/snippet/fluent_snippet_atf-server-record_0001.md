@@ -22,7 +22,7 @@ Test({
     $id: Now.ID['0002'],
     table: 'change_request',
     fieldValues: {
-      'cmdb_ci': cmdbCiInsert.record_id,
+      'cmdb_ci': cmdbCiInsert.recordId,
       'planned_start_date': '2019-07-25 05:30:00',
       'planned_end_date': '2019-07-25 05:40:00',
       'short_description': 'CI Already Scheduled'
@@ -36,7 +36,7 @@ Test({
     $id: Now.ID['0003'],
     table: 'change_request',
     fieldValues: {
-      'cmdb_ci': cmdbCiInsert.record_id,
+      'cmdb_ci': cmdbCiInsert.recordId,
       'planned_start_date': '2019-07-25 05:30:00',
       'planned_end_date': '2019-07-25 05:40:00',
       'short_description': 'CI Already Scheduled'
@@ -49,7 +49,7 @@ Test({
   atf.server.recordQuery({
     $id: Now.ID['0004'],
     table: 'conflict',
-    fieldValues: `change=${changeRequestInsert2.record_id}^type=CI Already Scheduled`,
+    fieldValues: `change=${changeRequestInsert2.recordId}^type=CI Already Scheduled`,
     enforceSecurity: false,
     assertType: 'records_match_query',
   })

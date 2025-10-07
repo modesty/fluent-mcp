@@ -29,7 +29,7 @@ Test({
   atf.form.openExistingRecord({
     $id: Now.ID['0003'],
     table: 'change_request', // Open the 'Change Request' form
-    recordId: insertedRecord.record_id,
+    recordId: insertedRecord.recordId,
     formUI: 'standard_ui',
     view: '',
     selectedTabIndex: 0

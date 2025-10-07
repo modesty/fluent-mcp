@@ -6,7 +6,7 @@ import { BusinessRule } from '@servicenow/sdk/core'
 BusinessRule({
     $id: '1a9b33736be23010bc5bffcd1e44af2e',
     action: ['insert'],
-    filter_condition: 'cmdb_ci!=NULL^is_sample=false',
+    filterCondition: 'cmdb_ci!=NULL^is_sample=false',
     script: `(function executeRule(current, previous /*null when async*/) {
     // Check if we have a CMDB CI
     if (current.cmdb_ci) {
@@ -31,8 +31,8 @@ BusinessRule({
     order: 100,
     when: 'after',
     active: true,
-    add_message: false,
-    abort_action: false,
+    addMessage: false,
+    abortAction: false,
     condition:
         'gs.nil(current.getValue("sn_air_core_integration_usage")) || gs.nil(current.sn_air_core_integration_usage.integration) || !current.sn_air_core_integration_usage.integration.exempt_from_billing',
 })

@@ -12,7 +12,7 @@ export default Acl({
     return buildUtil.buildEnabled(); // Return true if build is enabled, false otherwise
 }`,
     active: true,
-    admin_overrides: true,
+    adminOverrides: true,
     type: 'rest_endpoint',
     name: '/api/now/ide/build',
     operation: 'execute',

@@ -34,7 +34,7 @@ const applicationSubMenu = Record({
         title: 'My Assets Analytics',
         application: applicationMenu,
         active: true,
-        link_type: 'DIRECT',
+        linkType: 'DIRECT',
         query: 'now/platform-analytics-workspace/dashboards/params/edit/false/sys-id/272ecbceaef925b16972c10aaa456d2b'
     },
 })

@@ -10,9 +10,9 @@ Record({
 		name: 'Daily Hello Job',
 		active: true,
 		conditional: false,
-		run_type: 'daily',
-		time_zone: 'US/Pacific',
-		run_time: '2025-01-12 23:23:23',
+		runType: 'daily',
+		timeZone: 'US/Pacific',
+		runTime: '2025-01-12 23:23:23',
 		script: `// Set the system property 'test_property' to false
 gs.setProperty("test_property", "false");
 

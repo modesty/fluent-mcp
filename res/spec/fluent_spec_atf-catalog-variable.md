@@ -18,6 +18,6 @@ atf.catalog.submitRecordProducer({
     $id: Now.ID[''], // string | guid, mandatory
     assert: '' // '' | 'form_submitted_to_server' | 'form_submission_cancelled_in_browser'
 }): {
-    record_id: '' // sys_id
+    recordId: '' // sys_id
 };
 ```

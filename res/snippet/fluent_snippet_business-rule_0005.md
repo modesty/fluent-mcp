@@ -9,7 +9,7 @@ BusinessRule({
     table: 'sn_t2fluent_eval_llm',
     action: ['insert', 'update'],
     active: false,
-    add_message: false,
+    addMessage: false,
     script: 
         '(function executeRule(current, previous /*null when async*/ ) { if ((current.llm_output.toString() !== "" && current.llm_output.toString() === "") || (current.llm_output.toString() === "" && current.llm_output.toString() !== "")) { gs.addErrorMessage(gs.getMessage("content are out of sync")); current.setAbortAction(true); } })(current, previous);',
     order: 300,

@@ -33,7 +33,7 @@ atf.server.recordQuery({ // all props are mandatory
   enforceSecurity: false, // boolean;
   assert: 'records_match_query', // 'records_match_query' | 'no_records_match_query';
 }): { table: string; 
-    first_record: string; // sys_id of the first record
+    firstRecord: string; // sys_id of the first record
 };
 
 // Inserts a record into a table. Specify the field values to set on the new record, outputs the table and the sys_id of the new record.
@@ -44,6 +44,6 @@ atf.server.recordInsert({ // all props are mandatory
     assert: '', // 'record_successfully_inserted' | 'record_not_inserted';
     enforceSecurity: false, // boolean;
  }): { table: string;
-    record_id: string; // sys_id of the new record
+    recordId: string; // sys_id of the new record
 };
 ```

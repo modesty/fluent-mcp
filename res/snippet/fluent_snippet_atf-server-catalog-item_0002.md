@@ -18,7 +18,7 @@ Test({
   })
   atf.server.replayRequestItem({
     $id: 'step_2_g7h8i9',
-    request_item: checkoutResult.request_id,
+    requestItem: checkoutResult.requestId,
   })
   atf.server.log({
     $id: 'step_3_j0k1l2',

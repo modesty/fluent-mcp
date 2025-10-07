@@ -5,7 +5,7 @@ import { RestApi, Acl } from '@servicenow/sdk/core'
 RestApi({
     $id: Now.ID['get_guid_rest_api'],
     name: 'Get GUID',
-    service_id: 'custom_api',
+    serviceId: 'custom_api',
     consumes: 'application/json,application/xml,text/xml',
 	produces: 'application/json,application/xml,text/xml',
     routes: [
@@ -40,11 +40,11 @@ RestApi({
             headers: [],
 			authorization: true,
 			authentication: true,
-            enforce_acl: [restAcl],
+            enforceAcl: [restAcl],
             version: 1,
         },
     ],
-    enforce_acl: [restAcl],
+    enforceAcl: [restAcl],
     versions: [
         {
             $id: Now.ID['v1'],
@@ -54,7 +54,7 @@ RestApi({
 })
 
 const devRole = Role({ name: 'dev' });
-const adminRole = Role({ name: 'admin', contains_roles: [devRole] });
+const adminRole = Role({ name: 'admin', containsRoles: [devRole] });
 
 // The ACL referenced is defined using the ACL object:
 const restAcl = Acl({
@@ -63,7 +63,7 @@ const restAcl = Acl({
     type: 'rest_endpoint',
     script: ``,
     active: true,
-    admin_overrides: false,
+    adminOverrides: false,
     operations: ['execute'],
 	roles: [adminRole, devRole],
 })

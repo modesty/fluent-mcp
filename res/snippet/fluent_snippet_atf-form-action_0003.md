@@ -47,9 +47,9 @@ Test({
     })
     atf.server.recordValidation({
         $id: Now.ID['0006'],
-        table: 'incident', 
-        fieldValues: `problem_id=${outputOfCreateProblem.record_id}`, // string, servicenow encoded query
-        recordId: outputOfSave.record_id, // sys_id of the record
+        table: 'incident',
+        fieldValues: `problem_id=${outputOfCreateProblem.recordId}`, // string, servicenow encoded query
+        recordId: outputOfSave.recordId, // sys_id of the record
         enforceSecurity: false, // boolean
         assertType: 'record_validated' // 'record_validated' | 'record_not_found'
     })

@@ -3,13 +3,13 @@
 import { RestApi } from '@servicenow/sdk/core'
 
 RestApi({
-	$id: '08899e2837ac221002e674e8f2924b14', 
+	$id: '08899e2837ac221002e674e8f2924b14',
 	name: 'Echo JSON via PUT',
-	service_id: 'my_service_id_put',
+	serviceId: 'my_service_id_put',
 	active: true,
 	consumes: 'application/json',
-	doc_link: '',
-	enforce_acl: [],
+	docLink: '',
+	enforceAcl: [],
 	policy: '',
 	produces: 'application/json',
 	routes: [
@@ -39,11 +39,11 @@ RestApi({
 			name: 'Echo PUT',
 			active: true,
 			path: '/echo_put',
-			short_description: 'Echo parsed JSON using PUT method',
+			shortDescription: 'Echo parsed JSON using PUT method',
 			consumes: 'application/json',
-			enforce_acl: [],
+			enforceAcl: [],
 			produces: 'application/json',
-			request_example: '{ "name": "John", "age": 30 }',
+			requestExample: '{ "name": "John", "age": 30 }',
 			method: 'PUT',
 			authorization: true,
 			authentication: true,
@@ -52,7 +52,7 @@ RestApi({
 			version: 1
 		}
 	],
-	short_description: 'Simple API that echoes back JSON in PUT request',
+	shortDescription: 'Simple API that echoes back JSON in PUT request',
 	    versions: [
         {
             $id: Now.ID['v1'],

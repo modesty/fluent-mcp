@@ -10,8 +10,8 @@ atf.catalog.openCatalogItem({
 atf.catalog.addItemToShoppingCart({
     $id: Now.ID[''], // string | guid, mandatory
     assert: '' // '' | 'form_submission_cancelled_in_browser' | 'form_submitted_to_server';
-}): { 
-    cart_item_id: '' // sys_id of the item added to the cart
+}): {
+    cartItemId: '' // sys_id of the item added to the cart
 };
 
 // Sets quantity value on the current catalog item after a call to atf.catalog.openCatalogItem
@@ -25,7 +25,7 @@ atf.catalog.orderCatalogItem({
     $id: Now.ID[''], // string | guid, mandatory
     assert: '', // 'form_submitted_to_server' | 'form_submission_cancelled_in_browser'
 }): {
-    request_id: '', // sys_id
+    requestId: '', // sys_id
     cart: ''
 };
 

@@ -9,10 +9,10 @@ Record({
 		name: 'monthly scheduled script execution',
 		active: true,
 		conditional: false,
-		run_type: 'monthly',
-		run_dayofweek: 21,
-		time_zone: 'Europe/Amsterdam',
-		run_time: '1970-01-01 15:00:00',
+		runType: 'monthly',
+		runDayofweek: 21,
+		timeZone: 'Europe/Amsterdam',
+		runTime: '1970-01-01 15:00:00',
 		script: `// Log the message that the job has started
 gs.log("started scheduled job four", "ScheduledJobFour");
 
