@@ -36,7 +36,10 @@
     "dev": "ts-node src/index.ts",
     "lint": "eslint 'src/**/*.ts' --config eslint.config.js",
     "lint:fix": "eslint 'src/**/*.ts' --config eslint.config.js --fix",
-    "test": "jest"
+    "test": "jest",
+    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
+    "inspect:dev": "npx @modelcontextprotocol/inspector ts-node src/index.ts",
+    "inspect:published": "npx @modelcontextprotocol/inspector npx @modesty/fluent-mcp"
   },
   "type": "module",
   "engines": {

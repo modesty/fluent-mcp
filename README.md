@@ -328,6 +328,83 @@ Prompt:
 
 "I'm working on a ServiceNow app. Can you show me how to create a UI Action?"
 
+## Development & Testing
+
+### MCP Inspector
+
+The [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) is an interactive web-based tool for testing and debugging MCP servers. It provides real-time visibility into your server's tools, resources, prompts, and notifications without requiring any permanent installation.
+
+#### Quick Start
+
+**Test the published NPM package:**
+```bash
+npx @modelcontextprotocol/inspector npx @modesty/fluent-mcp
+```
+
+Or use the convenience script:
+```bash
+npm run inspect:published
+```
+
+**Test the locally built server:**
+```bash
+npm run build
+npm run inspect
+```
+
+**Test during development (without building):**
+```bash
+npm run inspect:dev
+```
+
+#### Using the Inspector
+
+Once launched, the Inspector provides a web interface with:
+
+1. **Server Connection Pane** - Configure environment variables (SN_INSTANCE_URL, SN_AUTH_TYPE) and verify server connectivity
+2. **Resources Tab** - Browse and test all resources (sn-spec://, sn-instruct://, sn-snippet://, sn-prompt://)
+3. **Prompts Tab** - Test prompt templates with custom arguments
+4. **Tools Tab** - Explore all available tools (sdk_info, build_fluent_app, etc.) and execute them with test inputs
+5. **Notifications Pane** - Monitor server logs and real-time events
+
+#### Development Workflow
+
+The recommended workflow for developing with fluent-mcp:
+
+1. **Make code changes** to your server implementation
+2. **Rebuild** the project: `npm run build`
+3. **Launch Inspector** to test: `npm run inspect`
+4. **Test your changes** interactively through the web interface
+5. **Iterate** - repeat the cycle as needed
+
+#### Environment Configuration
+
+You can configure ServiceNow instance settings when launching the Inspector. The Inspector will pass environment variables to your server:
+
+```bash
+# Example: Test with a specific ServiceNow instance
+SN_INSTANCE_URL=https://dev12345.service-now.com SN_AUTH_TYPE=oauth npm run inspect
+```
+
+#### Testing Scenarios
+
+**Test Tools:**
+- Verify all ServiceNow SDK commands are available
+- Execute commands with sample parameters
+- Validate error handling with invalid inputs
+
+**Test Resources:**
+- Browse API specifications: `sn-spec://business-rule`, `sn-spec://client-script`
+- View code snippets: `sn-snippet://acl/0001`
+- Check instructions: `sn-instruct://table`
+- Access prompts: `sn-prompt://coding_in_fluent`
+
+**Test Integration:**
+- Verify working directory resolution
+- Test authentication flows
+- Monitor command execution and output
+- Validate resource loading and caching
+
 ## License
 
 MIT
