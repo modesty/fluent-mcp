@@ -56,6 +56,7 @@ export class ResourceManager {
         `sn-spec-${type}`,
         template,
         {
+          name: `sn-spec-${type}`,
           title: `${type} API Specification for Fluent (ServiceNow SDK)`,
           description: `API specification for Fluent (ServiceNow SDK) ${type}`,
           mimeType: 'text/markdown'
@@ -133,6 +134,7 @@ export class ResourceManager {
         `sn-snippet-${type}`,
         template,
         {
+          name: `sn-snippet-${type}`,
           title: `${type} Code Snippets for Fluent (ServiceNow SDK)`,
           description: `Example code snippets for Fluent (ServiceNow SDK) ${type}`,
           mimeType: 'text/markdown'
@@ -196,6 +198,7 @@ export class ResourceManager {
         `sn-instruct-${type}`,
         template,
         {
+          name: `sn-instruct-${type}`,
           title: `${type} Instructions for Fluent (ServiceNow SDK)`,
           description: `Development instructions for Fluent (ServiceNow SDK) ${type}`,
           mimeType: 'text/markdown'
@@ -249,7 +252,7 @@ export class ResourceManager {
    * Get all available resources for listing
    * @returns List of resource objects
    */
-  async listResources(): Promise<{ uri: string, title: string, mimeType: string }[]> {
+  async listResources(): Promise<{ uri: string, name: string, title: string, mimeType: string }[]> {
     try {
       // Make sure metadata types are loaded
       if (!this.metadataTypes || this.metadataTypes.length === 0) {
@@ -262,6 +265,7 @@ export class ResourceManager {
       for (const type of this.metadataTypes) {
         resources.push({
           uri: `sn-spec://${type}`,
+          name: `sn-spec-${type}`,
           title: `${type} API Specification for Fluent (ServiceNow SDK) `,
           mimeType: 'text/markdown'
         });
@@ -271,6 +275,7 @@ export class ResourceManager {
       for (const type of this.metadataTypes) {
         resources.push({
           uri: `sn-instruct://${type}`,
+          name: `sn-instruct-${type}`,
           title: `${type} Instructions for Fluent (ServiceNow SDK)`,
           mimeType: 'text/markdown'
         });
@@ -283,6 +288,7 @@ export class ResourceManager {
           if (snippetIds.length > 0) {
             resources.push({
               uri: `sn-snippet://${type}/${snippetIds[0]}`,
+              name: `sn-snippet-${type}`,
               title: `${type} Code Snippet for Fluent (ServiceNow SDK)`,
               mimeType: 'text/markdown'
             });
@@ -317,5 +323,124 @@ export class ResourceManager {
    */
   getMetadataTypes(): string[] {
     return this.metadataTypes;
+  }
+
+  /**
+   * Read a resource by URI
+   * This method is called by the MCP server's resources/read handler
+   * @param uriString The resource URI to read
+   * @returns Resource contents
+   */
+  async readResource(uriString: string): Promise<{ contents: Array<{ uri: string; text: string; mimeType?: string }> }> {
+    try {
+      const uri = new URL(uriString);
+      const scheme = uri.protocol.replace(':', '');
+      const metadataType = uri.host;
+      
+      // Determine resource type from URI scheme
+      if (scheme === 'sn-spec') {
+        return await this.readSpecResource(uri, metadataType);
+      } else if (scheme === 'sn-snippet') {
+        return await this.readSnippetResource(uri, metadataType);
+      } else if (scheme === 'sn-instruct') {
+        return await this.readInstructResource(uri, metadataType);
+      }
+      
+      throw new Error(`Unknown resource URI scheme: ${scheme}`);
+    } catch (error) {
+      logger.error('Error reading resource',
+        error instanceof Error ? error : new Error(String(error))
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Read a spec resource
+   */
+  private async readSpecResource(uri: URL, metadataType: string) {
+    const result = await this.resourceLoader.getResource(
+      ResourceType.SPEC,
+      metadataType
+    );
+    
+    if (!result.found) {
+      return {
+        contents: [{
+          uri: uri.href,
+          text: `API specification not found for ${metadataType}`,
+          mimeType: 'text/plain'
+        }]
+      };
+    }
+    
+    return {
+      contents: [{
+        uri: uri.href,
+        text: result.content,
+        mimeType: 'text/markdown'
+      }]
+    };
+  }
+
+  /**
+   * Read a snippet resource
+   */
+  private async readSnippetResource(uri: URL, metadataType: string) {
+    // Extract snippet ID from URI path
+    const pathParts = uri.pathname.split('/').filter(p => p);
+    const snippetId = pathParts.length > 0 ? pathParts[0] : undefined;
+    
+    const result = await this.resourceLoader.getResource(
+      ResourceType.SNIPPET,
+      metadataType,
+      snippetId
+    );
+    
+    if (!result.found) {
+      return {
+        contents: [{
+          uri: uri.href,
+          text: `Snippet not found for ${metadataType}`,
+          mimeType: 'text/plain'
+        }]
+      };
+    }
+    
+    return {
+      contents: [{
+        uri: uri.href,
+        text: result.content,
+        mimeType: 'text/markdown'
+      }]
+    };
+  }
+
+  /**
+   * Read an instruct resource
+   */
+  private async readInstructResource(uri: URL, metadataType: string) {
+    const result = await this.resourceLoader.getResource(
+      ResourceType.INSTRUCT,
+      metadataType
+    );
+    
+    if (!result.found) {
+      return {
+        contents: [{
+          uri: uri.href,
+          text: `Instructions not found for ${metadataType}`,
+          mimeType: 'text/plain'
+        }]
+      };
+    }
+    
+    return {
+      contents: [{
+        uri: uri.href,
+        text: result.content,
+        mimeType: 'text/markdown'
+      }]
+    };
   }
 }

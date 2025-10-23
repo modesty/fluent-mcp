@@ -78,6 +78,14 @@ export interface McpServerConfig {
     /** Default timeout for SDK CLI commands in milliseconds */
     commandTimeoutMs: number;
   };
+
+  /** Sampling configuration for AI-powered features */
+  sampling: {
+    /** Enable AI-powered error analysis using MCP Sampling capability */
+    enableErrorAnalysis: boolean;
+    /** Minimum error length to trigger analysis (avoid analyzing trivial errors) */
+    minErrorLength: number;
+  };
 }
 
 // Environment variable names
@@ -90,6 +98,8 @@ const ENV_VAR = {
   RESOURCE_PATH_INSTRUCT: `${ENV_PREFIX}RESOURCE_PATH_INSTRUCT`,
   SERVICENOW_SDK_CLI_PATH: `${ENV_PREFIX}SERVICENOW_SDK_CLI_PATH`,
   COMMAND_TIMEOUT_MS: `${ENV_PREFIX}COMMAND_TIMEOUT_MS`,
+  ENABLE_ERROR_ANALYSIS: `${ENV_PREFIX}ENABLE_ERROR_ANALYSIS`,
+  MIN_ERROR_LENGTH: `${ENV_PREFIX}MIN_ERROR_LENGTH`,
 };
 
 /**
@@ -109,6 +119,10 @@ export const defaultConfig: McpServerConfig = {
   servicenowSdk: {
     cliPath: 'snc', // Default command name if installed globally
     commandTimeoutMs: 30000, // 30 seconds default timeout
+  },
+  sampling: {
+    enableErrorAnalysis: true, // Enable by default
+    minErrorLength: 50, // Only analyze errors with 50+ characters
   },
 };
 
@@ -145,6 +159,19 @@ export function getConfig(): McpServerConfig {
         getEnvVar(
           ENV_VAR.COMMAND_TIMEOUT_MS,
           defaultConfig.servicenowSdk.commandTimeoutMs.toString()
+        ),
+        10
+      ),
+    },
+    sampling: {
+      enableErrorAnalysis: getEnvVar(
+        ENV_VAR.ENABLE_ERROR_ANALYSIS,
+        defaultConfig.sampling.enableErrorAnalysis.toString()
+      ) === 'true',
+      minErrorLength: parseInt(
+        getEnvVar(
+          ENV_VAR.MIN_ERROR_LENGTH,
+          defaultConfig.sampling.minErrorLength.toString()
         ),
         10
       ),
