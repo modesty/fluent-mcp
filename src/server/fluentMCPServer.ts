@@ -6,6 +6,7 @@ import {
   ListToolsRequestSchema,
   CallToolResult,
   ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
   ListRootsRequestSchema,
   RootsListChangedNotificationSchema,
   InitializedNotificationSchema,
@@ -22,6 +23,7 @@ import { ToolsManager } from '../tools/toolsManager.js';
 import { ResourceManager } from '../res/resourceManager.js';
 import { PromptManager } from '../prompts/promptManager.js';
 import { autoValidateAuthIfConfigured } from './fluentInstanceAuth.js';
+import { SamplingManager } from '../utils/samplingManager.js';
 
 /**
  * Implementation of the Model Context Protocol server for Fluent (ServiceNow SDK) 
@@ -34,23 +36,26 @@ export class FluentMcpServer {
   private toolsManager: ToolsManager;
   private resourceManager: ResourceManager;
   private promptManager: PromptManager;
+  private samplingManager: SamplingManager;
+  private config: ReturnType<typeof getConfig>;
   private status: ServerStatus = ServerStatus.STOPPED;
   private roots: { uri: string; name?: string }[] = [];
   private autoAuthTriggered = false;
+  private resourcesRegistered = false;
 
   /**
    * Create a new MCP server instance
    */
   constructor() {
     // Initialize server with configuration
-    const config = getConfig();
+    this.config = getConfig();
 
     // Create MCP server instance with server info from package.json
     this.mcpServer = new McpServer(
       {
-        name: config.name,
-        version: config.version,
-        description: config.description,
+        name: this.config.name,
+        version: this.config.version,
+        description: this.config.description,
       },
       {
         capabilities: {
@@ -58,6 +63,7 @@ export class FluentMcpServer {
           resources: {}, // Enable resources capability
           logging: {},   // Enable logging capability
           elicitation: {}, // Enable elicitation capability for structured data collection
+          sampling: {}, // Enable sampling capability for AI-powered features
           prompts: {
             listChanged: true, // Enable prompt list change notifications
           },
@@ -68,17 +74,19 @@ export class FluentMcpServer {
       }
     );
 
-    // Initialize managers for tools, resources, and prompts
+    // Initialize managers for tools, resources, prompts, and sampling
     this.toolsManager = new ToolsManager(this.mcpServer);
     this.resourceManager = new ResourceManager(this.mcpServer);
     this.promptManager = new PromptManager(this.mcpServer);
+    this.samplingManager = new SamplingManager(this.mcpServer);
 
     // Initialize resources and prompts
     Promise.all([
       this.resourceManager.initialize(),
       this.promptManager.initialize()
     ]).then(() => {
-      // Now that all tools, resources, and prompts are registered, we can set up the handlers
+      // Set up the handlers after initialization
+      // Resources will be registered during start() to ensure proper timing
       this.setupHandlers();
     });
   }
@@ -92,7 +100,14 @@ export class FluentMcpServer {
     if (result.success) {
       return `✅ Output:\n${result.output}`;
     } else {
-      return `❌ Error:\n${result.error || 'Unknown error'}\n(exit code: ${result.exitCode})\n${result.output}`;
+      let errorOutput = `❌ Error:\n${result.error || 'Unknown error'}\n(exit code: ${result.exitCode})\n${result.output}`;
+      
+      // Append AI error analysis if available
+      if (result.errorAnalysis) {
+        errorOutput += '\n' + this.samplingManager.formatAnalysis(result.errorAnalysis);
+      }
+      
+      return errorOutput;
     }
   }
 
@@ -235,6 +250,27 @@ export class FluentMcpServer {
       }
     });
     
+    // Set up the resources/read handler
+    // The SDK's registerResource() doesn't automatically set up the read handler
+    // We need to explicitly handle resource read requests
+    server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      const { uri } = request.params;
+      
+      try {
+        logger.debug('Reading resource', { uri });
+        
+        // Call ResourceManager to handle the read request
+        const result = await this.resourceManager.readResource(uri);
+        return result;
+      } catch (error) {
+        logger.error('Error reading resource',
+          error instanceof Error ? error : new Error(String(error)),
+          { uri }
+        );
+        throw error;
+      }
+    });
+    
     // Set up prompts handlers
     this.promptManager.setupHandlers();
     
@@ -285,6 +321,33 @@ export class FluentMcpServer {
 
       try {
         const result = await command.execute(args || {});
+
+        // If command failed and error analysis is enabled, analyze the error
+        if (!result.success && this.config.sampling.enableErrorAnalysis && result.error) {
+          const errorMessage = result.error.message;
+          
+          if (this.samplingManager.shouldAnalyzeError(errorMessage, this.config.sampling.minErrorLength)) {
+            logger.info('Triggering error analysis for failed command', { command: name });
+            
+            try {
+              const analysis = await this.samplingManager.analyzeError({
+                command: name,
+                args: Object.entries(args || {}).map(([key, value]) => `${key}=${value}`),
+                errorOutput: errorMessage,
+                exitCode: result.exitCode,
+              });
+              
+              if (analysis) {
+                result.errorAnalysis = analysis;
+              }
+            } catch (analysisError) {
+              // Log but don't fail the tool call if analysis fails
+              logger.warn('Error analysis failed', {
+                error: analysisError instanceof Error ? analysisError.message : String(analysisError),
+              });
+            }
+          }
+        }
 
         return {
           content: [
@@ -443,9 +506,12 @@ export class FluentMcpServer {
       // Configure logging manager with MCP server
       loggingManager.configure(this.mcpServer);
 
-      // Now that we're connected and have set up handlers, register resources
-      // The prompt handlers are already registered by setupHandlers
-      this.resourceManager.registerAll();
+      // Register resources if not already done
+      // This sets up the resource read handlers in the MCP SDK
+      if (!this.resourcesRegistered) {
+        this.resourceManager.registerAll();
+        this.resourcesRegistered = true;
+      }
       
       // Set the server status to running before initializing roots
       // This ensures that client notifications will be sent correctly

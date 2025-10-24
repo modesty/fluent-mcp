@@ -12,6 +12,18 @@ export interface CommandArgument {
 }
 
 /**
+ * AI-powered error analysis result
+ */
+export interface ErrorAnalysis {
+  /** Root cause of the error */
+  rootCause: string;
+  /** Suggested solutions */
+  suggestions: string[];
+  /** Prevention tips for future */
+  preventionTips: string[];
+}
+
+/**
  * Command execution result
  */
 export interface CommandResult {
@@ -21,6 +33,8 @@ export interface CommandResult {
   output: string;
   /** Error that occurred during execution, if any */
   error?: Error;
+  /** AI-powered error analysis (optional, only when enabled and applicable) */
+  errorAnalysis?: ErrorAnalysis;
 }
 
 /**
