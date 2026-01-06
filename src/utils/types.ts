@@ -114,7 +114,63 @@ export interface CommandMetadata {
 export interface CLICommand extends CommandExecutor, CommandMetadata {
   /**
    * Get the command processor used by this command
-   * @returns The command processor instance
+   * @returns The command processor instance, or undefined for commands that don't use a processor
    */
-  getCommandProcessor(): CommandProcessor;
+  getCommandProcessor(): CommandProcessor | undefined;
 }
+
+/**
+ * Factory for creating consistent CommandResult objects
+ */
+export const CommandResultFactory = {
+  /**
+   * Normalize an unknown error to an Error instance
+   */
+  normalizeError(error: unknown): Error {
+    return error instanceof Error ? error : new Error(String(error));
+  },
+
+  /**
+   * Create a success result
+   */
+  success(output: string, exitCode = 0): CommandResult {
+    return { exitCode, success: true, output };
+  },
+
+  /**
+   * Create an error result from a message
+   */
+  error(message: string, exitCode = 1): CommandResult {
+    return {
+      exitCode,
+      success: false,
+      output: `Error: ${message}`,
+      error: new Error(message),
+    };
+  },
+
+  /**
+   * Create an error result from an Error or unknown value
+   */
+  fromError(error: unknown, exitCode = 1): CommandResult {
+    const normalizedError = CommandResultFactory.normalizeError(error);
+    return {
+      exitCode,
+      success: false,
+      output: `Error: ${normalizedError.message}`,
+      error: normalizedError,
+    };
+  },
+
+  /**
+   * Create an error result with custom output text
+   */
+  errorWithOutput(output: string, error: unknown, exitCode = 1): CommandResult {
+    return {
+      exitCode,
+      success: false,
+      output,
+      error: CommandResultFactory.normalizeError(error),
+    };
+  },
+};

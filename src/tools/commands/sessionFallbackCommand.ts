@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { CommandResult } from '../../utils/types.js';
+import { CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { BaseCLICommand } from './baseCommand.js';
 import { SessionManager } from '../../utils/sessionManager.js';
 import logger from '../../utils/logger.js';
@@ -77,12 +77,7 @@ export abstract class SessionFallbackCommand extends BaseCLICommand {
       try {
         return await this.commandProcessor.process(command, args, false, sessionWorkingDir);
       } catch (error) {
-        return {
-          exitCode: 1,
-          success: false,
-          output: '',
-          error: error instanceof Error ? error : new Error(String(error)),
-        };
+        return CommandResultFactory.fromError(error);
       }
     }
 

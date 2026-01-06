@@ -26,15 +26,10 @@ export class CleanCommand extends SessionAwareCLICommand {
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
     const sdkArgs = ['now-sdk', 'clean'];
 
-    // Add optional source directory if provided (overrides session working directory)
     if (args.source) {
       sdkArgs.push('--source', args.source as string);
     }
-
-    // Add debug flag if specified
-    if (args.debug) {
-      sdkArgs.push('--debug');
-    }
+    this.appendCommonFlags(sdkArgs, args);
 
     return this.executeWithSessionWorkingDirectory('npx', sdkArgs);
   }

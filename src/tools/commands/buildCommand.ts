@@ -19,12 +19,7 @@ export class BuildCommand extends SessionAwareCLICommand {
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
     const sdkArgs = ['now-sdk', 'build'];
-    
-    // Add debug flag if specified
-    if (args.debug) {
-      sdkArgs.push('--debug');
-    }
-
+    this.appendCommonFlags(sdkArgs, args);
     return this.executeWithSessionWorkingDirectory('npx', sdkArgs);
   }
 }

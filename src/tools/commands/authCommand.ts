@@ -1,6 +1,4 @@
-// import logger from '../../utils/logger.js';
-import { CommandArgument, CommandProcessor, CommandResult } from '../../utils/types.js';
-
+import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { SessionFallbackCommand } from './sessionFallbackCommand.js';
 
 /**
@@ -68,10 +66,6 @@ export class AuthCommand extends SessionFallbackCommand {
     },
   ];
 
-  constructor(commandProcessor: CommandProcessor) {
-    super(commandProcessor);
-  }
-
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
     this.validateArgs(args);
 
@@ -83,12 +77,7 @@ export class AuthCommand extends SessionFallbackCommand {
       typeof args.use !== 'undefined',
     ].filter(Boolean).length;
     if (primaryFlags > 1) {
-      return {
-        exitCode: 1,
-        success: false,
-        output: '',
-        error: new Error('Provide only one of --add, --list, --delete, or --use'),
-      };
+      return CommandResultFactory.error('Provide only one of --add, --list, --delete, or --use');
     }
 
     const sdkArgs = ['now-sdk', 'auth'];
@@ -97,12 +86,7 @@ export class AuthCommand extends SessionFallbackCommand {
     if (typeof args.add === 'string') {
       const addValue = args.add as string;
       if (!addValue.trim()) {
-        return {
-          exitCode: 1,
-          success: false,
-          output: '',
-          error: new Error('When using --add, you must provide a non-empty instance name or URL'),
-        };
+        return CommandResultFactory.error('When using --add, you must provide a non-empty instance name or URL');
       }
       sdkArgs.push('--add', addValue);
 
@@ -110,12 +94,7 @@ export class AuthCommand extends SessionFallbackCommand {
         const typeValue = String(args.type);
         const allowed = ['basic', 'oauth'];
         if (!allowed.includes(typeValue)) {
-          return {
-            exitCode: 1,
-            success: false,
-            output: '',
-            error: new Error(`Invalid --type '${typeValue}'. Allowed values: basic, oauth`),
-          };
+          return CommandResultFactory.error(`Invalid --type '${typeValue}'. Allowed values: basic, oauth`);
         }
         sdkArgs.push('--type', typeValue);
       }
@@ -131,10 +110,7 @@ export class AuthCommand extends SessionFallbackCommand {
       sdkArgs.push('--use', args.use as string);
     }
 
-    // Add debug flag if specified
-    if (args.debug) {
-      sdkArgs.push('--debug');
-    }
+    this.appendCommonFlags(sdkArgs, args);
 
     // Pass-through help/version if requested
     if (args.help) {

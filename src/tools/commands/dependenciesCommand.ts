@@ -26,14 +26,10 @@ export class DependenciesCommand extends SessionAwareCLICommand {
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
     const sdkArgs = ['now-sdk', 'dependencies'];
 
-    // Add optional arguments if provided
     if (args.auth) {
       sdkArgs.push('--auth', args.auth as string);
     }
-
-    if (args.debug) {
-      sdkArgs.push('--debug');
-    }
+    this.appendCommonFlags(sdkArgs, args);
 
     return this.executeWithSessionWorkingDirectory('npx', sdkArgs);
   }
