@@ -210,6 +210,8 @@ export class PromptManager {
       
       
       // Register the prompt
+      // Note: PromptArgument in MCP SDK v1.25+ only supports name, description, and required
+      // The 'type' and 'items' properties are no longer part of the schema
       const prompt: Prompt = {
         name: promptName,
         title: 'Coding in Fluent (ServiceNow SDK)',
@@ -217,11 +219,7 @@ export class PromptManager {
         arguments: [
           {
             name: 'metadata_list',
-            description: 'List of metadata types to include in the guide',
-            type: 'array',
-            items: {
-              type: 'string'
-            },
+            description: 'Comma-separated list of metadata types to include in the guide (e.g., "table,business-rule,script-include")',
             required: true
           }
         ]

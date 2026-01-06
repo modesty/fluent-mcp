@@ -56,7 +56,6 @@ export class ResourceManager {
         `sn-spec-${type}`,
         template,
         {
-          name: `sn-spec-${type}`,
           title: `${type} API Specification for Fluent (ServiceNow SDK)`,
           description: `API specification for Fluent (ServiceNow SDK) ${type}`,
           mimeType: 'text/markdown'
@@ -134,7 +133,6 @@ export class ResourceManager {
         `sn-snippet-${type}`,
         template,
         {
-          name: `sn-snippet-${type}`,
           title: `${type} Code Snippets for Fluent (ServiceNow SDK)`,
           description: `Example code snippets for Fluent (ServiceNow SDK) ${type}`,
           mimeType: 'text/markdown'
@@ -198,7 +196,6 @@ export class ResourceManager {
         `sn-instruct-${type}`,
         template,
         {
-          name: `sn-instruct-${type}`,
           title: `${type} Instructions for Fluent (ServiceNow SDK)`,
           description: `Development instructions for Fluent (ServiceNow SDK) ${type}`,
           mimeType: 'text/markdown'

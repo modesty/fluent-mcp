@@ -62,13 +62,11 @@ export class FluentMcpServer {
           tools: {},
           resources: {}, // Enable resources capability
           logging: {},   // Enable logging capability
-          elicitation: {}, // Enable elicitation capability for structured data collection
-          sampling: {}, // Enable sampling capability for AI-powered features
+          // Note: 'elicitation', 'sampling', and 'roots' are ClientCapabilities, not ServerCapabilities
+          // in MCP SDK v1.25+. Servers don't declare these - clients do.
+          // The server can still USE these features by making requests to the client.
           prompts: {
             listChanged: true, // Enable prompt list change notifications
-          },
-          roots: {
-            listChanged: true, // Enable root list change notifications
           },
         },
       }
