@@ -17,9 +17,14 @@ This MCP server implements the complete [Model Context Protocol](https://modelco
 - **Resources** - Provides 100+ resources across 35+ ServiceNow metadata types (API specs, instructions, snippets, prompts)
 - **Tools** - Exposes 10 ServiceNow SDK commands as MCP tools with full parameter validation
 - **Prompts** - Offers development workflow templates for common ServiceNow tasks
-- **Roots** - Supports MCP roots protocol for workspace-aware operations
+- **Logging** - Structured logging for debugging and monitoring
 
-### Extended Capabilities
+### Client Capabilities (used by this server)
+
+The server leverages these MCP client capabilities when available:
+
+- **Roots** - Requests workspace roots from the client for context-aware operations
+  - Falls back to project root when client doesn't provide roots
 
 - **Sampling** (MCP 2024-11-05) - Leverages client LLM for intelligent error analysis when SDK commands fail
   - Automatically analyzes command errors >50 characters

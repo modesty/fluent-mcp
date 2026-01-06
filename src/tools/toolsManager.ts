@@ -152,7 +152,7 @@ export class ToolsManager {
         description: command.description,
         inputSchema: inputSchema
       },
-      async (args: { [x: string]: any }, _extra) => {
+      async (args: { [x: string]: any }, _extra: unknown) => {
         const result = await command.execute(args);
         return {
           content: [{ type: 'text' as const, text: result.output }],
