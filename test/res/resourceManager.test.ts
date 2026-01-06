@@ -113,69 +113,72 @@ describe("ResourceManager", () => {
     });
   });
 
-  test("should register spec resources with required 'name' field", async () => {
+  test("should register spec resources with valid metadata", async () => {
     await resourceManager.initialize();
     resourceManager.registerAll();
-    
+
     // Get all registerResource calls
     const calls = mockMcpServer.registerResource.mock.calls;
-    
+
     // Filter spec resource registrations
     const specCalls = calls.filter((call: any[]) => call[0].startsWith('sn-spec-'));
-    
+
     expect(specCalls.length).toBeGreaterThan(0);
-    
-    // Validate each spec resource has required 'name' field
+
+    // Validate each spec resource has valid metadata
+    // Note: In MCP SDK v1.25+, 'name' is passed as the first argument, not in metadata
     specCalls.forEach((call: any[]) => {
-      const metadata = call[2]; // 3rd parameter is metadata
-      expect(metadata).toHaveProperty('name');
-      expect(metadata.name).toMatch(/^sn-spec-/);
+      const resourceName = call[0]; // 1st parameter is the name
+      const metadata = call[2]; // 3rd parameter is metadata (ResourceMetadata excludes 'name')
+      expect(resourceName).toMatch(/^sn-spec-/);
       expect(metadata).toHaveProperty('title');
       expect(metadata).toHaveProperty('description');
       expect(metadata).toHaveProperty('mimeType', 'text/markdown');
     });
   });
 
-  test("should register snippet resources with required 'name' field", async () => {
+  test("should register snippet resources with valid metadata", async () => {
     await resourceManager.initialize();
     resourceManager.registerAll();
-    
+
     // Get all registerResource calls
     const calls = mockMcpServer.registerResource.mock.calls;
-    
+
     // Filter snippet resource registrations
     const snippetCalls = calls.filter((call: any[]) => call[0].startsWith('sn-snippet-'));
-    
+
     expect(snippetCalls.length).toBeGreaterThan(0);
-    
-    // Validate each snippet resource has required 'name' field
+
+    // Validate each snippet resource has valid metadata
+    // Note: In MCP SDK v1.25+, 'name' is passed as the first argument, not in metadata
     snippetCalls.forEach((call: any[]) => {
-      const metadata = call[2]; // 3rd parameter is metadata
-      expect(metadata).toHaveProperty('name');
-      expect(metadata.name).toMatch(/^sn-snippet-/);
+      const resourceName = call[0]; // 1st parameter is the name
+      const metadata = call[2]; // 3rd parameter is metadata (ResourceMetadata excludes 'name')
+      expect(resourceName).toMatch(/^sn-snippet-/);
       expect(metadata).toHaveProperty('title');
       expect(metadata).toHaveProperty('description');
       expect(metadata).toHaveProperty('mimeType', 'text/markdown');
     });
   });
 
-  test("should register instruct resources with required 'name' field", async () => {
+  test("should register instruct resources with valid metadata", async () => {
     await resourceManager.initialize();
     resourceManager.registerAll();
-    
+
     // Get all registerResource calls
     const calls = mockMcpServer.registerResource.mock.calls;
-    
+
     // Filter instruct resource registrations
     const instructCalls = calls.filter((call: any[]) => call[0].startsWith('sn-instruct-'));
-    
+
     expect(instructCalls.length).toBeGreaterThan(0);
-    
-    // Validate each instruct resource has required 'name' field
+
+    // Validate each instruct resource has valid metadata
+    // Note: In MCP SDK v1.25+, 'name' is passed as the first argument, not in metadata
     instructCalls.forEach((call: any[]) => {
-      const metadata = call[2]; // 3rd parameter is metadata
-      expect(metadata).toHaveProperty('name');
-      expect(metadata.name).toMatch(/^sn-instruct-/);
+      const resourceName = call[0]; // 1st parameter is the name
+      const metadata = call[2]; // 3rd parameter is metadata (ResourceMetadata excludes 'name')
+      expect(resourceName).toMatch(/^sn-instruct-/);
       expect(metadata).toHaveProperty('title');
       expect(metadata).toHaveProperty('description');
       expect(metadata).toHaveProperty('mimeType', 'text/markdown');
@@ -185,23 +188,27 @@ describe("ResourceManager", () => {
   test("should ensure all registered resources have MCP-compliant metadata", async () => {
     await resourceManager.initialize();
     resourceManager.registerAll();
-    
+
     // Get all registerResource calls
     const calls = mockMcpServer.registerResource.mock.calls;
-    
+
     expect(calls.length).toBeGreaterThan(0);
-    
+
     // Validate every registered resource has MCP-required fields
-    calls.forEach((call: any[], index: number) => {
-      const resourceId = call[0];
+    // Note: In MCP SDK v1.25+, 'name' is passed as the first argument to registerResource,
+    // not in the metadata object. ResourceMetadata = Omit<Resource, 'uri' | 'name'>
+    calls.forEach((call: any[]) => {
+      const resourceName = call[0]; // 1st parameter is the name
       const metadata = call[2];
-      
-      // Required fields for MCP protocol
-      expect(metadata).toHaveProperty('name');
-      expect(metadata.name).toBeDefined();
-      
-      // The name should match the resource ID
-      expect(metadata.name).toBe(resourceId);
+
+      // Name should be a valid resource identifier
+      expect(resourceName).toBeDefined();
+      expect(typeof resourceName).toBe('string');
+      expect(resourceName).toMatch(/^sn-(spec|snippet|instruct)-/);
+
+      // Metadata should have title and description
+      expect(metadata).toHaveProperty('title');
+      expect(metadata).toHaveProperty('description');
     });
   });
 });
