@@ -1,4 +1,4 @@
-import { CommandResult } from '../../utils/types.js';
+import { CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { BaseCLICommand } from './baseCommand.js';
 import { SessionManager } from '../../utils/sessionManager.js';
 import { getPrimaryRootPath } from '../../utils/rootContext.js';
@@ -40,32 +40,22 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
    * @returns The command result
    */
   protected async executeWithSessionWorkingDirectory(
-    command: string, 
-    args: string[], 
+    command: string,
+    args: string[],
     useMcpCwd: boolean = false
   ): Promise<CommandResult> {
     const workingDirectory = this.getWorkingDirectory();
-    
+
     if (!workingDirectory) {
-      return {
-        exitCode: 1,
-        success: false,
-        output: '',
-        error: new Error(
-          'No working directory found. Please run the init command first to set up a working directory, or ensure MCP root context is configured.'
-        ),
-      };
+      return CommandResultFactory.error(
+        'No working directory found. Please run the init command first to set up a working directory, or ensure MCP root context is configured.'
+      );
     }
-    
+
     try {
       return await this.commandProcessor.process(command, args, useMcpCwd, workingDirectory);
     } catch (error) {
-      return {
-        exitCode: 1,
-        success: false,
-        output: '',
-        error: error instanceof Error ? error : new Error(String(error)),
-      };
+      return CommandResultFactory.fromError(error);
     }
   }
 }

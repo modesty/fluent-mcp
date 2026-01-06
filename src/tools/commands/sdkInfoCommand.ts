@@ -1,4 +1,4 @@
-import { CommandArgument, CommandProcessor, CommandResult } from '../../utils/types';
+import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types';
 import { BaseCLICommand } from './baseCommand.js';
 import { getProjectRootPath } from '../../config.js';
 
@@ -24,10 +24,6 @@ export class SdkInfoCommand extends BaseCLICommand {
     },
   ];
 
-  constructor(commandProcessor: CommandProcessor) {
-    super(commandProcessor);
-  }
-
   /**
    * Get command and working directory for ServiceNow SDK execution
    */
@@ -51,12 +47,7 @@ export class SdkInfoCommand extends BaseCLICommand {
     // Validate flag
     const validFlags = ['-v', '--version', '-h', '--help', '-d', '--debug'];
     if (!validFlags.includes(flag)) {
-      return {
-        success: false,
-        output: '',
-        error: new Error(`Invalid flag '${flag}'. Valid flags: ${validFlags.join(', ')}`),
-        exitCode: 1
-      };
+      return CommandResultFactory.error(`Invalid flag '${flag}'. Valid flags: ${validFlags.join(', ')}`);
     }
 
     // Build command arguments for SDK execution
@@ -80,26 +71,16 @@ export class SdkInfoCommand extends BaseCLICommand {
       const result = await this.commandProcessor.process(sdkCommand, sdkArgs, false, workingDirectory);
 
       if (result.exitCode === 0) {
-        return {
-          success: true,
-          output: this.formatOutput(result.output, flag, command),
-          exitCode: result.exitCode
-        };
+        return CommandResultFactory.success(this.formatOutput(result.output, flag, command));
       } else {
-        return {
-          success: false,
-          output: result.output,
-          error: result.error || new Error(`SDK flag '${flag}' execution failed`),
-          exitCode: result.exitCode
-        };
+        return CommandResultFactory.errorWithOutput(
+          result.output,
+          result.error || new Error(`SDK flag '${flag}' execution failed`),
+          result.exitCode
+        );
       }
     } catch (error) {
-      return {
-        success: false,
-        output: '',
-        error: error instanceof Error ? error : new Error('Unknown error occurred'),
-        exitCode: 1
-      };
+      return CommandResultFactory.fromError(error);
     }
   }
 

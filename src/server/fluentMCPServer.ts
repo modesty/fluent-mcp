@@ -10,8 +10,6 @@ import {
   ListRootsRequestSchema,
   RootsListChangedNotificationSchema,
   InitializedNotificationSchema,
-  // ListPromptsRequestSchema, - Unused import
-  // GetPromptRequestSchema, - Unused import
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { getConfig, getProjectRootPath } from '../config.js';
@@ -24,6 +22,12 @@ import { ResourceManager } from '../res/resourceManager.js';
 import { PromptManager } from '../prompts/promptManager.js';
 import { autoValidateAuthIfConfigured } from './fluentInstanceAuth.js';
 import { SamplingManager } from '../utils/samplingManager.js';
+
+/** Delay before fallback initialization if client doesn't send notifications */
+const INITIALIZATION_DELAY_MS = 1000;
+
+/** Timeout for client roots request before using fallback */
+const CLIENT_ROOTS_TIMEOUT_MS = 2000;
 
 /**
  * Implementation of the Model Context Protocol server for Fluent (ServiceNow SDK) 
@@ -127,8 +131,8 @@ export class FluentMcpServer {
           try {
             await Promise.race([
               this.requestRootsFromClient(),
-              new Promise<void>((_, reject) => 
-                setTimeout(() => reject(new Error('Client roots request timeout')), 2000)
+              new Promise<void>((_, reject) =>
+                setTimeout(() => reject(new Error('Client roots request timeout')), CLIENT_ROOTS_TIMEOUT_MS)
               )
             ]);
           } catch (error) {
@@ -154,7 +158,7 @@ export class FluentMcpServer {
           error instanceof Error ? error : new Error(String(error))
         );
       }
-    }, 1000); // Wait 1 second for proper client notifications
+    }, INITIALIZATION_DELAY_MS);
   }
 
   /**
@@ -181,14 +185,16 @@ export class FluentMcpServer {
         }))
       });
 
+      type RootsResponse = z.infer<typeof RootsResponseSchema>;
+
       // Using the correct request format with schema
+      // Note: The MCP SDK request method expects a specific schema type, but we use our own Zod schema
       const response = await this.mcpServer.server.request(
         { method: 'roots/list' },
-        RootsResponseSchema as any
-      );
+        RootsResponseSchema
+      ) as RootsResponse;
 
-      // Since we provided a schema, response will be properly typed
-      const roots = (response as any).roots;
+      const roots = response.roots;
       
       if (Array.isArray(roots) && roots.length > 0) {
         logger.info('Received roots from client', { rootCount: roots.length });

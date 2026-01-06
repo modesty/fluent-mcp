@@ -5,13 +5,13 @@ import {
   CLICommand,
   CommandProcessor,
   CommandResult,
+  CommandResultFactory,
   ProcessResult,
   ProcessRunner,
 } from '../utils/types.js';
 import { getPrimaryRootPath as getRootContextPrimaryRootPath, getPrimaryRootPathFrom as getPrimaryRootPathFromArray } from '../utils/rootContext.js';
 import {
   SdkInfoCommand,
-  // UpgradeCommand, // Commented out as it's not used
   AuthCommand,
   InitCommand,
   BuildCommand,
@@ -24,6 +24,9 @@ import {
 } from './commands/index.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import logger from '../utils/logger.js';
+
+/** Timeout for child process execution in milliseconds */
+const PROCESS_TIMEOUT_MS = 12000;
 
 // Infrastructure Layer
 export class NodeProcessRunner implements ProcessRunner {
@@ -40,8 +43,8 @@ export class NodeProcessRunner implements ProcessRunner {
       // Set timeout to automatically abort if process hangs
       const timeoutId = setTimeout(() => {
         controller.abort();
-        logger.warn(`Command execution timed out after 12000ms: ${command} ${args.join(' ')}`);
-      }, 12000); // 12 seconds timeout
+        logger.warn(`Command execution timed out after ${PROCESS_TIMEOUT_MS}ms: ${command} ${args.join(' ')}`);
+      }, PROCESS_TIMEOUT_MS);
 
       const options: SpawnOptionsWithoutStdio = {
         stdio: 'pipe',
@@ -52,7 +55,7 @@ export class NodeProcessRunner implements ProcessRunner {
 
       let child;
       try {
-        child = child = spawn(command, args, options);
+        child = spawn(command, args, options);
       } catch (error) {
         clearTimeout(timeoutId);
         reject(error);
@@ -105,31 +108,42 @@ export class NodeProcessRunner implements ProcessRunner {
   }
 }
 
-// Application Layer
-export class CLIExecutor implements CommandProcessor {
-  private roots: { uri: string; name?: string }[] = [];
-
-  constructor(private processRunner: ProcessRunner) {}
+/**
+ * Abstract base class for command processors with shared roots management
+ */
+export abstract class BaseCommandProcessor implements CommandProcessor {
+  protected roots: { uri: string; name?: string }[] = [];
 
   /**
    * Sets the roots from the MCP server
    * @param roots Array of root URIs and optional names
    */
   setRoots(roots: { uri: string; name?: string }[]): void {
-    // Only update and log if roots have actually changed
     const hasChanged = this.roots.length !== roots.length ||
-      this.roots.some((root, index) => 
-        root.uri !== roots[index]?.uri || 
+      this.roots.some((root, index) =>
+        root.uri !== roots[index]?.uri ||
         root.name !== roots[index]?.name
       );
-    
+
     if (hasChanged) {
       this.roots = [...roots];
-      logger.debug('Updated roots in CLIExecutor', { roots });
+      logger.debug(`Updated roots in ${this.constructor.name}`, { roots });
     }
   }
 
-  // Removed getPrimaryRoot(): use RootContext directly where needed
+  abstract process(
+    command: string,
+    args: string[],
+    useMcpCwd?: boolean,
+    customWorkingDir?: string
+  ): Promise<CommandResult>;
+}
+
+// Application Layer
+export class CLIExecutor extends BaseCommandProcessor {
+  constructor(private processRunner: ProcessRunner) {
+    super();
+  }
 
   /**
    * Process a command by executing it and returning the result
@@ -175,46 +189,13 @@ export class CLIExecutor implements CommandProcessor {
         exitCode: result.exitCode,
       };
     } catch (error) {
-      return {
-        success: false,
-        output: '',
-        error: error instanceof Error ? error : new Error(String(error)),
-        exitCode: 1,
-      };
+      return CommandResultFactory.fromError(error);
     }
   }
 }
 
 // Command Writer - generates command text instead of executing
-export class CLICmdWriter implements CommandProcessor {
-  private roots: { uri: string; name?: string }[] = [];
-
-  constructor() {}
-
-  /**
-   * Sets the roots from the MCP server
-   * @param roots Array of root URIs and optional names
-   */
-  setRoots(roots: { uri: string; name?: string }[]): void {
-    // Only update and log if roots have actually changed
-    const hasChanged = this.roots.length !== roots.length ||
-      this.roots.some((root, index) => 
-        root.uri !== roots[index]?.uri || 
-        root.name !== roots[index]?.name
-      );
-    
-    if (hasChanged) {
-      this.roots = [...roots];
-      logger.debug('Updated roots in CLICmdWriter', { roots });
-    }
-  }
-
-  /**
-   * Gets the primary root URI or falls back to project root path
-   * @returns The URI of the primary root or project root path
-   */
-  // Removed getPrimaryRoot(): use RootContext directly where needed
-
+export class CLICmdWriter extends BaseCommandProcessor {
   /**
    * Process a command by generating its text representation without executing it
    * Implements the CommandProcessor interface
@@ -275,20 +256,10 @@ export class CLICmdWriter implements CommandProcessor {
       const fullCommandText = cwdInfo ? `${commandText} ${cwdInfo}` : commandText;
       
       logger.info(`Generated command text: ${fullCommandText}`);
-            
-      return {
-        success: true,
-        output: fullCommandText,
-        error: undefined,
-        exitCode: 0,
-      };
+
+      return CommandResultFactory.success(fullCommandText);
     } catch (error) {
-      return {
-        success: false,
-        output: '',
-        error: error instanceof Error ? error : new Error(String(error)),
-        exitCode: 1,
-      };
+      return CommandResultFactory.fromError(error);
     }
   }
 }

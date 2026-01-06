@@ -29,4 +29,15 @@ export abstract class BaseCLICommand implements CLICommand {
       }
     }
   }
+
+  /**
+   * Append common SDK flags to the command arguments
+   * @param sdkArgs The array of SDK arguments to append to
+   * @param args The command arguments object
+   */
+  protected appendCommonFlags(sdkArgs: string[], args: Record<string, unknown>): void {
+    if (args.debug) {
+      sdkArgs.push('--debug');
+    }
+  }
 }

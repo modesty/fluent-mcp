@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { CommandArgument, CommandProcessor, CommandResult } from '../../utils/types.js';
+import { CommandArgument, CommandProcessor, CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { BaseCLICommand } from './baseCommand.js';
@@ -497,25 +497,15 @@ export class InitCommand extends BaseCLICommand {
         // Validate 'from' parameter
         const validation = await this.validateFromParameter(elicitedData.from);
         if (!validation.valid) {
-          return {
-            exitCode: 1,
-            success: false,
-            output: '',
-            error: new Error(`Invalid 'from' parameter: ${validation.error}`)
-          };
+          return CommandResultFactory.error(`Invalid 'from' parameter: ${validation.error}`);
         }
       } else {
         elicitedData = await this.elicitCreationData(args);
-        
+
         // Validate creation parameters
         const validation = await this.validateCreationParameters(elicitedData as CreationElicitationData);
         if (!validation.valid) {
-          return {
-            exitCode: 1,
-            success: false,
-            output: '',
-            error: new Error(`Invalid parameters: ${validation.errors.join(', ')}`)
-          };
+          return CommandResultFactory.error(`Invalid parameters: ${validation.errors.join(', ')}`);
         }
       }
       
@@ -535,46 +525,30 @@ export class InitCommand extends BaseCLICommand {
             fs.mkdirSync(workingDirectory, { recursive: true });
             logger.info(`Created working directory: ${workingDirectory}`);
           } catch (error) {
-            return {
-              exitCode: 1,
-              success: false,
-              output: '',
-              error: new Error(`Failed to create working directory ${workingDirectory}: ${error instanceof Error ? error.message : String(error)}`)
-            };
+            return CommandResultFactory.error(
+              `Failed to create working directory ${workingDirectory}: ${CommandResultFactory.normalizeError(error).message}`
+            );
           }
         }
         
         const appCheck = await FluentAppValidator.checkFluentAppExists(workingDirectory);
         if (appCheck.hasApp) {
           sessionManager.setWorkingDirectory(workingDirectory);
-          return {
-            exitCode: 0,
-            success: true,
-            output: `The directory ${workingDirectory} already contains a Fluent (ServiceNow SDK) application.\n` +
-                   `Package name: ${appCheck.packageName}\nScope name: ${appCheck.scopeName}\n` +
-                   'This directory has been saved as your working directory for future commands.',
-            error: undefined
-          };
+          return CommandResultFactory.success(
+            `The directory ${workingDirectory} already contains a Fluent (ServiceNow SDK) application.\n` +
+            `Package name: ${appCheck.packageName}\nScope name: ${appCheck.scopeName}\n` +
+            'This directory has been saved as your working directory for future commands.'
+          );
         }
-        
+
         if (appCheck.errorMessage) {
-          return {
-            exitCode: 1,
-            success: false,
-            output: '',
-            error: new Error(appCheck.errorMessage)
-          };
+          return CommandResultFactory.error(appCheck.errorMessage);
         }
       } else {
         try {
           workingDirectory = this.createDefaultWorkingDirectory();
         } catch (error) {
-          return {
-            exitCode: 1,
-            success: false,
-            output: '',
-            error: error instanceof Error ? error : new Error(String(error))
-          };
+          return CommandResultFactory.fromError(error);
         }
       }
       
@@ -612,14 +586,9 @@ export class InitCommand extends BaseCLICommand {
       }
       
       return result;
-      
+
     } catch (error) {
-      return {
-        exitCode: 1,
-        success: false,
-        output: '',
-        error: error instanceof Error ? error : new Error(String(error))
-      };
+      return CommandResultFactory.fromError(error);
     }
   }
 }

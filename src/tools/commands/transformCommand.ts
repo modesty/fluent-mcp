@@ -38,22 +38,16 @@ export class TransformCommand extends SessionAwareCLICommand {
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
     const sdkArgs = ['now-sdk', 'transform'];
 
-    // Add optional arguments if provided
     if (args.from) {
       sdkArgs.push('--from', args.from as string);
     }
-    
     if (args.directory) {
       sdkArgs.push('--directory', args.directory as string);
     }
-
     if (args.preview) {
       sdkArgs.push('--preview', args.preview as string);
     }
-    // Add debug flag if specified
-    if (args.debug) {
-      sdkArgs.push('--debug');
-    }
+    this.appendCommonFlags(sdkArgs, args);
 
     return this.executeWithSessionWorkingDirectory('npx', sdkArgs);
   }
