@@ -13,8 +13,9 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { getConfig, getProjectRootPath } from '../config.js';
-import { ServerStatus } from '../types.js';
+import { ServerStatus, AuthValidationResult } from '../types.js';
 import { CommandResult } from '../utils/types.js';
+import { LogLevel } from '../utils/logger.js';
 import loggingManager from '../utils/loggingManager.js';
 import logger from '../utils/logger.js';
 import { ToolsManager } from '../tools/toolsManager.js';
@@ -45,7 +46,9 @@ export class FluentMcpServer {
   private status: ServerStatus = ServerStatus.STOPPED;
   private roots: { uri: string; name?: string }[] = [];
   private autoAuthTriggered = false;
-  private resourcesRegistered = false;
+  private clientInitialized = false;
+  private pendingAuthResult: AuthValidationResult | null = null;
+  private initializationPromise: Promise<void>;
 
   /**
    * Create a new MCP server instance
@@ -82,8 +85,9 @@ export class FluentMcpServer {
     this.promptManager = new PromptManager(this.mcpServer);
     this.samplingManager = new SamplingManager(this.mcpServer);
 
-    // Initialize resources and prompts
-    Promise.all([
+    // Initialize resources and prompts, then set up handlers
+    // Store the promise so start() can await it before accepting connections
+    this.initializationPromise = Promise.all([
       this.resourceManager.initialize(),
       this.promptManager.initialize()
     ]).then(() => {
@@ -110,6 +114,62 @@ export class FluentMcpServer {
       }
       
       return errorOutput;
+    }
+  }
+
+  /**
+   * Send authentication status notification to the client
+   * Uses the 'authentication' logger name per MCP best practices
+   * @param result The auth validation result to send
+   */
+  private sendAuthStatusNotification(result: AuthValidationResult): void {
+    // Determine appropriate log level based on auth status
+    let level: LogLevel;
+    switch (result.status) {
+      case 'authenticated':
+        level = LogLevel.INFO;
+        break;
+      case 'skipped':
+        level = LogLevel.DEBUG;
+        break;
+      case 'not_authenticated':
+        level = LogLevel.NOTICE;
+        break;
+      case 'validation_error':
+        level = LogLevel.WARNING;
+        break;
+      default:
+        level = LogLevel.INFO;
+    }
+
+    // Build structured data for the notification (exclude sensitive info)
+    const data: Record<string, unknown> = {
+      status: result.status,
+      timestamp: result.timestamp,
+    };
+
+    if (result.alias) data.alias = result.alias;
+    if (result.host) data.host = result.host;
+    if (result.authType) data.authType = result.authType;
+    if (result.isDefault !== undefined) data.isDefault = result.isDefault;
+    if (result.actionRequired) data.actionRequired = result.actionRequired;
+
+    // Send notification with dedicated 'authentication' logger name
+    logger.sendNotification(level, result.message, data, 'authentication');
+  }
+
+  /**
+   * Handle auth validation result - either send immediately or queue for later
+   * @param result The auth validation result
+   */
+  private handleAuthResult(result: AuthValidationResult): void {
+    if (this.clientInitialized) {
+      // Client already initialized, send immediately
+      this.sendAuthStatusNotification(result);
+    } else {
+      // Queue for sending after client initialization
+      this.pendingAuthResult = result;
+      logger.debug('Auth result queued for notification after client initialized');
     }
   }
 
@@ -147,14 +207,17 @@ export class FluentMcpServer {
         if (!this.autoAuthTriggered) {
           this.autoAuthTriggered = true;
           logger.info('Triggering auto-auth validation...');
-          autoValidateAuthIfConfigured(this.toolsManager).catch((error) => {
+          try {
+            const result = await autoValidateAuthIfConfigured(this.toolsManager);
+            this.handleAuthResult(result);
+          } catch (error) {
             logger.warn('Auto-auth validation failed', {
               error: error instanceof Error ? error.message : String(error),
             });
-          });
+          }
         }
       } catch (error) {
-        logger.error('Error during delayed initialization', 
+        logger.error('Error during delayed initialization',
           error instanceof Error ? error : new Error(String(error))
         );
       }
@@ -289,12 +352,21 @@ export class FluentMcpServer {
     // Set up handler for notifications/initialized
     server.setNotificationHandler(InitializedNotificationSchema, async () => {
       logger.info('Received notifications/initialized notification from client');
-      
+
+      // Mark client as initialized
+      this.clientInitialized = true;
+
+      // Send any pending auth notification now that client is ready
+      if (this.pendingAuthResult) {
+        this.sendAuthStatusNotification(this.pendingAuthResult);
+        this.pendingAuthResult = null;
+      }
+
       // Request the list of roots from the client now that initialization is complete
       try {
         await this.requestRootsFromClient();
       } catch (error) {
-        logger.error('Failed to request roots after initialization notification', 
+        logger.error('Failed to request roots after initialization notification',
           error instanceof Error ? error : new Error(String(error))
         );
       }
@@ -417,17 +489,8 @@ export class FluentMcpServer {
           // Log the root change only once at this level
           loggingManager.logRootsChanged(this.roots);
         }
-
-        // Trigger auto-auth validation ONCE after roots are available
-        if (!this.autoAuthTriggered) {
-          this.autoAuthTriggered = true;
-          // Fire and forget; we don't want to block roots update
-          autoValidateAuthIfConfigured(this.toolsManager).catch((error) => {
-            logger.warn('Auto-auth validation failed after roots update', {
-              error: error instanceof Error ? error.message : String(error),
-            });
-          });
-        }
+        // Note: Auto-auth is triggered via scheduleDelayedInitialization() only,
+        // which provides a single, predictable entry point for auth validation
       }
     }
   }
@@ -501,6 +564,11 @@ export class FluentMcpServer {
         throw new Error('MCP server not properly initialized');
       }
 
+      // Wait for handlers to be set up before accepting connections
+      // This ensures notification handlers (like notifications/initialized) are registered
+      // before the client can send them, preventing race conditions in auth validation
+      await this.initializationPromise;
+
       // Create stdio transport for communication
       const transport = new StdioServerTransport();
 
@@ -510,13 +578,11 @@ export class FluentMcpServer {
       // Configure logging manager with MCP server
       loggingManager.configure(this.mcpServer);
 
-      // Register resources if not already done
-      // This sets up the resource read handlers in the MCP SDK
-      if (!this.resourcesRegistered) {
-        this.resourceManager.registerAll();
-        this.resourcesRegistered = true;
-      }
-      
+      // Note: Resources are handled by manual handlers in setupHandlers() that use
+      // resourceManager.listResources() and resourceManager.readResource().
+      // We don't call resourceManager.registerAll() here because it would try to
+      // set up duplicate resources/list handlers via the SDK's registerResource().
+
       // Set the server status to running before initializing roots
       // This ensures that client notifications will be sent correctly
       this.status = ServerStatus.RUNNING;

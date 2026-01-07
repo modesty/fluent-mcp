@@ -7,6 +7,9 @@ jest.mock("../../src/utils/sessionManager.js", () => ({
   SessionManager: {
     getInstance: jest.fn().mockReturnValue({
       getWorkingDirectory: jest.fn().mockReturnValue("/test-working-dir"),
+      getAuthAlias: jest.fn().mockReturnValue(undefined),
+      getAuthValidationResult: jest.fn().mockReturnValue(undefined),
+      setAuthValidationResult: jest.fn(),
     }),
   },
 }));
@@ -79,7 +82,8 @@ describe("AuthCommand", () => {
         "bar"
       ]),
       false,
-      "/test-working-dir"
+      "/test-working-dir",
+      undefined // stdinInput (credentials not set in env)
     );
     expect(result.success).toBe(true);
   });
@@ -104,7 +108,8 @@ describe("AuthCommand", () => {
       "npx",
       expect.arrayContaining(["now-sdk", "auth", "--list", "--help", "--version"]),
       false,
-      "/test-working-dir"
+      "/test-working-dir",
+      undefined // stdinInput (not needed for list/help/version)
     );
   });
 

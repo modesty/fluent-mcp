@@ -22,6 +22,12 @@ export class TransformCommand extends SessionAwareCLICommand {
       description: 'Path to "package.json", default to current working directory',
     },
     {
+      name: 'auth',
+      type: 'string',
+      required: false,
+      description: 'Credential alias to use for authentication with instance (auto-injected from session if not provided)',
+    },
+    {
       name: 'preview',
       type: 'boolean',
       required: false,
@@ -36,19 +42,11 @@ export class TransformCommand extends SessionAwareCLICommand {
   ];
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
-    const sdkArgs = ['now-sdk', 'transform'];
-
-    if (args.from) {
-      sdkArgs.push('--from', args.from as string);
-    }
-    if (args.directory) {
-      sdkArgs.push('--directory', args.directory as string);
-    }
-    if (args.preview) {
-      sdkArgs.push('--preview', args.preview as string);
-    }
-    this.appendCommonFlags(sdkArgs, args);
-
-    return this.executeWithSessionWorkingDirectory('npx', sdkArgs);
+    return this.executeSdkCommand('transform', args, {
+      from: '--from',
+      directory: '--directory',
+      auth: '--auth',
+      preview: '--preview',
+    });
   }
 }

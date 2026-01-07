@@ -1,5 +1,6 @@
 import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { SessionFallbackCommand } from './sessionFallbackCommand.js';
+import logger from '../../utils/logger.js';
 
 /**
  * Command to prepare shell command for ServiceNow SDK authentication
@@ -120,6 +121,24 @@ export class AuthCommand extends SessionFallbackCommand {
       sdkArgs.push('--version');
     }
 
-    return await this.executeWithFallback('npx', sdkArgs);
+    // For basic auth --add, prepare stdin input from environment variables
+    // The SDK prompts for username and password interactively
+    let stdinInput: string | undefined;
+    if (typeof args.add === 'string' && args.type === 'basic') {
+      const username = process.env.SN_USER_NAME?.trim() || process.env.SN_USERNAME?.trim();
+      const password = process.env.SN_PASSWORD;
+
+      if (username && password) {
+        logger.debug('Preparing stdin input for basic auth from environment variables');
+        stdinInput = `${username}\n${password}\n`;
+      } else {
+        logger.debug('Basic auth credentials not found in environment variables', {
+          hasUsername: !!username,
+          hasPassword: !!password
+        });
+      }
+    }
+
+    return await this.executeWithFallback('npx', sdkArgs, false, stdinInput);
   }
 }

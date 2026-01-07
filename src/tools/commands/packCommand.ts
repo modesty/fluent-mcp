@@ -24,13 +24,8 @@ export class PackCommand extends SessionAwareCLICommand {
   ];
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
-    const sdkArgs = ['now-sdk', 'pack'];
-
-    if (args.source) {
-      sdkArgs.push('--source', args.source as string);
-    }
-    this.appendCommonFlags(sdkArgs, args);
-
-    return this.executeWithSessionWorkingDirectory('npx', sdkArgs);
+    return this.executeSdkCommand('pack', args, {
+      source: '--source',
+    });
   }
 }

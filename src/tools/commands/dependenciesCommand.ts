@@ -13,7 +13,7 @@ export class DependenciesCommand extends SessionAwareCLICommand {
       name: 'auth',
       type: 'string',
       required: false,
-      description: 'The authentication alias to use',
+      description: 'Credential alias to use for authentication with instance (auto-injected from session if not provided)',
     },
     {
       name: 'debug',
@@ -24,13 +24,8 @@ export class DependenciesCommand extends SessionAwareCLICommand {
   ];
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
-    const sdkArgs = ['now-sdk', 'dependencies'];
-
-    if (args.auth) {
-      sdkArgs.push('--auth', args.auth as string);
-    }
-    this.appendCommonFlags(sdkArgs, args);
-
-    return this.executeWithSessionWorkingDirectory('npx', sdkArgs);
+    return this.executeSdkCommand('dependencies', args, {
+      auth: '--auth',
+    });
   }
 }

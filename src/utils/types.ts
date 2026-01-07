@@ -70,7 +70,7 @@ export interface ProcessResult {
 
 // Abstractions (Dependency Inversion)
 export interface ProcessRunner {
-  run(command: string, args: string[], cwd?: string): Promise<ProcessResult>;
+  run(command: string, args: string[], cwd?: string, stdinInput?: string): Promise<ProcessResult>;
 }
 
 /**
@@ -81,7 +81,8 @@ export interface CommandProcessor {
     command: string,
     args: string[],
     useMcpCwd?: boolean,
-    customWorkingDir?: string
+    customWorkingDir?: string,
+    stdinInput?: string
   ): Promise<CommandResult>;
 }
 

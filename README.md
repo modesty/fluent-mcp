@@ -5,17 +5,17 @@ An [MCP server](https://modelcontextprotocol.io) that brings [ServiceNow Fluent 
 ## Key Features
 
 - **🤖 AI-Powered Error Analysis** - Intelligent diagnosis with root cause, solutions, and prevention tips (MCP Sampling)
-- **Complete SDK Coverage** - All ServiceNow SDK commands: `auth`, `init`, `build`, `install`, `dependencies`, `transform`, `download`, `clean`, `pack`
+- **Complete SDK Coverage** - ServiceNow SDK commands: `init`, `build`, `install`, `dependencies`, `transform`, `download`, `clean`, `pack`
 - **Rich Resources** - API specifications, code snippets, instructions for 35+ metadata types
-- **Multi-Environment Auth** - Supports `basic` and `oauth` authentication with profile management
-- **Session-Aware** - Maintains working directory context across commands
+- **Auto-Authentication** - Automatic auth profile detection and session management via environment variables
+- **Session-Aware** - Maintains working directory and auth context across commands
 
 This MCP server implements the complete [Model Context Protocol](https://modelcontextprotocol.io) specification with the following capabilities:
 
 ### Core
 
 - **Resources** - Provides 100+ resources across 35+ ServiceNow metadata types (API specs, instructions, snippets, prompts)
-- **Tools** - Exposes 10 ServiceNow SDK commands as MCP tools with full parameter validation
+- **Tools** - Exposes 9 ServiceNow SDK commands as MCP tools with full parameter validation
 - **Prompts** - Offers development workflow templates for common ServiceNow tasks
 - **Logging** - Structured logging for debugging and monitoring
 
@@ -63,17 +63,16 @@ Create a new Fluent app in ~/projects/time-off-tracker to manage employee PTO re
 | Tool | Description | Key Parameters |
 |------|-------------|----------------|
 | `sdk_info` | Get SDK version, help, or debug info | `flag` (-v/-h/-d), `command` (optional) |
-| `manage_fluent_auth` | Manage instance authentication profiles | `add`, `list`, `delete`, `use`, `type` (basic/oauth) |
 | `init_fluent_app` | Initialize or convert ServiceNow app | `workingDirectory` (required), `template`, `from` (optional) |
 | `build_fluent_app` | Build the application | `debug` (optional) |
-| `deploy_fluent_app` | Deploy to ServiceNow instance | `auth` (optional), `debug` (optional) |
-| `fluent_transform` | Convert XML to Fluent TypeScript | `from`, `auth` (optional) |
-| `download_fluent_dependencies` | Download dependencies and type definitions | `auth` (optional) |
+| `deploy_fluent_app` | Deploy to ServiceNow instance | `auth` (auto-injected), `debug` (optional) |
+| `fluent_transform` | Convert XML to Fluent TypeScript | `from`, `auth` (auto-injected) |
+| `download_fluent_dependencies` | Download dependencies and type definitions | `auth` (auto-injected) |
 | `download_fluent_app` | Download metadata from instance | `directory`, `incremental` (optional) |
 | `clean_fluent_app` | Clean output directory | `source` (optional) |
 | `pack_fluent_app` | Create installable artifact | `source` (optional) |
 
-> **Note:** `manage_fluent_auth`, `init_fluent_app`, and `download_fluent_dependencies` are interactive commands. Use `init_fluent_app` to establish working directory context for subsequent commands.
+> **Note:** Authentication is automatically configured at startup via environment variables. The `auth` parameter is auto-injected from the session for commands that require instance access. Use `init_fluent_app` to establish working directory context for subsequent commands.
 
 ## Resources
 
@@ -110,7 +109,9 @@ Add to your MCP client configuration file:
       "args": ["-y", "@modesty/fluent-mcp"],
       "env": {
         "SN_INSTANCE_URL": "https://your-instance.service-now.com",
-        "SN_AUTH_TYPE": "oauth"
+        "SN_AUTH_TYPE": "basic",
+        "SN_USER_NAME": "local-username",
+        "SN_PASSWORD": "local-password"
       }
     }
   }
@@ -129,38 +130,40 @@ Add to your MCP client configuration file:
 
 **Environment Variables:**
 
-- `SN_INSTANCE_URL` - ServiceNow instance URL (optional, can use auth profiles instead)
-- `SN_AUTH_TYPE` - Authentication method: `basic` or `oauth` (optional)
-- `FLUENT_MCP_ENABLE_ERROR_ANALYSIS` - Enable AI error analysis (default: `true`)
-- `FLUENT_MCP_MIN_ERROR_LENGTH` - Minimum error length for analysis (default: `50`)
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `SN_INSTANCE_URL` | ServiceNow instance URL for auto-auth validation | - |
+| `SN_AUTH_TYPE` | Authentication method: `basic` or `oauth` | `oauth` |
+| `SN_USER_NAME` | Username for basic auth (informational) | - |
+| `SN_PASSWORD` | Password for basic auth (informational) | - |
+| `FLUENT_MCP_ENABLE_ERROR_ANALYSIS` | Enable AI error analysis | `true` |
+| `FLUENT_MCP_MIN_ERROR_LENGTH` | Minimum error length for analysis | `50` |
+
+> **Note:** The server automatically detects existing auth profiles matching `SN_INSTANCE_URL` at startup. If a matching profile is found, it's stored in the session and auto-injected into SDK commands. If no profile exists, you'll be prompted to run the auth command manually.
 
 ## Usage Examples
 
 ### Typical Workflow
 
-1. **Setup Authentication**
-
-   ```text
-   Create a new auth profile for https://dev12345.service-now.com with alias dev-instance
-   ```
-
-2. **Initialize Project**
+1. **Initialize Project**
 
    ```text
    Create a new Fluent app in ~/projects/asset-tracker for IT asset management
    ```
 
-3. **Develop with Resources**
+2. **Develop with Resources**
 
    ```text
    Show me the business-rule API specification and provide an example snippet
    ```
 
-4. **Build and Deploy**
+3. **Build and Deploy**
 
    ```text
-   Build the app with debug output, then deploy to dev-instance
+   Build the app with debug output, then deploy it
    ```
+
+> **Note:** Authentication is automatically configured via environment variables (`SN_INSTANCE_URL`, `SN_AUTH_TYPE`). If you need to set up a new auth profile, run: `npx @servicenow/sdk auth --add <instance-url> --type <basic|oauth> --alias <alias>`
 
 ## Testing with MCP Inspector
 

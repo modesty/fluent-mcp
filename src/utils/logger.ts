@@ -48,7 +48,7 @@ export interface LogEntry {
  */
 export class Logger {
   private logLevel: LogLevel;
-  private mcpServer?: McpServer; // Add McpServer reference
+  private mcpServer?: McpServer;
 
   constructor() {
     const config = getConfig();
@@ -64,7 +64,6 @@ export class Logger {
 
   /**
    * Set the log level
-   * @param level The log level to set
    */
   public setLogLevel(level: LogLevel): void {
     this.logLevel = level;
@@ -72,8 +71,6 @@ export class Logger {
 
   /**
    * Determine if a log level should be output based on the current log level
-   * @param level The log level to check
-   * @returns True if the log level should be output
    */
   private shouldLog(level: LogLevel): boolean {
     return logLevelPriority[level] >= logLevelPriority[this.logLevel];
@@ -81,10 +78,6 @@ export class Logger {
 
   /**
    * Format a log entry as JSON
-   * @param level The log level
-   * @param message The log message
-   * @param context Optional context object
-   * @returns The formatted log entry
    */
   private formatLogEntry(
     level: LogLevel,
@@ -124,7 +117,6 @@ export class Logger {
 
   /**
    * Set the MCP server instance for sending log notifications
-   * @param server MCP server instance
    */
   public setMcpServer(server: McpServer): void {
     this.mcpServer = server;
@@ -133,28 +125,29 @@ export class Logger {
   /**
    * Send a log message as an MCP notification
    * @param level Log level
-   * @param message Message text
-   * @param data Additional data for the notification
+   * @param message Log message
+   * @param data Optional structured data
+   * @param loggerName Optional logger name (defaults to 'fluent-mcp')
    */
   private sendMcpNotification(
     level: LogLevel,
     message: string,
-    data?: Record<string, unknown>
+    data?: Record<string, unknown>,
+    loggerName: string = 'fluent-mcp'
   ): void {
     if (!this.mcpServer) return;
 
     // Construct notification params according to MCP protocol
     const params = {
       level,
-      logger: 'fluent-mcp',
+      logger: loggerName,
       message,
       ...(data ? { data } : {}),
     };
 
     try {
       // Send notification via MCP - this goes to stdout via the MCP server
-      // We don't need to write to stderr here as that's handled separately
-      this.mcpServer.server.notification({ method: 'logging/message', params });
+      this.mcpServer.server.notification({ method: 'notifications/message', params });
     } catch (err) {
       // If notification fails, fallback to stderr
       this.writeToStderr(`Failed to send MCP notification: ${err}`);
@@ -162,11 +155,29 @@ export class Logger {
   }
 
   /**
+   * Send a dedicated notification with custom logger name
+   * Use this for domain-specific notifications (e.g., authentication)
+   * @param level Log level
+   * @param message Log message
+   * @param data Structured data to include
+   * @param loggerName The logger name (e.g., 'authentication')
+   */
+  public sendNotification(
+    level: LogLevel,
+    message: string,
+    data: Record<string, unknown>,
+    loggerName: string
+  ): void {
+    // Also write to stderr for debugging
+    const logJson = `[${new Date().toISOString()}] [${level.toUpperCase()}] [${loggerName}]: ${message} ${JSON.stringify(data)}`;
+    this.writeToStderr(logJson);
+
+    // Send MCP notification with custom logger name
+    this.sendMcpNotification(level, message, data, loggerName);
+  }
+
+  /**
    * Set up logging request handlers on the MCP server
-   * 
-   * Note: The MCP SDK should automatically handle logging/setLevel requests
-   * when the logging capability is declared. This method is a fallback
-   * in case the automatic handler is not working.
    */
   public setupLoggingHandlers(): void {
     if (!this.mcpServer) return;
@@ -178,83 +189,73 @@ export class Logger {
       this.info(`Log level set to: ${level}`);
       return {};
     });
-    
+
     // Log the status
     this.debug('Logging capability enabled with current level: ' + this.logLevel);
   }
 
   /**
+   * Core logging method - logs a message at the specified level
+   * All level-specific methods delegate to this
+   */
+  private logAtLevel(
+    level: LogLevel,
+    message: string,
+    context?: Record<string, unknown>,
+    options: { skipLevelCheck?: boolean } = {}
+  ): void {
+    if (!options.skipLevelCheck && !this.shouldLog(level)) {
+      return;
+    }
+
+    const entry = this.formatLogEntry(level, message, context);
+    this.writeLogEntry(level, entry);
+  }
+
+  /**
    * Log a message at the debug level
-   * @param message The message to log
-   * @param context Optional context object
    */
   public debug(message: string, context?: Record<string, unknown>): void {
-    if (!this.shouldLog(LogLevel.DEBUG)) return;
-    const entry = this.formatLogEntry(LogLevel.DEBUG, message, context);
-    // Only write to stderr, not stdout
-    this.writeLogEntry(LogLevel.DEBUG, entry);
+    this.logAtLevel(LogLevel.DEBUG, message, context);
   }
 
   /**
    * Log a message at the info level
-   * @param message The message to log
-   * @param context Optional context object
    */
   public info(message: string, context?: Record<string, unknown>): void {
-    if (!this.shouldLog(LogLevel.INFO)) return;
-    const entry = this.formatLogEntry(LogLevel.INFO, message, context);
-    // Only write to stderr, not stdout
-    this.writeLogEntry(LogLevel.INFO, entry);
+    this.logAtLevel(LogLevel.INFO, message, context);
   }
 
   /**
    * Log a message at the notice level
-   * @param message The message to log
-   * @param context Optional context object
    */
   public notice(message: string, context?: Record<string, unknown>): void {
-    if (!this.shouldLog(LogLevel.NOTICE)) return;
-    const entry = this.formatLogEntry(LogLevel.NOTICE, message, context);
-    // Only write to stderr, not stdout
-    this.writeLogEntry(LogLevel.NOTICE, entry);
+    this.logAtLevel(LogLevel.NOTICE, message, context);
   }
 
   /**
    * Log a message at the warn level
-   * @param message The message to log
-   * @param context Optional context object
    */
   public warn(message: string, context?: Record<string, unknown>): void {
-    if (!this.shouldLog(LogLevel.WARN)) return;
-    const entry = this.formatLogEntry(LogLevel.WARN, message, context);
-    // Only write to stderr, not stdout
-    this.writeLogEntry(LogLevel.WARN, entry);
+    this.logAtLevel(LogLevel.WARN, message, context);
   }
 
   /**
    * Log a message at the warning level
-   * @param message The message to log
-   * @param context Optional context object
    */
   public warning(message: string, context?: Record<string, unknown>): void {
-    if (!this.shouldLog(LogLevel.WARNING)) return;
-    const entry = this.formatLogEntry(LogLevel.WARNING, message, context);
-    // Only write to stderr, not stdout
-    this.writeLogEntry(LogLevel.WARNING, entry);
+    this.logAtLevel(LogLevel.WARNING, message, context);
   }
 
   /**
    * Log a message at the error level
-   * @param message The message to log
-   * @param error Optional error object
-   * @param context Optional context object
+   * Always logs regardless of log level, with optional error object for stack trace
    */
   public error(
     message: string,
     error?: Error,
     context?: Record<string, unknown>
   ): void {
-    // Always log errors regardless of log level
     // Prepare error context
     const errorContext: Record<string, unknown> = {
       ...(context || {}),
@@ -270,76 +271,40 @@ export class Logger {
 
     // In test environment, downgrade error logs to WARN to keep test output clean
     const level = process.env.NODE_ENV === 'test' ? LogLevel.WARN : LogLevel.ERROR;
-    const entry = this.formatLogEntry(level, message, errorContext);
-    // Only write to stderr, not stdout
-    this.writeLogEntry(level, entry);
+    this.logAtLevel(level, message, errorContext, { skipLevelCheck: true });
   }
+
+  /**
+   * Log a message at the critical level
+   */
   public critical(message: string, context?: Record<string, unknown>): void {
-    if (!this.shouldLog(LogLevel.CRITICAL)) return;
-    const entry = this.formatLogEntry(LogLevel.CRITICAL, message, context);
-    // Only write to stderr, not stdout
-    this.writeLogEntry(LogLevel.CRITICAL, entry);
+    this.logAtLevel(LogLevel.CRITICAL, message, context);
   }
 
   /**
    * Log a message at the alert level
-   * @param message The message to log
-   * @param context Optional context object
    */
   public alert(message: string, context?: Record<string, unknown>): void {
-    if (!this.shouldLog(LogLevel.ALERT)) return;
-    const entry = this.formatLogEntry(LogLevel.ALERT, message, context);
-    // Only write to stderr, not stdout
-    this.writeLogEntry(LogLevel.ALERT, entry);
+    this.logAtLevel(LogLevel.ALERT, message, context);
   }
 
   /**
    * Log a message at the emergency level
-   * @param message The message to log
-   * @param context Optional context object
    */
   public emergency(message: string, context?: Record<string, unknown>): void {
-    if (!this.shouldLog(LogLevel.EMERGENCY)) return;
-    const entry = this.formatLogEntry(LogLevel.EMERGENCY, message, context);
-    // Only write to stderr, not stdout
-    this.writeLogEntry(LogLevel.EMERGENCY, entry);
+    this.logAtLevel(LogLevel.EMERGENCY, message, context);
   }
 
   /**
-   * Log a message with an object for additional context
-   * @param message The message to log
-   * @param level The log level
-   * @param obj The object to include
+   * Log a message with an object for additional context at any level
    */
   public log(level: LogLevel, message: string, obj?: unknown): void {
-    switch (level) {
-      case LogLevel.DEBUG:
-        this.debug(message, obj as Record<string, unknown>);
-        break;
-      case LogLevel.INFO:
-        this.info(message, obj as Record<string, unknown>);
-        break;
-      case LogLevel.NOTICE:
-        this.notice(message, obj as Record<string, unknown>);
-        break;
-      case LogLevel.WARN:
-        this.warn(message, obj as Record<string, unknown>);
-        break;
-      case LogLevel.WARNING:
-        this.warning(message, obj as Record<string, unknown>);
-        break;
-      case LogLevel.ERROR:
-        this.error(message, undefined, obj as Record<string, unknown>);
-        break;
-      case LogLevel.CRITICAL:
-        this.critical(message, obj as Record<string, unknown>);
-        break;
-      case LogLevel.ALERT:
-        this.alert(message, obj as Record<string, unknown>);
-        break;
-      case LogLevel.EMERGENCY:
-        this.emergency(message, obj as Record<string, unknown>);
-        break;
+    const context = obj as Record<string, unknown>;
+
+    if (level === LogLevel.ERROR) {
+      this.error(message, undefined, context);
+    } else {
+      this.logAtLevel(level, message, context);
     }
   }
 }

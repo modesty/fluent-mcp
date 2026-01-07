@@ -68,6 +68,12 @@ jest.mock("../../src/tools/resourceTools.js", () => {
       description: "List metadata types",
       arguments: [],
       execute: jest.fn().mockResolvedValue({ success: true, output: "Mock output" })
+    })),
+    CheckAuthStatusCommand: jest.fn().mockImplementation(() => ({
+      name: "check_auth_status",
+      description: "Check authentication status",
+      arguments: [],
+      execute: jest.fn().mockResolvedValue({ success: true, output: "Mock auth status" })
     }))
   };
 });

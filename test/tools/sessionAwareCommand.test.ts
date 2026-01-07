@@ -8,6 +8,9 @@ jest.mock("../../src/utils/sessionManager.js", () => {
     SessionManager: {
       getInstance: jest.fn().mockReturnValue({
         getWorkingDirectory: jest.fn().mockReturnValue("/test-working-dir"),
+        getAuthAlias: jest.fn().mockReturnValue(undefined),
+        getAuthValidationResult: jest.fn().mockReturnValue(undefined),
+        setAuthValidationResult: jest.fn(),
       }),
     },
   };

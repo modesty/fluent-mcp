@@ -36,16 +36,14 @@ export class DownloadCommand extends SessionAwareCLICommand {
   ];
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
-    const sdkArgs = ['now-sdk', 'download', args.directory as string];
-
-    if (args.source) {
-      sdkArgs.push('--source', args.source as string);
-    }
-    if (args.incremental) {
-      sdkArgs.push('--incremental');
-    }
-    this.appendCommonFlags(sdkArgs, args);
-
-    return this.executeWithSessionWorkingDirectory('npx', sdkArgs);
+    return this.executeSdkCommand(
+      'download',
+      args,
+      {
+        source: '--source',
+        incremental: { flag: '--incremental', hasValue: false },
+      },
+      [args.directory as string]  // positional argument
+    );
   }
 }

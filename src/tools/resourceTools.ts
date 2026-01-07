@@ -1,8 +1,10 @@
 /**
  * MCP tools for accessing ServiceNow metadata resources (API specs, snippets, instructions)
+ * and checking authentication status
  */
 import { ResourceLoader, ResourceType } from '../utils/resourceLoader.js';
 import { CLICommand, CommandArgument, CommandResult, CommandResultFactory } from '../utils/types.js';
+import { SessionManager } from '../utils/sessionManager.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -189,6 +191,48 @@ export class ListMetadataTypesCommand implements CLICommand {
       return CommandResultFactory.success(output);
     } catch (error) {
       logger.error('Error listing metadata types', CommandResultFactory.normalizeError(error));
+      return CommandResultFactory.fromError(error);
+    }
+  }
+}
+
+/**
+ * Command for checking current authentication status
+ * Returns the cached auth validation result from the session
+ */
+export class CheckAuthStatusCommand implements CLICommand {
+  name = 'check_auth_status';
+  description = 'Check current ServiceNow authentication status. Returns the result of auto-auth validation including status, profile alias, instance host, and any required action.';
+  arguments: CommandArgument[] = [];
+
+  /**
+   * This command doesn't use a command processor
+   */
+  getCommandProcessor(): undefined {
+    return undefined;
+  }
+
+  /**
+   * Execute the command to check auth status
+   * @returns Command result with auth status information
+   */
+  async execute(): Promise<CommandResult> {
+    try {
+      const sessionManager = SessionManager.getInstance();
+      const authResult = sessionManager.getAuthValidationResult();
+
+      if (!authResult) {
+        return CommandResultFactory.success(JSON.stringify({
+          status: 'unknown',
+          message: 'Auth validation has not been performed yet. This may happen if the server just started or SN_INSTANCE_URL is not configured.',
+          timestamp: new Date().toISOString(),
+        }, null, 2));
+      }
+
+      // Return the auth result as formatted JSON
+      return CommandResultFactory.success(JSON.stringify(authResult, null, 2));
+    } catch (error) {
+      logger.error('Error checking auth status', CommandResultFactory.normalizeError(error));
       return CommandResultFactory.fromError(error);
     }
   }

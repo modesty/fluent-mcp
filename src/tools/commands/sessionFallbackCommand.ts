@@ -53,16 +53,18 @@ export abstract class SessionFallbackCommand extends BaseCLICommand {
    * @param command The command to execute
    * @param args The command arguments
    * @param useMcpCwd Whether to use the MCP's current working directory instead of the working directory
+   * @param stdinInput Optional input to write to stdin (for interactive commands)
    * @returns The command result
    */
   protected async executeWithFallback(
-    command: string, 
-    args: string[], 
-    useMcpCwd: boolean = false
+    command: string,
+    args: string[],
+    useMcpCwd: boolean = false,
+    stdinInput?: string
   ): Promise<CommandResult> {
     // If explicitly requested, use the MCP root-based CWD
     if (useMcpCwd) {
-      return await this.commandProcessor.process(command, args, true);
+      return await this.commandProcessor.process(command, args, true, undefined, stdinInput);
     }
 
     // Prefer session working directory when available
@@ -75,7 +77,7 @@ export abstract class SessionFallbackCommand extends BaseCLICommand {
       (process.env.NODE_ENV === 'test' || fs.existsSync(sessionWorkingDir))
     ) {
       try {
-        return await this.commandProcessor.process(command, args, false, sessionWorkingDir);
+        return await this.commandProcessor.process(command, args, false, sessionWorkingDir, stdinInput);
       } catch (error) {
         return CommandResultFactory.fromError(error);
       }
@@ -83,6 +85,6 @@ export abstract class SessionFallbackCommand extends BaseCLICommand {
 
     // Fallback: use MCP server's root as the working directory
     // This ensures root-based CWD is applicable to all fallback commands
-    return await this.commandProcessor.process(command, args, true);
+    return await this.commandProcessor.process(command, args, true, undefined, stdinInput);
   }
 }
