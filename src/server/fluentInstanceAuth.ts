@@ -144,9 +144,7 @@ export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): 
       }
 
       // Auth add failed - return instructions for manual setup
-      const setupHint = authType === 'basic'
-        ? 'For basic auth, ensure SN_USER_NAME and SN_PASSWORD environment variables are set.'
-        : 'For OAuth, a browser window should open for authentication.';
+      const setupHint = getAuthSetupHint(authType);
 
       logger.warn('Auto-auth failed to add profile', {
         exitCode: addRes.exitCode,
@@ -165,9 +163,7 @@ export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): 
     } catch (addError) {
       // Error during auth add attempt - return instructions for manual setup
       const errorMessage = addError instanceof Error ? addError.message : String(addError);
-      const setupHint = authType === 'basic'
-        ? 'For basic auth, ensure SN_USER_NAME and SN_PASSWORD environment variables are set.'
-        : 'For OAuth, a browser window will open for authentication.';
+      const setupHint = getAuthSetupHint(authType);
 
       logger.warn('Auto-auth error during profile add', { error: errorMessage });
 
@@ -203,6 +199,15 @@ export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): 
  */
 function buildAuthCommand(instUrl: string, authType: string, alias: string): string {
   return `npx @servicenow/sdk auth --add ${instUrl} --type ${authType} --alias ${alias}`;
+}
+
+/**
+ * Get setup hint message based on auth type
+ */
+function getAuthSetupHint(authType: string): string {
+  return authType === 'basic'
+    ? 'For basic auth, ensure SN_USER_NAME and SN_PASSWORD environment variables are set.'
+    : 'For OAuth, a browser window will open for authentication.';
 }
 
 /**

@@ -9,13 +9,13 @@ import { SetLevelRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
 import { getConfig } from '../config.js';
 
-// Log levels enum
+// Log levels enum - uses MCP/RFC 5424 severity level names
 export enum LogLevel {
   DEBUG = 'debug',
   INFO = 'info',
   NOTICE = 'notice',
-  WARN = 'warn',
-  WARNING = 'warning', // MCP protocol alias for warn
+  WARNING = 'warning', // MCP protocol standard name
+  WARN = 'warning',    // Alias for WARNING (both map to 'warning' for MCP compliance)
   ERROR = 'error',
   CRITICAL = 'critical',
   ALERT = 'alert',
@@ -23,12 +23,12 @@ export enum LogLevel {
 }
 
 // Level priorities - higher number means more severe
-const logLevelPriority: Record<LogLevel, number> = {
+// Note: WARN and WARNING both map to 'warning', so only one entry needed
+const logLevelPriority: Record<string, number> = {
   [LogLevel.DEBUG]: 0,
   [LogLevel.INFO]: 1,
   [LogLevel.NOTICE]: 2,
-  [LogLevel.WARN]: 3,
-  [LogLevel.WARNING]: 3, // Same priority as WARN
+  [LogLevel.WARNING]: 3, // WARN also maps to 'warning'
   [LogLevel.ERROR]: 4,
   [LogLevel.CRITICAL]: 5,
   [LogLevel.ALERT]: 6,

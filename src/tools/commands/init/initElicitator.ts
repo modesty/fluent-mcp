@@ -3,6 +3,7 @@
  * Handles MCP elicitation for gathering user input
  */
 
+import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import {
@@ -11,6 +12,25 @@ import {
   InitIntent,
   VALID_TEMPLATES,
 } from './types.js';
+
+// Zod schemas for validating elicitation responses
+const IntentResponseSchema = z.object({
+  intent: z.enum(['conversion', 'creation']),
+});
+
+const ConversionResponseSchema = z.object({
+  from: z.string().min(1, 'from is required'),
+  workingDirectory: z.string().min(1, 'workingDirectory is required'),
+  auth: z.string().optional(),
+});
+
+const CreationResponseSchema = z.object({
+  appName: z.string().min(1, 'appName is required').optional(),
+  packageName: z.string().min(1, 'packageName is required').optional(),
+  scopeName: z.string().min(1, 'scopeName is required').optional(),
+  workingDirectory: z.string().min(1, 'workingDirectory is required').optional(),
+  template: z.enum(VALID_TEMPLATES).optional(),
+});
 
 /**
  * Elicitator class for InitCommand
@@ -83,11 +103,17 @@ export class InitElicitator {
       },
     });
 
-    if (result.action !== 'accept' || !result.content?.intent) {
+    if (result.action !== 'accept' || !result.content) {
       throw new Error('Intent selection is required');
     }
 
-    return result.content.intent as InitIntent;
+    // Validate response with zod schema
+    const parsed = IntentResponseSchema.safeParse(result.content);
+    if (!parsed.success) {
+      throw new Error(`Invalid intent response: ${parsed.error.issues.map(e => e.message).join(', ')}`);
+    }
+
+    return parsed.data.intent;
   }
 
   /**
@@ -134,16 +160,21 @@ export class InitElicitator {
       },
     });
 
-    if (result.action !== 'accept' || !result.content?.from || !result.content?.workingDirectory) {
+    if (result.action !== 'accept' || !result.content) {
       throw new Error('From and workingDirectory parameters are required for conversion');
+    }
+
+    // Validate response with zod schema
+    const parsed = ConversionResponseSchema.safeParse(result.content);
+    if (!parsed.success) {
+      throw new Error(`Invalid conversion response: ${parsed.error.issues.map(e => e.message).join(', ')}`);
     }
 
     // Build the data object with current args and elicited data
     return {
-      from: (args.from as string) || (result.content.from as string),
-      workingDirectory:
-        (args.workingDirectory as string) || (result.content.workingDirectory as string),
-      auth: (args.auth as string) || (result.content.auth as string),
+      from: (args.from as string) || parsed.data.from,
+      workingDirectory: (args.workingDirectory as string) || parsed.data.workingDirectory,
+      auth: (args.auth as string) || parsed.data.auth,
       debug: args.debug as boolean,
     };
   }
@@ -220,13 +251,18 @@ export class InitElicitator {
         throw new Error('Required parameters for creation are missing');
       }
 
-      // Apply elicited data
-      if (result.content.appName) data.appName = result.content.appName as string;
-      if (result.content.packageName) data.packageName = result.content.packageName as string;
-      if (result.content.scopeName) data.scopeName = result.content.scopeName as string;
-      if (result.content.workingDirectory)
-        data.workingDirectory = result.content.workingDirectory as string;
-      if (result.content.template) data.template = result.content.template as string;
+      // Validate response with zod schema
+      const parsed = CreationResponseSchema.safeParse(result.content);
+      if (!parsed.success) {
+        throw new Error(`Invalid creation response: ${parsed.error.issues.map(e => e.message).join(', ')}`);
+      }
+
+      // Apply elicited data from validated response
+      if (parsed.data.appName) data.appName = parsed.data.appName;
+      if (parsed.data.packageName) data.packageName = parsed.data.packageName;
+      if (parsed.data.scopeName) data.scopeName = parsed.data.scopeName;
+      if (parsed.data.workingDirectory) data.workingDirectory = parsed.data.workingDirectory;
+      if (parsed.data.template) data.template = parsed.data.template;
     }
 
     return data as CreationElicitationData;
