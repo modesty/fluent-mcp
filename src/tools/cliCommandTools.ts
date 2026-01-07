@@ -27,6 +27,12 @@ import logger from '../utils/logger.js';
 /** Timeout for child process execution in milliseconds */
 const PROCESS_TIMEOUT_MS = 12000;
 
+/** Delay before checking for prompts after stdout data (allows buffering) */
+const STDIN_PROMPT_CHECK_DELAY_MS = 50;
+
+/** Delay before closing stdin after all input lines written */
+const STDIN_CLOSE_DELAY_MS = 200;
+
 // Infrastructure Layer
 export class NodeProcessRunner implements ProcessRunner {
   async run(
@@ -110,7 +116,7 @@ export class NodeProcessRunner implements ProcessRunner {
                 logger.debug('Closing stdin after writing all lines');
                 child.stdin.end();
               }
-            }, 200);
+            }, STDIN_CLOSE_DELAY_MS);
           }
         }
       };
@@ -125,7 +131,7 @@ export class NodeProcessRunner implements ProcessRunner {
         if (stdinInput && !stdinState.inputComplete) {
           stdinState.pendingStdout += text;
           // Check for prompts after a tiny delay to allow buffering
-          setTimeout(writeNextLineIfPrompted, 50);
+          setTimeout(writeNextLineIfPrompted, STDIN_PROMPT_CHECK_DELAY_MS);
         }
       });
 

@@ -11,7 +11,6 @@ import {
   CheckAuthStatusCommand
 } from './resourceTools.js';
 import { CLIExecutor, CLICmdWriter, NodeProcessRunner, BaseCommandProcessor } from './cliCommandTools.js';
-import { AuthCommand } from './commands/authCommand.js';
 import { setRoots as setRootContextRoots } from '../utils/rootContext.js';
 
 /**
@@ -265,8 +264,11 @@ export class ToolsManager {
    * Note: AuthCommand is not exposed to MCP clients - authentication is managed
    * via environment variables (SN_INSTANCE_URL, SN_AUTH_TYPE) and the auth alias
    * is stored in session for use by all SDK commands.
+   * Uses dynamic import to lazy-load AuthCommand only when needed.
    */
   async runAuth(args: Record<string, unknown>): Promise<CommandResult> {
+    // Lazy load AuthCommand to avoid importing it at module load time
+    const { AuthCommand } = await import('./commands/authCommand.js');
     const cmd = new AuthCommand(this.cliExecutor);
     return await cmd.execute(args);
   }

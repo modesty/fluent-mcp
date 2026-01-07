@@ -112,70 +112,15 @@ export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): 
     }
 
     // Not found -> attempt to add auth profile automatically
-    const alias = deriveAliasFromInstance(instUrl);
-    const authCommand = buildAuthCommand(instUrl, authType, alias);
-
-    logger.debug('No matching auth profile found, attempting to add automatically', { instUrl, authType, alias });
-
-    try {
-      // Attempt to add authentication profile
-      // For basic auth: relies on SN_USER_NAME/SN_USERNAME and SN_PASSWORD env vars
-      // For OAuth: will open browser for authentication
-      const addRes = await toolsManager.runAuth({
-        add: instUrl,
-        type: authType,
-        alias,
-      });
-
-      if (addRes.exitCode === 0) {
-        // Auth add succeeded - store the alias in session
-        sessionManager.setAuthAlias(alias);
-        logger.debug('Auto-auth succeeded: added new profile', { alias, authType });
-
-        return createResult({
-          status: 'authenticated',
-          alias,
-          host,
-          authType,
-          isDefault: true,
-          message: `Auto-auth succeeded: added new ${authType} profile for ${host}`,
-          timestamp,
-        });
-      }
-
-      // Auth add failed - return instructions for manual setup
-      const setupHint = getAuthSetupHint(authType);
-
-      logger.warn('Auto-auth failed to add profile', {
-        exitCode: addRes.exitCode,
-        output: addRes.output,
-        error: addRes.error?.message
-      });
-
-      return createResult({
-        status: 'not_authenticated',
-        host,
-        authType,
-        message: `Auto-auth failed to add profile. ${setupHint}`,
-        actionRequired: authCommand,
-        timestamp,
-      });
-    } catch (addError) {
-      // Error during auth add attempt - return instructions for manual setup
-      const errorMessage = addError instanceof Error ? addError.message : String(addError);
-      const setupHint = getAuthSetupHint(authType);
-
-      logger.warn('Auto-auth error during profile add', { error: errorMessage });
-
-      return createResult({
-        status: 'not_authenticated',
-        host,
-        authType,
-        message: `Auto-auth error: ${errorMessage}. ${setupHint}`,
-        actionRequired: authCommand,
-        timestamp,
-      });
-    }
+    return await attemptAddAuthProfile(
+      toolsManager,
+      sessionManager,
+      createResult,
+      instUrl,
+      authType,
+      host,
+      timestamp
+    );
   } catch (error) {
     const alias = deriveAliasFromInstance(instUrl);
     const authCommand = buildAuthCommand(instUrl, authType, alias);
@@ -188,6 +133,89 @@ export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): 
       host,
       authType,
       message: `Auth validation failed: ${errorMessage}`,
+      actionRequired: authCommand,
+      timestamp,
+    });
+  }
+}
+
+/**
+ * Attempt to add a new auth profile automatically
+ * Extracted to reduce nesting in the main function
+ */
+async function attemptAddAuthProfile(
+  toolsManager: ToolsManager,
+  sessionManager: SessionManager,
+  createResult: (result: AuthValidationResult) => AuthValidationResult,
+  instUrl: string,
+  authType: string,
+  host: string,
+  timestamp: string
+): Promise<AuthValidationResult> {
+  const alias = deriveAliasFromInstance(instUrl);
+  const authCommand = buildAuthCommand(instUrl, authType, alias);
+
+  logger.debug('No matching auth profile found, attempting to add automatically', {
+    instUrl,
+    authType,
+    alias,
+  });
+
+  try {
+    // Attempt to add authentication profile
+    // For basic auth: relies on SN_USER_NAME/SN_USERNAME and SN_PASSWORD env vars
+    // For OAuth: will open browser for authentication
+    const addRes = await toolsManager.runAuth({
+      add: instUrl,
+      type: authType,
+      alias,
+    });
+
+    if (addRes.exitCode === 0) {
+      // Auth add succeeded - store the alias in session
+      sessionManager.setAuthAlias(alias);
+      logger.debug('Auto-auth succeeded: added new profile', { alias, authType });
+
+      return createResult({
+        status: 'authenticated',
+        alias,
+        host,
+        authType,
+        isDefault: true,
+        message: `Auto-auth succeeded: added new ${authType} profile for ${host}`,
+        timestamp,
+      });
+    }
+
+    // Auth add failed - return instructions for manual setup
+    const setupHint = getAuthSetupHint(authType);
+
+    logger.warn('Auto-auth failed to add profile', {
+      exitCode: addRes.exitCode,
+      output: addRes.output,
+      error: addRes.error?.message,
+    });
+
+    return createResult({
+      status: 'not_authenticated',
+      host,
+      authType,
+      message: `Auto-auth failed to add profile. ${setupHint}`,
+      actionRequired: authCommand,
+      timestamp,
+    });
+  } catch (addError) {
+    // Error during auth add attempt - return instructions for manual setup
+    const errorMessage = addError instanceof Error ? addError.message : String(addError);
+    const setupHint = getAuthSetupHint(authType);
+
+    logger.warn('Auto-auth error during profile add', { error: errorMessage });
+
+    return createResult({
+      status: 'not_authenticated',
+      host,
+      authType,
+      message: `Auto-auth error: ${errorMessage}. ${setupHint}`,
       actionRequired: authCommand,
       timestamp,
     });

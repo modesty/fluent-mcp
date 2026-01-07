@@ -13,9 +13,8 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { getConfig, getProjectRootPath } from '../config.js';
-import { ServerStatus, AuthValidationResult } from '../types.js';
+import { ServerStatus } from '../types.js';
 import { CommandResult } from '../utils/types.js';
-import { LogLevel } from '../utils/logger.js';
 import loggingManager from '../utils/loggingManager.js';
 import logger from '../utils/logger.js';
 import { ToolsManager } from '../tools/toolsManager.js';
@@ -23,6 +22,7 @@ import { ResourceManager } from '../res/resourceManager.js';
 import { PromptManager } from '../prompts/promptManager.js';
 import { autoValidateAuthIfConfigured } from './fluentInstanceAuth.js';
 import { SamplingManager } from '../utils/samplingManager.js';
+import { AuthNotificationHandler } from './authNotificationHandler.js';
 
 /** Delay before fallback initialization if client doesn't send notifications */
 const INITIALIZATION_DELAY_MS = 1000;
@@ -46,8 +46,7 @@ export class FluentMcpServer {
   private status: ServerStatus = ServerStatus.STOPPED;
   private roots: { uri: string; name?: string }[] = [];
   private autoAuthTriggered = false;
-  private clientInitialized = false;
-  private pendingAuthResult: AuthValidationResult | null = null;
+  private authNotificationHandler: AuthNotificationHandler;
   private initializationPromise: Promise<void>;
   private delayedInitTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -85,6 +84,7 @@ export class FluentMcpServer {
     this.resourceManager = new ResourceManager(this.mcpServer);
     this.promptManager = new PromptManager(this.mcpServer);
     this.samplingManager = new SamplingManager(this.mcpServer);
+    this.authNotificationHandler = new AuthNotificationHandler();
 
     // Initialize resources and prompts, then set up handlers
     // Store the promise so start() can await it before accepting connections
@@ -118,63 +118,7 @@ export class FluentMcpServer {
     }
   }
 
-  /**
-   * Send authentication status notification to the client
-   * Uses the 'authentication' logger name per MCP best practices
-   * @param result The auth validation result to send
-   */
-  private sendAuthStatusNotification(result: AuthValidationResult): void {
-    // Determine appropriate log level based on auth status
-    let level: LogLevel;
-    switch (result.status) {
-      case 'authenticated':
-        level = LogLevel.INFO;
-        break;
-      case 'skipped':
-        level = LogLevel.DEBUG;
-        break;
-      case 'not_authenticated':
-        level = LogLevel.NOTICE;
-        break;
-      case 'validation_error':
-        level = LogLevel.WARNING;
-        break;
-      default:
-        level = LogLevel.INFO;
-    }
-
-    // Build structured data for the notification (exclude sensitive info)
-    const data: Record<string, unknown> = {
-      status: result.status,
-      timestamp: result.timestamp,
-    };
-
-    if (result.alias) data.alias = result.alias;
-    if (result.host) data.host = result.host;
-    if (result.authType) data.authType = result.authType;
-    if (result.isDefault !== undefined) data.isDefault = result.isDefault;
-    if (result.actionRequired) data.actionRequired = result.actionRequired;
-
-    // Send notification with dedicated 'authentication' logger name
-    logger.sendNotification(level, result.message, data, 'authentication');
-  }
-
-  /**
-   * Handle auth validation result - either send immediately or queue for later
-   * @param result The auth validation result
-   */
-  private handleAuthResult(result: AuthValidationResult): void {
-    if (this.clientInitialized) {
-      // Client already initialized, send immediately
-      this.sendAuthStatusNotification(result);
-    } else {
-      // Queue for sending after client initialization
-      this.pendingAuthResult = result;
-      logger.debug('Auth result queued for notification after client initialized');
-    }
-  }
-
-  // auto-auth code moved to fluentInstanceAuto.ts
+  // Auth notification handling delegated to AuthNotificationHandler (SRP)
 
   /**
    * Schedule a delayed initialization to ensure roots and auth are set up
@@ -215,7 +159,7 @@ export class FluentMcpServer {
           logger.info('Triggering auto-auth validation...');
           try {
             const result = await autoValidateAuthIfConfigured(this.toolsManager);
-            this.handleAuthResult(result);
+            this.authNotificationHandler.handleAuthResult(result);
           } catch (error) {
             logger.warn('Auto-auth validation failed', {
               error: error instanceof Error ? error.message : String(error),
@@ -366,14 +310,8 @@ export class FluentMcpServer {
         logger.debug('Cancelled delayed initialization fallback - proper init received');
       }
 
-      // Mark client as initialized
-      this.clientInitialized = true;
-
-      // Send any pending auth notification now that client is ready
-      if (this.pendingAuthResult) {
-        this.sendAuthStatusNotification(this.pendingAuthResult);
-        this.pendingAuthResult = null;
-      }
+      // Mark client as initialized and send any pending notifications
+      this.authNotificationHandler.markClientInitialized();
 
       // Request the list of roots from the client now that initialization is complete
       try {
@@ -390,7 +328,7 @@ export class FluentMcpServer {
         logger.info('Triggering auto-auth validation after client initialization...');
         try {
           const result = await autoValidateAuthIfConfigured(this.toolsManager);
-          this.handleAuthResult(result);
+          this.authNotificationHandler.handleAuthResult(result);
         } catch (error) {
           logger.warn('Auto-auth validation failed', {
             error: error instanceof Error ? error.message : String(error),
