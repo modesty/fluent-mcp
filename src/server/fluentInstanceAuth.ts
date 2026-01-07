@@ -49,10 +49,14 @@ export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): 
   // Extract hostname for display (no credentials)
   const host = extractHostname(instUrl);
 
-  // Log username info for debugging (don't log password)
+  // Check if credentials are configured (don't log actual values)
   const username = process.env.SN_USER_NAME?.trim() || process.env.SN_USERNAME?.trim();
-  if (authType === 'basic' && username) {
-    logger.debug('Basic auth configured with username', { username });
+  const password = process.env.SN_PASSWORD;
+  if (authType === 'basic') {
+    logger.debug('Basic auth credential check', {
+      hasUsername: !!username,
+      hasPassword: !!password
+    });
   }
 
   try {

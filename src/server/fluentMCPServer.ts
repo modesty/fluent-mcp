@@ -49,6 +49,7 @@ export class FluentMcpServer {
   private clientInitialized = false;
   private pendingAuthResult: AuthValidationResult | null = null;
   private initializationPromise: Promise<void>;
+  private delayedInitTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * Create a new MCP server instance
@@ -180,8 +181,13 @@ export class FluentMcpServer {
    * This provides a fallback if the client doesn't send proper notifications
    */
   private scheduleDelayedInitialization(): void {
+    // Prevent scheduling multiple fallback timers
+    if (this.delayedInitTimeoutId !== null) {
+      return;
+    }
+
     // Give the client some time to send notifications, then fallback
-    setTimeout(async () => {
+    this.delayedInitTimeoutId = setTimeout(async () => {
       try {
         // Only initialize if roots haven't been set up yet
         if (this.roots.length === 0) {
@@ -353,6 +359,13 @@ export class FluentMcpServer {
     server.setNotificationHandler(InitializedNotificationSchema, async () => {
       logger.info('Received notifications/initialized notification from client');
 
+      // Cancel the delayed initialization fallback since proper init is happening
+      if (this.delayedInitTimeoutId !== null) {
+        clearTimeout(this.delayedInitTimeoutId);
+        this.delayedInitTimeoutId = null;
+        logger.debug('Cancelled delayed initialization fallback - proper init received');
+      }
+
       // Mark client as initialized
       this.clientInitialized = true;
 
@@ -369,6 +382,20 @@ export class FluentMcpServer {
         logger.error('Failed to request roots after initialization notification',
           error instanceof Error ? error : new Error(String(error))
         );
+      }
+
+      // Trigger auth validation via the proper initialization path
+      if (!this.autoAuthTriggered) {
+        this.autoAuthTriggered = true;
+        logger.info('Triggering auto-auth validation after client initialization...');
+        try {
+          const result = await autoValidateAuthIfConfigured(this.toolsManager);
+          this.handleAuthResult(result);
+        } catch (error) {
+          logger.warn('Auto-auth validation failed', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
     });
     

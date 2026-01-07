@@ -95,12 +95,16 @@ export class NodeProcessRunner implements ProcessRunner {
           const line = stdinState.lines[stdinState.lineIndex];
           logger.debug(`Prompt detected, writing stdin line ${stdinState.lineIndex + 1}/${stdinState.lines.length}`);
           child.stdin.write(line + '\n');
+          // Security: Clear the credential line from memory after writing
+          stdinState.lines[stdinState.lineIndex] = '';
           stdinState.lineIndex++;
           stdinState.pendingStdout = ''; // Reset to wait for next prompt
 
           // If all lines written, close stdin after a small delay
           if (stdinState.lineIndex >= stdinState.lines.length) {
             stdinState.inputComplete = true;
+            // Security: Clear all stdin lines from memory
+            stdinState.lines.length = 0;
             setTimeout(() => {
               if (child.stdin && !child.stdin.destroyed) {
                 logger.debug('Closing stdin after writing all lines');
