@@ -12,7 +12,6 @@ import {
 import { getPrimaryRootPath as getRootContextPrimaryRootPath, getPrimaryRootPathFrom as getPrimaryRootPathFromArray } from '../utils/rootContext.js';
 import {
   SdkInfoCommand,
-  AuthCommand,
   InitCommand,
   BuildCommand,
   InstallCommand,
@@ -28,12 +27,19 @@ import logger from '../utils/logger.js';
 /** Timeout for child process execution in milliseconds */
 const PROCESS_TIMEOUT_MS = 12000;
 
+/** Delay before checking for prompts after stdout data (allows buffering) */
+const STDIN_PROMPT_CHECK_DELAY_MS = 50;
+
+/** Delay before closing stdin after all input lines written */
+const STDIN_CLOSE_DELAY_MS = 200;
+
 // Infrastructure Layer
 export class NodeProcessRunner implements ProcessRunner {
   async run(
     command: string,
     args: string[] = [],
-    cwd?: string
+    cwd?: string,
+    stdinInput?: string
   ): Promise<ProcessResult> {
     return new Promise((resolve, reject) => {
       const env = { ...process.env }; // ensure full environment inheritance
@@ -62,14 +68,71 @@ export class NodeProcessRunner implements ProcessRunner {
         return;
       }
 
+      // Log if stdin input is provided (actual writing happens in response to prompts)
+      if (stdinInput && child.stdin) {
+        logger.debug('Stdin input provided, will write in response to detected prompts');
+      }
+
       let stdout = '';
       let stderr = '';
+
+      // For interactive input, track state and detect prompts
+      const stdinState = {
+        lines: stdinInput?.split('\n').filter(line => line.length > 0) || [],
+        lineIndex: 0,
+        pendingStdout: '',
+        inputComplete: false
+      };
+
+      // Function to check for prompts and write next input line
+      const writeNextLineIfPrompted = () => {
+        if (stdinState.inputComplete || stdinState.lineIndex >= stdinState.lines.length) {
+          return;
+        }
+        if (!child.stdin || child.stdin.destroyed) {
+          return;
+        }
+
+        // Detect inquirer-style prompts (start with "?") or other input requests
+        // Match: "? Question text" - inquirer prompts start with question mark
+        const hasPrompt = /\?\s+[^\n]+$/.test(stdinState.pendingStdout);
+
+        if (hasPrompt) {
+          const line = stdinState.lines[stdinState.lineIndex];
+          logger.debug(`Prompt detected, writing stdin line ${stdinState.lineIndex + 1}/${stdinState.lines.length}`);
+          child.stdin.write(line + '\n');
+          // Security: Clear the credential line from memory after writing
+          stdinState.lines[stdinState.lineIndex] = '';
+          stdinState.lineIndex++;
+          stdinState.pendingStdout = ''; // Reset to wait for next prompt
+
+          // If all lines written, close stdin after a small delay
+          if (stdinState.lineIndex >= stdinState.lines.length) {
+            stdinState.inputComplete = true;
+            // Security: Clear all stdin lines from memory
+            stdinState.lines.length = 0;
+            setTimeout(() => {
+              if (child.stdin && !child.stdin.destroyed) {
+                logger.debug('Closing stdin after writing all lines');
+                child.stdin.end();
+              }
+            }, STDIN_CLOSE_DELAY_MS);
+          }
+        }
+      };
 
       child.stdout?.on('data', (data: Buffer) => {
         const text = data.toString();
         stdout += text;
         // Log real-time output for debugging
         logger.info(`[STDOUT] ${text.trim()}`);
+
+        // Accumulate stdout for prompt detection if we have stdin to write
+        if (stdinInput && !stdinState.inputComplete) {
+          stdinState.pendingStdout += text;
+          // Check for prompts after a tiny delay to allow buffering
+          setTimeout(writeNextLineIfPrompted, STDIN_PROMPT_CHECK_DELAY_MS);
+        }
       });
 
       child.stderr?.on('data', (data: Buffer) => {
@@ -135,7 +198,8 @@ export abstract class BaseCommandProcessor implements CommandProcessor {
     command: string,
     args: string[],
     useMcpCwd?: boolean,
-    customWorkingDir?: string
+    customWorkingDir?: string,
+    stdinInput?: string
   ): Promise<CommandResult>;
 }
 
@@ -153,16 +217,18 @@ export class CLIExecutor extends BaseCommandProcessor {
     command: string,
     args: string[],
     useMcpCwd: boolean = false,
-    customWorkingDir?: string
+    customWorkingDir?: string,
+    stdinInput?: string
   ): Promise<CommandResult> {
-    return this.execute(command, args, useMcpCwd, customWorkingDir);
+    return this.execute(command, args, useMcpCwd, customWorkingDir, stdinInput);
   }
 
   async execute(
     command: string,
     args: string[],
     useMcpCwd: boolean = false,
-    customWorkingDir?: string
+    customWorkingDir?: string,
+    stdinInput?: string
   ): Promise<CommandResult> {
     try {
       let cwd = customWorkingDir;
@@ -171,7 +237,7 @@ export class CLIExecutor extends BaseCommandProcessor {
         const resolved = getPrimaryRootPathFromArray(this.roots);
         cwd = resolved || getRootContextPrimaryRootPath();
       }
-      
+
       // Sanity check on working directory - warn if it's the system root
       if (cwd === '/' || cwd === '\\') {
         throw new Error('ERROR: Command should never be executed with system root (/) as working directory');
@@ -179,8 +245,8 @@ export class CLIExecutor extends BaseCommandProcessor {
 
       // Better logging with clear working directory information
       logger.info(`Executing command: ${command} ${args.join(' ')}`, { cwd });
-            
-      const result = await this.processRunner.run(command, args, cwd);
+
+      const result = await this.processRunner.run(command, args, cwd, stdinInput);
 
       return {
         success: result.exitCode === 0,
@@ -204,7 +270,8 @@ export class CLICmdWriter extends BaseCommandProcessor {
     command: string,
     args: string[],
     useMcpCwd: boolean = false,
-    customWorkingDir?: string
+    customWorkingDir?: string,
+    _stdinInput?: string // Not used by writer, but kept for interface compatibility
   ): Promise<CommandResult> {
     return this.execute(command, args, useMcpCwd, customWorkingDir);
   }
@@ -217,7 +284,8 @@ export class CLICmdWriter extends BaseCommandProcessor {
     command: string,
     args: string[],
     useMcpCwd: boolean = false,
-    customWorkingDir?: string
+    customWorkingDir?: string,
+    _stdinInput?: string // Not used by writer, but kept for interface compatibility
   ): Promise<CommandResult> {
     return this.getCommandText(command, args, useMcpCwd, customWorkingDir);
   }
@@ -332,20 +400,24 @@ export class CommandFactory {
   /**
    * Creates all CLI command instances with appropriate processors
    * @param executor The command processor to use for most commands that require execution
-   * @param writer The command processor to use for commands that should return text (AuthCommand, InitCommand)
+   * @param writer The command processor to use for commands that should return text (InitCommand)
    * @param mcpServer Optional MCP server for commands that support elicitation
    * @returns An array of command instances
+   *
+   * Note: AuthCommand is not exposed to MCP clients. Authentication is handled
+   * automatically at startup via environment variables (SN_INSTANCE_URL, SN_AUTH_TYPE).
+   * The auth alias is stored in the session and used by all SDK commands.
    */
   static createCommands(executor: CommandProcessor, writer?: CommandProcessor, mcpServer?: McpServer): CLICommand[] {
     // If no writer is provided, use the executor for all commands
     const textProcessor = writer || executor;
-    
+
     return [
       // SDK Information Tool (using SDK flags, not commands)
       new SdkInfoCommand(executor),
 
       // SDK Command Tools (actual SDK subcommands)
-      new AuthCommand(textProcessor), // Uses writer to generate text instead of executing
+      // Note: AuthCommand removed - auth is handled via env vars at startup
       new InitCommand(textProcessor, mcpServer), // Uses writer to generate text instead of executing
       new BuildCommand(executor),
       new InstallCommand(executor),

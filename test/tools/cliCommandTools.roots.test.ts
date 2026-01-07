@@ -54,45 +54,48 @@ describe('CLI Command Tools with Root capability', () => {
         { uri: '/test/root2', name: 'Test Root 2' }
       ];
       cliExecutor.setRoots(testRoots);
-      
+
       // Execute command with useMcpCwd=true
       await cliExecutor.execute('test-command', ['arg1', 'arg2'], true);
-      
+
       // Verify that the primary root was used
       expect(mockRun).toHaveBeenCalledWith(
         'test-command',
         ['arg1', 'arg2'],
-        '/test/root1'
+        '/test/root1',
+        undefined // stdinInput
       );
     });
-    
+
     test('should use custom working directory when provided', async () => {
       // Set up roots
       const testRoots = [
         { uri: '/test/root1', name: 'Test Root 1' }
       ];
       cliExecutor.setRoots(testRoots);
-      
+
       // Execute command with custom working directory
       await cliExecutor.execute('test-command', ['arg1'], true, '/custom/dir');
-      
+
       // Verify that the custom directory was used instead of root
       expect(mockRun).toHaveBeenCalledWith(
         'test-command',
         ['arg1'],
-        '/custom/dir'
+        '/custom/dir',
+        undefined // stdinInput
       );
     });
-    
+
     test('should fall back to project root when no roots are set', async () => {
       // Execute command with useMcpCwd=true but no roots set
       await cliExecutor.execute('test-command', ['arg1'], true);
-      
+
       // Verify that the project root was used as fallback
       expect(mockRun).toHaveBeenCalledWith(
         'test-command',
         ['arg1'],
-        '/mock/project/root'
+        '/mock/project/root',
+        undefined // stdinInput
       );
     });
   });

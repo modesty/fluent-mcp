@@ -1,32 +1,63 @@
 import logger from '../utils/logger.js';
 import { ToolsManager } from '../tools/toolsManager.js';
+import { SessionManager } from '../utils/sessionManager.js';
+import { AuthValidationResult } from '../types.js';
 
 /**
  * Perform auto-authentication validation if environment is configured
+ *
+ * Environment variables:
+ * - SN_INSTANCE_URL: ServiceNow instance URL (required for auto-auth)
+ * - SN_AUTH_TYPE: Authentication type ('basic' or 'oauth', defaults to 'oauth')
+ * - SN_USER_NAME / SN_USERNAME: Username for basic auth
+ * - SN_PASSWORD: Password for basic auth
+ *
  * Rules:
- * 1. If SN_INSTANCE_URL is not set -> log and exit
- * 2. If SN_INSTANCE_URL, SN_USERNAME, SN_PASSWORD, SN_AUTH_TYPE are all set -> validate via `npx now-sdk auth --list`
- *    - If a profile's host matches SN_INSTANCE_URL and default = Yes -> validated
- *    - If host matches but default = No -> run `npx now-sdk auth --use <alias>`
- *    - Otherwise -> run `npx now-sdk auth --add <SN_INSTANCE_URL> --type <SN_AUTH_TYPE>` and
- *      for basic type, interactively provide username/password
+ * 1. If SN_INSTANCE_URL is not set -> return skipped status
+ * 2. List existing auth profiles via `npx now-sdk auth --list`
+ *    - If a profile's host matches SN_INSTANCE_URL -> use that profile
+ *    - Store the auth alias in session for use by all SDK commands
+ * 3. If no matching profile found -> attempt to add auth profile automatically
+ *    - For basic auth: uses SN_USER_NAME/SN_USERNAME and SN_PASSWORD env vars
+ *    - For OAuth: opens browser for authentication
+ *    - If successful, store the auth alias in session
+ *    - If failed, return not_authenticated with setup instructions
+ *
+ * @returns AuthValidationResult with structured auth status for client notification
  */
-export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): Promise<void> {
+export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): Promise<AuthValidationResult> {
   const instUrl = process.env.SN_INSTANCE_URL?.trim();
   const authType = process.env.SN_AUTH_TYPE?.trim() || 'oauth';
+  const sessionManager = SessionManager.getInstance();
+  const timestamp = new Date().toISOString();
+
+  // Helper to create result and store in session
+  const createResult = (result: AuthValidationResult): AuthValidationResult => {
+    sessionManager.setAuthValidationResult(result);
+    return result;
+  };
+
   if (!instUrl) {
-    logger.info('Auto-auth skipped: SN_INSTANCE_URL is not set');
-    return;
+    logger.debug('Auto-auth skipped: SN_INSTANCE_URL is not set');
+    return createResult({
+      status: 'skipped',
+      message: 'Auto-auth skipped: SN_INSTANCE_URL environment variable is not set',
+      timestamp,
+    });
   }
 
+  // Extract hostname for display (no credentials)
+  const host = extractHostname(instUrl);
 
-  // const username = process.env.SN_USERNAME?.trim();
-  // const password = process.env.SN_PASSWORD?.trim();
-
-  // if (!username || !password) {
-  //   logger.info('Auto-auth skipped: SN_USERNAME/SN_PASSWORD/SN_AUTH_TYPE not fully set');
-  //   return;
-  // }
+  // Check if credentials are configured (don't log actual values)
+  const username = process.env.SN_USER_NAME?.trim() || process.env.SN_USERNAME?.trim();
+  const password = process.env.SN_PASSWORD;
+  if (authType === 'basic') {
+    logger.debug('Basic auth credential check', {
+      hasUsername: !!username,
+      hasPassword: !!password
+    });
+  }
 
   try {
     // Validate existing auth profiles using the registered AuthCommand via ToolsManager
@@ -35,51 +66,188 @@ export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): 
 
     const matched = profiles.find((p) => urlsEqual(p.host, instUrl));
     if (matched) {
+      // Found a matching profile - store the alias in session
+      sessionManager.setAuthAlias(matched.alias);
+
       if (matched.defaultYes) {
-        logger.info('Auto-auth validated: default profile matches SN_INSTANCE_URL', {
+        logger.debug('Auto-auth validated: default profile matches SN_INSTANCE_URL');
+        return createResult({
+          status: 'authenticated',
           alias: matched.alias,
-          host: matched.host,
+          host,
+          authType: matched.type || authType,
+          isDefault: true,
+          message: 'Auto-auth validated: default profile matches SN_INSTANCE_URL',
+          timestamp,
         });
-        return;
       }
 
       // Found matching host but not default, switch default
       const useAlias = matched.alias;
       const useRes = await toolsManager.runAuth({ use: useAlias });
       if (useRes.exitCode === 0) {
-        logger.info('Auto-auth updated: switched default profile', { alias: useAlias, host: matched.host });
-      } else {
-        logger.warn('Auto-auth warning: failed to switch default profile with now-sdk auth --use', {
+        logger.debug('Auto-auth updated: switched default profile');
+        return createResult({
+          status: 'authenticated',
           alias: useAlias,
-          stderr: useRes.error?.message,
+          host,
+          authType: matched.type || authType,
+          isDefault: true,
+          message: 'Auto-auth validated: switched to matching profile',
+          timestamp,
+        });
+      } else {
+        // Profile exists but couldn't switch - still consider authenticated
+        logger.warn('Auto-auth warning: failed to switch default profile');
+        return createResult({
+          status: 'authenticated',
+          alias: useAlias,
+          host,
+          authType: matched.type || authType,
+          isDefault: false,
+          message: 'Profile found but could not set as default. Commands may need explicit --auth flag.',
+          timestamp,
         });
       }
-      return;
     }
 
-    // Not found -> attempt to add credentials (simplified)
-    const alias = deriveAliasFromInstance(instUrl);
-    // logger.info('Auto-auth attempting to add credentials', { alias, host: instUrl, type: authType });
-      
-    // const addRes = await toolsManager.runAuth({ add: instUrl, type: authType, alias });
-    // if (addRes.exitCode === 0) {
-    //   logger.info('Auto-auth added credentials', { alias, host: instUrl, type: authType });
-        
-    //   // Try to set as default
-    //   const useRes = await runNowSdk(['auth', '--use', alias]);
-    //   if (useRes.exitCode === 0) {
-    //     logger.info('Auto-auth set as default', { alias });
-    //   }
-    // } else {
-    logger.notice('not authenticated, please run following shell command to login:', {
-      shellCommand: `npx @servicenow/sdk auth --add ${instUrl} --type ${authType} --alias ${alias}`
-    });
-    // }
+    // Not found -> attempt to add auth profile automatically
+    return await attemptAddAuthProfile(
+      toolsManager,
+      sessionManager,
+      createResult,
+      instUrl,
+      authType,
+      host,
+      timestamp
+    );
   } catch (error) {
-    logger.warn('Auto-auth failed to validate', { error: error instanceof Error ? error.message : String(error) });
-    logger.notice('please run following shell command to login:', {
-      shellCommand: `npx @servicenow/sdk auth --add ${instUrl} --type ${authType}`
+    const alias = deriveAliasFromInstance(instUrl);
+    const authCommand = buildAuthCommand(instUrl, authType, alias);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    logger.warn('Auto-auth failed to validate', { error: errorMessage });
+
+    return createResult({
+      status: 'validation_error',
+      host,
+      authType,
+      message: `Auth validation failed: ${errorMessage}`,
+      actionRequired: authCommand,
+      timestamp,
     });
+  }
+}
+
+/**
+ * Attempt to add a new auth profile automatically
+ * Extracted to reduce nesting in the main function
+ */
+async function attemptAddAuthProfile(
+  toolsManager: ToolsManager,
+  sessionManager: SessionManager,
+  createResult: (result: AuthValidationResult) => AuthValidationResult,
+  instUrl: string,
+  authType: string,
+  host: string,
+  timestamp: string
+): Promise<AuthValidationResult> {
+  const alias = deriveAliasFromInstance(instUrl);
+  const authCommand = buildAuthCommand(instUrl, authType, alias);
+
+  logger.debug('No matching auth profile found, attempting to add automatically', {
+    instUrl,
+    authType,
+    alias,
+  });
+
+  try {
+    // Attempt to add authentication profile
+    // For basic auth: relies on SN_USER_NAME/SN_USERNAME and SN_PASSWORD env vars
+    // For OAuth: will open browser for authentication
+    const addRes = await toolsManager.runAuth({
+      add: instUrl,
+      type: authType,
+      alias,
+    });
+
+    if (addRes.exitCode === 0) {
+      // Auth add succeeded - store the alias in session
+      sessionManager.setAuthAlias(alias);
+      logger.debug('Auto-auth succeeded: added new profile', { alias, authType });
+
+      return createResult({
+        status: 'authenticated',
+        alias,
+        host,
+        authType,
+        isDefault: true,
+        message: `Auto-auth succeeded: added new ${authType} profile for ${host}`,
+        timestamp,
+      });
+    }
+
+    // Auth add failed - return instructions for manual setup
+    const setupHint = getAuthSetupHint(authType);
+
+    logger.warn('Auto-auth failed to add profile', {
+      exitCode: addRes.exitCode,
+      output: addRes.output,
+      error: addRes.error?.message,
+    });
+
+    return createResult({
+      status: 'not_authenticated',
+      host,
+      authType,
+      message: `Auto-auth failed to add profile. ${setupHint}`,
+      actionRequired: authCommand,
+      timestamp,
+    });
+  } catch (addError) {
+    // Error during auth add attempt - return instructions for manual setup
+    const errorMessage = addError instanceof Error ? addError.message : String(addError);
+    const setupHint = getAuthSetupHint(authType);
+
+    logger.warn('Auto-auth error during profile add', { error: errorMessage });
+
+    return createResult({
+      status: 'not_authenticated',
+      host,
+      authType,
+      message: `Auto-auth error: ${errorMessage}. ${setupHint}`,
+      actionRequired: authCommand,
+      timestamp,
+    });
+  }
+}
+
+/**
+ * Build the auth command string for display to the user
+ */
+function buildAuthCommand(instUrl: string, authType: string, alias: string): string {
+  return `npx @servicenow/sdk auth --add ${instUrl} --type ${authType} --alias ${alias}`;
+}
+
+/**
+ * Get setup hint message based on auth type
+ */
+function getAuthSetupHint(authType: string): string {
+  return authType === 'basic'
+    ? 'For basic auth, ensure SN_USER_NAME and SN_PASSWORD environment variables are set.'
+    : 'For OAuth, a browser window will open for authentication.';
+}
+
+/**
+ * Extract hostname from URL for safe display (no credentials)
+ */
+function extractHostname(instUrl: string): string {
+  try {
+    const u = new URL(instUrl);
+    return u.hostname;
+  } catch {
+    // If URL parsing fails, return sanitized string
+    return instUrl.replace(/^https?:\/\//, '').split('/')[0];
   }
 }
 

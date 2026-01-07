@@ -74,6 +74,10 @@ jest.mock("../../src/utils/sessionManager.js", () => {
       getInstance: jest.fn().mockReturnValue({
         setWorkingDirectory: jest.fn(),
         getWorkingDirectory: jest.fn().mockReturnValue("/saved-working-dir"),
+        getAuthAlias: jest.fn().mockReturnValue(undefined),
+        setAuthAlias: jest.fn(),
+        getAuthValidationResult: jest.fn().mockReturnValue(undefined),
+        setAuthValidationResult: jest.fn(),
       }),
     },
   };
@@ -194,7 +198,8 @@ describe("InitCommand", () => {
     expect(workingDirArg?.required).toBe(true);
 
     const templateArg = initCommand.arguments.find(arg => arg.name === "template");
-    expect(templateArg?.required).toBe(true);
+    expect(templateArg?.required).toBe(false); // Only required for creation intent, not globally
+    expect(templateArg?.description).toContain("For creation only");
 
     const appNameArg = initCommand.arguments.find(arg => arg.name === "appName");
     expect(appNameArg?.required).toBe(false);

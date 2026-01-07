@@ -7,6 +7,9 @@ jest.mock("../../src/utils/sessionManager.js", () => ({
   SessionManager: {
     getInstance: jest.fn().mockReturnValue({
       getWorkingDirectory: jest.fn(),
+      getAuthAlias: jest.fn().mockReturnValue(undefined),
+      getAuthValidationResult: jest.fn().mockReturnValue(undefined),
+      setAuthValidationResult: jest.fn(),
     }),
   },
 }));
@@ -80,10 +83,11 @@ describe("SessionFallbackCommand", () => {
 
     expect(SessionManager.getInstance().getWorkingDirectory).toHaveBeenCalled();
     expect(mockExecutor.process).toHaveBeenCalledWith(
-      "test", 
-      ["arg1", "arg2"], 
+      "test",
+      ["arg1", "arg2"],
       false, // useMcpCwd
-      "/session-working-dir" // working directory from session
+      "/session-working-dir", // working directory from session
+      undefined // stdinInput
     );
   });
 
@@ -98,7 +102,9 @@ describe("SessionFallbackCommand", () => {
     expect(mockExecutor.process).toHaveBeenCalledWith(
       "test",
       ["arg1", "arg2"],
-      true // use MCP root as working directory
+      true, // use MCP root as working directory
+      undefined, // customWorkingDir
+      undefined // stdinInput
     );
   });
 });

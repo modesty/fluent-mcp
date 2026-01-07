@@ -7,13 +7,13 @@ import { SessionAwareCLICommand } from './sessionAwareCommand.js';
  */
 export class InstallCommand extends SessionAwareCLICommand {
   name = 'deploy_fluent_app';
-  description = 'Deploy the Fluent (ServiceNow SDK) application to a ServiceNow instance by auth alias or default auth';
+  description = 'Deploy the Fluent (ServiceNow SDK) application to a ServiceNow instance';
   arguments: CommandArgument[] = [
     {
       name: 'auth',
       type: 'string',
       required: false,
-      description: 'The authentication alias to use',
+      description: 'Credential alias to use for authentication with instance (auto-injected from session if not provided)',
     },
     {
       name: 'debug',
@@ -24,13 +24,8 @@ export class InstallCommand extends SessionAwareCLICommand {
   ];
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
-    const sdkArgs = ['now-sdk', 'install'];
-
-    if (args.auth) {
-      sdkArgs.push('--auth', args.auth as string);
-    }
-    this.appendCommonFlags(sdkArgs, args);
-
-    return this.executeWithSessionWorkingDirectory('npx', sdkArgs);
+    return this.executeSdkCommand('install', args, {
+      auth: '--auth',
+    });
   }
 }

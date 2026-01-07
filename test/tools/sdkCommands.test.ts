@@ -14,7 +14,7 @@ class MockProcessRunner extends NodeProcessRunner {
     this.mockResult = result;
   }
 
-  async run(_command: string, args: string[] = []): Promise<ProcessResult> {
+  async run(_command: string, args: string[] = [], _cwd?: string, _stdinInput?: string): Promise<ProcessResult> {
     // Return different mocked responses based on args
     if (args.includes('--version') || args.includes('-v')) {
       return {
@@ -134,7 +134,8 @@ describe('SDK Command Tools', () => {
     expect(mockRunner.run).toHaveBeenCalledWith(
       'npx',  // Should use npx
       expect.arrayContaining(['now-sdk', 'auth', '--help']),  // Args with 'now-sdk' prefix
-      expect.any(String)  // Working directory should be provided (project root path)
+      expect.any(String),  // Working directory should be provided (project root path)
+      undefined  // stdinInput
     );
     
     // Restore the original run method

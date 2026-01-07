@@ -3,14 +3,14 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { CommandFactory, CommandRegistry } from './cliCommandTools.js';
 import { CLICommand, CommandProcessor, CommandResult } from '../utils/types.js';
 import logger from '../utils/logger.js';
-import { 
+import {
   GetApiSpecCommand,
   GetSnippetCommand,
   GetInstructCommand,
-  ListMetadataTypesCommand
+  ListMetadataTypesCommand,
+  CheckAuthStatusCommand
 } from './resourceTools.js';
 import { CLIExecutor, CLICmdWriter, NodeProcessRunner, BaseCommandProcessor } from './cliCommandTools.js';
-import { AuthCommand } from './commands/authCommand.js';
 import { setRoots as setRootContextRoots } from '../utils/rootContext.js';
 
 /**
@@ -49,7 +49,8 @@ export class ToolsManager {
     this.cliCmdWriter = cliCmdWriter;
     
     // Create commands with appropriate processors for each type
-    // AuthCommand and InitCommand will use CLICmdWriter, others will use CLIExecutor
+    // InitCommand will use CLICmdWriter, others will use CLIExecutor
+    // Note: AuthCommand is not exposed to MCP clients - it's used internally for auto-auth validation
     const commands = CommandFactory.createCommands(cliExecutor, cliCmdWriter, this.mcpServer);
 
     commands.forEach((command) => {
@@ -86,6 +87,11 @@ export class ToolsManager {
       const getInstructCommand = new GetInstructCommand();
       this.commandRegistry.register(getInstructCommand);
       this.registerToolFromCommand(getInstructCommand);
+
+      // Register auth status check tool
+      const checkAuthStatusCommand = new CheckAuthStatusCommand();
+      this.commandRegistry.register(checkAuthStatusCommand);
+      this.registerToolFromCommand(checkAuthStatusCommand);
 
       logger.debug('Resource tools registered successfully');
     } catch (error) {
@@ -254,9 +260,15 @@ export class ToolsManager {
 
   /**
    * Execute the AuthCommand using the shared executor (not the writer)
-   * Used by server-internal flows like auto auth validation
+   * Used internally by server for auto-auth validation at startup.
+   * Note: AuthCommand is not exposed to MCP clients - authentication is managed
+   * via environment variables (SN_INSTANCE_URL, SN_AUTH_TYPE) and the auth alias
+   * is stored in session for use by all SDK commands.
+   * Uses dynamic import to lazy-load AuthCommand only when needed.
    */
   async runAuth(args: Record<string, unknown>): Promise<CommandResult> {
+    // Lazy load AuthCommand to avoid importing it at module load time
+    const { AuthCommand } = await import('./commands/authCommand.js');
     const cmd = new AuthCommand(this.cliExecutor);
     return await cmd.execute(args);
   }

@@ -58,4 +58,49 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
       return CommandResultFactory.fromError(error);
     }
   }
+
+  /**
+   * Execute an SDK command with argument mapping to CLI flags
+   * @param sdkCommand The SDK command name (e.g., 'build', 'install')
+   * @param args The command arguments object
+   * @param flagMapping Optional mapping of arg names to CLI flags
+   * @param positionalArgs Optional positional arguments to append at the end
+   * @returns The command result
+   */
+  protected async executeSdkCommand(
+    sdkCommand: string,
+    args: Record<string, unknown>,
+    flagMapping: Record<string, string | { flag: string; hasValue: boolean }> = {},
+    positionalArgs: string[] = []
+  ): Promise<CommandResult> {
+    // Build the full SDK command args: ['now-sdk', 'subcommand', ...flags, ...positional]
+    const sdkArgs: string[] = ['now-sdk', sdkCommand];
+
+    // Add positional arguments first (before flags)
+    sdkArgs.push(...positionalArgs);
+
+    // Add mapped flags
+    for (const [argName, flagConfig] of Object.entries(flagMapping)) {
+      const value = args[argName];
+      if (value !== undefined && value !== null && value !== '') {
+        if (typeof flagConfig === 'string') {
+          // Simple string flag with value
+          sdkArgs.push(flagConfig, String(value));
+        } else {
+          // Object config with flag and hasValue
+          if (flagConfig.hasValue) {
+            sdkArgs.push(flagConfig.flag, String(value));
+          } else if (value) {
+            // Boolean flag without value
+            sdkArgs.push(flagConfig.flag);
+          }
+        }
+      }
+    }
+
+    // Add common flags (like --debug)
+    this.appendCommonFlags(sdkArgs, args);
+
+    return this.executeWithSessionWorkingDirectory('npx', sdkArgs);
+  }
 }

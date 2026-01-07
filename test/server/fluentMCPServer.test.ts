@@ -125,15 +125,30 @@ jest.mock("../../src/res/resourceManager.js", () => {
   };
 });
 
-// Mock logger
+// Mock logger with LogLevel enum
 jest.mock("../../src/utils/logger.js", () => {
+  // Define LogLevel enum for the mock
+  const LogLevel = {
+    DEBUG: 'debug',
+    INFO: 'info',
+    NOTICE: 'notice',
+    WARNING: 'warning',
+    WARN: 'warning',
+    ERROR: 'error',
+    CRITICAL: 'critical',
+    ALERT: 'alert',
+    EMERGENCY: 'emergency',
+  };
+
   return {
+    LogLevel,
     debug: jest.fn(),
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
     setMcpServer: jest.fn(),
     setupLoggingHandlers: jest.fn(),
+    sendNotification: jest.fn(),
     __esModule: true,
     default: {
       debug: jest.fn(),
@@ -141,7 +156,8 @@ jest.mock("../../src/utils/logger.js", () => {
       warn: jest.fn(),
       error: jest.fn(),
       setMcpServer: jest.fn(),
-      setupLoggingHandlers: jest.fn()
+      setupLoggingHandlers: jest.fn(),
+      sendNotification: jest.fn()
     }
   };
 });

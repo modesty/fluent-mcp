@@ -22,6 +22,7 @@ import { ResourceManager } from '../res/resourceManager.js';
 import { PromptManager } from '../prompts/promptManager.js';
 import { autoValidateAuthIfConfigured } from './fluentInstanceAuth.js';
 import { SamplingManager } from '../utils/samplingManager.js';
+import { AuthNotificationHandler } from './authNotificationHandler.js';
 
 /** Delay before fallback initialization if client doesn't send notifications */
 const INITIALIZATION_DELAY_MS = 1000;
@@ -45,7 +46,9 @@ export class FluentMcpServer {
   private status: ServerStatus = ServerStatus.STOPPED;
   private roots: { uri: string; name?: string }[] = [];
   private autoAuthTriggered = false;
-  private resourcesRegistered = false;
+  private authNotificationHandler: AuthNotificationHandler;
+  private initializationPromise: Promise<void>;
+  private delayedInitTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * Create a new MCP server instance
@@ -81,9 +84,11 @@ export class FluentMcpServer {
     this.resourceManager = new ResourceManager(this.mcpServer);
     this.promptManager = new PromptManager(this.mcpServer);
     this.samplingManager = new SamplingManager(this.mcpServer);
+    this.authNotificationHandler = new AuthNotificationHandler();
 
-    // Initialize resources and prompts
-    Promise.all([
+    // Initialize resources and prompts, then set up handlers
+    // Store the promise so start() can await it before accepting connections
+    this.initializationPromise = Promise.all([
       this.resourceManager.initialize(),
       this.promptManager.initialize()
     ]).then(() => {
@@ -113,15 +118,20 @@ export class FluentMcpServer {
     }
   }
 
-  // auto-auth code moved to fluentInstanceAuto.ts
+  // Auth notification handling delegated to AuthNotificationHandler (SRP)
 
   /**
    * Schedule a delayed initialization to ensure roots and auth are set up
    * This provides a fallback if the client doesn't send proper notifications
    */
   private scheduleDelayedInitialization(): void {
+    // Prevent scheduling multiple fallback timers
+    if (this.delayedInitTimeoutId !== null) {
+      return;
+    }
+
     // Give the client some time to send notifications, then fallback
-    setTimeout(async () => {
+    this.delayedInitTimeoutId = setTimeout(async () => {
       try {
         // Only initialize if roots haven't been set up yet
         if (this.roots.length === 0) {
@@ -147,14 +157,17 @@ export class FluentMcpServer {
         if (!this.autoAuthTriggered) {
           this.autoAuthTriggered = true;
           logger.info('Triggering auto-auth validation...');
-          autoValidateAuthIfConfigured(this.toolsManager).catch((error) => {
+          try {
+            const result = await autoValidateAuthIfConfigured(this.toolsManager);
+            this.authNotificationHandler.handleAuthResult(result);
+          } catch (error) {
             logger.warn('Auto-auth validation failed', {
               error: error instanceof Error ? error.message : String(error),
             });
-          });
+          }
         }
       } catch (error) {
-        logger.error('Error during delayed initialization', 
+        logger.error('Error during delayed initialization',
           error instanceof Error ? error : new Error(String(error))
         );
       }
@@ -289,14 +302,38 @@ export class FluentMcpServer {
     // Set up handler for notifications/initialized
     server.setNotificationHandler(InitializedNotificationSchema, async () => {
       logger.info('Received notifications/initialized notification from client');
-      
+
+      // Cancel the delayed initialization fallback since proper init is happening
+      if (this.delayedInitTimeoutId !== null) {
+        clearTimeout(this.delayedInitTimeoutId);
+        this.delayedInitTimeoutId = null;
+        logger.debug('Cancelled delayed initialization fallback - proper init received');
+      }
+
+      // Mark client as initialized and send any pending notifications
+      this.authNotificationHandler.markClientInitialized();
+
       // Request the list of roots from the client now that initialization is complete
       try {
         await this.requestRootsFromClient();
       } catch (error) {
-        logger.error('Failed to request roots after initialization notification', 
+        logger.error('Failed to request roots after initialization notification',
           error instanceof Error ? error : new Error(String(error))
         );
+      }
+
+      // Trigger auth validation via the proper initialization path
+      if (!this.autoAuthTriggered) {
+        this.autoAuthTriggered = true;
+        logger.info('Triggering auto-auth validation after client initialization...');
+        try {
+          const result = await autoValidateAuthIfConfigured(this.toolsManager);
+          this.authNotificationHandler.handleAuthResult(result);
+        } catch (error) {
+          logger.warn('Auto-auth validation failed', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
     });
     
@@ -417,17 +454,8 @@ export class FluentMcpServer {
           // Log the root change only once at this level
           loggingManager.logRootsChanged(this.roots);
         }
-
-        // Trigger auto-auth validation ONCE after roots are available
-        if (!this.autoAuthTriggered) {
-          this.autoAuthTriggered = true;
-          // Fire and forget; we don't want to block roots update
-          autoValidateAuthIfConfigured(this.toolsManager).catch((error) => {
-            logger.warn('Auto-auth validation failed after roots update', {
-              error: error instanceof Error ? error.message : String(error),
-            });
-          });
-        }
+        // Note: Auto-auth is triggered via scheduleDelayedInitialization() only,
+        // which provides a single, predictable entry point for auth validation
       }
     }
   }
@@ -501,6 +529,11 @@ export class FluentMcpServer {
         throw new Error('MCP server not properly initialized');
       }
 
+      // Wait for handlers to be set up before accepting connections
+      // This ensures notification handlers (like notifications/initialized) are registered
+      // before the client can send them, preventing race conditions in auth validation
+      await this.initializationPromise;
+
       // Create stdio transport for communication
       const transport = new StdioServerTransport();
 
@@ -510,13 +543,11 @@ export class FluentMcpServer {
       // Configure logging manager with MCP server
       loggingManager.configure(this.mcpServer);
 
-      // Register resources if not already done
-      // This sets up the resource read handlers in the MCP SDK
-      if (!this.resourcesRegistered) {
-        this.resourceManager.registerAll();
-        this.resourcesRegistered = true;
-      }
-      
+      // Note: Resources are handled by manual handlers in setupHandlers() that use
+      // resourceManager.listResources() and resourceManager.readResource().
+      // We don't call resourceManager.registerAll() here because it would try to
+      // set up duplicate resources/list handlers via the SDK's registerResource().
+
       // Set the server status to running before initializing roots
       // This ensures that client notifications will be sent correctly
       this.status = ServerStatus.RUNNING;
