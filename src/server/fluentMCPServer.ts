@@ -23,6 +23,7 @@ import { PromptManager } from '../prompts/promptManager.js';
 import { autoValidateAuthIfConfigured } from './fluentInstanceAuth.js';
 import { SamplingManager } from '../utils/samplingManager.js';
 import { AuthNotificationHandler } from './authNotificationHandler.js';
+import { McpResourceNotFoundError, McpUnknownToolError, McpInternalError } from '../utils/mcpErrors.js';
 
 /** Delay before fallback initialization if client doesn't send notifications */
 const INITIALIZATION_DELAY_MS = 1000;
@@ -108,12 +109,12 @@ export class FluentMcpServer {
       return `✅ Output:\n${result.output}`;
     } else {
       let errorOutput = `❌ Error:\n${result.error || 'Unknown error'}\n(exit code: ${result.exitCode})\n${result.output}`;
-      
+
       // Append AI error analysis if available
       if (result.errorAnalysis) {
         errorOutput += '\n' + this.samplingManager.formatAnalysis(result.errorAnalysis);
       }
-      
+
       return errorOutput;
     }
   }
@@ -136,7 +137,7 @@ export class FluentMcpServer {
         // Only initialize if roots haven't been set up yet
         if (this.roots.length === 0) {
           logger.info('No roots received from client after delay, using fallback initialization...');
-          
+
           // Try to request from client first, with short timeout
           try {
             await Promise.race([
@@ -152,7 +153,7 @@ export class FluentMcpServer {
             await this.addRoot(`file://${projectRoot}`, 'Project Root (Fallback)');
           }
         }
-        
+
         // Trigger auth validation if not already triggered
         if (!this.autoAuthTriggered) {
           this.autoAuthTriggered = true;
@@ -187,7 +188,7 @@ export class FluentMcpServer {
     }
 
     logger.info('Requesting roots from client via roots/list...');
-    
+
     try {
       // Create a schema for the response using the Zod library
       // This is needed because the request method requires a result schema
@@ -208,15 +209,15 @@ export class FluentMcpServer {
       ) as RootsResponse;
 
       const roots = response.roots;
-      
+
       if (Array.isArray(roots) && roots.length > 0) {
         logger.info('Received roots from client', { rootCount: roots.length });
-        
+
         // Update roots with client-provided roots
         await this.updateRoots(roots);
       } else {
         logger.warn('Client responded to roots/list but provided no roots');
-        
+
         // Fall back to project root if no valid roots received
         if (this.roots.length === 0) {
           const projectRoot = getProjectRootPath();
@@ -225,10 +226,10 @@ export class FluentMcpServer {
         }
       }
     } catch (error) {
-      logger.error('Error requesting roots from client', 
+      logger.error('Error requesting roots from client',
         error instanceof Error ? error : new Error(String(error))
       );
-      
+
       // Fall back to project root if request fails
       if (this.roots.length === 0) {
         const projectRoot = getProjectRootPath();
@@ -244,15 +245,15 @@ export class FluentMcpServer {
   private setupHandlers(): void {
     const server = this.mcpServer?.server;
     if (!server) return;
-    
+
     // Set up the tools/list handler
     server.setRequestHandler(ListToolsRequestSchema, async () => {
       const tools = this.toolsManager.getMCPTools();
-      
+
       // Start a delayed initialization process to ensure roots and auth are set up
       // even if the client doesn't send proper notifications
       this.scheduleDelayedInitialization();
-      
+
       return { tools };
     });
 
@@ -266,31 +267,46 @@ export class FluentMcpServer {
         return { resources: [] };
       }
     });
-    
+
     // Set up the resources/read handler
     // The SDK's registerResource() doesn't automatically set up the read handler
     // We need to explicitly handle resource read requests
     server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const { uri } = request.params;
-      
+
       try {
         logger.debug('Reading resource', { uri });
-        
+
         // Call ResourceManager to handle the read request
         const result = await this.resourceManager.readResource(uri);
+
+        // Check if resource was not found (result has no contents)
+        if (!result.contents || result.contents.length === 0) {
+          throw new McpResourceNotFoundError(uri);
+        }
+
         return result;
       } catch (error) {
+        // Re-throw MCP errors as-is for proper error codes
+        if (error instanceof McpResourceNotFoundError) {
+          logger.warn('Resource not found', { uri });
+          throw error;
+        }
+
+        // Wrap other errors as internal errors
         logger.error('Error reading resource',
           error instanceof Error ? error : new Error(String(error)),
           { uri }
         );
-        throw error;
+        throw new McpInternalError(
+          `Failed to read resource: ${error instanceof Error ? error.message : String(error)}`
+        );
       }
     });
-    
+
     // Set up prompts handlers
     this.promptManager.setupHandlers();
-    
+
     // Set up roots/list handler
     server.setRequestHandler(ListRootsRequestSchema, async () => {
       logger.debug('Received roots/list request, returning current roots');
@@ -298,7 +314,7 @@ export class FluentMcpServer {
         roots: this.roots,
       };
     });
-    
+
     // Set up handler for notifications/initialized
     server.setNotificationHandler(InitializedNotificationSchema, async () => {
       logger.info('Received notifications/initialized notification from client');
@@ -336,28 +352,28 @@ export class FluentMcpServer {
         }
       }
     });
-    
+
     // Set up handler for roots/list_changed notification
     server.setNotificationHandler(RootsListChangedNotificationSchema, async () => {
       logger.info('Received notifications/roots/list_changed notification from client');
-      
+
       // When a root list change notification is received, request the updated roots list
       try {
         await this.requestRootsFromClient();
       } catch (error) {
-        logger.error('Failed to request updated roots after notification', 
+        logger.error('Failed to request updated roots after notification',
           error instanceof Error ? error : new Error(String(error))
         );
       }
     });
-    
+
     // Execute tool calls handler
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
 
       const command = this.toolsManager.getCommand(name);
       if (!command) {
-        throw new Error(`Unknown command: ${name}`);
+        throw new McpUnknownToolError(name);
       }
 
       try {
@@ -366,10 +382,10 @@ export class FluentMcpServer {
         // If command failed and error analysis is enabled, analyze the error
         if (!result.success && this.config.sampling.enableErrorAnalysis && result.error) {
           const errorMessage = result.error.message;
-          
+
           if (this.samplingManager.shouldAnalyzeError(errorMessage, this.config.sampling.minErrorLength)) {
             logger.info('Triggering error analysis for failed command', { command: name });
-            
+
             try {
               const analysis = await this.samplingManager.analyzeError({
                 command: name,
@@ -377,7 +393,7 @@ export class FluentMcpServer {
                 errorOutput: errorMessage,
                 exitCode: result.exitCode,
               });
-              
+
               if (analysis) {
                 result.errorAnalysis = analysis;
               }
@@ -428,17 +444,17 @@ export class FluentMcpServer {
       }
       return true;
     });
-    
+
     // Check if roots have changed
     const hasChanged = this.roots.length !== validatedRoots.length ||
-      this.roots.some((root, index) => 
-        root.uri !== validatedRoots[index]?.uri || 
+      this.roots.some((root, index) =>
+        root.uri !== validatedRoots[index]?.uri ||
         root.name !== validatedRoots[index]?.name
       );
-    
+
     if (hasChanged) {
       this.roots = [...validatedRoots];
-      
+
       // Only update tools manager with the roots if the server is running
       // or if the status is INITIALIZING (for tests)
       // This prevents unnecessary updates during initialization
@@ -459,7 +475,7 @@ export class FluentMcpServer {
       }
     }
   }
-  
+
   /**
    * Add a new root to the list of roots
    * @param uri The URI of the root
@@ -471,10 +487,10 @@ export class FluentMcpServer {
       logger.warn('Attempted to add root with empty URI, ignoring');
       return;
     }
-    
+
     // Check if root already exists
     const existingIndex = this.roots.findIndex(root => root.uri === uri);
-    
+
     if (existingIndex >= 0) {
       // Update existing root if name has changed
       if (this.roots[existingIndex].name !== name) {
@@ -491,19 +507,19 @@ export class FluentMcpServer {
       await this.updateRoots([...this.roots, { uri, name }]);
     }
   }
-  
+
   /**
    * Remove a root from the list of roots
    * @param uri The URI of the root to remove
    */
   async removeRoot(uri: string): Promise<void> {
     const updatedRoots = this.roots.filter(root => root.uri !== uri);
-    
+
     if (updatedRoots.length !== this.roots.length) {
       await this.updateRoots(updatedRoots);
     }
   }
-  
+
   /**
    * Get the current list of roots
    * @returns The list of roots
@@ -511,7 +527,7 @@ export class FluentMcpServer {
   getRoots(): { uri: string; name?: string }[] {
     return [...this.roots];
   }
-  
+
   /**
    * Start the MCP server
    */
@@ -552,7 +568,7 @@ export class FluentMcpServer {
       // This ensures that client notifications will be sent correctly
       this.status = ServerStatus.RUNNING;
       loggingManager.logServerStarted();
-      
+
       // The root list will be requested when the client sends the notifications/initialized notification
       // This ensures proper timing according to the MCP protocol
     } catch (error) {
