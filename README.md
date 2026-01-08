@@ -62,7 +62,8 @@ Create a new Fluent app in ~/projects/time-off-tracker to manage employee PTO re
 
 | Tool | Description | Key Parameters |
 |------|-------------|----------------|
-| `sdk_info` | Get SDK version, help, or debug info | `flag` (-v/-h/-d), `command` (optional) |
+| `sdk_info` | Get SDK version or help | `flag` (-v/-h), `command` (optional for -h) |
+| `get-api-spec` | Get API spec or list all metadata types | `metadataType` (optional, omit to list all) |
 | `init_fluent_app` | Initialize or convert ServiceNow app | `workingDirectory` (required), `template`, `from` (optional) |
 | `build_fluent_app` | Build the application | `debug` (optional) |
 | `deploy_fluent_app` | Deploy to ServiceNow instance | `auth` (auto-injected), `debug` (optional) |
@@ -224,6 +225,7 @@ npm run build && npm run inspect
 
 - Version command returns SDK version string
 - Help command returns detailed command documentation
+- List metadata (`-lm`) returns available Fluent metadata types
 - No errors in notifications pane
 - Commands execute within 2-3 seconds
 

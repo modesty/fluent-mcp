@@ -7,7 +7,6 @@ import {
   GetApiSpecCommand,
   GetSnippetCommand,
   GetInstructCommand,
-  ListMetadataTypesCommand,
   CheckAuthStatusCommand
 } from './resourceTools.js';
 import { CLIExecutor, CLICmdWriter, NodeProcessRunner, BaseCommandProcessor } from './cliCommandTools.js';
@@ -29,7 +28,7 @@ export class ToolsManager {
   constructor(mcpServer: McpServer) {
     this.mcpServer = mcpServer;
     this.commandRegistry = new CommandRegistry();
-    
+
     // Initialize the tools
     this.initializeTools();
   }
@@ -40,14 +39,14 @@ export class ToolsManager {
   private initializeTools(): void {
     // Register CLI commands
     const processRunner = new NodeProcessRunner();
-    
+
     // Create both types of command processors
     const cliExecutor = new CLIExecutor(processRunner);
     const cliCmdWriter = new CLICmdWriter(); // CLICmdWriter doesn't need processRunner
     // Store shared processors for later use (e.g., server-internal invocations)
     this.cliExecutor = cliExecutor;
     this.cliCmdWriter = cliCmdWriter;
-    
+
     // Create commands with appropriate processors for each type
     // InitCommand will use CLICmdWriter, others will use CLIExecutor
     // Note: AuthCommand is not exposed to MCP clients - it's used internally for auto-auth validation
@@ -58,7 +57,7 @@ export class ToolsManager {
       // Register each CLI command as an MCP tool
       this.registerToolFromCommand(command);
     });
-    
+
     // Register resource tools
     this.registerResourceTools();
   }
@@ -68,11 +67,6 @@ export class ToolsManager {
    */
   private registerResourceTools(): void {
     try {
-      // Register metadata type listing tool
-      const listMetadataTypesCommand = new ListMetadataTypesCommand();
-      this.commandRegistry.register(listMetadataTypesCommand);
-      this.registerToolFromCommand(listMetadataTypesCommand);
-
       // Register API specification tool
       const getApiSpecCommand = new GetApiSpecCommand();
       this.commandRegistry.register(getApiSpecCommand);
@@ -101,14 +95,14 @@ export class ToolsManager {
       throw error;
     }
   }
-  
+
   /**
    * Registers a command as an MCP tool
    * @param command The command to register
    */
   private registerToolFromCommand(command: CLICommand): void {
     if (!this.mcpServer) return;
-    
+
     // Convert command arguments to Zod schema
     const schema: Record<string, z.ZodTypeAny> = {};
 
@@ -142,7 +136,7 @@ export class ToolsManager {
       schema[arg.name] = zodType;
     }
 
-    
+
     // Create schema for MCP - use raw schema object, let MCP handle the z.object() wrapping
     let inputSchema: any = undefined;
     if (Object.keys(schema).length > 0) {
@@ -159,11 +153,30 @@ export class ToolsManager {
         inputSchema: inputSchema
       },
       async (args: { [x: string]: any }, _extra: unknown) => {
-        const result = await command.execute(args);
-        return {
-          content: [{ type: 'text' as const, text: result.output }],
-          structuredContent: { success: result.success }
-        };
+        try {
+          const result = await command.execute(args);
+
+          // Format the output for display (with ✅/❌ prefixes)
+          const formattedOutput = this.formatResult({
+            success: result.success,
+            output: result.output,
+            exitCode: result.exitCode,
+            error: result.error?.message
+          });
+
+          return {
+            content: [{ type: 'text' as const, text: formattedOutput }],
+            isError: !result.success
+          };
+        } catch (error) {
+          // Handle exceptions from validateArgs() or command execution
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          logger.error(`Tool '${command.name}' execution failed`, error instanceof Error ? error : new Error(errorMessage));
+          return {
+            content: [{ type: 'text' as const, text: `❌ Error: ${errorMessage}` }],
+            isError: true
+          };
+        }
       }
     );
   }
@@ -177,9 +190,8 @@ export class ToolsManager {
     if (result.success) {
       return `✅ Command executed successfully\n\nOutput:\n${result.output}`;
     } else {
-      return `❌ Command failed (exit code: ${result.exitCode})\n\nError:\n${
-        result.error || 'Unknown error'
-      }\n\nOutput:\n${result.output}`;
+      return `❌ Command failed (exit code: ${result.exitCode})\n\nError:\n${result.error || 'Unknown error'
+        }\n\nOutput:\n${result.output}`;
     }
   }
 
@@ -207,7 +219,7 @@ export class ToolsManager {
   getCommandRegistry(): CommandRegistry {
     return this.commandRegistry;
   }
-  
+
   /**
    * Update the roots in CLI tools
    * @param roots Array of root URIs and optional names

@@ -137,34 +137,18 @@ describe('SDK Command Tools', () => {
       expect.any(String),  // Working directory should be provided (project root path)
       undefined  // stdinInput
     );
-    
+
     // Restore the original run method
     mockRunner.run = originalRun;
   });
 
-  test('SdkInfoCommand should execute correctly with -d flag', async () => {
+  test('SdkInfoCommand should reject -lm flag (no longer supported)', async () => {
     const sdkInfoCommand = commands.find((cmd) => cmd.name === 'sdk_info');
     expect(sdkInfoCommand).toBeDefined();
 
-    // Set up mock response for debug flag
-    const originalRun = mockRunner.run;
-    mockRunner.run = jest.fn().mockImplementation(async (_command, args) => {
-      if (args.includes('--debug')) {
-        return {
-          stdout: 'Debug logs for ServiceNow SDK',
-          stderr: '',
-          exitCode: 0
-        };
-      }
-      return originalRun.call(mockRunner, _command, args);
-    });
-
-    const result = await sdkInfoCommand.execute({ flag: '-d' });
-    expect(result.success).toBe(true);
-    expect(result.output).toContain('Debug logs for ServiceNow SDK');
-
-    // Restore the original run method
-    mockRunner.run = originalRun;
+    const result = await sdkInfoCommand.execute({ flag: '-lm' });
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toContain('Invalid flag');
   });
 
   test('SdkInfoCommand should handle invalid flags', async () => {

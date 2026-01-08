@@ -9,7 +9,7 @@ import {
   ProcessResult,
   ProcessRunner,
 } from '../utils/types.js';
-import { getPrimaryRootPath as getRootContextPrimaryRootPath, getPrimaryRootPathFrom as getPrimaryRootPathFromArray } from '../utils/rootContext.js';
+import { resolveWorkingDirectory } from '../utils/rootContext.js';
 import {
   SdkInfoCommand,
   InitCommand,
@@ -233,9 +233,8 @@ export class CLIExecutor extends BaseCommandProcessor {
     try {
       let cwd = customWorkingDir;
       if (!cwd && useMcpCwd) {
-        // Prefer instance roots when provided, fallback to RootContext
-        const resolved = getPrimaryRootPathFromArray(this.roots);
-        cwd = resolved || getRootContextPrimaryRootPath();
+        // Use canonical working directory resolution
+        cwd = resolveWorkingDirectory(this.roots);
       }
 
       // Sanity check on working directory - warn if it's the system root
@@ -307,9 +306,10 @@ export class CLICmdWriter extends BaseCommandProcessor {
     try {
       let cwd = customWorkingDir;
       if (!cwd && useMcpCwd) {
-        cwd = getPrimaryRootPathFromArray(this.roots) || getRootContextPrimaryRootPath();
+        // Use canonical working directory resolution
+        cwd = resolveWorkingDirectory(this.roots);
       }
-      
+
       // Sanity check on working directory - warn if it's the system root
       if (cwd === '/' || cwd === '\\') {
         throw new Error('ERROR: Command should never use system root (/) as working directory');
@@ -318,11 +318,11 @@ export class CLICmdWriter extends BaseCommandProcessor {
       // Format the command string
       const argsText = args.join(' ');
       const commandText = `${command} ${argsText}`;
-      
+
       // Add working directory context if available
       const cwdInfo = cwd ? `(in directory: ${cwd})` : '';
       const fullCommandText = cwdInfo ? `${commandText} ${cwdInfo}` : commandText;
-      
+
       logger.info(`Generated command text: ${fullCommandText}`);
 
       return CommandResultFactory.success(fullCommandText);
@@ -352,7 +352,7 @@ export class CommandRegistry {
 
   // Convert to MCP Tool format
   toMCPTools(): Tool[] {
-    return this.getAllCommands().map((command) => {      
+    return this.getAllCommands().map((command) => {
       const tool: Tool = {
         name: command.name,
         description: command.description,
@@ -375,7 +375,7 @@ export class CommandRegistry {
             .map((arg) => arg.name),
         }
       };
-      
+
       // Add annotations if they exist
       if (command.annotations) {
         // MCP SDK expects annotations to be a direct object with properties
@@ -387,7 +387,7 @@ export class CommandRegistry {
           openWorldHint: command.annotations.openWorldHint
         };
       }
-      
+
       return tool;
     });
   }

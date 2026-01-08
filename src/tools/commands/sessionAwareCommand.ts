@@ -1,7 +1,7 @@
 import { CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { BaseCLICommand } from './baseCommand.js';
 import { SessionManager } from '../../utils/sessionManager.js';
-import { getPrimaryRootPath } from '../../utils/rootContext.js';
+import { resolveWorkingDirectory } from '../../utils/rootContext.js';
 import logger from '../../utils/logger.js';
 
 /**
@@ -10,26 +10,23 @@ import logger from '../../utils/logger.js';
  */
 export abstract class SessionAwareCLICommand extends BaseCLICommand {
   /**
-   * Get the working directory from the session, or use the root context as fallback
+   * Get the working directory from the session, or use the root context as fallback.
+   * Priority: session working directory > root context > project root
    * @returns The working directory to use for the command
    */
   protected getWorkingDirectory(): string | undefined {
     const sessionManager = SessionManager.getInstance();
-    let workingDirectory = sessionManager.getWorkingDirectory();
-    
-    if (workingDirectory) {
-      logger.debug(`Using session working directory: ${workingDirectory}`);
-    } else {
-      // Fallback to root context when no session working directory is set
-      try {
-        workingDirectory = getPrimaryRootPath();
-        logger.debug(`No session working directory found, using root context: ${workingDirectory}`);
-      } catch (error) {
-        logger.debug(`No working directory found in session or root context: ${error}`);
-      }
+    const sessionDir = sessionManager.getWorkingDirectory();
+
+    if (sessionDir) {
+      logger.debug(`Using session working directory: ${sessionDir}`);
+      return sessionDir;
     }
-    
-    return workingDirectory;
+
+    // Fallback to root context using canonical resolution
+    const fallbackDir = resolveWorkingDirectory();
+    logger.debug(`No session working directory, using root context: ${fallbackDir}`);
+    return fallbackDir;
   }
 
   /**

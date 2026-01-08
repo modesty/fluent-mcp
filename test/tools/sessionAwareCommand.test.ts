@@ -20,6 +20,7 @@ jest.mock("../../src/utils/sessionManager.js", () => {
 jest.mock("../../src/utils/rootContext.js", () => {
   return {
     getPrimaryRootPath: jest.fn().mockReturnValue("/test-root-context"),
+    resolveWorkingDirectory: jest.fn().mockReturnValue("/test-root-context"),
   };
 });
 
@@ -41,7 +42,7 @@ describe("SessionAwareCommand", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Create a mock processor
     mockExecutor = {
       process: jest.fn().mockImplementation(() => {
@@ -65,7 +66,7 @@ describe("SessionAwareCommand", () => {
 
   test("should execute command with working directory from session", async () => {
     const result = await sessionAwareCommand.execute({});
-    
+
     expect(SessionManager.getInstance().getWorkingDirectory).toHaveBeenCalled();
     expect(mockExecutor.process).toHaveBeenCalledWith(
       "test-command",
@@ -79,14 +80,12 @@ describe("SessionAwareCommand", () => {
   test("should return error when no working directory is available", async () => {
     // Override the mock to return undefined working directory
     (SessionManager.getInstance().getWorkingDirectory as jest.Mock).mockReturnValueOnce(undefined);
-    // Mock rootContext to throw error
-    const { getPrimaryRootPath } = require("../../src/utils/rootContext.js");
-    (getPrimaryRootPath as jest.Mock).mockImplementationOnce(() => {
-      throw new Error("No root context available");
-    });
-    
+    // Mock resolveWorkingDirectory to return undefined (simulating no fallback available)
+    const { resolveWorkingDirectory } = require("../../src/utils/rootContext.js");
+    (resolveWorkingDirectory as jest.Mock).mockReturnValueOnce(undefined);
+
     const result = await sessionAwareCommand.execute({});
-    
+
     expect(SessionManager.getInstance().getWorkingDirectory).toHaveBeenCalled();
     expect(mockExecutor.process).not.toHaveBeenCalled();
     expect(result.success).toBe(false);
@@ -98,9 +97,9 @@ describe("SessionAwareCommand", () => {
     (mockExecutor.process as jest.Mock).mockImplementationOnce(() => {
       throw new Error("Test execution error");
     });
-    
+
     const result = await sessionAwareCommand.execute({});
-    
+
     expect(result.success).toBe(false);
     expect(result.error?.message).toBe("Test execution error");
   });

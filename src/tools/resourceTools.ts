@@ -90,11 +90,56 @@ export abstract class BaseResourceCommand implements CLICommand {
 
 /**
  * Command for accessing API specifications
+ * When called without metadataType, lists all available metadata types
  */
 export class GetApiSpecCommand extends BaseResourceCommand {
   name = 'get-api-spec';
-  description = 'Fetches the Fluent API specification for a given ServiceNow metadata type (e.g., "business-rule", "acl", etc.).';
+  description = 'Fetches the Fluent API specification for a given ServiceNow metadata type. Call without arguments to list all available metadata types.';
   resourceType = ResourceType.SPEC;
+
+  // Override arguments to make metadataType optional for listing
+  arguments: CommandArgument[] = [
+    {
+      name: 'metadataType',
+      type: 'string',
+      required: false,  // Optional - if not provided, lists all available types
+      description: 'ServiceNow metadata type (e.g., business-rule, script-include). Omit to list all available types.',
+    },
+  ];
+
+  /**
+   * Override doExecute to add listing functionality when no metadataType is provided
+   */
+  protected async doExecute(args: Record<string, unknown>): Promise<CommandResult> {
+    const metadataType = args.metadataType as string | undefined;
+
+    // If no metadataType provided, list all available types
+    if (!metadataType) {
+      try {
+        const metadataTypes = await this.resourceLoader.getAvailableMetadataTypes();
+
+        if (metadataTypes.length === 0) {
+          return CommandResultFactory.error('No metadata types found.');
+        }
+
+        const output = `Available Fluent metadata types (${metadataTypes.length}):\n${metadataTypes.join('\n')}\n\nUse get-api-spec with a specific metadataType to fetch its API specification.`;
+        return CommandResultFactory.success(output);
+      } catch (error) {
+        logger.error('Error listing metadata types', CommandResultFactory.normalizeError(error));
+        return CommandResultFactory.fromError(error);
+      }
+    }
+
+    // Otherwise, fetch the specific API spec
+    return super.doExecute(args);
+  }
+
+  /**
+   * Override validateArgs since metadataType is now optional
+   */
+  protected validateArgs(_args: Record<string, unknown>): void {
+    // No validation needed - metadataType is optional
+  }
 }
 
 /**
@@ -153,47 +198,6 @@ export class GetInstructCommand extends BaseResourceCommand {
   name = 'get-instruct';
   description = 'Retrieves instructions of Fluent API usage for a given ServiceNow metadata type';
   resourceType = ResourceType.INSTRUCT;
-}
-
-/**
- * Command for listing available metadata types
- */
-export class ListMetadataTypesCommand implements CLICommand {
-  name = 'list-metadata-types';
-  description = 'List all available ServiceNow metadata types that currently supported by Fluent (ServiceNow SDK)';
-  arguments: CommandArgument[] = [];
-
-  private resourceLoader: ResourceLoader;
-
-  constructor() {
-    this.resourceLoader = new ResourceLoader();
-  }
-
-  /**
-   * Resource commands don't use command processors
-   */
-  getCommandProcessor(): undefined {
-    return undefined;
-  }
-
-  /**
-   * Execute the command to list available metadata types
-   * @returns Command result with list of metadata types
-   */
-  async execute(): Promise<CommandResult> {
-    try {
-      const metadataTypes = await this.resourceLoader.getAvailableMetadataTypes();
-
-      const output = metadataTypes.length === 0
-        ? 'No metadata types found.'
-        : `Available metadata types:\n${metadataTypes.join('\n')}`;
-
-      return CommandResultFactory.success(output);
-    } catch (error) {
-      logger.error('Error listing metadata types', CommandResultFactory.normalizeError(error));
-      return CommandResultFactory.fromError(error);
-    }
-  }
 }
 
 /**
