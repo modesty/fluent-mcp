@@ -1,20 +1,22 @@
-import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types';
+import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { BaseCLICommand } from './baseCommand.js';
 import { getProjectRootPath } from '../../config.js';
 
 /**
  * ServiceNow SDK information command that accepts SDK flags
- * Handles -v/--version, -h/--help, -d/--debug flags as per SDK specification
+ * Handles:
+ * - -v/--version: Show SDK version
+ * - -h/--help: Show SDK help (optionally for a specific command)
  */
 export class SdkInfoCommand extends BaseCLICommand {
   name = 'sdk_info';
-  description = 'Get Fluent (ServiceNow SDK) information using native SDK flags (-v, -h, -d)';
+  description = 'Get Fluent (ServiceNow SDK) information. Flags: -v (version), -h (help)';
   arguments: CommandArgument[] = [
     {
       name: 'flag',
       type: 'string',
       required: true,
-      description: 'SDK flag to execute (-v/--version, -h/--help, -d/--debug)',
+      description: 'SDK flag to execute: -v/--version (SDK version), -h/--help (SDK help)',
     },
     {
       name: 'command',
@@ -30,7 +32,7 @@ export class SdkInfoCommand extends BaseCLICommand {
   private getSdkCommand(): { command: string; baseArgs: string[]; workingDirectory: string } {
     // Use the project root path where @servicenow/sdk is installed
     const projectRoot = getProjectRootPath();
-    
+
     return {
       command: 'npx',
       baseArgs: ['now-sdk'],
@@ -39,15 +41,35 @@ export class SdkInfoCommand extends BaseCLICommand {
   }
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
+    // Validate base args (type checking and shell injection protection)
     this.validateArgs(args);
 
     const flag = args.flag as string;
     const command = args.command as string | undefined;
 
-    // Validate flag
-    const validFlags = ['-v', '--version', '-h', '--help', '-d', '--debug'];
-    if (!validFlags.includes(flag)) {
-      return CommandResultFactory.error(`Invalid flag '${flag}'. Valid flags: ${validFlags.join(', ')}`);
+    // Strict flag validation - must exactly match allowed patterns
+    const validFlagPattern = /^(-v|--version|-h|--help)$/;
+    if (!validFlagPattern.test(flag)) {
+      return CommandResultFactory.error(
+        `Invalid flag '${flag}'. Valid flags: -v/--version, -h/--help`
+      );
+    }
+
+    // Additional validation for the optional command argument
+    if (command !== undefined) {
+      // Command should only be used with help flag
+      if (flag !== '-h' && flag !== '--help') {
+        return CommandResultFactory.error(
+          'The \'command\' argument is only valid with -h/--help flag'
+        );
+      }
+      // Validate command contains only safe characters (alphanumeric, hyphen, underscore)
+      const safeCommandPattern = /^[a-zA-Z0-9_-]+$/;
+      if (!safeCommandPattern.test(command)) {
+        return CommandResultFactory.error(
+          `Invalid command name '${command}'. Command must contain only alphanumeric characters, hyphens, and underscores.`
+        );
+      }
     }
 
     // Build command arguments for SDK execution
@@ -63,7 +85,7 @@ export class SdkInfoCommand extends BaseCLICommand {
         sdkArgs.push('--help');
       }
     } else {
-      // For version and debug: npx now-sdk <flag>
+      // For version: npx now-sdk <flag>
       sdkArgs.push(flag);
     }
 
@@ -107,10 +129,6 @@ export class SdkInfoCommand extends BaseCLICommand {
           return `ServiceNow SDK Help for '${command}' command:\n\n${trimmed}\n\nNote: Retrieved using 'npx now-sdk ${command} --help'`;
         }
         return `ServiceNow SDK General Help:\n\n${trimmed}\n\nNote: Retrieved using 'npx now-sdk --help'`;
-
-      case '-d':
-      case '--debug':
-        return `ServiceNow SDK Debug Information:\n\n${trimmed}\n\nNote: Retrieved using 'npx now-sdk --debug'`;
 
       default:
         return trimmed;

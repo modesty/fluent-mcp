@@ -22,7 +22,14 @@ jest.mock('../../src/utils/logger.js', () => ({
 
 // Mock the config module
 jest.mock('../../src/config.js', () => ({
-  getProjectRootPath: jest.fn().mockReturnValue('/mock/project/root')
+  getProjectRootPath: jest.fn().mockReturnValue('/mock/project/root'),
+  getConfig: jest.fn().mockReturnValue({
+    resourcePaths: {
+      spec: '/mock/spec',
+      snippet: '/mock/snippet',
+      instruct: '/mock/instruct'
+    }
+  })
 }));
 
 // Mock the rootContext module
@@ -50,7 +57,7 @@ jest.mock('../../src/utils/sessionManager.js', () => ({
 
 describe('New SDK Commands', () => {
   let mockProcessor: { process: jest.Mock };
-  
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockProcessor = {
@@ -65,30 +72,30 @@ describe('New SDK Commands', () => {
   describe('DownloadCommand', () => {
     test('should create DownloadCommand with correct metadata', () => {
       const command = new DownloadCommand(mockProcessor as any);
-      
+
       expect(command.name).toBe('download_fluent_app');
       expect(command.description).toBe('Download application metadata from instance, including metadata that not exist in local but deployed to instance');
       expect(command.arguments).toHaveLength(4);
-      
+
       // Check required directory argument
       const directoryArg = command.arguments.find(arg => arg.name === 'directory');
       expect(directoryArg).toBeDefined();
       expect(directoryArg?.required).toBe(true);
       expect(directoryArg?.type).toBe('string');
       expect(directoryArg?.description).toBe('Path to expand application');
-      
+
       // Check optional source argument
       const sourceArg = command.arguments.find(arg => arg.name === 'source');
       expect(sourceArg).toBeDefined();
       expect(sourceArg?.required).toBe(false);
       expect(sourceArg?.type).toBe('string');
-      
+
       // Check optional incremental argument
       const incrementalArg = command.arguments.find(arg => arg.name === 'incremental');
       expect(incrementalArg).toBeDefined();
       expect(incrementalArg?.required).toBe(false);
       expect(incrementalArg?.type).toBe('boolean');
-      
+
       // Check optional debug argument
       const debugArg = command.arguments.find(arg => arg.name === 'debug');
       expect(debugArg).toBeDefined();
@@ -98,9 +105,9 @@ describe('New SDK Commands', () => {
 
     test('should execute download command with required directory', async () => {
       const command = new DownloadCommand(mockProcessor as any);
-      
+
       const result = await command.execute({ directory: 'my-app' });
-      
+
       expect(result.success).toBe(true);
       expect(result.output).toContain('Mock command output');
       expect(mockProcessor.process).toHaveBeenCalledWith(
@@ -113,14 +120,14 @@ describe('New SDK Commands', () => {
 
     test('should execute download command with all arguments', async () => {
       const command = new DownloadCommand(mockProcessor as any);
-      
+
       const result = await command.execute({
         directory: 'my-app',
         source: './src',
         incremental: true,
         debug: true
       });
-      
+
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
@@ -134,18 +141,18 @@ describe('New SDK Commands', () => {
   describe('CleanCommand', () => {
     test('should create CleanCommand with correct metadata', () => {
       const command = new CleanCommand(mockProcessor as any);
-      
+
       expect(command.name).toBe('clean_fluent_app');
       expect(command.description).toBe('Clean up output directory of a Fluent (ServiceNow SDK) application');
       expect(command.arguments).toHaveLength(2);
-      
+
       // Check optional source argument
       const sourceArg = command.arguments.find(arg => arg.name === 'source');
       expect(sourceArg).toBeDefined();
       expect(sourceArg?.required).toBe(false);
       expect(sourceArg?.type).toBe('string');
       expect(sourceArg?.description).toBe('Path to the directory that contains package.json configuration');
-      
+
       // Check optional debug argument
       const debugArg = command.arguments.find(arg => arg.name === 'debug');
       expect(debugArg).toBeDefined();
@@ -155,9 +162,9 @@ describe('New SDK Commands', () => {
 
     test('should execute clean command without arguments', async () => {
       const command = new CleanCommand(mockProcessor as any);
-      
+
       const result = await command.execute({});
-      
+
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
@@ -169,12 +176,12 @@ describe('New SDK Commands', () => {
 
     test('should execute clean command with source and debug', async () => {
       const command = new CleanCommand(mockProcessor as any);
-      
+
       const result = await command.execute({
         source: 'src',
         debug: true
       });
-      
+
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
@@ -188,18 +195,18 @@ describe('New SDK Commands', () => {
   describe('PackCommand', () => {
     test('should create PackCommand with correct metadata', () => {
       const command = new PackCommand(mockProcessor as any);
-      
+
       expect(command.name).toBe('pack_fluent_app');
       expect(command.description).toBe('Zip built Fluent (ServiceNow SDK) application into installable artifact');
       expect(command.arguments).toHaveLength(2);
-      
+
       // Check optional source argument
       const sourceArg = command.arguments.find(arg => arg.name === 'source');
       expect(sourceArg).toBeDefined();
       expect(sourceArg?.required).toBe(false);
       expect(sourceArg?.type).toBe('string');
       expect(sourceArg?.description).toBe('Path to the directory that contains package.json configuration');
-      
+
       // Check optional debug argument
       const debugArg = command.arguments.find(arg => arg.name === 'debug');
       expect(debugArg).toBeDefined();
@@ -209,9 +216,9 @@ describe('New SDK Commands', () => {
 
     test('should execute pack command without arguments', async () => {
       const command = new PackCommand(mockProcessor as any);
-      
+
       const result = await command.execute({});
-      
+
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
@@ -223,12 +230,12 @@ describe('New SDK Commands', () => {
 
     test('should execute pack command with source and debug', async () => {
       const command = new PackCommand(mockProcessor as any);
-      
+
       const result = await command.execute({
         source: './build',
         debug: true
       });
-      
+
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
@@ -243,9 +250,9 @@ describe('New SDK Commands', () => {
     test('should include new commands in CommandFactory.createCommands', () => {
       const mockExecutor = { process: jest.fn() };
       const commands = CommandFactory.createCommands(mockExecutor as any);
-      
+
       const commandNames = commands.map(cmd => cmd.name);
-      
+
       expect(commandNames).toContain('download_fluent_app');
       expect(commandNames).toContain('clean_fluent_app');
       expect(commandNames).toContain('pack_fluent_app');

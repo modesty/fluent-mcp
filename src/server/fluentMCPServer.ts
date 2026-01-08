@@ -2,9 +2,7 @@ import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
-  CallToolRequestSchema,
   ListToolsRequestSchema,
-  CallToolResult,
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
   ListRootsRequestSchema,
@@ -23,7 +21,7 @@ import { PromptManager } from '../prompts/promptManager.js';
 import { autoValidateAuthIfConfigured } from './fluentInstanceAuth.js';
 import { SamplingManager } from '../utils/samplingManager.js';
 import { AuthNotificationHandler } from './authNotificationHandler.js';
-import { McpResourceNotFoundError, McpUnknownToolError, McpInternalError } from '../utils/mcpErrors.js';
+import { McpResourceNotFoundError, McpInternalError } from '../utils/mcpErrors.js';
 
 /** Delay before fallback initialization if client doesn't send notifications */
 const INITIALIZATION_DELAY_MS = 1000;
@@ -367,68 +365,8 @@ export class FluentMcpServer {
       }
     });
 
-    // Execute tool calls handler
-    server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const { name, arguments: args } = request.params;
-
-      const command = this.toolsManager.getCommand(name);
-      if (!command) {
-        throw new McpUnknownToolError(name);
-      }
-
-      try {
-        const result = await command.execute(args || {});
-
-        // If command failed and error analysis is enabled, analyze the error
-        if (!result.success && this.config.sampling.enableErrorAnalysis && result.error) {
-          const errorMessage = result.error.message;
-
-          if (this.samplingManager.shouldAnalyzeError(errorMessage, this.config.sampling.minErrorLength)) {
-            logger.info('Triggering error analysis for failed command', { command: name });
-
-            try {
-              const analysis = await this.samplingManager.analyzeError({
-                command: name,
-                args: Object.entries(args || {}).map(([key, value]) => `${key}=${value}`),
-                errorOutput: errorMessage,
-                exitCode: result.exitCode,
-              });
-
-              if (analysis) {
-                result.errorAnalysis = analysis;
-              }
-            } catch (analysisError) {
-              // Log but don't fail the tool call if analysis fails
-              logger.warn('Error analysis failed', {
-                error: analysisError instanceof Error ? analysisError.message : String(analysisError),
-              });
-            }
-          }
-        }
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: this.formatResult(result),
-            },
-          ],
-        } as CallToolResult;
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Error: ${errorMessage}`,
-            },
-          ],
-          isError: true,
-        } as CallToolResult;
-      }
-    });
+    // Note: Tool calls are handled by the callbacks registered via mcpServer.registerTool() in ToolsManager.
+    // We don't need a separate setRequestHandler for CallToolRequestSchema as that would conflict.
   }
 
   /**
