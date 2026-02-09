@@ -1,6 +1,6 @@
 {
   "name": "@modesty/fluent-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for Fluent (ServiceNow SDK)",
   "keywords": [
     "Servicenow SDK",
@@ -53,11 +53,12 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.26.0",
-    "@servicenow/sdk": "4.1.1",
+    "@servicenow/sdk": "4.2.0",
     "zod": "^4.3.6",
     "zod-to-json-schema": "^3.25.1"
   },
   "devDependencies": {
+    "eslint": "^9.39.2",
     "@eslint/js": "^9.39.2",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-json": "^6.0.1",
@@ -68,7 +69,6 @@
     "@types/node": "^25.2.2",
     "@typescript-eslint/eslint-plugin": "^8.54.0",
     "@typescript-eslint/parser": "^8.54.0",
-    "eslint": "^9.39.2",
     "jest": "^30.2.0",
     "rollup": "^4.57.1",
     "ts-jest": "^29.4.6",

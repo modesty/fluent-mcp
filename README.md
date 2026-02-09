@@ -6,7 +6,7 @@ An [MCP server](https://modelcontextprotocol.io) that brings [ServiceNow Fluent 
 
 - **🤖 AI-Powered Error Analysis** - Intelligent diagnosis with root cause, solutions, and prevention tips (MCP Sampling)
 - **Complete SDK Coverage** - ServiceNow SDK commands: `init`, `build`, `install`, `dependencies`, `transform`, `download`, `clean`, `pack`
-- **Rich Resources** - API specifications, code snippets, instructions for 35+ metadata types
+- **Rich Resources** - API specifications, code snippets, instructions for 37+ metadata types
 - **Auto-Authentication** - Automatic auth profile detection and session management via environment variables
 - **Session-Aware** - Maintains working directory and auth context across commands
 
@@ -14,7 +14,7 @@ This MCP server implements the complete [Model Context Protocol](https://modelco
 
 ### Core
 
-- **Resources** - Provides 100+ resources across 35+ ServiceNow metadata types (API specs, instructions, snippets, prompts)
+- **Resources** - Provides 180+ resources across 37+ ServiceNow metadata types (API specs, instructions, snippets, prompts)
 - **Tools** - Exposes 9 ServiceNow SDK commands as MCP tools with full parameter validation
 - **Prompts** - Offers development workflow templates for common ServiceNow tasks
 - **Logging** - Structured logging for debugging and monitoring
@@ -88,7 +88,7 @@ Standardized URI patterns following MCP specification:
 
 ### Supported Metadata Types
 
-**Core Types:** `acl`, `application-menu`, `business-rule`, `client-script`, `cross-scope-privilege`, `form`, `list`, `property`, `role`, `scheduled-script`, `script-action`, `script-include`, `scripted-rest`, `service-portal`, `table`, `ui-action`, `ui-page`, `user-preference`
+**Core Types:** `acl`, `application-menu`, `business-rule`, `client-script`, `cross-scope-privilege`, `form`, `import-set`, `list`, `property`, `role`, `scheduled-script`, `script-action`, `script-include`, `scripted-rest`, `service-portal`, `table`, `ui-action`, `ui-page`, `ui-policy`, `user-preference`
 
 **Table Types:** `column`, `column-generic`
 

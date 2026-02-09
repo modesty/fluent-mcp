@@ -7,7 +7,7 @@ import { SessionAwareCLICommand } from './sessionAwareCommand.js';
  */
 export class DependenciesCommand extends SessionAwareCLICommand {
   name = 'download_fluent_dependencies';
-  description = 'Download configured dependencies in now.config.json and TypeScript type definitions for use in the application';
+  description = 'Download configured dependencies in now.config.json and TypeScript type definitions for use in the application. Supports pulling type definitions for tables and roles outside application scope via dependencies.global configuration.';
   arguments: CommandArgument[] = [
     {
       name: 'auth',

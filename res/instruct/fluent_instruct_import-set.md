@@ -1,0 +1,10 @@
+# Instructions for Fluent ImportSet API
+Always reference the ImportSet API specifications for more details.
+1. Import `ImportSet` from `@servicenow/sdk/core`. The `$id` field is mandatory and must be unique, typically using `Now.ID['value']`.
+2. The `name`, `targetTable`, and `sourceTable` fields are all required. `targetTable` is the destination table receiving final records, and `sourceTable` is the staging table holding raw import rows.
+3. Field mappings in the `fields` object map target field names (keys) to source field names (string values) or advanced configuration objects. Simple mappings use direct strings: `{ target_field: 'source_field' }`.
+4. Use `coalesce: true` on fields that serve as match keys for upsert behavior. When coalesce finds an existing record matching on all coalesce fields, it updates that record instead of inserting a new one. Use `createOnEmptyCoalesce: true` to create a new record when no match is found.
+5. The `choiceAction` property controls how unmapped choice values are handled: `'reject'` rejects the row, `'ignore'` skips the field, and `'create'` creates the choice value on the fly.
+6. Transform scripts in the `scripts` array run at specific lifecycle hooks. Use `when` to specify the timing: `'onBefore'` runs before each row transform, `'onAfter'` runs after each row, `'onStart'` runs once before all rows, `'onComplete'` runs once after all rows, `'onReject'` runs when a row is rejected, `'onForeignInsert'` runs on foreign record insert, and `'onChoiceCreate'` runs when a new choice is created.
+7. The `enforceMandatoryFields` option controls mandatory field validation during transform: `'no'` skips validation, `'onlyMappedFields'` validates only mapped fields, and `'allFields'` enforces all target table mandatory fields.
+8. Use `dateFormat` in field mapping configuration objects to specify how date strings in the source should be parsed. The format must match one of the supported patterns (e.g., `'yyyy-MM-dd'`, `'MM-dd-yyyy HH:mm:ss z'`).
