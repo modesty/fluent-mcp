@@ -7,7 +7,7 @@ Always reference the Table API to create Table (Dictionary) for more details.
 5. The `index` takes an array of column names to generate indexes in bootstrap.xml. To specify a composite index, add multiple column names to 'element' array.
 6. Columns are specified as additional function calls within the Table API on the `schema` key. The `name` field is taken from the variable name or object key provided to the Table API.
 7. For creating attributes refer to the provided attributes in the table spec.
-8. Here are valid `functionDefinition` functions that Column objects can use: [ 
+8. Here are valid `functionDefinition` functions that Column objects can use: [
     'add',
     'coalesce',
     'concat',
@@ -23,3 +23,5 @@ Always reference the Table API to create Table (Dictionary) for more details.
     'substring',
     'subtract'
 ]
+9. Use `Now.attach('path/to/image.png')` to set default image values for BasicImageColumn fields. The image file must exist in the project and the path is relative to the source root. Supported formats: jpg, png, bmp, gif, jpeg, ico, svg.
+10. For tables outside application scope, configure `dependencies.global.tables` in `now.config.json` and run `now-sdk dependencies` to pull type definitions. This enables type-checked references to global tables like `cmdb_ci_server` via `#now:{scope}/{category}` imports.
