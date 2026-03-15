@@ -232,8 +232,11 @@ export class PromptManager {
       logger.debug(`Prompt content length: ${content ? content.length : 0} bytes`);
       logger.debug(`Prompt content beginning: ${content ? content.substring(0, 100) + '...' : 'empty'}`);
       
-    } catch (error) {      
-      throw new Error(error instanceof Error ? error.message : String(error));
+    } catch (error) {
+      throw new Error(
+        error instanceof Error ? error.message : String(error),
+        { cause: error }
+      );
     }
   }
 

@@ -1,5 +1,5 @@
 /**
- * Unit tests for SDK v4.2.0 new types - resource tool command pipeline
+ * Unit tests for SDK v4.4.0 metadata coverage - resource tool command pipeline
  * Tests with mocked filesystem, following patterns from test/tools/resourceTools.test.ts
  */
 import fs from 'node:fs';
@@ -24,7 +24,7 @@ jest.mock('node:fs', () => {
   };
 });
 
-describe('SDK v4.2.0 Types - Unit Tests', () => {
+describe('SDK v4.4.0 Types - Unit Tests', () => {
   const IMPORT_SET_SPEC = '# ImportSet API spec\nImportSet({ $id: "", targetTable: "" })';
   const IMPORT_SET_INSTRUCT = '# Instructions for Fluent ImportSet API\nImport ImportSet from @servicenow/sdk/core';
   const IMPORT_SET_SNIPPET_1 = '# ImportSet snippet 1\nImportSet({ fields: {} })';
@@ -36,6 +36,18 @@ describe('SDK v4.2.0 Types - Unit Tests', () => {
   const UI_POLICY_SNIPPET_1 = '# UiPolicy snippet 1\nUiPolicy({ actions: [{ visible: true }] })';
   const UI_POLICY_SNIPPET_2 = '# UiPolicy snippet 2\nUiPolicy({ runScripts: true, scriptTrue: "" })';
   const UI_POLICY_SNIPPET_3 = '# UiPolicy snippet 3\nUiPolicy({ relatedListActions: [] })';
+
+  const FLOW_SPEC = '# Flow API spec\nFlow({ $id: "", name: "" })';
+  const FLOW_INSTRUCT = '# Instructions for Fluent Flow API\nImport { Flow, wfa, trigger, action } from @servicenow/sdk/automation';
+  const FLOW_SNIPPET_1 = '# Flow snippet 1\nFlow({ name: "My Flow" })';
+
+  const EMAIL_NOTIFICATION_SPEC = '# EmailNotification API spec\nEmailNotification({ table: "incident" })';
+  const EMAIL_NOTIFICATION_INSTRUCT = '# Instructions for Fluent EmailNotification API\nImport EmailNotification from @servicenow/sdk/core';
+  const EMAIL_NOTIFICATION_SNIPPET_1 = '# EmailNotification snippet 1\nEmailNotification({ table: "incident" })';
+
+  const ATF_REST_ASSERT_PAYLOAD_SPEC = '# ATF REST Assert Payload API spec\natf.rest.assertResponseJSONPayloadIsValid({ $id: Now.ID[""] })';
+  const ATF_REST_ASSERT_PAYLOAD_INSTRUCT = '# Instructions for Fluent ATF REST Assert Payload API\nAlways reference fluent_instruct_atf.md';
+  const ATF_REST_ASSERT_PAYLOAD_SNIPPET_1 = '# ATF REST Assert Payload snippet 1\natf.rest.assertResponseJSONPayloadIsValid({ $id: "step_2" })';
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -49,18 +61,27 @@ describe('SDK v4.2.0 Types - Unit Tests', () => {
           'fluent_snippet_ui-policy_0001.md',
           'fluent_snippet_ui-policy_0002.md',
           'fluent_snippet_ui-policy_0003.md',
+          'fluent_snippet_flow_0001.md',
+          'fluent_snippet_email-notification_0001.md',
+          'fluent_snippet_atf-rest-assert-payload_0001.md',
         ]);
       }
       if (dirPath.includes('spec')) {
         return Promise.resolve([
           'fluent_spec_import-set.md',
           'fluent_spec_ui-policy.md',
+          'fluent_spec_flow.md',
+          'fluent_spec_email-notification.md',
+          'fluent_spec_atf-rest-assert-payload.md',
         ]);
       }
       if (dirPath.includes('instruct')) {
         return Promise.resolve([
           'fluent_instruct_import-set.md',
           'fluent_instruct_ui-policy.md',
+          'fluent_instruct_flow.md',
+          'fluent_instruct_email-notification.md',
+          'fluent_instruct_atf-rest-assert-payload.md',
         ]);
       }
       return Promise.resolve([]);
@@ -91,11 +112,45 @@ describe('SDK v4.2.0 Types - Unit Tests', () => {
         if (filePath.includes('0002')) return Promise.resolve(UI_POLICY_SNIPPET_2);
         if (filePath.includes('0003')) return Promise.resolve(UI_POLICY_SNIPPET_3);
       }
+      // Flow resources
+      if (filePath.includes('spec') && filePath.includes('flow')) {
+        return Promise.resolve(FLOW_SPEC);
+      }
+      if (filePath.includes('instruct') && filePath.includes('flow')) {
+        return Promise.resolve(FLOW_INSTRUCT);
+      }
+      if (filePath.includes('snippet') && filePath.includes('flow')) {
+        if (filePath.includes('0001')) return Promise.resolve(FLOW_SNIPPET_1);
+      }
+      // Email Notification resources
+      if (filePath.includes('spec') && filePath.includes('email-notification')) {
+        return Promise.resolve(EMAIL_NOTIFICATION_SPEC);
+      }
+      if (filePath.includes('instruct') && filePath.includes('email-notification')) {
+        return Promise.resolve(EMAIL_NOTIFICATION_INSTRUCT);
+      }
+      if (filePath.includes('snippet') && filePath.includes('email-notification')) {
+        if (filePath.includes('0001')) return Promise.resolve(EMAIL_NOTIFICATION_SNIPPET_1);
+      }
+      // ATF REST Assert Payload resources
+      if (filePath.includes('spec') && filePath.includes('atf-rest-assert-payload')) {
+        return Promise.resolve(ATF_REST_ASSERT_PAYLOAD_SPEC);
+      }
+      if (filePath.includes('instruct') && filePath.includes('atf-rest-assert-payload')) {
+        return Promise.resolve(ATF_REST_ASSERT_PAYLOAD_INSTRUCT);
+      }
+      if (filePath.includes('snippet') && filePath.includes('atf-rest-assert-payload')) {
+        if (filePath.includes('0001')) return Promise.resolve(ATF_REST_ASSERT_PAYLOAD_SNIPPET_1);
+      }
       return Promise.resolve('');
     });
 
     (fs.existsSync as jest.Mock).mockImplementation((filePath: string) => {
-      return filePath.includes('import-set') || filePath.includes('ui-policy');
+      return filePath.includes('import-set')
+        || filePath.includes('ui-policy')
+        || filePath.includes('flow')
+        || filePath.includes('email-notification')
+        || filePath.includes('atf-rest-assert-payload');
     });
   });
 
@@ -122,6 +177,15 @@ describe('SDK v4.2.0 Types - Unit Tests', () => {
       expect(result.success).toBe(true);
       expect(result.output).toBe(UI_POLICY_SPEC);
       expect(result.output).toContain('UiPolicy(');
+    });
+
+    it('should return spec for flow', async () => {
+      const result = await command.execute({ metadataType: 'flow' });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.success).toBe(true);
+      expect(result.output).toBe(FLOW_SPEC);
+      expect(result.output).toContain('Flow(');
     });
   });
 
@@ -153,6 +217,24 @@ describe('SDK v4.2.0 Types - Unit Tests', () => {
       expect(result.output).toContain('0002');
       expect(result.output).toContain('0003');
     });
+
+    it('should return snippet for atf-rest-assert-payload', async () => {
+      const result = await command.execute({ metadataType: 'atf-rest-assert-payload' });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.success).toBe(true);
+      expect(result.output).toContain(ATF_REST_ASSERT_PAYLOAD_SNIPPET_1);
+      expect(result.output).toContain('assertResponseJSONPayloadIsValid');
+    });
+
+    it('should return error for typo metadata type atf-asert-payload', async () => {
+      const result = await command.execute({ metadataType: 'atf-asert-payload' });
+
+      expect(result.exitCode).toBe(1);
+      expect(result.success).toBe(false);
+      expect(result.output).toContain('No snippets found for metadata type: atf-asert-payload');
+      expect(result.error).toBeDefined();
+    });
   });
 
   describe('GetInstructCommand', () => {
@@ -179,6 +261,15 @@ describe('SDK v4.2.0 Types - Unit Tests', () => {
       expect(result.output).toBe(UI_POLICY_INSTRUCT);
       expect(result.output).toContain('UiPolicy');
     });
+
+    it('should return instructions for email-notification', async () => {
+      const result = await command.execute({ metadataType: 'email-notification' });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.success).toBe(true);
+      expect(result.output).toBe(EMAIL_NOTIFICATION_INSTRUCT);
+      expect(result.output).toContain('EmailNotification');
+    });
   });
 
   describe('ResourceLoader', () => {
@@ -188,6 +279,9 @@ describe('SDK v4.2.0 Types - Unit Tests', () => {
 
       expect(types).toContain('import-set');
       expect(types).toContain('ui-policy');
+      expect(types).toContain('flow');
+      expect(types).toContain('email-notification');
+      expect(types).toContain('atf-rest-assert-payload');
     });
   });
 });

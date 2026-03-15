@@ -190,8 +190,7 @@ export class ToolsManager {
     if (result.success) {
       return `✅ Command executed successfully\n\nOutput:\n${result.output}`;
     } else {
-      return `❌ Command failed (exit code: ${result.exitCode})\n\nError:\n${result.error || 'Unknown error'
-        }\n\nOutput:\n${result.output}`;
+      return `❌ Command failed (exit code: ${result.exitCode})\n\nError:\n${result.error || 'Unknown error'}\n\nOutput:\n${result.output}`;
     }
   }
 
