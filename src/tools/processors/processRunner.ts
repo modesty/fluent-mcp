@@ -1,6 +1,6 @@
 import { spawn, SpawnOptionsWithoutStdio } from 'node:child_process';
-import { ProcessResult, ProcessRunner } from '../utils/types.js';
-import logger from '../utils/logger.js';
+import { ProcessResult, ProcessRunner } from '../../utils/types.js';
+import logger from '../../utils/logger.js';
 
 /** Timeout for child process execution in milliseconds */
 const PROCESS_TIMEOUT_MS = 12000;

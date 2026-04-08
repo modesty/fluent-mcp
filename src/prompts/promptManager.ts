@@ -10,6 +10,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { getProjectRootPath } from '../config.js';
 import logger from '../utils/logger.js';
+import { CommandResultFactory } from '../utils/types.js';
 import loggingManager from '../utils/loggingManager.js';
 
 /**
@@ -80,7 +81,7 @@ export class PromptManager {
     } catch (error) {
       logger.error(
         'Error initializing prompts',
-        error instanceof Error ? error : new Error(String(error))
+        CommandResultFactory.normalizeError(error)
       );
       throw error;
     }
@@ -234,7 +235,7 @@ export class PromptManager {
       
     } catch (error) {
       throw new Error(
-        error instanceof Error ? error.message : String(error),
+        CommandResultFactory.normalizeError(error).message,
         { cause: error }
       );
     }

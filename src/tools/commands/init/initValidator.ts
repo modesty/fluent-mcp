@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { FluentAppValidator } from '../../../utils/fluentAppValidator.js';
+import { CommandResultFactory } from '../../../utils/types.js';
 import logger from '../../../utils/logger.js';
 import {
   CreationElicitationData,
@@ -46,7 +47,7 @@ export class InitValidator {
       } catch (error) {
         return {
           valid: false,
-          error: `Failed to create working directory ${normalizedPath}: ${error instanceof Error ? error.message : String(error)}`,
+          error: `Failed to create working directory ${normalizedPath}: ${CommandResultFactory.normalizeError(error).message}`,
         };
       }
     }
@@ -103,7 +104,7 @@ export class InitValidator {
       } catch (error) {
         return {
           valid: false,
-          error: `Failed to validate directory: ${error instanceof Error ? error.message : String(error)}`,
+          error: `Failed to validate directory: ${CommandResultFactory.normalizeError(error).message}`,
         };
       }
     } else {

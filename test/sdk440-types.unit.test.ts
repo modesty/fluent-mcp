@@ -7,7 +7,7 @@ import {
   GetApiSpecCommand,
   GetSnippetCommand,
   GetInstructCommand,
-} from '../src/tools/resourceTools.js';
+} from '../src/tools/resources/resourceTools.js';
 import { ResourceLoader } from '../src/utils/resourceLoader.js';
 
 // Mock the file system operations for tests

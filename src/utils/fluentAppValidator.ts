@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import logger from './logger.js';
+import { CommandResultFactory } from './types.js';
 
 /**
  * Interface for the result of checking if a directory contains a Fluent (ServiceNow SDK) application
@@ -67,7 +68,7 @@ export class FluentAppValidator {
       logger.error('Error checking for ServiceNow app', error as Error);
       return { 
         hasApp: false, 
-        errorMessage: `Failed to check directory: ${error instanceof Error ? error.message : String(error)}`
+        errorMessage: `Failed to check directory: ${CommandResultFactory.normalizeError(error).message}`
       };
     }
   }

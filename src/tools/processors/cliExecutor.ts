@@ -1,7 +1,6 @@
-import { CommandResult, CommandResultFactory, ProcessRunner } from '../utils/types.js';
-import { resolveWorkingDirectory } from '../utils/rootContext.js';
+import { CommandResult, CommandResultFactory, ProcessRunner } from '../../utils/types.js';
 import { BaseCommandProcessor } from './baseCommandProcessor.js';
-import logger from '../utils/logger.js';
+import logger from '../../utils/logger.js';
 
 /**
  * Executes CLI commands via a ProcessRunner and returns results
@@ -33,16 +32,7 @@ export class CLIExecutor extends BaseCommandProcessor {
     stdinInput?: string
   ): Promise<CommandResult> {
     try {
-      let cwd = customWorkingDir;
-      if (!cwd && useMcpCwd) {
-        // Use canonical working directory resolution
-        cwd = resolveWorkingDirectory(this.roots);
-      }
-
-      // Sanity check on working directory - warn if it's the system root
-      if (cwd === '/' || cwd === '\\') {
-        throw new Error('ERROR: Command should never be executed with system root (/) as working directory');
-      }
+      const cwd = this.resolveCommandWorkingDirectory(useMcpCwd, customWorkingDir);
 
       // Better logging with clear working directory information
       logger.info(`Executing command: ${command} ${args.join(' ')}`, { cwd });

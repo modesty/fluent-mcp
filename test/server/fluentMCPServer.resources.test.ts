@@ -107,25 +107,25 @@ jest.mock("../../src/utils/resourceLoader.js", () => {
 });
 
 // Mock command tools (split into individual modules)
-jest.mock("../../src/tools/processRunner.js", () => ({
+jest.mock("../../src/tools/processors/processRunner.js", () => ({
   NodeProcessRunner: jest.fn()
 }));
-jest.mock("../../src/tools/cliExecutor.js", () => ({
+jest.mock("../../src/tools/processors/cliExecutor.js", () => ({
   CLIExecutor: jest.fn().mockImplementation(() => ({
     setRoots: jest.fn()
   }))
 }));
-jest.mock("../../src/tools/cliCmdWriter.js", () => ({
+jest.mock("../../src/tools/processors/cliCmdWriter.js", () => ({
   CLICmdWriter: jest.fn().mockImplementation(() => ({
     setRoots: jest.fn()
   }))
 }));
-jest.mock("../../src/tools/commandFactory.js", () => ({
+jest.mock("../../src/tools/registry/commandFactory.js", () => ({
   CommandFactory: {
     createCommands: jest.fn().mockImplementation((executor, writer) => [])
   }
 }));
-jest.mock("../../src/tools/commandRegistry.js", () => {
+jest.mock("../../src/tools/registry/commandRegistry.js", () => {
   const mockRegister = jest.fn();
   const mockGetCommand = jest.fn();
   const mockToMCPTools = jest.fn().mockReturnValue([]);
@@ -141,7 +141,7 @@ jest.mock("../../src/tools/commandRegistry.js", () => {
 });
 
 // Mock the resource tools
-jest.mock("../../src/tools/resourceTools.js", () => {
+jest.mock("../../src/tools/resources/resourceTools.js", () => {
   return {
     GetApiSpecCommand: jest.fn().mockImplementation(() => ({
       name: "get-api-spec",

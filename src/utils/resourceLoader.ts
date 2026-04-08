@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { ResourceResult, ResourceType } from './types.js';
+import { ResourceResult, ResourceType, CommandResultFactory } from './types.js';
 import logger from './logger.js';
 import { getConfig } from '../config.js';
 import { ServiceNowMetadataType } from '../types.js';
@@ -60,7 +60,7 @@ export class ResourceLoader {
       }
     } catch (error) {
       logger.error('Failed to get available metadata types', 
-        error instanceof Error ? error : new Error(String(error))
+        CommandResultFactory.normalizeError(error)
       );
       return [];
     }
@@ -132,7 +132,7 @@ export class ResourceLoader {
       };
     } catch (error) {
       logger.error(`Failed to get ${resourceType} for ${metadataType}`, 
-        error instanceof Error ? error : new Error(String(error))
+        CommandResultFactory.normalizeError(error)
       );
       
       return {
@@ -167,7 +167,7 @@ export class ResourceLoader {
       return snippetIds;
     } catch (error) {
       logger.error(`Failed to list snippets for ${metadataType}`, 
-        error instanceof Error ? error : new Error(String(error))
+        CommandResultFactory.normalizeError(error)
       );
       return [];
     }

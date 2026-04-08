@@ -1,7 +1,6 @@
-import { CommandResult, CommandResultFactory } from '../utils/types.js';
-import { resolveWorkingDirectory } from '../utils/rootContext.js';
+import { CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { BaseCommandProcessor } from './baseCommandProcessor.js';
-import logger from '../utils/logger.js';
+import logger from '../../utils/logger.js';
 
 /**
  * Generates command text without executing — used for interactive commands
@@ -46,16 +45,7 @@ export class CLICmdWriter extends BaseCommandProcessor {
     customWorkingDir?: string
   ): CommandResult {
     try {
-      let cwd = customWorkingDir;
-      if (!cwd && useMcpCwd) {
-        // Use canonical working directory resolution
-        cwd = resolveWorkingDirectory(this.roots);
-      }
-
-      // Sanity check on working directory - warn if it's the system root
-      if (cwd === '/' || cwd === '\\') {
-        throw new Error('ERROR: Command should never use system root (/) as working directory');
-      }
+      const cwd = this.resolveCommandWorkingDirectory(useMcpCwd, customWorkingDir);
 
       // Format the command string
       const argsText = args.join(' ');

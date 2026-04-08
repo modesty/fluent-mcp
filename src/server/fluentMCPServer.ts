@@ -12,7 +12,7 @@ import {
 
 import { getConfig, getProjectRootPath } from '../config.js';
 import { ServerStatus } from '../types.js';
-import { CommandResult } from '../utils/types.js';
+import { CommandResultFactory } from '../utils/types.js';
 import loggingManager from '../utils/loggingManager.js';
 import logger from '../utils/logger.js';
 import { ToolsManager } from '../tools/toolsManager.js';
@@ -97,26 +97,6 @@ export class FluentMcpServer {
     });
   }
 
-  /**
-   * Format the result of a command execution
-   * @param result The command result
-   * @returns Formatted string with the result
-   */
-  private formatResult(result: CommandResult): string {
-    if (result.success) {
-      return `✅ Output:\n${result.output}`;
-    } else {
-      let errorOutput = `❌ Error:\n${result.error || 'Unknown error'}\n(exit code: ${result.exitCode})\n${result.output}`;
-
-      // Append AI error analysis if available
-      if (result.errorAnalysis) {
-        errorOutput += '\n' + this.samplingManager.formatAnalysis(result.errorAnalysis);
-      }
-
-      return errorOutput;
-    }
-  }
-
   // Auth notification handling delegated to AuthNotificationHandler (SRP)
 
   /**
@@ -161,13 +141,13 @@ export class FluentMcpServer {
             this.authNotificationHandler.handleAuthResult(result);
           } catch (error) {
             logger.warn('Auto-auth validation failed', {
-              error: error instanceof Error ? error.message : String(error),
+              error: CommandResultFactory.normalizeError(error).message,
             });
           }
         }
       } catch (error) {
         logger.error('Error during delayed initialization',
-          error instanceof Error ? error : new Error(String(error))
+          CommandResultFactory.normalizeError(error)
         );
       }
     }, INITIALIZATION_DELAY_MS);
@@ -225,7 +205,7 @@ export class FluentMcpServer {
       }
     } catch (error) {
       logger.error('Error requesting roots from client',
-        error instanceof Error ? error : new Error(String(error))
+        CommandResultFactory.normalizeError(error)
       );
 
       // Fall back to project root if request fails
@@ -293,11 +273,11 @@ export class FluentMcpServer {
 
         // Wrap other errors as internal errors
         logger.error('Error reading resource',
-          error instanceof Error ? error : new Error(String(error)),
+          CommandResultFactory.normalizeError(error),
           { uri }
         );
         throw new McpInternalError(
-          `Failed to read resource: ${error instanceof Error ? error.message : String(error)}`
+          `Failed to read resource: ${CommandResultFactory.normalizeError(error).message}`
         );
       }
     });
@@ -332,7 +312,7 @@ export class FluentMcpServer {
         await this.requestRootsFromClient();
       } catch (error) {
         logger.error('Failed to request roots after initialization notification',
-          error instanceof Error ? error : new Error(String(error))
+          CommandResultFactory.normalizeError(error)
         );
       }
 
@@ -345,7 +325,7 @@ export class FluentMcpServer {
           this.authNotificationHandler.handleAuthResult(result);
         } catch (error) {
           logger.warn('Auto-auth validation failed', {
-            error: error instanceof Error ? error.message : String(error),
+            error: CommandResultFactory.normalizeError(error).message,
           });
         }
       }
@@ -360,7 +340,7 @@ export class FluentMcpServer {
         await this.requestRootsFromClient();
       } catch (error) {
         logger.error('Failed to request updated roots after notification',
-          error instanceof Error ? error : new Error(String(error))
+          CommandResultFactory.normalizeError(error)
         );
       }
     });

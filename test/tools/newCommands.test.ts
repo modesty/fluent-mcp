@@ -1,8 +1,8 @@
 /**
  * Tests for new SDK commands: Download, Clean, and Pack
  */
-import { CommandFactory } from '../../src/tools/commandFactory.js';
-import { NodeProcessRunner } from '../../src/tools/processRunner.js';
+import { CommandFactory } from '../../src/tools/registry/commandFactory.js';
+import { NodeProcessRunner } from '../../src/tools/processors/processRunner.js';
 import { DownloadCommand, CleanCommand, PackCommand } from '../../src/tools/commands/index.js';
 
 jest.mock('../../src/utils/logger.js', () => require('../mocks/index.js').createLoggerMock());

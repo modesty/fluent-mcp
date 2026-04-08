@@ -1,5 +1,5 @@
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
-import { CLICommand } from '../utils/types.js';
+import { CLICommand } from '../../utils/types.js';
 
 /**
  * Stores and retrieves commands, converts to MCP Tool format

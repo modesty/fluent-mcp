@@ -113,7 +113,7 @@ export class InitCommand extends BaseCLICommand {
     } catch (error) {
       logger.error(`Failed to create directory ${dirPath}: ${error}`);
       throw new Error(
-        `Failed to create default working directory: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to create default working directory: ${CommandResultFactory.normalizeError(error).message}`,
         { cause: error }
       );
     }

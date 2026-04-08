@@ -1,6 +1,7 @@
 import logger from '../utils/logger.js';
 import { ToolsManager } from '../tools/toolsManager.js';
 import { SessionManager } from '../utils/sessionManager.js';
+import { CommandResultFactory } from '../utils/types.js';
 import { AuthValidationResult } from '../types.js';
 
 /**
@@ -124,7 +125,7 @@ export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): 
   } catch (error) {
     const alias = deriveAliasFromInstance(instUrl);
     const authCommand = buildAuthCommand(instUrl, authType, alias);
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = CommandResultFactory.normalizeError(error).message;
 
     logger.warn('Auto-auth failed to validate', { error: errorMessage });
 
@@ -206,7 +207,7 @@ async function attemptAddAuthProfile(
     });
   } catch (addError) {
     // Error during auth add attempt - return instructions for manual setup
-    const errorMessage = addError instanceof Error ? addError.message : String(addError);
+    const errorMessage = CommandResultFactory.normalizeError(addError).message;
     const setupHint = getAuthSetupHint(authType);
 
     logger.warn('Auto-auth error during profile add', { error: errorMessage });

@@ -1,19 +1,19 @@
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { CommandFactory } from './commandFactory.js';
-import { CommandRegistry } from './commandRegistry.js';
-import { NodeProcessRunner } from './processRunner.js';
-import { CLIExecutor } from './cliExecutor.js';
-import { CLICmdWriter } from './cliCmdWriter.js';
-import { BaseCommandProcessor } from './baseCommandProcessor.js';
-import { CLICommand, CommandProcessor, CommandResult } from '../utils/types.js';
+import { CommandFactory } from './registry/commandFactory.js';
+import { CommandRegistry } from './registry/commandRegistry.js';
+import { NodeProcessRunner } from './processors/processRunner.js';
+import { CLIExecutor } from './processors/cliExecutor.js';
+import { CLICmdWriter } from './processors/cliCmdWriter.js';
+import { BaseCommandProcessor } from './processors/baseCommandProcessor.js';
+import { CLICommand, CommandProcessor, CommandResult, CommandResultFactory } from '../utils/types.js';
 import logger from '../utils/logger.js';
 import {
   GetApiSpecCommand,
   GetSnippetCommand,
   GetInstructCommand,
   CheckAuthStatusCommand
-} from './resourceTools.js';
+} from './resources/resourceTools.js';
 import { setRoots as setRootContextRoots } from '../utils/rootContext.js';
 
 /**
@@ -94,7 +94,7 @@ export class ToolsManager {
       logger.debug('Resource tools registered successfully');
     } catch (error) {
       logger.error('Error registering resource tools',
-        error instanceof Error ? error : new Error(String(error))
+        CommandResultFactory.normalizeError(error)
       );
       throw error;
     }
@@ -174,10 +174,10 @@ export class ToolsManager {
           };
         } catch (error) {
           // Handle exceptions from validateArgs() or command execution
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          logger.error(`Tool '${command.name}' execution failed`, error instanceof Error ? error : new Error(errorMessage));
+          const normalizedError = CommandResultFactory.normalizeError(error);
+          logger.error(`Tool '${command.name}' execution failed`, normalizedError);
           return {
-            content: [{ type: 'text' as const, text: `❌ Error: ${errorMessage}` }],
+            content: [{ type: 'text' as const, text: `❌ Error: ${normalizedError.message}` }],
             isError: true
           };
         }

@@ -1,9 +1,9 @@
 /**
  * Tests for CLI command tools with Root capability
  */
-import { CLIExecutor } from '../../src/tools/cliExecutor.js';
-import { CLICmdWriter } from '../../src/tools/cliCmdWriter.js';
-import { NodeProcessRunner } from '../../src/tools/processRunner.js';
+import { CLIExecutor } from '../../src/tools/processors/cliExecutor.js';
+import { CLICmdWriter } from '../../src/tools/processors/cliCmdWriter.js';
+import { NodeProcessRunner } from '../../src/tools/processors/processRunner.js';
 import { CommandResult } from '../../src/utils/types.js';
 
 // Mock the process runner

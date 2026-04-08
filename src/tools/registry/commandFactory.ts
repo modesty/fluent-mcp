@@ -1,4 +1,4 @@
-import { CommandProcessor, CLICommand } from '../utils/types.js';
+import { CommandProcessor, CLICommand } from '../../utils/types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
   SdkInfoCommand,
@@ -10,7 +10,7 @@ import {
   DownloadCommand,
   CleanCommand,
   PackCommand,
-} from './commands/index.js';
+} from '../commands/index.js';
 
 /**
  * Factory for creating all CLI command instances with appropriate processors

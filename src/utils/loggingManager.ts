@@ -5,6 +5,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import logger from './logger.js';
+import { CommandResultFactory } from './types.js';
 import { ServerStatus } from '../types.js';
 import { getConfig } from '../config.js';
 
@@ -84,7 +85,7 @@ export class LoggingManager {
   logServerStartFailed(error: Error | unknown, status: ServerStatus): void {
     logger.error(
       'Failed to start MCP server',
-      error instanceof Error ? error : new Error(String(error)),
+      CommandResultFactory.normalizeError(error),
       { status }
     );
   }
@@ -97,7 +98,7 @@ export class LoggingManager {
   logServerStopFailed(error: Error | unknown, status: ServerStatus): void {
     logger.error(
       'Error stopping MCP server',
-      error instanceof Error ? error : new Error(String(error)),
+      CommandResultFactory.normalizeError(error),
       { status }
     );
   }
@@ -109,7 +110,7 @@ export class LoggingManager {
   logResourceListingFailed(error: Error | unknown): void {
     logger.error(
       'Error listing resources', 
-      error instanceof Error ? error : new Error(String(error))
+      CommandResultFactory.normalizeError(error)
     );
   }
 
@@ -120,7 +121,7 @@ export class LoggingManager {
   logPromptListingFailed(error: unknown): void {
     logger.error(
       'Failed to list prompts',
-      error instanceof Error ? error : new Error(String(error))
+      CommandResultFactory.normalizeError(error)
     );
   }
 
@@ -132,7 +133,7 @@ export class LoggingManager {
   logPromptRetrievalFailed(promptName: string, error: unknown): void {
     logger.error(
       `Failed to get prompt '${promptName}'`,
-      error instanceof Error ? error : new Error(String(error))
+      CommandResultFactory.normalizeError(error)
     );
   }
 
