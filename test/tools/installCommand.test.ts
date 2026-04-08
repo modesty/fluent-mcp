@@ -60,7 +60,8 @@ describe('InstallCommand', () => {
         'npx',
         ['now-sdk', 'install'],
         false,
-        '/mock/working/dir'
+        '/mock/working/dir',
+        undefined // stdinInput
       );
     });
 
@@ -73,7 +74,8 @@ describe('InstallCommand', () => {
         'npx',
         ['now-sdk', 'install', '--skip-flow-activation'],
         false,
-        '/mock/working/dir'
+        '/mock/working/dir',
+        undefined // stdinInput
       );
     });
 
@@ -99,7 +101,8 @@ describe('InstallCommand', () => {
         'npx',
         ['now-sdk', 'install', '--auth', 'my-alias', '--skip-flow-activation', '--debug'],
         false,
-        '/mock/working/dir'
+        '/mock/working/dir',
+        undefined // stdinInput
       );
     });
   });

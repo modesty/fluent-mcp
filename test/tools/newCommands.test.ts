@@ -69,7 +69,8 @@ describe('New SDK Commands', () => {
         'npx',
         ['now-sdk', 'download', 'my-app'],
         false,
-        '/mock/working/dir'
+        '/mock/working/dir',
+        undefined // stdinInput
       );
     });
 
@@ -88,7 +89,8 @@ describe('New SDK Commands', () => {
         'npx',
         ['now-sdk', 'download', 'my-app', '--source', './src', '--incremental', '--debug'],
         false,
-        '/mock/working/dir'
+        '/mock/working/dir',
+        undefined // stdinInput
       );
     });
   });
@@ -125,7 +127,8 @@ describe('New SDK Commands', () => {
         'npx',
         ['now-sdk', 'clean'],
         false,
-        '/mock/working/dir'
+        '/mock/working/dir',
+        undefined // stdinInput
       );
     });
 
@@ -142,7 +145,8 @@ describe('New SDK Commands', () => {
         'npx',
         ['now-sdk', 'clean', '--source', 'src', '--debug'],
         false,
-        '/mock/working/dir'
+        '/mock/working/dir',
+        undefined // stdinInput
       );
     });
   });
@@ -179,7 +183,8 @@ describe('New SDK Commands', () => {
         'npx',
         ['now-sdk', 'pack'],
         false,
-        '/mock/working/dir'
+        '/mock/working/dir',
+        undefined // stdinInput
       );
     });
 
@@ -196,7 +201,8 @@ describe('New SDK Commands', () => {
         'npx',
         ['now-sdk', 'pack', '--source', './build', '--debug'],
         false,
-        '/mock/working/dir'
+        '/mock/working/dir',
+        undefined // stdinInput
       );
     });
   });

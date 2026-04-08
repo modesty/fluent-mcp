@@ -23,4 +23,5 @@ jest.mock('../src/config.js', () => ({
   }),
 }));
 
-// Add any other global mocks here
+// Globally mock logger to suppress stderr output during tests
+jest.mock('../src/utils/logger.js', () => require('./mocks/index.js').createLoggerMock());

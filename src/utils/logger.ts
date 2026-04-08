@@ -202,9 +202,8 @@ export class Logger {
     level: LogLevel,
     message: string,
     context?: Record<string, unknown>,
-    options: { skipLevelCheck?: boolean } = {}
   ): void {
-    if (!options.skipLevelCheck && !this.shouldLog(level)) {
+    if (!this.shouldLog(level)) {
       return;
     }
 
@@ -248,15 +247,13 @@ export class Logger {
   }
 
   /**
-   * Log a message at the error level
-   * Always logs regardless of log level, with optional error object for stack trace
+   * Log a message at the error level, with optional error object for stack trace
    */
   public error(
     message: string,
     error?: Error,
     context?: Record<string, unknown>
   ): void {
-    // Prepare error context
     const errorContext: Record<string, unknown> = {
       ...(context || {}),
     };
@@ -269,9 +266,7 @@ export class Logger {
       };
     }
 
-    // In test environment, downgrade error logs to WARN to keep test output clean
-    const level = process.env.NODE_ENV === 'test' ? LogLevel.WARN : LogLevel.ERROR;
-    this.logAtLevel(level, message, errorContext, { skipLevelCheck: true });
+    this.logAtLevel(LogLevel.ERROR, message, errorContext);
   }
 
   /**
@@ -300,12 +295,7 @@ export class Logger {
    */
   public log(level: LogLevel, message: string, obj?: unknown): void {
     const context = obj as Record<string, unknown>;
-
-    if (level === LogLevel.ERROR) {
-      this.error(message, undefined, context);
-    } else {
-      this.logAtLevel(level, message, context);
-    }
+    this.logAtLevel(level, message, context);
   }
 }
 

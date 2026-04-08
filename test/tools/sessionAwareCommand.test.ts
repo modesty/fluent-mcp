@@ -53,7 +53,8 @@ describe("SessionAwareCommand", () => {
       "test-command",
       ["test", "command", "args"],
       false,
-      "/mock/working/dir"
+      "/mock/working/dir",
+      undefined // stdinInput
     );
     expect(result.success).toBe(true);
   });

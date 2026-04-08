@@ -3,6 +3,7 @@ import { AuthCommand } from "../../src/tools/commands/authCommand.js";
 import { SessionManager } from "../../src/utils/sessionManager.js";
 
 jest.mock("../../src/utils/sessionManager.js", () => require('../mocks/index.js').createSessionManagerMock());
+jest.mock("../../src/utils/rootContext.js", () => require('../mocks/index.js').createRootContextMock());
 
 // Create mock CLICmdWriter for tests
 function createMockCmdWriter(): CommandProcessor {

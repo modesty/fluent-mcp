@@ -39,7 +39,8 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
   protected async executeWithSessionWorkingDirectory(
     command: string,
     args: string[],
-    useMcpCwd: boolean = false
+    useMcpCwd: boolean = false,
+    stdinInput?: string
   ): Promise<CommandResult> {
     const workingDirectory = this.getWorkingDirectory();
 
@@ -50,7 +51,7 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
     }
 
     try {
-      return await this.commandProcessor.process(command, args, useMcpCwd, workingDirectory);
+      return await this.commandProcessor.process(command, args, useMcpCwd, workingDirectory, stdinInput);
     } catch (error) {
       return CommandResultFactory.fromError(error);
     }
