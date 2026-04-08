@@ -11,7 +11,7 @@ Flow(
         $id: Now.ID['my_flow'], // string | Now.ID key, mandatory — unique identifier
         name: '',               // string, mandatory — display name of the flow
         description: '',        // string, optional — purpose description
-        runAs: 'system',        // 'system' | 'user', optional — execution context
+        runAs: 'system',        // 'system' | 'user', optional — execution context (default: 'system' since SDK v4.5.0, was 'user' before)
         runWithRoles: [],       // (string | Role)[], optional — roles to run flow with
         flowPriority: 'LOW',    // 'LOW' | 'MEDIUM' | 'HIGH', optional — execution priority
         protection: 'read',     // 'read' | '', optional — 'read' makes flow read-protected

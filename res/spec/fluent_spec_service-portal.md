@@ -1,4 +1,4 @@
-# **Context**: Service Portal API spec: defines custom widgets, widget dependencies, and Angular providers for Service Portal pages
+# **Context**: Service Portal API spec: defines custom widgets, pages, themes, menus, widget dependencies, and Angular providers for Service Portal
 
 ## SpWidget API
 
@@ -47,6 +47,55 @@ SPWidgetDependency({
     source: '', // string, optional, source URL of the dependency (e.g., CDN URL)
     version: '', // string, optional, version of the library/dependency for tracking
     order: 100, // number, optional, load order for the dependency (lower numbers load first), default 100
+})
+```
+
+## SPPage API (SDK v4.5.0)
+
+Creates a Service Portal Page (`sp_page`) that serves as a container for widget instances within a portal.
+
+```typescript
+// Creates a new Service Portal Page (sp_page)
+SPPage({
+    $id: '', // string | guid, mandatory
+    title: '', // string, mandatory, display title of the page
+    description: '', // string, optional, description of the page's purpose
+    category: '', // string, optional, page category for organization
+    public: false, // boolean, optional, whether the page is publicly accessible without authentication
+    roles: '', // string, optional, comma-separated list of roles required to view the page
+    cssVariables: '', // string, optional, CSS custom properties for theming the page
+    draft: false, // boolean, optional, whether the page is in draft mode
+})
+```
+
+## SPTheme API (SDK v4.5.0)
+
+Creates a Service Portal Theme (`sp_theme`) that defines the visual appearance of a portal including colors, fonts, and CSS.
+
+```typescript
+// Creates a new Service Portal Theme (sp_theme)
+SPTheme({
+    $id: '', // string | guid, mandatory
+    name: '', // string, mandatory, name of the theme
+    cssVariables: '', // string, optional, CSS custom properties defining theme colors, fonts, etc.
+    navbarFixedPadding: '', // string, optional, padding for fixed navbar layout
+    header: '', // string, optional, reference to a header widget for the theme
+    footer: '', // string, optional, reference to a footer widget for the theme
+})
+```
+
+## SPMenu API (SDK v4.5.0)
+
+Creates a Service Portal Menu (`sp_instance_menu`) for navigation within a portal. Menus define hierarchical navigation structures.
+
+```typescript
+// Creates a new Service Portal Menu (sp_instance_menu)
+SPMenu({
+    $id: '', // string | guid, mandatory
+    title: '', // string, mandatory, display title of the menu
+    items: [], // MenuItemConfig[], optional, array of menu item configurations
+      // Each item: { label: string, url?: string, type?: string, order?: number, subItems?: MenuItemConfig[] }
+    roles: '', // string, optional, comma-separated list of roles required to view the menu
 })
 ```
 

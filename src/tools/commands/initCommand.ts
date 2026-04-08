@@ -70,7 +70,7 @@ export class InitCommand extends BaseCLICommand {
       name: 'auth',
       type: 'string',
       required: false,
-      description: 'Credential alias to use for authentication with instance (auto-injected from session if not provided)',
+      description: 'For conversion only: credential alias for authentication with instance (auto-injected from session if not provided)',
     },
     {
       name: 'workingDirectory',
@@ -207,8 +207,8 @@ export class InitCommand extends BaseCLICommand {
     sdkArgs.push('--packageName', data.packageName);
     sdkArgs.push('--scopeName', data.scopeName);
     if (data.template) sdkArgs.push('--template', data.template);
-    const auth = this.getAuthAlias(data.auth);
-    if (auth) sdkArgs.push('--auth', auth);
+    // SDK v4.5.0: init no longer prompts for credentials during creation,
+    // auth is only needed for conversion (pulling from instance)
     if (data.debug) sdkArgs.push('--debug');
 
     return sdkArgs;

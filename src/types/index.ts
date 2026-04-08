@@ -7,6 +7,8 @@
  */
 export enum ServiceNowMetadataType {
   ACL = 'acl',
+  AI_AGENT = 'ai-agent',
+  AI_AGENT_WORKFLOW = 'ai-agent-workflow',
   APPLICATION_MENU = 'application-menu',
   ATF_APPNAV = 'atf-appnav',
   ATF_CATALOG_ACTION = 'atf-catalog-action',
@@ -38,7 +40,9 @@ export enum ServiceNowMetadataType {
   FLOW = 'flow',
   FORM = 'form',
   IMPORT_SET = 'import-set',
+  INSTANCE_SCAN = 'instance-scan',
   LIST = 'list',
+  NOW_ASSIST_SKILL_CONFIG = 'now-assist-skill-config',
   PROPERTY = 'property',
   ROLE = 'role',
   SCHEDULED_SCRIPT = 'scheduled-script',

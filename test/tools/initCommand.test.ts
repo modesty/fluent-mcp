@@ -384,17 +384,17 @@ describe("InitCommand", () => {
 
     await initCommand.execute(args);
     
+    // SDK v4.5.0: init no longer injects --auth for creation (only for conversion)
     expect(mockExecutor.process).toHaveBeenCalledWith(
       'npx',
       [
         '-y',
-        '@servicenow/sdk', 
-        'init', 
+        '@servicenow/sdk',
+        'init',
         '--appName', '"Test App"',
         '--packageName', 'test-app',
         '--scopeName', 'x_test_scope',
         '--template', 'typescript.react',
-        '--auth', 'test-auth'
       ],
       false,
       '/valid-dir'

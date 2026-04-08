@@ -62,3 +62,23 @@ Always reference the Service Portal API specifications for more details.
    - Avoid heavy computations in filters (run on every digest cycle)
    - Don't manipulate DOM in services/factories - use directives
    - Always handle promise rejections with error callbacks
+
+## SPPage API (SDK v4.5.0)
+
+1. Import `SPPage` from `@servicenow/sdk/core`. The `$id` field is mandatory and must be unique.
+2. The `title` field is mandatory and serves as the display name for the page.
+3. Set `public: true` to make a page accessible without authentication. Use `roles` to restrict access to specific roles.
+4. Pages serve as containers for widget instances — configure the page layout and add widgets separately.
+
+## SPTheme API (SDK v4.5.0)
+
+1. Import `SPTheme` from `@servicenow/sdk/core`. The `$id` field is mandatory and must be unique.
+2. The `name` field is mandatory. Use descriptive names that reflect the visual identity (e.g., "Corporate Dark Theme").
+3. Define `cssVariables` as CSS custom properties to control colors, fonts, and spacing across the portal.
+4. Use `header` and `footer` to reference widget instances that serve as the theme's header and footer.
+
+## SPMenu API (SDK v4.5.0)
+
+1. Import `SPMenu` from `@servicenow/sdk/core`. The `$id` field is mandatory and must be unique.
+2. The `title` field is mandatory. Define navigation items in the `items` array with labels, URLs, and optional sub-items.
+3. Use `roles` to restrict menu visibility to specific user roles.
