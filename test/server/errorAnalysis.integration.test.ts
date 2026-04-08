@@ -6,40 +6,18 @@ import { SamplingManager } from '../../src/utils/samplingManager.js';
 import { ErrorAnalysis, CommandResult } from '../../src/utils/types.js';
 
 // Mock config with sampling enabled
-jest.mock('../../src/config.js', () => ({
-  __esModule: true,
-  getConfig: jest.fn().mockReturnValue({
-    name: 'test-mcp-server',
-    version: '1.0.0',
-    description: 'Test MCP Server',
-    logLevel: 'info',
-    resourcePaths: {
-      spec: '/mock/path/to/spec',
-      snippet: '/mock/path/to/snippet',
-      instruct: '/mock/path/to/instruct',
-    },
-    servicenowSdk: {
-      cliPath: 'snc',
-      commandTimeoutMs: 30000,
-    },
-    sampling: {
-      enableErrorAnalysis: true,
-      minErrorLength: 50,
-    },
-  }),
-  getProjectRootPath: jest.fn().mockReturnValue('/mock/project/root'),
-}));
-
-// Mock logger
-jest.mock('../../src/utils/logger.js', () => ({
-  __esModule: true,
-  default: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
+jest.mock('../../src/config.js', () => require('../mocks/index.js').createConfigMock({
+  servicenowSdk: {
+    cliPath: 'snc',
+    commandTimeoutMs: 30000,
+  },
+  sampling: {
+    enableErrorAnalysis: true,
+    minErrorLength: 50,
   },
 }));
+
+jest.mock('../../src/utils/logger.js', () => require('../mocks/index.js').createLoggerMock());
 
 describe('Error Analysis Integration', () => {
   describe('Configuration Integration', () => {

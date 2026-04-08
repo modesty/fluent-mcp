@@ -3,13 +3,10 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { ResourceResult, ResourceTypeEnum } from './types.js';
+import { ResourceResult, ResourceType } from './types.js';
 import logger from './logger.js';
 import { getConfig } from '../config.js';
-import { ServiceNowMetadataType } from '../types/index.js';
-
-// Re-export ResourceTypeEnum as ResourceType for backward compatibility
-export import ResourceType = ResourceTypeEnum;
+import { ServiceNowMetadataType } from '../types.js';
 
 /**
  * Resource loader class for accessing ServiceNow metadata resources

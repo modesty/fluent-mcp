@@ -8,7 +8,8 @@ import {
   GetSnippetCommand,
   GetInstructCommand,
 } from "../../src/tools/resourceTools.js";
-import { ResourceLoader, ResourceType } from "../../src/utils/resourceLoader.js";
+import { ResourceLoader } from "../../src/utils/resourceLoader.js";
+import { ResourceType } from "../../src/utils/types.js";
 import { getProjectRootPath } from "../../src/config.js";
 
 // Mock the file system operations for tests

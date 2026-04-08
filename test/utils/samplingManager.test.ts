@@ -4,16 +4,7 @@
 import { SamplingManager } from '../../src/utils/samplingManager.js';
 import { ErrorAnalysis } from '../../src/utils/types.js';
 
-// Mock the logger
-jest.mock('../../src/utils/logger.js', () => ({
-  __esModule: true,
-  default: {
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
-  },
-}));
+jest.mock('../../src/utils/logger.js', () => require('../mocks/index.js').createLoggerMock());
 
 describe('SamplingManager', () => {
   let samplingManager: SamplingManager;

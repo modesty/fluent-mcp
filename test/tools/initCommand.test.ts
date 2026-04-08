@@ -68,20 +68,7 @@ class VirtualFileSystem {
 
 const mockFs = new VirtualFileSystem();
 
-jest.mock("../../src/utils/sessionManager.js", () => {
-  return {
-    SessionManager: {
-      getInstance: jest.fn().mockReturnValue({
-        setWorkingDirectory: jest.fn(),
-        getWorkingDirectory: jest.fn().mockReturnValue("/saved-working-dir"),
-        getAuthAlias: jest.fn().mockReturnValue(undefined),
-        setAuthAlias: jest.fn(),
-        getAuthValidationResult: jest.fn().mockReturnValue(undefined),
-        setAuthValidationResult: jest.fn(),
-      }),
-    },
-  };
-});
+jest.mock("../../src/utils/sessionManager.js", () => require('../mocks/index.js').createSessionManagerMock());
 
 describe("InitCommand", () => {
   let initCommand: InitCommand;

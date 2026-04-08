@@ -1,15 +1,6 @@
 import { SessionManager } from "../../src/utils/sessionManager.js";
 
-// Mock the logger
-jest.mock("../../src/utils/logger.js", () => ({
-  __esModule: true,
-  default: {
-    debug: jest.fn(),
-    info: jest.fn(),
-    error: jest.fn(),
-    warn: jest.fn()
-  }
-}));
+jest.mock("../../src/utils/logger.js", () => require('../mocks/index.js').createLoggerMock());
 
 describe("SessionManager", () => {
   beforeEach(() => {

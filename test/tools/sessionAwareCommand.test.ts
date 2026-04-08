@@ -2,27 +2,8 @@ import { CommandProcessor, CommandResult } from "../../src/utils/types.js";
 import { SessionAwareCLICommand } from "../../src/tools/commands/sessionAwareCommand.js";
 import { SessionManager } from "../../src/utils/sessionManager.js";
 
-// Mock the SessionManager
-jest.mock("../../src/utils/sessionManager.js", () => {
-  return {
-    SessionManager: {
-      getInstance: jest.fn().mockReturnValue({
-        getWorkingDirectory: jest.fn().mockReturnValue("/test-working-dir"),
-        getAuthAlias: jest.fn().mockReturnValue(undefined),
-        getAuthValidationResult: jest.fn().mockReturnValue(undefined),
-        setAuthValidationResult: jest.fn(),
-      }),
-    },
-  };
-});
-
-// Mock the rootContext
-jest.mock("../../src/utils/rootContext.js", () => {
-  return {
-    getPrimaryRootPath: jest.fn().mockReturnValue("/test-root-context"),
-    resolveWorkingDirectory: jest.fn().mockReturnValue("/test-root-context"),
-  };
-});
+jest.mock("../../src/utils/sessionManager.js", () => require('../mocks/index.js').createSessionManagerMock());
+jest.mock("../../src/utils/rootContext.js", () => require('../mocks/index.js').createRootContextMock());
 
 // Create a concrete implementation of SessionAwareCLICommand for testing
 class TestSessionAwareCommand extends SessionAwareCLICommand {
@@ -72,7 +53,7 @@ describe("SessionAwareCommand", () => {
       "test-command",
       ["test", "command", "args"],
       false,
-      "/test-working-dir"
+      "/mock/working/dir"
     );
     expect(result.success).toBe(true);
   });

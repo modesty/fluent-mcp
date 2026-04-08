@@ -2,8 +2,8 @@
  * MCP tools for accessing ServiceNow metadata resources (API specs, snippets, instructions)
  * and checking authentication status
  */
-import { ResourceLoader, ResourceType } from '../utils/resourceLoader.js';
-import { CLICommand, CommandArgument, CommandResult, CommandResultFactory } from '../utils/types.js';
+import { ResourceLoader } from '../utils/resourceLoader.js';
+import { CLICommand, CommandArgument, CommandResult, CommandResultFactory, ResourceType } from '../utils/types.js';
 import { SessionManager } from '../utils/sessionManager.js';
 import logger from '../utils/logger.js';
 

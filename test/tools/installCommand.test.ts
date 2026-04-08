@@ -3,54 +3,10 @@
  */
 import { InstallCommand } from '../../src/tools/commands/installCommand.js';
 
-// Mock the logger module
-jest.mock('../../src/utils/logger.js', () => ({
-  debug: jest.fn(),
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-  __esModule: true,
-  default: {
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-  }
-}));
-
-// Mock the config module
-jest.mock('../../src/config.js', () => ({
-  getProjectRootPath: jest.fn().mockReturnValue('/mock/project/root'),
-  getConfig: jest.fn().mockReturnValue({
-    resourcePaths: {
-      spec: '/mock/spec',
-      snippet: '/mock/snippet',
-      instruct: '/mock/instruct'
-    }
-  })
-}));
-
-// Mock the rootContext module
-jest.mock('../../src/utils/rootContext.js', () => ({
-  getPrimaryRootPath: jest.fn().mockReturnValue('/mock/root'),
-  getPrimaryRootPathFrom: jest.fn().mockReturnValue('/mock/root'),
-  resolveWorkingDirectory: jest.fn().mockReturnValue('/mock/root'),
-  setRoots: jest.fn(),
-}));
-
-// Mock SessionManager
-jest.mock('../../src/utils/sessionManager.js', () => ({
-  SessionManager: {
-    getInstance: jest.fn().mockReturnValue({
-      getWorkingDirectory: jest.fn().mockReturnValue('/mock/working/dir'),
-      setWorkingDirectory: jest.fn(),
-      getAuthAlias: jest.fn().mockReturnValue(undefined),
-      setAuthAlias: jest.fn(),
-      getAuthValidationResult: jest.fn().mockReturnValue(undefined),
-      setAuthValidationResult: jest.fn(),
-    }),
-  }
-}));
+jest.mock('../../src/utils/logger.js', () => require('../mocks/index.js').createLoggerMock());
+jest.mock('../../src/config.js', () => require('../mocks/index.js').createConfigMock());
+jest.mock('../../src/utils/rootContext.js', () => require('../mocks/index.js').createRootContextMock());
+jest.mock('../../src/utils/sessionManager.js', () => require('../mocks/index.js').createSessionManagerMock());
 
 describe('InstallCommand', () => {
   let mockProcessor: { process: jest.Mock };

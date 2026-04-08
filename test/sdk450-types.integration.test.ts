@@ -4,7 +4,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { ServiceNowMetadataType } from '../src/types/index.js';
+import { ServiceNowMetadataType } from '../src/types.js';
 
 // Use process.cwd() as project root (same as setup.js mock for getProjectRootPath)
 const PROJECT_ROOT = process.cwd();

@@ -1,5 +1,6 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { ResourceLoader, ResourceType } from '../utils/resourceLoader.js';
+import { ResourceLoader } from '../utils/resourceLoader.js';
+import { ResourceType } from '../utils/types.js';
 import logger from '../utils/logger.js';
 
 /**

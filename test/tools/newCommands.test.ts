@@ -1,59 +1,14 @@
 /**
  * Tests for new SDK commands: Download, Clean, and Pack
  */
-import { CommandFactory } from '../../src/tools/cliCommandTools.js';
-import { NodeProcessRunner } from '../../src/tools/cliCommandTools.js';
+import { CommandFactory } from '../../src/tools/commandFactory.js';
+import { NodeProcessRunner } from '../../src/tools/processRunner.js';
 import { DownloadCommand, CleanCommand, PackCommand } from '../../src/tools/commands/index.js';
 
-// Mock the logger module
-jest.mock('../../src/utils/logger.js', () => ({
-  debug: jest.fn(),
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-  __esModule: true,
-  default: {
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-  }
-}));
-
-// Mock the config module
-jest.mock('../../src/config.js', () => ({
-  getProjectRootPath: jest.fn().mockReturnValue('/mock/project/root'),
-  getConfig: jest.fn().mockReturnValue({
-    resourcePaths: {
-      spec: '/mock/spec',
-      snippet: '/mock/snippet',
-      instruct: '/mock/instruct'
-    }
-  })
-}));
-
-// Mock the rootContext module
-jest.mock('../../src/utils/rootContext.js', () => ({
-  getPrimaryRootPath: jest.fn().mockReturnValue('/mock/root'),
-  getPrimaryRootPathFrom: jest.fn().mockReturnValue('/mock/root'),
-  setRoots: jest.fn(),
-}));
-
-// Mock SessionManager
-jest.mock('../../src/utils/sessionManager.js', () => ({
-  SessionManager: {
-    getInstance: jest.fn().mockReturnValue({
-      getWorkingDirectory: jest.fn().mockReturnValue('/mock/working/dir'),
-      setWorkingDirectory: jest.fn(),
-      getAuthAlias: jest.fn().mockReturnValue(undefined),
-      setAuthAlias: jest.fn(),
-      getAuthValidationResult: jest.fn().mockReturnValue(undefined),
-      setAuthValidationResult: jest.fn(),
-    }),
-    getWorkingDirectory: jest.fn().mockReturnValue('/mock/working/dir'),
-    setWorkingDirectory: jest.fn(),
-  }
-}));
+jest.mock('../../src/utils/logger.js', () => require('../mocks/index.js').createLoggerMock());
+jest.mock('../../src/config.js', () => require('../mocks/index.js').createConfigMock());
+jest.mock('../../src/utils/rootContext.js', () => require('../mocks/index.js').createRootContextMock());
+jest.mock('../../src/utils/sessionManager.js', () => require('../mocks/index.js').createSessionManagerMock());
 
 describe('New SDK Commands', () => {
   let mockProcessor: { process: jest.Mock };

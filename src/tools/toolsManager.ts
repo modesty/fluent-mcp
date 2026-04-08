@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { CommandFactory, CommandRegistry } from './cliCommandTools.js';
+import { CommandFactory } from './commandFactory.js';
+import { CommandRegistry } from './commandRegistry.js';
+import { NodeProcessRunner } from './processRunner.js';
+import { CLIExecutor } from './cliExecutor.js';
+import { CLICmdWriter } from './cliCmdWriter.js';
+import { BaseCommandProcessor } from './baseCommandProcessor.js';
 import { CLICommand, CommandProcessor, CommandResult } from '../utils/types.js';
 import logger from '../utils/logger.js';
 import {
@@ -9,7 +14,6 @@ import {
   GetInstructCommand,
   CheckAuthStatusCommand
 } from './resourceTools.js';
-import { CLIExecutor, CLICmdWriter, NodeProcessRunner, BaseCommandProcessor } from './cliCommandTools.js';
 import { setRoots as setRootContextRoots } from '../utils/rootContext.js';
 
 /**

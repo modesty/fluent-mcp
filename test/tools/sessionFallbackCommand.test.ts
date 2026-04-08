@@ -2,40 +2,9 @@ import { CommandProcessor, CommandResult } from "../../src/utils/types.js";
 import { SessionFallbackCommand } from "../../src/tools/commands/sessionFallbackCommand.js";
 import { SessionManager } from "../../src/utils/sessionManager.js";
 
-// Mock the session manager
-jest.mock("../../src/utils/sessionManager.js", () => ({
-  SessionManager: {
-    getInstance: jest.fn().mockReturnValue({
-      getWorkingDirectory: jest.fn(),
-      getAuthAlias: jest.fn().mockReturnValue(undefined),
-      getAuthValidationResult: jest.fn().mockReturnValue(undefined),
-      setAuthValidationResult: jest.fn(),
-    }),
-  },
-}));
-
-// Mock the config module specifically for this test
-jest.mock("../../src/config.js", () => ({
-  getProjectRootPath: jest.fn(() => "/mock-project-root"),
-  getConfig: jest.fn().mockReturnValue({
-    name: "test",
-    version: "0.0.0",
-    description: "Test description",
-    logLevel: "info",
-    // Other config properties as needed
-  }),
-}));
-
-// Mock the logger
-jest.mock("../../src/utils/logger.js", () => ({
-  __esModule: true,
-  default: {
-    debug: jest.fn(),
-    info: jest.fn(),
-    error: jest.fn(),
-    warn: jest.fn(),
-  }
-}));
+jest.mock("../../src/utils/sessionManager.js", () => require('../mocks/index.js').createSessionManagerMock());
+jest.mock("../../src/config.js", () => require('../mocks/index.js').createConfigMock());
+jest.mock("../../src/utils/logger.js", () => require('../mocks/index.js').createLoggerMock());
 
 // Create a test implementation of SessionFallbackCommand
 class TestFallbackCommand extends SessionFallbackCommand {

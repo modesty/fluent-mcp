@@ -1,29 +1,15 @@
 /**
  * Tests for CLI command tools with Root capability
  */
-import { CLIExecutor, CLICmdWriter, NodeProcessRunner } from '../../src/tools/cliCommandTools.js';
+import { CLIExecutor } from '../../src/tools/cliExecutor.js';
+import { CLICmdWriter } from '../../src/tools/cliCmdWriter.js';
+import { NodeProcessRunner } from '../../src/tools/processRunner.js';
 import { CommandResult } from '../../src/utils/types.js';
 
 // Mock the process runner
 const mockRun = jest.fn();
-jest.mock('../../src/utils/logger.js', () => ({
-  debug: jest.fn(),
-  info: jest.fn(),
-  warn: jest.fn(),
-  error: jest.fn(),
-  __esModule: true,
-  default: {
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-  }
-}));
-
-// Mock the config module
-jest.mock('../../src/config.js', () => ({
-  getProjectRootPath: jest.fn().mockReturnValue('/mock/project/root')
-}));
+jest.mock('../../src/utils/logger.js', () => require('../mocks/index.js').createLoggerMock());
+jest.mock('../../src/config.js', () => require('../mocks/index.js').createConfigMock());
 
 // Create a mock ProcessRunner implementation
 const mockProcessRunner = {
