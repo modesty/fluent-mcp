@@ -55,7 +55,7 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
       const expectedTerms = [
         'LinterCheck(', 'ScriptOnlyCheck(', 'ColumnTypeCheck(', 'TableCheck(',
         '$id', 'name', 'category', 'active',
-        'findType', 'findPattern', 'columnType', 'condition',
+        'columnType', 'conditions', 'priority', 'shortDescription',
       ];
       for (const term of expectedTerms) {
         expect(content).toContain(term);
@@ -80,8 +80,8 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
         path.join(SNIPPET_DIR, 'fluent_snippet_instance-scan_0001.md'), 'utf-8'
       );
       expect(content).toContain('LinterCheck(');
-      expect(content).toContain('findType');
-      expect(content).toContain('findPattern');
+      expect(content).toContain('script');
+      expect(content).toContain('priority');
     });
 
     it('should have snippet 0002 with ScriptOnlyCheck example', () => {
@@ -110,7 +110,9 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
       expect(content).toContain('NowAssistSkillConfig(');
       expect(content).toContain('$id');
       expect(content).toContain('name');
-      expect(content).toContain('utterances');
+      expect(content).toContain('securityControls');
+      expect(content).toContain('inputs');
+      expect(content).toContain('outputs');
     });
 
     it('should have instruct with guidance', () => {
@@ -129,8 +131,8 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
       );
       expect(content).toContain('AiAgent(');
       expect(content).toContain('$id');
-      expect(content).toContain('instructions');
-      expect(content).toContain('skills');
+      expect(content).toContain('agentRole');
+      expect(content).toContain('tools');
     });
 
     it('should have instruct with guidance', () => {
@@ -139,19 +141,19 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
       );
       expect(content).toContain('@servicenow/sdk/core');
       expect(content).toContain('AiAgent');
-      expect(content).toContain('AiAgentWorkflow');
+      expect(content).toContain('AiAgenticWorkflow');
     });
   });
 
   describe('AI Agent Workflow resource files', () => {
-    it('should have spec with AiAgentWorkflow API signature', () => {
+    it('should have spec with AiAgenticWorkflow API signature', () => {
       const content = fs.readFileSync(
         path.join(SPEC_DIR, 'fluent_spec_ai-agent-workflow.md'), 'utf-8'
       );
-      expect(content).toContain('AiAgentWorkflow(');
+      expect(content).toContain('AiAgenticWorkflow(');
       expect(content).toContain('$id');
-      expect(content).toContain('agent');
-      expect(content).toContain('steps');
+      expect(content).toContain('executionMode');
+      expect(content).toContain('triggerConfig');
     });
 
     it('should have instruct with guidance', () => {
@@ -159,7 +161,7 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
         path.join(INSTRUCT_DIR, 'fluent_instruct_ai-agent-workflow.md'), 'utf-8'
       );
       expect(content).toContain('@servicenow/sdk/core');
-      expect(content).toContain('AiAgentWorkflow');
+      expect(content).toContain('AiAgenticWorkflow');
     });
   });
 
@@ -171,7 +173,7 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
       expect(content).toContain('SPPage(');
       expect(content).toContain('SPTheme(');
       expect(content).toContain('SPMenu(');
-      expect(content).toContain('SpWidget('); // existing API still present
+      expect(content).toContain('SPWidget('); // existing API still present
     });
 
     it('should contain SPPage, SPTheme, and SPMenu guidance in instruct', () => {
@@ -203,7 +205,7 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
       );
       expect(content).toContain('ScheduledScript(');
       expect(content).toContain('@servicenow/sdk/core');
-      expect(content).toContain('runType');
+      expect(content).toContain('frequency');
       expect(content).toContain('timeZone');
     });
 

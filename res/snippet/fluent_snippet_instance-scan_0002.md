@@ -5,9 +5,11 @@ import { ScriptOnlyCheck } from '@servicenow/sdk/core'
 ScriptOnlyCheck({
 	$id: Now.ID['scan_br_async_check'],
 	name: 'Business Rules Should Use Async When Possible',
+	shortDescription: 'Identifies synchronous business rules that could be converted to async',
 	description: 'Identifies synchronous business rules that could be converted to async for better performance',
 	active: true,
-	category: 'Performance',
+	category: 'performance',
+	priority: '3',
 	script: `
 		(function(engine) {
 			var gr = new GlideRecord('sys_script');

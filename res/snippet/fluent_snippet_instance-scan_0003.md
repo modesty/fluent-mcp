@@ -2,24 +2,28 @@
 ```typescript
 import { ColumnTypeCheck, TableCheck } from '@servicenow/sdk/core'
 
-// Validates that all string columns have a max length configured
+// Validates that all script columns follow best practices
 ColumnTypeCheck({
-	$id: Now.ID['scan_string_max_length'],
-	name: 'String Columns Must Have Max Length',
-	description: 'Ensures string columns define a maximum length to prevent data quality issues',
+	$id: Now.ID['scan_script_column_check'],
+	name: 'Script Columns Must Follow Standards',
+	shortDescription: 'Ensures script columns follow coding standards',
+	description: 'Validates that script-type columns across tables follow coding best practices',
 	active: true,
-	category: 'Best Practice',
-	columnType: 'string',
-	condition: 'max_length=0',
+	category: 'manageability',
+	priority: '3',
+	columnType: 'script',
 })
 
 // Validates that custom tables have proper access controls defined
 TableCheck({
 	$id: Now.ID['scan_table_acl_required'],
 	name: 'Custom Tables Must Have ACLs',
+	shortDescription: 'Ensures custom tables have at least one ACL rule',
 	description: 'Ensures custom tables have at least one ACL rule defined for security compliance',
 	active: true,
-	category: 'Security',
-	condition: 'nameSTARTSWITHu_^ORnameSTARTSWITHx_',
+	category: 'security',
+	priority: '2',
+	table: 'sys_db_object',
+	conditions: 'nameSTARTSWITHu_^ORnameSTARTSWITHx_',
 })
 ```

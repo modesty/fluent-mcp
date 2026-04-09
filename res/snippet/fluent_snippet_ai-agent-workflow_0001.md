@@ -1,18 +1,44 @@
-# AI Agent Workflow API example: incident triage workflow
+# AI Agentic Workflow API example: incident triage workflow with team and triggers
 ```typescript
-import { AiAgentWorkflow } from '@servicenow/sdk/core'
+import { AiAgenticWorkflow } from '@servicenow/sdk/core'
 
-AiAgentWorkflow({
+AiAgenticWorkflow({
 	$id: Now.ID['workflow_incident_triage'],
 	name: 'Incident Triage Workflow',
 	description: 'Automated workflow for triaging incoming incidents by analyzing symptoms, categorizing, and routing to appropriate teams',
 	active: true,
-	agent: Now.ID['agent_it_support'],
-	steps: [
-		{ name: 'Analyze Symptoms', type: 'action', action: 'analyze_incident_description' },
-		{ name: 'Categorize Issue', type: 'decision', action: 'determine_category' },
-		{ name: 'Set Priority', type: 'action', action: 'calculate_priority' },
-		{ name: 'Route to Team', type: 'action', action: 'assign_to_group' },
+	executionMode: 'copilot',
+	team: {
+		$id: Now.ID['team_incident_triage'],
+		name: 'Incident Triage Team',
+		description: 'Team of agents that collaborate on incident triage',
+		members: [
+			Now.ID['agent_it_support'],
+			Now.ID['agent_categorization'],
+		],
+	},
+	versions: [
+		{
+			name: 'v1',
+			number: 1,
+			instructions: 'Analyze incoming incidents, categorize by type, set priority based on impact and urgency, then route to the appropriate support team.',
+			state: 'published',
+		},
 	],
+	triggerConfig: [
+		{
+			name: 'New Incident Trigger',
+			description: 'Triggers workflow when a new incident is created',
+			channel: 'Now Assist Panel',
+			active: true,
+			targetTable: 'incident',
+			triggerFlowDefinitionType: 'record_create',
+			triggerCondition: 'priority=1^ORpriority=2',
+		},
+	],
+	dataAccess: {
+		description: 'Access for incident triage roles',
+		roleList: [Now.ID['role_incident_manager']],
+	},
 })
 ```

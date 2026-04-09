@@ -1,9 +1,12 @@
 # Instructions for Fluent NowAssist Skill Config API
 Always reference the NowAssist Skill Config API specifications for more details.
-1. Import `NowAssistSkillConfig` from `@servicenow/sdk/core`. The `$id` field is mandatory and must be unique, typically using `Now.ID['value']`.
-2. The `name` field is mandatory and should clearly describe the skill's function (e.g., "Summarize Incident", "Generate Knowledge Article").
-3. Use `utterances` to define sample phrases that should trigger the skill. These help NowAssist map user intents to the correct skill.
-4. Define `inputParameters` to specify what data the skill requires as input, and `outputParameters` to define what the skill produces.
-5. Use the `category` field to organize skills by domain (e.g., 'IT Service Management', 'HR', 'Customer Service').
-6. Set `active: false` to disable a skill configuration without deleting it.
-7. NowAssist Skill configurations work within the NowAssist framework and are intended to extend AI-powered assistance capabilities in the ServiceNow platform.
+1. Import `NowAssistSkillConfig` from `@servicenow/sdk/core`. This is a **two-argument function**: `NowAssistSkillConfig(definition, promptConfig)`.
+2. **First argument (definition):** The `$id` and `name` fields are mandatory. Use `shortDescription` for a brief one-liner and `description` for detailed explanation. Set `state: 'published'` to publish; omit for draft.
+3. Define `inputs` as an array of `InputAttribute` objects. Each requires `$id` (using `Now.ID`), `name`, and `dataType` ('string'|'numeric'|'boolean'|'glide_record'|'simple_array'|'json_object'|'json_array'). For `glide_record` type, both `tableName` and `tableSysId` are REQUIRED. Use `mandatory: true` for required inputs.
+4. Define `outputs` as an array of `OutputAttribute` objects with the same structure as inputs (`$id`, `name`, `dataType` are mandatory). Output names must not contain underscores.
+5. `securityControls` is **MANDATORY**. It requires `userAccess` (either `{ type: 'authenticated' }` for any logged-in user or `{ type: 'roles', roles: [...] }` for specific roles) and `roleRestrictions` (mandatory array of role sys_ids that the skill can inherit during execution).
+6. Use `tools` callback to define a tool graph: `tools: (t) => ({ myTool: t.Script(...), ... })`. Available tool types: `Script`, `InlineScript`, `FlowAction`, `Subflow`, `Skill`, `WebSearch`, `Decision`. Access skill inputs via `t.input.fieldName`. Chain dependencies via `depends` array. Return tool handles to enable type-safe prompt access.
+7. **Second argument (promptConfig):** Must contain `providers` array with at least one provider. Each provider has `provider` name (e.g., 'Now LLM Service', 'Azure OpenAI'), `prompts` array, and optional `defaultPrompt`. Each prompt has `$id`, `name`, and `versions` array with `model`, `temperature`, `promptState`, and `prompt` (string or builder callback `(p) => ...`).
+8. In prompt builder callbacks, access inputs via `p.input.fieldName` and tool outputs via `p.tool.ToolName.output` (for single-output tools) or `p.tool.ToolName.fieldName` (for multi-output tools).
+9. Use `deploymentSettings` to configure where the skill is deployed: `uiAction` for form-level UI Actions, `nowAssistPanel` for NAP deployment (requires `enabled: true` and `roles`), `flowAction: true` for workflow trigger.
+10. Use `skillSettings` for pre/postprocessing providers that transform request/response payloads before/after LLM calls.

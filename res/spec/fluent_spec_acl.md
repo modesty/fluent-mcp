@@ -19,5 +19,6 @@ const specAcl = Acl({
     securityAttribute: 'LoggedIn', // typed string, `LoggedIn`|`Group`|`GroupExplicit`|`HasAdminRole`|`Impersonating`|`InteractiveSession`|`NetworkCriteria`|`Role`|`RoleExplicit`, additional security attributes may be available based on installed plugins, ex. com.glide.client_session_security_attributes
     localOrExisting: 'Local', // typed string, 'Local'|'Existing': if `Local`: A security attribute based on the `condition` property that is saved only for the ACL it is created in; if `Existing`: An existing security attribute to reference in the `security_attribute` property
     protectionPolicy: 'read', // typed string (added SDK 4.4.0): 'read' | 'protected' — controls edit/view access for other developers
+    dataBroker: '', // string | Record<'sys_ux_data_broker'>, optional — reference to UX data broker, applicable when `type` is `ux_data_broker`
 }): Acl; // returns an Acl object
 ```

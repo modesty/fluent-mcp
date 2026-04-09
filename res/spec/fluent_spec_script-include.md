@@ -14,5 +14,6 @@ ScriptInclude({
     clientCallable: false, // boolean, optional, whether GlideAJAX is enabled to enable it runnable from browser client, default false
     mobileCallable: false, // boolean, optional, whether the script include is callable from mobile, default false
     sandboxCallable: false, // boolean, optional, whether the script include is callable from sandbox, default false
+    protectionPolicy: '', // 'read' | 'protected', optional — controls edit/view access for other developers
 })
 ```

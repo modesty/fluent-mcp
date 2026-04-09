@@ -57,7 +57,46 @@ UxListMenuConfig({
                             order: 100,
                         }
                     ],
-                    // Hide various UI elements
+                    // UI visibility toggles (all boolean, optional, default: false)
+                    groups: [], // (string | Record<'sys_user_group'>)[], optional - user groups that can access this list
+                    hideCellFilter: false,
+                    hideCheckboxHover: false,
+                    hideColumnGrouping: false,
+                    hideColumnResizing: false,
+                    hideDragAndDrop: false,
+                    hideEmptyStateImage: false,
+                    hideFirstPage: false,
+                    hideHighlightContent: false,
+                    hideHighlightedValues: false,
+                    hideLastPage: false,
+                    hideLastRefreshedText: false,
+                    hideLinks: false,
+                    hideMenuButton: false,
+                    hideNextPage: false,
+                    hideOptionToSaveAs: false,
+                    hidePages: false,
+                    hidePanelAdvanced: false,
+                    hidePanelButton: false,
+                    hidePanelConditionDelete: false,
+                    hidePanelFooter: false,
+                    hidePanelRestore: false,
+                    hidePersonalization: false,
+                    hidePreviousPage: false,
+                    hideQuickEdit: false,
+                    hideRange: false,
+                    hideRecordCountBadge: false,
+                    hideReferenceLinks: false,
+                    hideRowSelector: false,
+                    hideRowsPerPageSelector: false,
+                    hideSelectAll: false,
+                    hideSharingButton: false,
+                    hideTitle: false,
+                    highlightContentColor: '', // string, optional - highlight color
+                    highlightContentPattern: '', // string, optional - highlight pattern
+                    listAttributes: '', // string, optional - additional list attributes
+                    liveUpdates: false, // boolean, optional - enable live updates
+                    overrideWordWrapUserPref: false, // boolean, optional - override user word wrap preference
+                    // Hide various UI elements (legacy toggles)
                     hideHeader: false,       // boolean, optional
                     hidePagination: false,   // boolean, optional
                     hideRefreshButton: false, // boolean, optional

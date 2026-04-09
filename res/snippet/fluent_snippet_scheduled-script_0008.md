@@ -1,19 +1,16 @@
-# Scheduled Job API example: modifying what the Scheduled Script Execution does by updating its script to set a system property false
-
+# Scheduled Script API example: daily job that sets a system property to false
 ```typescript
-import { Record } from '@servicenow/sdk/core'
+import { ScheduledScript } from '@servicenow/sdk/core'
 
-Record({
+ScheduledScript({
 	$id: Now.ID['scheduledscript8'],
-	table: 'sysauto_script',
-	data: {
-		name: 'Daily Hello Job',
-		active: true,
-		conditional: false,
-		runType: 'daily',
-		timeZone: 'US/Pacific',
-		runTime: '2025-01-12 23:23:23',
-		script: `// Set the system property 'test_property' to false
+	name: 'Daily Hello Job',
+	active: true,
+	conditional: false,
+	frequency: 'daily',
+	timeZone: 'US/Pacific',
+	executionTime: { hours: 23, minutes: 23, seconds: 23 },
+	script: `// Set the system property 'test_property' to false
 gs.setProperty("test_property", "false");
 
 // Log the property update
@@ -21,6 +18,5 @@ gs.log("System property 'test_property' has been set to 'false'", "PropertyUpdat
 
 // Add information message for admins
 gs.info("Daily job has updated test_property to false");`
-	}
-});
+})
 ```

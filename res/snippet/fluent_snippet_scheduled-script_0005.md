@@ -1,17 +1,15 @@
-# Scheduled Job API example: creating a new Scheduled Script Execution that runs the beginning of the quarter on the business calendar. This job prints a string into the instance system logs.
+# Scheduled Script API example: quarterly script using business calendar start trigger
 ```typescript
-import { Record } from '@servicenow/sdk/core'
+import { ScheduledScript } from '@servicenow/sdk/core'
 
-Record({
+ScheduledScript({
 	$id: Now.ID['scheduledscript5'],
-	table: 'sysauto_script',
-	data: {
-		name: 'quarterly scheduled script execution',
-		active: true,
-		conditional: false,
-		runType: 'business_calendar_start',
-		businessCalendar: get_sys_id('business_calendar', 'calendar_name=Quarter^ORlabel=Quarter'),
-		script: `// Log the message that the job has started
+	name: 'quarterly scheduled script execution',
+	active: true,
+	conditional: false,
+	frequency: 'business_calendar_start',
+	businessCalendar: get_sys_id('business_calendar', 'calendar_name=Quarter^ORlabel=Quarter'),
+	script: `// Log the message that the job has started
 gs.log("started scheduled job five", "ScheduledJobFive");
 
 // Add an info message
@@ -24,6 +22,5 @@ gs.setProperty("last_quarterly_job_run", currentDateTime.getDisplayValue());
 // Log the quarter start date
 var quarterCal = new GlideCalendarEntry.getStartDate('Quarter', currentDateTime);
 gs.log("Quarter start date: " + quarterCal, "QuarterlyJob");`
-	}
 })
 ```

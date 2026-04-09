@@ -16,7 +16,7 @@ atf.form.openExistingRecord({ // all props are mandatory
   recordId: '', // sys_id of the record
   formUI: 'standard_ui', // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace' 
   view: '', // string
-  selectedTabIndex: 0
+  selectedTabIndex: 1
 }): void;
 
 // Submits the current form.
@@ -35,6 +35,7 @@ atf.form.clickModalButton({ // all props are mandatory
   assertTimeout: 10, // seconds to wait for pass or fail after the button clickable
   formUI: 'standard_ui', // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace'
   action: 'confirm', //'confirm' | 'cancel'
+  values: '', // string, optional — field values for workspace UI
 }): void;
 
 // Sets field values on the current form after a call to atf.form.openNewForm or atf.form.openExistingRecord

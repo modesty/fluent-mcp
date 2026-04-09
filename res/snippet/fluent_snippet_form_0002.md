@@ -1,4 +1,6 @@
 # Update default view for the incident table with two sections
+> Note: This snippet uses the legacy Record API. For new forms, prefer the `Form()` API (see snippet_0001).
+
 ```typescript
 import { Record, default_view } from '@servicenow/sdk/core';
 

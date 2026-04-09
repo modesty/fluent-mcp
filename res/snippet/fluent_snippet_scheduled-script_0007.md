@@ -1,24 +1,20 @@
-# Scheduled Job API example: modifying what the Scheduled Script Execution does by updating its script to log "Hello from Fluent Scheduled Job"
-
+# Scheduled Script API example: daily Hello job at 8AM US/Pacific
 ```typescript
-import { Record } from '@servicenow/sdk/core'
+import { ScheduledScript } from '@servicenow/sdk/core'
 
-Record({
+ScheduledScript({
 	$id: Now.ID['scheduledscript7'],
-	table: 'sysauto_script',
-	data: {
-		name: 'Daily Hello Job',
-		active: true,
-		conditional: false,
-		runType: 'daily',
-		timeZone: 'US/Pacific',
-		runTime: '2025-03-13 08:00:00',
-		script: `// Display info message
+	name: 'Daily Hello Job',
+	active: true,
+	conditional: false,
+	frequency: 'daily',
+	timeZone: 'US/Pacific',
+	executionTime: { hours: 8, minutes: 0, seconds: 0 },
+	script: `// Display info message
 gs.info("Hello from Fluent Scheduled Job");
 
 // Log the execution time
 var currentTime = new GlideDateTime();
 gs.log("Daily Hello Job executed at " + currentTime.getDisplayValue(), "DailyHelloJob");`
-	}
-});
+})
 ```

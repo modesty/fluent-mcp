@@ -11,7 +11,7 @@ Test({ // all properties are mandatory
   active: true, // boolean
   failOnServerError: true // boolean
 }, (atf) => {
-  // ATF step API goes here, including atf.form, atf.server, etc.
+  // ATF step API goes here, including atf.form, atf.form_SP, atf.server, etc.
   // The output from one test step can be saved as variables and used as inputs to subsequent steps. Example:
   // atf.server.impersonate({
   //  $id: Now.ID['0001'], //id the test step in the test suite

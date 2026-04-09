@@ -71,6 +71,7 @@ Dashboard({
     // 'spline'             — Spline (curved line) chart
     // 'step'               — Step chart
     // 'vertical-bar'       — Vertical bar chart
+    // 'compatibility-mode-widget' — Legacy compatibility mode widget
     // string               — Custom component sys_id
 
     // ─── Visibilities ───

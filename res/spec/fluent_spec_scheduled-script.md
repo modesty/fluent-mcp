@@ -1,51 +1,37 @@
-# **Context**: Scheduled Script spec: creates a Scheduled Script Execution (`sysauto_script`) in ServiceNow. SDK v4.5.0 introduces a dedicated `ScheduledScript` Fluent API alongside the existing Record API approach.
-
-## ScheduledScript Fluent API (SDK v4.5.0)
+# **Context**: Scheduled Script spec: creates a Scheduled Script Execution (`sys_script_execution`) in ServiceNow using the dedicated `ScheduledScript` Fluent API.
 
 ```typescript
-// Creates a new Scheduled Script Execution (`sysauto_script`) using the dedicated Fluent API
+// Creates a new Scheduled Script Execution using the Fluent API
 import { ScheduledScript } from '@servicenow/sdk/core'
 
 ScheduledScript({
-	$id: '', // string | guid, mandatory
-	name: '', // string, mandatory - display name of the scheduled script
-	active: true, // boolean, optional - whether the scheduled script is active
-	conditional: false, // boolean, optional - whether execution depends on a condition script
-	condition: '', // string, optional - server-side script that returns a boolean, mandatory only if `conditional` is `true`
-	runType: 'daily', // string, mandatory - execution schedule type
-	  // Valid values: 'daily' | 'weekly' | 'monthly' | 'periodically' | 'once' | 'on_demand' | 'business_calendar_start' | 'business_calendar_end'
-	timeZone: '', // string, optional - the time zone for the job, mandatory if `runType` is `daily`, `weekly`, or `monthly`
-	runDayofweek: 1, // number, optional - day of week (1=Monday to 7=Sunday), mandatory if `runType` is `weekly`
-	runDayofmonth: 1, // number, optional - day of month (1-31), mandatory if `runType` is `monthly`
-	runPeriod: '1970-01-01 00:00:00', // string, optional - repeat interval as datetime offset from epoch, mandatory if `runType` is `periodically`
-	runStart: '', // string, optional - job starting time (YYYY-MM-DD HH:MM:SS), mandatory if `runType` is `periodically` or `once`
-	runTime: '1970-01-01 00:00:00', // string, optional - execution time per occurrence (YYYY-MM-DD HH:MM:SS), mandatory if `runType` is `daily`, `weekly`, or `monthly`
-	businessCalendar: '', // string, optional - sys_id of business_calendar, mandatory if `runType` is `business_calendar_start` or `business_calendar_end`
-	script: '', // string, mandatory - ServiceNow server-side script to execute
-})
-```
-
-## Record API approach (legacy, still supported)
-
-```typescript
-// Creates a new Scheduled Script Execution (`sysauto_script`) using the Record API
-Record({
-	$id: '', // string | guid, mandatory
-	table: 'sys_auto_script',
-	data: {
-		name: '', // string
-		active: true, // boolean
-		conditional: false, // boolean
-		condition: '', // string, a ServiceNow server side script that returns a boolean (i.e. `GlidePluginManager.isActive('sn_generative_ai');`), mandatory only if `conditional` is `true`
-		runType: 'daily', // string
-		timeZone: '', // string, the time zone for the job, mandatory only if `runType` is `daily` or `weekly` or `monthly`
-		runDayofweek: 1, // number, mandatory if `runType` is `weekly`
-		runDayofmonth: 1, // number, mandatory if `runType` is `monthly`, can take any number between `1` and `31` which represents the specific calender day
-		runPeriod: '1970-01-01 00:00:00', // string, mandatory only if `runType` is `periodically`
-		runStart: '', // string, job starting time, default value should be the user's current time, mandatory if `runType` is `periodically` or `once`
-		runTime: '1970-01-01 00:00:00', // string, the execution time per job occurence, mandatory only if `runType` is `daily`, `weekly`, or `monthly`
-		businessCalendar: get_sys_id('business_calendar', ''), // string, mandatory only if `runType` is `business_calendar_start` or `business_calendar_end`
-		script: '', // ServiceNow script to fullfil the functional request in scripting,
-	}
+  $id: '', // string | guid, mandatory
+  name: '', // string, optional - display name of the scheduled script
+  script: '', // string, optional - script to execute (supports Now.include() for external files)
+  active: true, // boolean, optional - whether the scheduled job is active (default: true)
+  conditional: false, // boolean, optional - if true, job only runs when condition evaluates to true (default: false)
+  condition: '', // string, optional - script-based condition, evaluated only when conditional is true
+  frequency: '', // RunType, optional - frequency at which the job runs
+    // Valid values: 'daily' | 'weekly' | 'monthly' | 'periodically' | 'once' | 'on_demand' | 'day_and_month_in_year' | 'day_week_month_year' | 'week_in_month' | 'business_calendar_start' | 'business_calendar_end'
+  timeZone: '', // 'floating' | TimeZone, optional - time zone in which the job runs (default: 'floating')
+  dayOfWeek: '', // 'monday'|'tuesday'|'wednesday'|'thursday'|'friday'|'saturday'|'sunday', optional - specific day for weekly jobs
+  daysOfWeek: [], // DayOfWeek[], optional - multiple days of the week (array, at least one element)
+  dayOfMonth: 1, // number (1-31), optional - day of month for monthly jobs
+  weekInMonth: 1, // number (1-6), optional - week within the month (1=First through 6=Sixth)
+  month: 1, // number (1-12), optional - month for yearly jobs
+  executionTime: { hours: 0, minutes: 0, seconds: 0 }, // TimeOfDay, optional - time of day when the job runs ({ hours?, minutes?, seconds? })
+  executionInterval: { days: 0, hours: 0, minutes: 0, seconds: 0 }, // Duration, optional - interval between runs for periodic jobs ({ days?, hours?, minutes?, seconds? })
+  executionStart: '', // string, optional - date/time when the job should start running
+  executionEnd: '', // string, optional - date/time when the job should stop running
+  offset: { days: 0, hours: 0, minutes: 0, seconds: 0 }, // Duration, optional - offset duration from the scheduled time
+  offsetType: '', // 'future' | 'past', optional - direction of offset
+  runAs: '', // string | Record<'sys_user'>, optional - user whose credentials are used to execute the job
+  userTimeZone: '', // TimeZone, optional - time zone context for GlideDateTime calculations inside the script
+  maxDrift: { days: 0, hours: 0, minutes: 0, seconds: 0 }, // Duration, optional - maximum time the job can drift before being cancelled
+  repeatEvery: 1, // number, optional - for recurring types, repeat only every Nth occurrence
+  upgradeSafe: false, // boolean, optional - preserve during upgrades (default: false)
+  advanced: false, // boolean, optional - whether the job can run in advanced mode (default: false)
+  businessCalendar: '', // string | Record<'business_calendar'>, optional - reference to business calendar for calendar-based scheduling
+  protectionPolicy: '', // 'read' | 'protected', optional - protection level for this scheduled job
 })
 ```

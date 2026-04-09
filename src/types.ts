@@ -57,6 +57,7 @@ export enum ServiceNowMetadataType {
   ATF_FORM_ACTION = 'atf-form-action',
   ATF_FORM_DECLARATIVE_ACTION = 'atf-form-declarative-action',
   ATF_FORM_FIELD = 'atf-form-field',
+  ATF_FORM_SP = 'atf-form-sp',
   ATF_REPORTING = 'atf-reporting',
   ATF_REST_API = 'atf-rest-api',
   ATF_REST_ASSERT_PAYLOAD = 'atf-rest-assert-payload',

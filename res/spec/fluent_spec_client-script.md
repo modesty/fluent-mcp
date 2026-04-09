@@ -11,7 +11,7 @@ ClientScript({
     description: '', // string, optional, description of the functionality and purpose of the client script
     messages: '', // string, optional, strings that are available to the client script as localized messages using `getmessage('[message]')`.
     active: true, // boolean, optional, whether the record is enabled, default true
-    script: '', // ServiceNow script to fullfil the functional request in scripting,
+    script: '', // string, optional — ServiceNow script to fulfill the functional request in scripting
     appliesExtended: false, // boolean, optional, indicates whether the client script applies to tables extended from the specified table, default false
     global: true, // boolean, optional, indicates whether the client script runs on all views of the table or only on specific views. Default is true.
     view: '', // string, optional, views of the table on which the client script runs. This property applies only when the `global` property is set to `false`
