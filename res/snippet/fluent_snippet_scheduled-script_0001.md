@@ -1,18 +1,16 @@
-# Scheduled Job API example: creating a new Scheduled Script that runs daily at 3PM in the GMT time zone. This job sets a new value for a system property
+# Scheduled Script API example: daily script that runs at 3PM GMT and sets a system property
 ```typescript
-import { Record } from '@servicenow/sdk/core'
+import { ScheduledScript } from '@servicenow/sdk/core'
 
-Record({
+ScheduledScript({
 	$id: Now.ID['scheduledscript1'],
-	table: 'sysauto_script',
-	data: {
-		name: 'daily scheduled script execution',
-		active: true,
-		conditional: false,
-		runType: 'daily',
-		timeZone: 'GMT',
-		runTime: '1970-01-01 15:00:00',
-		script: `// Set the property to indicate the job has run
+	name: 'daily scheduled script execution',
+	active: true,
+	conditional: false,
+	frequency: 'daily',
+	timeZone: 'GMT',
+	executionTime: { hours: 15, minutes: 0, seconds: 0 },
+	script: `// Set the property to indicate the job has run
 gs.setProperty("scheduled_job_ran_1", "true");
 
 // Log that the job has been executed
@@ -21,6 +19,5 @@ gs.log("Daily scheduled script execution completed", "DailyScheduledScript");
 // Get the current date/time
 var currentTime = new GlideDateTime();
 gs.info("Job executed at: " + currentTime.getDisplayValue());`
-	}
 })
 ```

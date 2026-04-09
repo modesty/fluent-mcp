@@ -1,4 +1,54 @@
-# create a new form for the incident table with two sections, and a custom view to store them
+# Create a new form for the incident table with two sections and a custom view
+
+## Primary: Using the `Form()` API
+```typescript
+import { Form } from '@servicenow/sdk/core';
+
+Form({
+    table: 'incident',
+    view: 'example_incident_view',
+    roles: ['admin', 'itil'],
+    sections: [
+        {
+            caption: 'incident',
+            content: [
+                {
+                    layout: 'two-column',
+                    leftElements: [
+                        { field: 'number', type: 'table_field' },
+                        { field: 'caller_id', type: 'table_field' },
+                    ],
+                    rightElements: [
+                        { field: 'state', type: 'table_field' },
+                    ],
+                },
+                {
+                    layout: 'one-column',
+                    elements: [
+                        { field: 'short_description', type: 'table_field' },
+                    ],
+                },
+            ],
+        },
+        {
+            caption: 'Additional fields',
+            content: [
+                {
+                    layout: 'one-column',
+                    elements: [
+                        { field: 'business_service', type: 'table_field' },
+                        { type: 'list', listType: 'M2M', listRef: 'incident.task_ci.task' },
+                    ],
+                },
+            ],
+        },
+    ],
+});
+```
+
+## Legacy: Using the `Record` plugin
+> Note: This approach uses the lower-level Record API. Prefer the `Form()` API for new development.
+
 ```typescript
 import { Record } from '@servicenow/sdk/core';
 

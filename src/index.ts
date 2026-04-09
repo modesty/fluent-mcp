@@ -3,6 +3,7 @@
 import { FluentMcpServer } from './server/fluentMCPServer.js';
 import logger from './utils/logger.js';
 import { getConfig } from './config.js';
+import { CommandResultFactory } from './utils/types.js';
 
 /**
  * Main entry point for the Fluent MCP server for ServiceNow SDK
@@ -42,7 +43,7 @@ async function handleShutdown(): Promise<void> {
     await server.stop();
     logger.info('Server stopped successfully', { processId: process.pid });
   } catch (error) {
-    logger.error('Error during shutdown', error instanceof Error ? error : new Error(String(error)));
+    logger.error('Error during shutdown', CommandResultFactory.normalizeError(error));
   }
   process.exit(0);
 }
@@ -63,7 +64,7 @@ async function main(): Promise<void> {
     });
   } catch (error) {
     logger.error('Error initializing Fluent MCP Server',
-      error instanceof Error ? error : new Error(String(error))
+      CommandResultFactory.normalizeError(error)
     );
     process.exit(1);
   }

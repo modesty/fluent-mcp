@@ -5,7 +5,7 @@ atf.server.recordQuery({ // all props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
   table: '', // table name
   fieldValues: '', // string, servicenow encoded query
-  enforceSecurity: false, // boolean;
+  enforceSecurity: true, // boolean; defaults to true in SDK v4.5.0
   assert: 'records_match_query', // 'records_match_query' | 'no_records_match_query';
 }): { table: string; 
     firstRecord: string; // sys_id of the first record
@@ -17,7 +17,7 @@ atf.server.recordValidation({ // all props are mandatory
   table: '', // table name
   fieldValues: '', // string, servicenow encoded query
   recordId: '', // sys_id of the record
-  enforceSecurity: false, // boolean
+  enforceSecurity: true, // boolean; defaults to true in SDK v4.5.0
   assert: 'record_validated', // 'record_validated' | 'record_not_found';
 }): void;
 
@@ -27,7 +27,7 @@ atf.server.recordInsert({ // all props are mandatory
   table: '', // table name
   fieldValues: {}, // a valid JSON object, field must be snake_case and double-quoted and values must be double-quoted with properly escaped JSON values, example: { "field_one": "value1", "field_two": "value2" }
   assert: '', // 'record_successfully_inserted' | 'record_not_inserted';
-  enforceSecurity: false, // boolean;
+  enforceSecurity: true, // boolean; defaults to true in SDK v4.5.0
 }): { table: string; 
   recordId: string; // sys_id of the new record
 };
@@ -40,7 +40,7 @@ atf.server.recordUpdate({ // all props are mandatory
   fieldValues: {}, // a valid JSON object, field must be snake_case and double-quoted and values must be double-quoted with properly escaped JSON values, example: { "field_name": "value1", "field_two": "value2" }
   recordId: '', // sys_id of the record
   assert: 'record_successfully_updated', // 'record_successfully_updated' | 'record_not_updated';
-  enforceSecurity: false, // boolean;
+  enforceSecurity: true, // boolean; defaults to true in SDK v4.5.0
 }): void;
 
 // Deletes a record of a table.
@@ -48,7 +48,7 @@ atf.server.recordDelete({ // all props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
   table: '', // table name
   recordId: '', // sys_id of the record
-  enforceSecurity: false, // boolean
+  enforceSecurity: true, // boolean; defaults to true in SDK v4.5.0
   assert: 'record_successfully_deleted', // 'record_successfully_deleted' | 'record_not_deleted';
 }): void;
 

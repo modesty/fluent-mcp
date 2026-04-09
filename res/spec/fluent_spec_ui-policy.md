@@ -35,5 +35,9 @@ UiPolicy({
    //   list: '', // string | Record<'sys_relationship'>, optional - the related list identifier
    //     // Supports: 'REL:sys_id' for system relationships, 'parent_table.child_table' for parent-child, or direct string
    //   visible: true, // boolean | 'ignore', optional - whether the related list should be visible
+ setValues: [], // UiPolicySetValue[], optional - field values to set when condition is met
+   // Each set value: { field: '', value: '' }
+ modelId: '', // string, optional - model ID for scoped UI policies
+ modelTable: '', // string, optional - model table for scoped UI policies
 }): UiPolicy // returns a UiPolicy object
 ```

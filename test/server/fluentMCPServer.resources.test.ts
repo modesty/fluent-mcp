@@ -2,7 +2,8 @@
  * Tests for FluentMCPServer resource capability
  */
 import { FluentMcpServer } from "../../src/server/fluentMCPServer.js";
-import { ResourceLoader, ResourceType } from "../../src/utils/resourceLoader.js";
+import { ResourceLoader } from "../../src/utils/resourceLoader.js";
+import { ResourceType } from "../../src/utils/types.js";
 import { patchLoggerForTests } from "../utils/loggerPatch.js";
 
 // Mock the Model Context Protocol SDK
@@ -105,35 +106,42 @@ jest.mock("../../src/utils/resourceLoader.js", () => {
   };
 });
 
-// Mock command registry
-jest.mock("../../src/tools/cliCommandTools.js", () => {
+// Mock command tools (split into individual modules)
+jest.mock("../../src/tools/processors/processRunner.js", () => ({
+  NodeProcessRunner: jest.fn()
+}));
+jest.mock("../../src/tools/processors/cliExecutor.js", () => ({
+  CLIExecutor: jest.fn().mockImplementation(() => ({
+    setRoots: jest.fn()
+  }))
+}));
+jest.mock("../../src/tools/processors/cliCmdWriter.js", () => ({
+  CLICmdWriter: jest.fn().mockImplementation(() => ({
+    setRoots: jest.fn()
+  }))
+}));
+jest.mock("../../src/tools/registry/commandFactory.js", () => ({
+  CommandFactory: {
+    createCommands: jest.fn().mockImplementation((executor, writer) => [])
+  }
+}));
+jest.mock("../../src/tools/registry/commandRegistry.js", () => {
   const mockRegister = jest.fn();
   const mockGetCommand = jest.fn();
   const mockToMCPTools = jest.fn().mockReturnValue([]);
   const mockGetAllCommands = jest.fn().mockReturnValue([]);
-  
   return {
-    CLIExecutor: jest.fn().mockImplementation(() => ({
-      setRoots: jest.fn()
-    })),
-    CLICmdWriter: jest.fn().mockImplementation(() => ({
-      setRoots: jest.fn()
-    })),
-    CommandFactory: {
-      createCommands: jest.fn().mockImplementation((executor, writer) => [])
-    },
     CommandRegistry: jest.fn().mockImplementation(() => ({
       register: mockRegister,
       getCommand: mockGetCommand,
       toMCPTools: mockToMCPTools,
       getAllCommands: mockGetAllCommands
-    })),
-    NodeProcessRunner: jest.fn()
+    }))
   };
 });
 
 // Mock the resource tools
-jest.mock("../../src/tools/resourceTools.js", () => {
+jest.mock("../../src/tools/resources/resourceTools.js", () => {
   return {
     GetApiSpecCommand: jest.fn().mockImplementation(() => ({
       name: "get-api-spec",

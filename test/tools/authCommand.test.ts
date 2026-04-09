@@ -2,17 +2,8 @@ import { CommandProcessor, CommandResult } from "../../src/utils/types.js";
 import { AuthCommand } from "../../src/tools/commands/authCommand.js";
 import { SessionManager } from "../../src/utils/sessionManager.js";
 
-// Mock SessionManager
-jest.mock("../../src/utils/sessionManager.js", () => ({
-  SessionManager: {
-    getInstance: jest.fn().mockReturnValue({
-      getWorkingDirectory: jest.fn().mockReturnValue("/test-working-dir"),
-      getAuthAlias: jest.fn().mockReturnValue(undefined),
-      getAuthValidationResult: jest.fn().mockReturnValue(undefined),
-      setAuthValidationResult: jest.fn(),
-    }),
-  },
-}));
+jest.mock("../../src/utils/sessionManager.js", () => require('../mocks/index.js').createSessionManagerMock());
+jest.mock("../../src/utils/rootContext.js", () => require('../mocks/index.js').createRootContextMock());
 
 // Create mock CLICmdWriter for tests
 function createMockCmdWriter(): CommandProcessor {
@@ -82,7 +73,7 @@ describe("AuthCommand", () => {
         "bar"
       ]),
       false,
-      "/test-working-dir",
+      "/mock/working/dir",
       undefined // stdinInput (credentials not set in env)
     );
     expect(result.success).toBe(true);
@@ -108,7 +99,7 @@ describe("AuthCommand", () => {
       "npx",
       expect.arrayContaining(["now-sdk", "auth", "--list", "--help", "--version"]),
       false,
-      "/test-working-dir",
+      "/mock/working/dir",
       undefined // stdinInput (not needed for list/help/version)
     );
   });

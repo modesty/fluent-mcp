@@ -1,6 +1,5 @@
 export * from './baseCommand.js';
 export * from './sessionAwareCommand.js';
-export * from './sessionFallbackCommand.js';
 export * from './sdkInfoCommand.js';
 
 export * from './authCommand.js';

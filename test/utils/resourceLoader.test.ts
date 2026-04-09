@@ -4,7 +4,8 @@
 import fs from "fs";
 import path from "path";
 import * as nodeFs from 'node:fs';
-import { ResourceLoader, ResourceType } from "../../src/utils/resourceLoader.js";
+import { ResourceLoader } from "../../src/utils/resourceLoader.js";
+import { ResourceType } from "../../src/utils/types.js";
 
 // Mock configuration
 jest.mock('../../src/config.js', () => ({

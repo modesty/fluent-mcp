@@ -30,7 +30,7 @@ atf.server.recordQuery({ // all props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
   table: '', // table name
   fieldValues: '', // string, servicenow encoded query
-  enforceSecurity: false, // boolean;
+  enforceSecurity: true, // boolean; defaults to true in SDK v4.5.0
   assert: 'records_match_query', // 'records_match_query' | 'no_records_match_query';
 }): { table: string; 
     firstRecord: string; // sys_id of the first record
@@ -42,8 +42,28 @@ atf.server.recordInsert({ // all props are mandatory
     table: '', // table name
     fieldValues: {}, // a valid JSON object, field must be snake_case and double-quoted and values must be double-quoted with properly escaped JSON values, example: { "field_one": "value1", "field_two": "value2" }
     assert: '', // 'record_successfully_inserted' | 'record_not_inserted';
-    enforceSecurity: false, // boolean;
+    enforceSecurity: true, // boolean; defaults to true in SDK v4.5.0
  }): { table: string;
     recordId: string; // sys_id of the new record
 };
+
+// Sets output variables for the test step. Use to pass data between test steps.
+atf.server.setOutputVariables({
+  $id: Now.ID[''], // string | guid, mandatory
+  variables: {}, // a valid JSON object, keys are variable names and values are the variable values, example: { "var_name": "var_value" }
+}): void;
+
+// Runs a server-side script in the context of the test.
+atf.server.runServerSideScript({
+  $id: Now.ID[''], // string | guid, mandatory
+  script: '', // string, the server-side script to execute
+}): void;
+
+// Adds attachments to an existing record.
+atf.server.addAttachmentsToExistingRecord({
+  $id: Now.ID[''], // string | guid, mandatory
+  table: '', // table name
+  recordId: '', // sys_id of the record
+  attachments: [], // array of attachment objects
+}): void;
 ```

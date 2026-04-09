@@ -18,31 +18,38 @@ jest.mock("@modelcontextprotocol/sdk/server/mcp.js", () => {
   };
 });
 
-// Mock command registry with minimal functionality needed for these tests
-jest.mock("../../src/tools/cliCommandTools.js", () => {
+// Mock command tools (split into individual modules)
+jest.mock("../../src/tools/processors/processRunner.js", () => ({
+  NodeProcessRunner: jest.fn()
+}));
+jest.mock("../../src/tools/processors/cliExecutor.js", () => ({
+  CLIExecutor: jest.fn()
+}));
+jest.mock("../../src/tools/processors/cliCmdWriter.js", () => ({
+  CLICmdWriter: jest.fn()
+}));
+jest.mock("../../src/tools/registry/commandFactory.js", () => ({
+  CommandFactory: {
+    createCommands: jest.fn().mockImplementation(() => [])
+  }
+}));
+jest.mock("../../src/tools/registry/commandRegistry.js", () => {
   const mockRegister = jest.fn();
   const mockGetCommand = jest.fn();
   const mockToMCPTools = jest.fn().mockReturnValue([
     { id: "mock-command", title: "Mock Command", description: "A mock command for testing" }
   ]);
-  
   return {
-    CLIExecutor: jest.fn(),
-    CLICmdWriter: jest.fn(),
-    CommandFactory: {
-      createCommands: jest.fn().mockImplementation(() => [])
-    },
     CommandRegistry: jest.fn().mockImplementation(() => ({
       register: mockRegister,
       getCommand: mockGetCommand,
       toMCPTools: mockToMCPTools
-    })),
-    NodeProcessRunner: jest.fn()
+    }))
   };
 });
 
 // Mock the resource tools module with proper arguments array
-jest.mock("../../src/tools/resourceTools.js", () => {
+jest.mock("../../src/tools/resources/resourceTools.js", () => {
   // Create commands with empty arguments arrays to satisfy iteration
   return {
     GetApiSpecCommand: jest.fn().mockImplementation(() => ({

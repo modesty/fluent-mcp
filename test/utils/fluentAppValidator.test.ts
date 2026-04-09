@@ -13,15 +13,7 @@ jest.mock("node:path", () => ({
 }));
 
 // Mock the logger
-jest.mock("../../src/utils/logger.js", () => ({
-  __esModule: true,
-  default: {
-    info: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
-    warn: jest.fn(),
-  },
-}));
+jest.mock("../../src/utils/logger.js", () => require('../mocks/index.js').createLoggerMock());
 
 describe("FluentAppValidator", () => {
   beforeEach(() => {

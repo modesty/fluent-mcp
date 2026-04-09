@@ -40,7 +40,7 @@ export interface CommandResult {
 /**
  * Resource types supported by the loader
  */
-export enum ResourceTypeEnum {
+export enum ResourceType {
   SPEC = 'spec',
   SNIPPET = 'snippet',
   INSTRUCT = 'instruct',

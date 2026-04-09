@@ -1,4 +1,6 @@
 # Add a new section to an existing form for the `ex_table` table
+> Note: This snippet uses the legacy Record API. For new forms, prefer the `Form()` API (see snippet_0001).
+
 ```typescript
 import { Record } from '@servicenow/sdk/core';
 

@@ -10,6 +10,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { getProjectRootPath } from '../config.js';
 import logger from '../utils/logger.js';
+import { CommandResultFactory } from '../utils/types.js';
 import loggingManager from '../utils/loggingManager.js';
 
 /**
@@ -37,10 +38,10 @@ async function findFile(filename: string): Promise<string | null> {
       await fs.access(tryPath);
       logger.debug(`- File found at: ${tryPath}`);
       return tryPath;
-    } catch (error) {
-      // File not found at this location
-      logger.debug(`${error}- Not found at: ${tryPath}`);
-      return null;
+    } catch {
+      // File not found at this location, try next path
+      logger.debug(`Not found at: ${tryPath}`);
+      continue;
     }
   }
   
@@ -80,7 +81,7 @@ export class PromptManager {
     } catch (error) {
       logger.error(
         'Error initializing prompts',
-        error instanceof Error ? error : new Error(String(error))
+        CommandResultFactory.normalizeError(error)
       );
       throw error;
     }
@@ -191,16 +192,10 @@ export class PromptManager {
           content = await fs.readFile(promptPath, 'utf-8');
           logger.debug(`Prompt content loaded from file: ${promptPath}, length: ${content.length}`);
         } catch (fileErr) {
-          logger.warn(`Could not read from located file ${promptPath}: ${fileErr instanceof Error ? fileErr.message : String(fileErr)}`);
+          logger.warn(`Could not read from located file ${promptPath}: ${CommandResultFactory.normalizeError(fileErr).message}`);
         }
       } else {
         logger.warn(`Could not find prompt file: ${relativePath}`);
-      }
-      
-      // If we're in a test environment and couldn't load the file, use a mock content
-      if (!content && process.env.NODE_ENV === 'test') {
-        content = '# Mock Coding in Fluent Guide for Testing\n\nThis is a mock prompt for testing purposes.\n\nYou are currently interested in working with the following metadata types:';
-        logger.debug('Using mock content for testing environment');
       }
       
       // Final check - if we still have no content, throw an error
@@ -234,7 +229,7 @@ export class PromptManager {
       
     } catch (error) {
       throw new Error(
-        error instanceof Error ? error.message : String(error),
+        CommandResultFactory.normalizeError(error).message,
         { cause: error }
       );
     }

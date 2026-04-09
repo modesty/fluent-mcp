@@ -5,7 +5,7 @@
  * which allows the server to request LLM assistance from the client.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { ErrorAnalysis } from './types.js';
+import { ErrorAnalysis, CommandResultFactory } from './types.js';
 import logger from './logger.js';
 
 /**
@@ -92,7 +92,7 @@ export class SamplingManager {
     } catch (error) {
       // If Sampling fails, log but don't break the flow
       logger.warn('Error analysis failed, continuing without it', {
-        error: error instanceof Error ? error.message : String(error),
+        error: CommandResultFactory.normalizeError(error).message,
       });
       return null;
     }
