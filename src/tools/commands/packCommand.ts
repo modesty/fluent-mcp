@@ -7,7 +7,9 @@ import { SessionAwareCLICommand } from './sessionAwareCommand.js';
  */
 export class PackCommand extends SessionAwareCLICommand {
   name = 'pack_fluent_app';
-  description = 'Zip built Fluent (ServiceNow SDK) application into installable artifact';
+  description = 'Package a built Fluent (ServiceNow SDK) application into a zip artifact for installation. Requires a prior build via build_fluent_app. The output zip can be used for manual installation on a ServiceNow instance. Does NOT require authentication.';
+  annotations = { idempotentHint: true };
+  timeoutMs = 30_000;
   arguments: CommandArgument[] = [
     {
       name: 'source',

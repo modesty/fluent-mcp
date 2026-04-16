@@ -2,8 +2,8 @@ import { spawn, SpawnOptionsWithoutStdio } from 'node:child_process';
 import { ProcessResult, ProcessRunner } from '../../utils/types.js';
 import logger from '../../utils/logger.js';
 
-/** Timeout for child process execution in milliseconds */
-const PROCESS_TIMEOUT_MS = 12000;
+/** Default timeout for child process execution in milliseconds */
+const DEFAULT_PROCESS_TIMEOUT_MS = 12000;
 
 /** Delay before checking for prompts after stdout data (allows buffering) */
 const STDIN_PROMPT_CHECK_DELAY_MS = 50;
@@ -20,9 +20,11 @@ export class NodeProcessRunner implements ProcessRunner {
     command: string,
     args: string[] = [],
     cwd?: string,
-    stdinInput?: string
+    stdinInput?: string,
+    timeoutMs?: number
   ): Promise<ProcessResult> {
     return new Promise((resolve, reject) => {
+      const effectiveTimeout = timeoutMs ?? DEFAULT_PROCESS_TIMEOUT_MS;
       const env = { ...process.env }; // ensure full environment inheritance
       // Create AbortController for timeout handling
       const controller = new AbortController();
@@ -30,8 +32,8 @@ export class NodeProcessRunner implements ProcessRunner {
       // Set timeout to automatically abort if process hangs
       const timeoutId = setTimeout(() => {
         controller.abort();
-        logger.warn(`Command execution timed out after ${PROCESS_TIMEOUT_MS}ms: ${command} ${args.join(' ')}`);
-      }, PROCESS_TIMEOUT_MS);
+        logger.warn(`Command execution timed out after ${effectiveTimeout}ms: ${command} ${args.join(' ')}`);
+      }, effectiveTimeout);
 
       const options: SpawnOptionsWithoutStdio = {
         stdio: 'pipe',
@@ -144,7 +146,7 @@ export class NodeProcessRunner implements ProcessRunner {
         if (child && !child.killed) {
           // Force kill the process that's hanging
           child.kill('SIGKILL');
-          reject(new Error(`Process killed after timeout (12000ms): ${command} ${args.join(' ')}`));
+          reject(new Error(`Process killed after timeout (${effectiveTimeout}ms): ${command} ${args.join(' ')}`));
         }
       });
 

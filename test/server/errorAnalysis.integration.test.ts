@@ -237,11 +237,11 @@ PREVENTION:
         preventionTips: ['Store credentials securely'],
       };
 
-      const baseErrorOutput = '❌ Error:\nAuthentication failed\n(exit code: 1)';
+      const baseErrorOutput = 'Error (exit 1): Authentication failed';
       const formatted = samplingManager.formatAnalysis(analysis);
       const fullOutput = baseErrorOutput + '\n' + formatted;
 
-      expect(fullOutput).toContain('❌ Error:');
+      expect(fullOutput).toContain('Error (exit 1)');
       expect(fullOutput).toContain('🤖 AI Error Analysis:');
       expect(fullOutput).toContain('Authentication failed'); // Appears in both sections
     });

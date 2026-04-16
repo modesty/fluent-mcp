@@ -50,7 +50,17 @@ export abstract class BaseResourceCommand implements CLICommand {
    */
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
     try {
-      return await this.doExecute(args);
+      // Normalize args before processing:
+      // 1. Lowercase metadataType to match resource file naming convention
+      // 2. Coerce null/empty id to undefined (LLMs often send null for "not provided")
+      const normalized = { ...args };
+      if (typeof normalized.metadataType === 'string') {
+        normalized.metadataType = normalized.metadataType.toLowerCase();
+      }
+      if (normalized.id === null || normalized.id === '') {
+        delete normalized.id;
+      }
+      return await this.doExecute(normalized);
     } catch (error) {
       logger.error(`Error executing ${this.name}`, CommandResultFactory.normalizeError(error));
       return CommandResultFactory.fromError(error);
@@ -70,7 +80,10 @@ export abstract class BaseResourceCommand implements CLICommand {
     const result = await this.resourceLoader.getResource(this.resourceType, metadataType, id);
 
     if (!result.found) {
-      return CommandResultFactory.error(`Resource not found for metadata type: ${metadataType}`);
+      return CommandResultFactory.error(
+        `No ${this.resourceType} resource found for metadata type '${metadataType}'. ` +
+        'Call get-api-spec without arguments to list all available metadata types.'
+      );
     }
 
     return CommandResultFactory.success(result.content);
@@ -83,7 +96,10 @@ export abstract class BaseResourceCommand implements CLICommand {
    */
   protected validateArgs(args: Record<string, unknown>): void {
     if (!args.metadataType) {
-      throw new Error('Missing required argument: metadataType');
+      throw new Error(
+        "Missing required argument 'metadataType'. Provide a ServiceNow metadata type " +
+        "like 'business-rule' or 'script-include'. Call get-api-spec without arguments to list all available types."
+      );
     }
   }
 }
@@ -94,7 +110,8 @@ export abstract class BaseResourceCommand implements CLICommand {
  */
 export class GetApiSpecCommand extends BaseResourceCommand {
   name = 'get-api-spec';
-  description = 'Fetches the Fluent API specification for a given ServiceNow metadata type. Call without arguments to list all available metadata types.';
+  description = 'Fetch the Fluent API specification for a ServiceNow metadata type (e.g., "business-rule", "script-include"). Call without arguments to list all available metadata types. Use this to understand the Fluent API for a specific metadata type before writing code. For code examples, use get-snippet instead. For best practices, use get-instruct instead.';
+  annotations = { readOnlyHint: true, idempotentHint: true };
   resourceType = ResourceType.SPEC;
 
   // Override arguments to make metadataType optional for listing
@@ -147,7 +164,8 @@ export class GetApiSpecCommand extends BaseResourceCommand {
  */
 export class GetSnippetCommand extends BaseResourceCommand {
   name = 'get-snippet';
-  description = 'Fetches the Fluent code snippet for a given ServiceNow metadata type';
+  description = 'Fetch a Fluent code snippet for a ServiceNow metadata type (e.g., "business-rule", "script-include"). Returns the first available snippet when called without an id. Provides additional snippet ids if more are available. For API specifications, use get-api-spec instead. For best practices, use get-instruct instead.';
+  annotations = { readOnlyHint: true, idempotentHint: true };
   resourceType = ResourceType.SNIPPET;
 
   /**
@@ -168,7 +186,10 @@ export class GetSnippetCommand extends BaseResourceCommand {
     const snippetIds = await this.resourceLoader.listSnippets(metadataType);
 
     if (snippetIds.length === 0) {
-      return CommandResultFactory.error(`No snippets found for metadata type: ${metadataType}`);
+      return CommandResultFactory.error(
+        `No snippets found for metadata type '${metadataType}'. ` +
+        'Verify the metadata type name using get-api-spec without arguments.'
+      );
     }
 
     // Get the first snippet
@@ -179,7 +200,10 @@ export class GetSnippetCommand extends BaseResourceCommand {
     );
 
     if (!result.found) {
-      return CommandResultFactory.error(`Snippet not found for metadata type: ${metadataType}`);
+      return CommandResultFactory.error(
+        `Snippet not found for metadata type '${metadataType}'. ` +
+        'Verify the metadata type name using get-api-spec without arguments.'
+      );
     }
 
     // Add information about other available snippets
@@ -196,8 +220,27 @@ export class GetSnippetCommand extends BaseResourceCommand {
  */
 export class GetInstructCommand extends BaseResourceCommand {
   name = 'get-instruct';
-  description = 'Retrieves instructions of Fluent API usage for a given ServiceNow metadata type';
+  description = 'Fetch instructions and best practices for creating a ServiceNow metadata type using the Fluent API (e.g., "business-rule", "script-include"). Provides guidance on patterns, conventions, and common pitfalls. For API specifications, use get-api-spec. For code examples, use get-snippet.';
+  annotations = { readOnlyHint: true, idempotentHint: true };
   resourceType = ResourceType.INSTRUCT;
+
+  // Override to only expose metadataType — instruct resources don't use id
+  arguments: CommandArgument[] = [
+    {
+      name: 'metadataType',
+      type: 'string',
+      required: true,
+      description: 'ServiceNow metadata type (e.g., business-rule, script-include)',
+    },
+  ];
+
+  /**
+   * Override doExecute to strip id — instruct resources are keyed by metadataType only.
+   */
+  protected async doExecute(args: Record<string, unknown>): Promise<CommandResult> {
+    const { id: _ignored, ...rest } = args;
+    return super.doExecute(rest);
+  }
 }
 
 /**
@@ -206,7 +249,8 @@ export class GetInstructCommand extends BaseResourceCommand {
  */
 export class CheckAuthStatusCommand implements CLICommand {
   name = 'check_auth_status';
-  description = 'Check current ServiceNow authentication status. Returns the result of auto-auth validation including status, profile alias, instance host, and any required action.';
+  description = 'Check current ServiceNow authentication status. Returns the cached auto-auth validation result as JSON including status, profile alias, instance host, auth type, and any required user action. Call this before commands that require authentication (deploy_fluent_app, fluent_transform, download_fluent_dependencies, download_fluent_app) to verify credentials are configured.';
+  annotations = { readOnlyHint: true, idempotentHint: true };
   arguments: CommandArgument[] = [];
 
   /**

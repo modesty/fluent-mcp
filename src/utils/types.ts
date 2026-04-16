@@ -70,7 +70,7 @@ export interface ProcessResult {
 
 // Abstractions (Dependency Inversion)
 export interface ProcessRunner {
-  run(command: string, args: string[], cwd?: string, stdinInput?: string): Promise<ProcessResult>;
+  run(command: string, args: string[], cwd?: string, stdinInput?: string, timeoutMs?: number): Promise<ProcessResult>;
 }
 
 /**
@@ -82,7 +82,8 @@ export interface CommandProcessor {
     args: string[],
     useMcpCwd?: boolean,
     customWorkingDir?: string,
-    stdinInput?: string
+    stdinInput?: string,
+    timeoutMs?: number
   ): Promise<CommandResult>;
 }
 
@@ -100,8 +101,6 @@ export interface CommandAnnotations {
   idempotentHint?: boolean;   // If true, the tool can be run multiple times with the same result
   openWorldHint?: boolean;    // If true, the tool is open-world and can interact with external systems
   [key: string]: unknown;
-  // idempotentHint?: boolean;  // If true, repeated calls with same args have no additional effect
-  // openWorldHint?: boolean;   // If true, tool interacts with external entities
 }
 
 export interface CommandMetadata {
@@ -109,6 +108,8 @@ export interface CommandMetadata {
   description: string;
   arguments: CommandArgument[];
   annotations?: CommandAnnotations;
+  /** Command-specific timeout in milliseconds. Overrides the default process timeout. */
+  timeoutMs?: number;
   _meta?: { [key: string]: unknown };
 }
 
@@ -139,26 +140,30 @@ export const CommandResultFactory = {
   },
 
   /**
-   * Create an error result from a message
+   * Create an error result from a message.
+   * Output is the raw error message without prefix (e.g. no "Error: " wrapper).
+   * Presentation formatting (prefixes, exit codes) is applied by ToolsManager.formatResult().
    */
   error(message: string, exitCode = 1): CommandResult {
     return {
       exitCode,
       success: false,
-      output: `Error: ${message}`,
+      output: message,
       error: new Error(message),
     };
   },
 
   /**
-   * Create an error result from an Error or unknown value
+   * Create an error result from an Error or unknown value.
+   * Output is the raw error message without prefix (e.g. no "Error: " wrapper).
+   * Presentation formatting (prefixes, exit codes) is applied by ToolsManager.formatResult().
    */
   fromError(error: unknown, exitCode = 1): CommandResult {
     const normalizedError = CommandResultFactory.normalizeError(error);
     return {
       exitCode,
       success: false,
-      output: `Error: ${normalizedError.message}`,
+      output: normalizedError.message,
       error: normalizedError,
     };
   },

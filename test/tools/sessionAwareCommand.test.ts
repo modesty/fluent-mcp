@@ -54,7 +54,8 @@ describe("SessionAwareCommand", () => {
       ["test", "command", "args"],
       false,
       "/mock/working/dir",
-      undefined // stdinInput
+      undefined, // stdinInput
+      undefined  // timeoutMs
     );
     expect(result.success).toBe(true);
   });

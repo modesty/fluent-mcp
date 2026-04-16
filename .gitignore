@@ -28,6 +28,7 @@ yarn-error.log*
 # Environment
 .env
 .env.*
+.npmrc
 
 # Misc
 *.tgz
@@ -54,3 +55,6 @@ Desktop.ini
 
 # Optional eslint cache
 .eslintcache
+
+# ExplainCommand scaffold directory (auto-generated)
+.explain-scaffold/

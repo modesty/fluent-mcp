@@ -13,43 +13,6 @@ import logger from '../utils/logger.js';
 import { CommandResultFactory } from '../utils/types.js';
 import loggingManager from '../utils/loggingManager.js';
 
-/**
- * Utility function to find a file by trying multiple possible locations
- * @param filename The relative path to the file
- * @returns The resolved file path if found
- */
-async function findFile(filename: string): Promise<string | null> {
-  const possiblePaths = [
-    // Standard path from project root
-    path.join(getProjectRootPath(), filename),
-    // Try from current working directory
-    path.join(process.cwd(), filename),
-    // Try direct path if it's an absolute path
-    filename,
-    // Try one level up (if src is the current directory)
-    path.join(process.cwd(), '..', filename),
-  ];
-  
-  logger.debug(`Looking for file ${filename} in possible locations:`);
-  
-  for (const tryPath of possiblePaths) {
-    try {
-      logger.debug(`- Checking: ${tryPath}`);
-      await fs.access(tryPath);
-      logger.debug(`- File found at: ${tryPath}`);
-      return tryPath;
-    } catch {
-      // File not found at this location, try next path
-      logger.debug(`Not found at: ${tryPath}`);
-      continue;
-    }
-  }
-  
-  logger.error(`File not found in any location: ${filename}`);
-  return null;
-}
-
-
 
 /**
  * Manager for handling MCP prompts registration and access
@@ -68,15 +31,18 @@ export class PromptManager {
   }
 
   /**
-   * Initialize prompts by loading prompt files
+   * Initialize prompts by scanning the res/prompt/ directory and loading all .md files
    */
   async initialize(): Promise<void> {
     try {
       logger.debug(`Project root path: ${getProjectRootPath()}`);
       logger.debug(`Current working directory: ${process.cwd()}`);
-      
-      // Register the main coding_in_fluent prompt
-      await this.registerCodingInFluentPrompt();
+
+      const promptDir = path.join(getProjectRootPath(), 'res', 'prompt');
+      await this.registerAllPrompts(promptDir);
+      if (this.prompts.size === 0) {
+        logger.warn(`No prompts found in ${promptDir} — expected at least one .md file`);
+      }
       logger.debug(`Initialized PromptManager with ${this.prompts.size} prompts`);
     } catch (error) {
       logger.error(
@@ -173,65 +139,150 @@ export class PromptManager {
   }
 
   /**
-   * Register the coding_in_fluent prompt
+   * Parse YAML-style frontmatter from a markdown file.
+   * Returns the frontmatter fields and the body content (without the frontmatter block).
+   * If no frontmatter is present, returns empty metadata and full content.
    */
-  private async registerCodingInFluentPrompt(): Promise<void> {
-    const promptName = 'coding_in_fluent';
-    // Use our findFile utility to locate the file
-    const relativePath = 'res/prompt/coding_in_fluent.md';
-    
-    try {
-      let content = null;
-      
-      // First try to load the file using our utility
-      const promptPath = await findFile(relativePath);
-      
-      if (promptPath) {
-        try {
-          // Read the prompt content from the file
-          content = await fs.readFile(promptPath, 'utf-8');
-          logger.debug(`Prompt content loaded from file: ${promptPath}, length: ${content.length}`);
-        } catch (fileErr) {
-          logger.warn(`Could not read from located file ${promptPath}: ${CommandResultFactory.normalizeError(fileErr).message}`);
+  private static parseFrontmatter(raw: string): { meta: Record<string, unknown>; body: string } {
+    const match = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+    if (!match) {
+      return { meta: {}, body: raw };
+    }
+
+    const yamlBlock = match[1];
+    const body = match[2];
+    const meta: Record<string, unknown> = {};
+
+    // Lightweight YAML parser — handles scalar key: value pairs and simple arrays
+    let currentKey: string | null = null;
+    let currentArray: Record<string, unknown>[] | null = null;
+    let currentItem: Record<string, unknown> | null = null;
+
+    for (const line of yamlBlock.split('\n')) {
+      // Top-level "key: value" (value may be quoted)
+      const scalarMatch = line.match(/^(\w+):\s*(.+)$/);
+      if (scalarMatch) {
+        if (currentKey && currentArray) {
+          if (currentItem && Object.keys(currentItem).length > 0) currentArray.push(currentItem);
+          meta[currentKey] = currentArray;
         }
-      } else {
-        logger.warn(`Could not find prompt file: ${relativePath}`);
+        currentKey = null;
+        currentArray = null;
+        currentItem = null;
+
+        let val: string = scalarMatch[2].trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1);
+        }
+        meta[scalarMatch[1]] = val === 'true' ? true : val === 'false' ? false : val;
+        continue;
       }
-      
-      // Final check - if we still have no content, throw an error
-      if (!content) {
-        throw new Error(`Failed to load prompt content from file or fallback: ${relativePath}`);
+
+      // Top-level "key:" (start of array or nested object)
+      const blockKeyMatch = line.match(/^(\w+):$/);
+      if (blockKeyMatch) {
+        if (currentKey && currentArray) {
+          if (currentItem && Object.keys(currentItem).length > 0) currentArray.push(currentItem);
+          meta[currentKey] = currentArray;
+        }
+        currentKey = blockKeyMatch[1];
+        currentArray = [];
+        currentItem = null;
+        continue;
       }
-      
-      
-      // Register the prompt
-      // Note: PromptArgument in MCP SDK v1.25+ only supports name, description, and required
-      // The 'type' and 'items' properties are no longer part of the schema
-      const prompt: Prompt = {
-        name: promptName,
-        title: 'Coding in Fluent (ServiceNow SDK)',
-        description: 'Guide for coding in Fluent (ServiceNow SDK) with examples for specific metadata types',
-        arguments: [
-          {
-            name: 'metadata_list',
-            description: 'Comma-separated list of metadata types to include in the guide (e.g., "table,business-rule,script-include")',
-            required: true
-          }
-        ]
-      };
-      
-      this.prompts.set(promptName, prompt);
-      this.promptContents.set(promptName, content);
-      
-      logger.debug(`Registered prompt: ${promptName}`);
-      logger.debug(`Prompt content length: ${content ? content.length : 0} bytes`);
-      logger.debug(`Prompt content beginning: ${content ? content.substring(0, 100) + '...' : 'empty'}`);
-      
+
+      // Array item start "  - key: value"
+      const arrayItemMatch = line.match(/^\s+-\s+(\w+):\s*(.+)$/);
+      if (arrayItemMatch && currentArray !== null) {
+        if (currentItem && Object.keys(currentItem).length > 0) currentArray.push(currentItem);
+        let val: string = arrayItemMatch[2].trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1);
+        }
+        currentItem = { [arrayItemMatch[1]]: val === 'true' ? true : val === 'false' ? false : val };
+        continue;
+      }
+
+      // Continuation "    key: value" inside an array item
+      const contMatch = line.match(/^\s{4,}(\w+):\s*(.+)$/);
+      if (contMatch && currentItem) {
+        let val: string = contMatch[2].trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1);
+        }
+        currentItem[contMatch[1]] = val === 'true' ? true : val === 'false' ? false : val;
+      }
+    }
+
+    // Flush last array
+    if (currentKey && currentArray) {
+      if (currentItem && Object.keys(currentItem).length > 0) currentArray.push(currentItem);
+      meta[currentKey] = currentArray;
+    }
+
+    return { meta, body };
+  }
+
+  /**
+   * Scan the prompt directory and register all .md files as prompts.
+   * Metadata (title, description, arguments) is read from YAML frontmatter in each
+   * file. When frontmatter fields are absent, title is derived from the filename and
+   * description from the first markdown heading.
+   */
+  private async registerAllPrompts(promptDir: string): Promise<void> {
+    let files: string[];
+    try {
+      files = await fs.readdir(promptDir);
     } catch (error) {
-      throw new Error(
-        CommandResultFactory.normalizeError(error).message,
-        { cause: error }
-      );
+      logger.warn(`Could not read prompt directory ${promptDir}: ${CommandResultFactory.normalizeError(error).message}`);
+      return;
+    }
+
+    const mdFiles = files.filter(f => f.endsWith('.md')).sort();
+
+    for (const file of mdFiles) {
+      const promptName = file.replace(/\.md$/, '');
+      const filePath = path.join(promptDir, file);
+
+      try {
+        const raw = await fs.readFile(filePath, 'utf-8');
+        const { meta, body } = PromptManager.parseFrontmatter(raw);
+
+        // Derive title from frontmatter or from filename
+        const title = (typeof meta.title === 'string' ? meta.title : null)
+          ?? promptName.replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+        // Derive description from frontmatter or from first markdown heading
+        let description = typeof meta.description === 'string' ? meta.description : null;
+        if (!description) {
+          const headingMatch = body.match(/^#\s+(.+)$/m);
+          description = headingMatch ? headingMatch[1] : `Prompt: ${promptName}`;
+        }
+
+        // Parse arguments from frontmatter array
+        let promptArgs: Prompt['arguments'] | undefined;
+        if (Array.isArray(meta.arguments)) {
+          promptArgs = (meta.arguments as Record<string, unknown>[]).map(a => ({
+            name: String(a.name ?? ''),
+            description: String(a.description ?? ''),
+            required: a.required === true || a.required === 'true',
+          }));
+        }
+
+        const prompt: Prompt = {
+          name: promptName,
+          title,
+          description,
+          ...(promptArgs && { arguments: promptArgs }),
+        };
+
+        this.prompts.set(promptName, prompt);
+        // Store the body (without frontmatter) as the content sent to clients
+        this.promptContents.set(promptName, body);
+        logger.debug(`Registered prompt: ${promptName} (${body.length} bytes)`);
+      } catch (error) {
+        logger.error(`Failed to load prompt ${promptName}: ${CommandResultFactory.normalizeError(error).message}`);
+      }
     }
   }
 

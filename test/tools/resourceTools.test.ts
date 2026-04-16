@@ -106,7 +106,7 @@ describe("Resource Tool Commands", () => {
 
       expect(result.exitCode).toBe(1);
       expect(result.success).toBe(false);
-      expect(result.output).toContain("Resource not found for metadata type: non-existent");
+      expect(result.output).toContain("resource found for metadata type 'non-existent'");
       expect(result.error).toBeDefined();
     });
 
@@ -167,13 +167,22 @@ describe("Resource Tool Commands", () => {
       });
     });
 
+    it("should normalize uppercase metadataType to lowercase", async () => {
+      // Pass uppercase metadata type - should be normalized to lowercase
+      const result = await command.execute({ metadataType: "BUSINESS-RULE" });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.success).toBe(true);
+      expect(result.output).toContain(mockSnippetContent);
+    });
+
     it("should handle no snippets found for non-existent metadata type", async () => {
       // Execute the command with a non-existent metadata type
       const result = await command.execute({ metadataType: "non-existent" });
 
       expect(result.exitCode).toBe(1);
       expect(result.success).toBe(false);
-      expect(result.output).toContain("No snippets found for metadata type: non-existent");
+      expect(result.output).toContain("No snippets found for metadata type 'non-existent'");
       expect(result.error).toBeDefined();
     });
   });
@@ -204,7 +213,7 @@ describe("Resource Tool Commands", () => {
 
       expect(result.exitCode).toBe(1);
       expect(result.success).toBe(false);
-      expect(result.output).toContain("Resource not found for metadata type: non-existent");
+      expect(result.output).toContain("resource found for metadata type 'non-existent'");
       expect(result.error).toBeDefined();
     });
 
@@ -214,7 +223,7 @@ describe("Resource Tool Commands", () => {
 
       expect(result.exitCode).toBe(1);
       expect(result.success).toBe(false);
-      expect(result.output).toContain("Error: Missing required argument: metadataType");
+      expect(result.output).toContain("Missing required argument 'metadataType'");
       expect(result.error).toBeDefined();
     });
   });

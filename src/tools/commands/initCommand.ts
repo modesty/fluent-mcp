@@ -25,7 +25,7 @@ import {
  */
 export class InitCommand extends BaseCLICommand {
   name = 'init_fluent_app';
-  description = 'Initialize a new ServiceNow custom application or convert a legacy ServiceNow application from an instance or directory within the current directory. Uses MCP elicitation to gather required parameters based on your intent.';
+  description = 'Initialize a new Fluent (ServiceNow SDK) application or convert an existing scoped application. Set intent to "creation" for a new app (requires appName, packageName, scopeName, template) or "conversion" to convert from an instance sys_id or local directory (requires from, and auth for instance conversion). The workingDirectory must be an empty directory. After init, use build_fluent_app to compile.';
 
   private elicitator: InitElicitator;
 

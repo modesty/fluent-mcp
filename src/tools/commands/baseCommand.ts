@@ -14,6 +14,7 @@ export abstract class BaseCLICommand implements CLICommand {
   abstract name: string;
   abstract description: string;
   abstract arguments: CommandArgument[];
+  timeoutMs?: number;
 
   constructor(protected commandProcessor: CommandProcessor) { }
 
@@ -60,7 +61,10 @@ export abstract class BaseCLICommand implements CLICommand {
 
       // Check required arguments are present
       if (arg.required && !(arg.name in args)) {
-        throw new Error(`Required argument '${arg.name}' is missing`);
+        throw new Error(
+          `Missing required argument '${arg.name}'. ${arg.description}. ` +
+          `Expected type: ${arg.type}.`
+        );
       }
 
       // Skip validation for undefined optional arguments

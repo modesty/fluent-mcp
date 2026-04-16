@@ -1,12 +1,15 @@
+---
+title: "Coding in Fluent (ServiceNow SDK)"
+description: "Guide for coding in Fluent (ServiceNow SDK) with examples for specific metadata types"
+arguments:
+  - name: metadata_list
+    description: 'Comma-separated list of metadata types to include in the guide (e.g., "table,business-rule,script-include")'
+    required: true
+---
+
 # Coding in ServiceNow Fluent
 
 Guide for coding in ServiceNow Fluent with metadata type examples.
-
-## Arguments
-
-- `metadata_types`: List of metadata types to include in guide. (Required)
-
-## Content
 
 Fluent (ServiceNow SDK) is a TypeScript-based domain-specific language that allows you to create and manage metadata, modules, records, and tests in the ServiceNow platform. It features:
 

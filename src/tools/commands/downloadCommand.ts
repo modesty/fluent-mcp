@@ -7,7 +7,9 @@ import { SessionAwareCLICommand } from './sessionAwareCommand.js';
  */
 export class DownloadCommand extends SessionAwareCLICommand {
   name = 'download_fluent_app';
-  description = 'Download application metadata from instance, including metadata that not exist in local but deployed to instance';
+  description = 'Download application metadata from a ServiceNow instance into a local directory. Includes metadata deployed to the instance that may not exist locally. The directory argument specifies where to expand the application. Use incremental mode to download only changes since the last download. Requires instance authentication (auto-injected from session).';
+  annotations = { openWorldHint: true };
+  timeoutMs = 60_000;
   arguments: CommandArgument[] = [
     {
       name: 'directory',

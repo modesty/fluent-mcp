@@ -7,7 +7,9 @@ import { SessionAwareCLICommand } from './sessionAwareCommand.js';
  */
 export class InstallCommand extends SessionAwareCLICommand {
   name = 'deploy_fluent_app';
-  description = 'Deploy the Fluent (ServiceNow SDK) application to a ServiceNow instance';
+  description = 'Deploy a built Fluent (ServiceNow SDK) application to a ServiceNow instance. Requires a prior build via build_fluent_app and valid instance authentication (auto-injected from session, or pass auth explicitly). Use skipFlowActivation to prevent auto-publishing of flows and subflows during deployment.';
+  annotations = { openWorldHint: true };
+  timeoutMs = 120_000;
   arguments: CommandArgument[] = [
     {
       name: 'auth',

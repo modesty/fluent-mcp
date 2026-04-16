@@ -114,27 +114,29 @@ export class ToolsManager {
     for (const arg of command.arguments) {
       let zodType: z.ZodTypeAny;
 
-      // Map command argument types to Zod types
+      // Map command argument types to Zod types with descriptions for JSON Schema.
+      // Optional args use .nullable().optional() because LLMs commonly send null
+      // for "not provided" parameters, and z.string().optional() rejects null.
       switch (arg.type) {
         case 'string':
-          zodType = z.string();
+          zodType = z.string().describe(arg.description);
           break;
         case 'number':
-          zodType = z.number();
+          zodType = z.number().describe(arg.description);
           break;
         case 'boolean':
-          zodType = z.boolean();
+          zodType = z.boolean().describe(arg.description);
           break;
         case 'array':
-          zodType = z.array(z.any());
+          zodType = z.array(z.any()).describe(arg.description);
           break;
         default:
-          zodType = z.any();
+          zodType = z.any().describe(arg.description);
       }
 
-      // Make optional if not required
+      // Make optional if not required — also accept null since LLMs often send null
       if (!arg.required) {
-        zodType = zodType.optional();
+        zodType = zodType.nullable().optional();
       }
 
       schema[arg.name] = zodType;
@@ -154,13 +156,14 @@ export class ToolsManager {
       {
         title: command.name,
         description: command.description,
-        inputSchema: inputSchema
+        inputSchema: inputSchema,
+        ...(command.annotations && { annotations: command.annotations }),
       },
       async (args: { [x: string]: any }, _extra: unknown) => {
         try {
           const result = await command.execute(args);
 
-          // Format the output for display (with ✅/❌ prefixes)
+          // Format the output: clean on success, concise error context on failure
           const formattedOutput = this.formatResult({
             success: result.success,
             output: result.output,
@@ -177,7 +180,7 @@ export class ToolsManager {
           const normalizedError = CommandResultFactory.normalizeError(error);
           logger.error(`Tool '${command.name}' execution failed`, normalizedError);
           return {
-            content: [{ type: 'text' as const, text: `❌ Error: ${normalizedError.message}` }],
+            content: [{ type: 'text' as const, text: `Error: ${normalizedError.message}` }],
             isError: true
           };
         }
@@ -186,16 +189,30 @@ export class ToolsManager {
   }
 
   /**
-   * Format the result of a command execution
-   * @param result The command result
-   * @returns Formatted string with the result
+   * Strip ANSI escape codes from CLI output to avoid wasting LLM tokens.
+   * Covers CSI sequences (colors, cursor, 24-bit), OSC (title), and charset selectors.
+   */
+  private stripAnsi(text: string): string {
+    // eslint-disable-next-line no-control-regex
+    return text.replace(/\x1B(?:\[[0-9;:]*[A-Za-z]|\][^\x07\x1B]*(?:\x07|\x1B\\)|\([A-B0-2]|[>=])/g, '');
+  }
+
+  /**
+   * Format the result of a command execution.
+   * On success, returns clean output only (isError field already conveys success/failure).
+   * On failure, returns concise error with output context.
    */
   formatResult(result: { success: boolean, output: string, exitCode?: number, error?: string }): string {
+    const cleanOutput = this.stripAnsi(result.output);
+
     if (result.success) {
-      return `✅ Command executed successfully\n\nOutput:\n${result.output}`;
-    } else {
-      return `❌ Command failed (exit code: ${result.exitCode})\n\nError:\n${result.error || 'Unknown error'}\n\nOutput:\n${result.output}`;
+      return cleanOutput;
     }
+
+    const errorMsg = result.error || 'Unknown error';
+    return cleanOutput
+      ? `Error (exit ${result.exitCode}): ${errorMsg}\n\nOutput:\n${cleanOutput}`
+      : `Error (exit ${result.exitCode}): ${errorMsg}`;
   }
 
   /**

@@ -7,7 +7,9 @@ import { SessionAwareCLICommand } from './sessionAwareCommand.js';
  */
 export class DependenciesCommand extends SessionAwareCLICommand {
   name = 'download_fluent_dependencies';
-  description = 'Download configured dependencies in now.config.json and TypeScript type definitions for use in the application. Supports pulling type definitions for tables and roles outside application scope via dependencies.global configuration.';
+  description = 'Download configured dependencies from now.config.json and TypeScript type definitions for use in a Fluent application. Requires instance authentication (auto-injected from session, or pass auth explicitly). Supports pulling type definitions for tables and roles outside application scope via dependencies.global configuration. Run this after init_fluent_app to set up type definitions before development.';
+  annotations = { openWorldHint: true };
+  timeoutMs = 60_000;
   arguments: CommandArgument[] = [
     {
       name: 'auth',

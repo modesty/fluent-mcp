@@ -78,6 +78,8 @@ export class ResourceLoader {
     metadataType: string,
     id?: string
   ): Promise<ResourceResult> {
+    // Normalize to lowercase to match file naming convention
+    metadataType = metadataType.toLowerCase();
     try {
       const resourcePath = this.resourcePaths[resourceType];
       
@@ -151,6 +153,8 @@ export class ResourceLoader {
    * @returns Array of snippet IDs
    */
   public async listSnippets(metadataType: string): Promise<string[]> {
+    // Normalize to lowercase to match file naming convention
+    metadataType = metadataType.toLowerCase();
     try {
       const resourcePath = this.resourcePaths[ResourceType.SNIPPET];
       const files = await fs.promises.readdir(resourcePath);

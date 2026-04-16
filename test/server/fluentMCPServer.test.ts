@@ -85,11 +85,12 @@ jest.mock("../../src/tools/toolsManager.js", () => {
       }),
       formatResult: jest.fn().mockImplementation((result) => {
         if (result.success) {
-          return `✅ Command executed successfully\n\nOutput:\n${result.output}`;
+          return result.output;
         } else {
-          return `❌ Command failed (exit code: ${result.exitCode})\n\nError:\n${
-            result.error || "Unknown error"
-          }\n\nOutput:\n${result.output}`;
+          const errorMsg = result.error || 'Unknown error';
+          return result.output
+            ? `Error (exit ${result.exitCode}): ${errorMsg}\n\nOutput:\n${result.output}`
+            : `Error (exit ${result.exitCode}): ${errorMsg}`;
         }
       }),
       updateRoots: mockUpdateRoots

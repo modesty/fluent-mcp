@@ -7,7 +7,9 @@ import { SessionAwareCLICommand } from './sessionAwareCommand.js';
  */
 export class CleanCommand extends SessionAwareCLICommand {
   name = 'clean_fluent_app';
-  description = 'Clean up output directory of a Fluent (ServiceNow SDK) application';
+  description = 'Delete the build output directory of a Fluent (ServiceNow SDK) application. This is a destructive operation that removes all compiled artifacts. Run build_fluent_app afterward to regenerate. Does NOT require authentication.';
+  annotations = { destructiveHint: true, idempotentHint: true };
+  timeoutMs = 15_000;
   arguments: CommandArgument[] = [
     {
       name: 'source',

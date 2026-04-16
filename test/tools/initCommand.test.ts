@@ -171,9 +171,9 @@ describe("InitCommand", () => {
   test("should have correct properties", () => {
     expect(initCommand.name).toBe("init_fluent_app");
     expect(initCommand.description).toContain(
-      "Initialize a new ServiceNow custom application"
+      "Initialize a new Fluent"
     );
-    expect(initCommand.description).toContain("MCP elicitation");
+    expect(initCommand.description).toContain("convert");
     expect(initCommand.arguments.length).toBeGreaterThan(0);
     
     const intentArg = initCommand.arguments.find(arg => arg.name === "intent");
