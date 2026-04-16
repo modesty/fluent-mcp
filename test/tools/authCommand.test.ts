@@ -74,24 +74,25 @@ describe("AuthCommand", () => {
       ]),
       false,
       "/mock/working/dir",
-      undefined // stdinInput (credentials not set in env)
+      undefined, // stdinInput (credentials not set in env)
+      undefined  // timeoutMs
     );
     expect(result.success).toBe(true);
   });
-  
+
   // Add a comment explaining the relationship between execute and process
   test("should handle relationship between execute and process methods", () => {
     // The command.execute method should call the commandProcessor.process method
     // This is a key part of the refactoring to ensure AuthCommand uses CLICmdWriter properly
-    
+
     const args = { list: true };
-    
+
     authCommand.execute(args);
-    
+
     // Verify the process method of the command processor was called
     expect(mockCmdWriter.process).toHaveBeenCalled();
   });
-  
+
   test("should pass through --list, --help and --version", async () => {
     const args = { list: true, help: true, version: true };
     await authCommand.execute(args);
@@ -100,7 +101,8 @@ describe("AuthCommand", () => {
       expect.arrayContaining(["now-sdk", "auth", "--list", "--help", "--version"]),
       false,
       "/mock/working/dir",
-      undefined // stdinInput (not needed for list/help/version)
+      undefined, // stdinInput (not needed for list/help/version)
+      undefined  // timeoutMs
     );
   });
 

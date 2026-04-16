@@ -1,3 +1,8 @@
+---
+title: "Create a Custom UI with Fluent (ServiceNow SDK)"
+description: "Guide for creating custom UIs with React, Svelte, Vue.js, or SolidJS using the Fluent (ServiceNow SDK) UiPage API"
+---
+
 # Create a Custom UI with Framework You Choose
 
 Starting Fluent v4, you can create custom UIs using frameworks of your choice, such as React, Svelte, Vue.js, or SolidJS. This guide will walk you through the steps to set up a custom UI project.

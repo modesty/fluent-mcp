@@ -10,7 +10,9 @@ import { getProjectRootPath } from '../../config.js';
  */
 export class SdkInfoCommand extends BaseCLICommand {
   name = 'sdk_info';
-  description = 'Get Fluent (ServiceNow SDK) information. Flags: -v (version), -h (help)';
+  description = 'Get Fluent (ServiceNow SDK) version or help information. Use -v to check the installed SDK version, or -h for general help or help on a specific command (e.g., flag: "-h", command: "build"). Does NOT require authentication or a Fluent project directory.';
+  annotations = { readOnlyHint: true, idempotentHint: true };
+  timeoutMs = 10_000;
   arguments: CommandArgument[] = [
     {
       name: 'flag',
@@ -90,7 +92,7 @@ export class SdkInfoCommand extends BaseCLICommand {
     }
 
     try {
-      const result = await this.commandProcessor.process(sdkCommand, sdkArgs, false, workingDirectory);
+      const result = await this.commandProcessor.process(sdkCommand, sdkArgs, false, workingDirectory, undefined, this.timeoutMs);
 
       if (result.exitCode === 0) {
         return CommandResultFactory.success(this.formatOutput(result.output, flag, command));

@@ -10,6 +10,7 @@ import {
   DownloadCommand,
   CleanCommand,
   PackCommand,
+  ExplainCommand,
 } from '../commands/index.js';
 
 /**
@@ -45,6 +46,7 @@ export class CommandFactory {
       new DownloadCommand(executor),
       new CleanCommand(executor),
       new PackCommand(executor),
+      new ExplainCommand(executor),
     ];
   }
 }

@@ -61,7 +61,8 @@ describe('InstallCommand', () => {
         ['now-sdk', 'install'],
         false,
         '/mock/working/dir',
-        undefined // stdinInput
+        undefined, // stdinInput
+        120000    // timeoutMs
       );
     });
 
@@ -75,7 +76,8 @@ describe('InstallCommand', () => {
         ['now-sdk', 'install', '--skip-flow-activation'],
         false,
         '/mock/working/dir',
-        undefined // stdinInput
+        undefined, // stdinInput
+        120000    // timeoutMs
       );
     });
 
@@ -102,7 +104,8 @@ describe('InstallCommand', () => {
         ['now-sdk', 'install', '--auth', 'my-alias', '--skip-flow-activation', '--debug'],
         false,
         '/mock/working/dir',
-        undefined // stdinInput
+        undefined, // stdinInput
+        120000    // timeoutMs
       );
     });
   });

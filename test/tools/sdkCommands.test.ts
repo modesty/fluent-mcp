@@ -137,7 +137,8 @@ describe('SDK Command Tools', () => {
       'npx',  // Should use npx
       expect.arrayContaining(['now-sdk', 'auth', '--help']),  // Args with 'now-sdk' prefix
       expect.any(String),  // Working directory should be provided (project root path)
-      undefined  // stdinInput
+      undefined, // stdinInput
+      10000     // timeoutMs
     );
 
     // Restore the original run method
@@ -167,7 +168,7 @@ describe('SDK Command Tools', () => {
     const sdkInfoCommand = commands.find((cmd) => cmd.name === 'sdk_info');
     expect(sdkInfoCommand).toBeDefined();
 
-    await expect(sdkInfoCommand.execute({})).rejects.toThrow('Required argument \'flag\' is missing');
+    await expect(sdkInfoCommand.execute({})).rejects.toThrow("Missing required argument 'flag'");
   });
 
   test('SdkInfoCommand should handle errors correctly', async () => {

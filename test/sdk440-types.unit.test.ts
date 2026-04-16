@@ -232,7 +232,7 @@ describe('SDK v4.4.0 Types - Unit Tests', () => {
 
       expect(result.exitCode).toBe(1);
       expect(result.success).toBe(false);
-      expect(result.output).toContain('No snippets found for metadata type: atf-asert-payload');
+      expect(result.output).toContain("No snippets found for metadata type 'atf-asert-payload'");
       expect(result.error).toBeDefined();
     });
   });

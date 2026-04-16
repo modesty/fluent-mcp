@@ -49,7 +49,8 @@ describe('CLI Command Tools with Root capability', () => {
         'test-command',
         ['arg1', 'arg2'],
         '/test/root1',
-        undefined // stdinInput
+        undefined, // stdinInput
+        undefined  // timeoutMs
       );
     });
 
@@ -68,7 +69,8 @@ describe('CLI Command Tools with Root capability', () => {
         'test-command',
         ['arg1'],
         '/custom/dir',
-        undefined // stdinInput
+        undefined, // stdinInput
+        undefined  // timeoutMs
       );
     });
 
@@ -81,7 +83,8 @@ describe('CLI Command Tools with Root capability', () => {
         'test-command',
         ['arg1'],
         '/mock/project/root',
-        undefined // stdinInput
+        undefined, // stdinInput
+        undefined  // timeoutMs
       );
     });
   });

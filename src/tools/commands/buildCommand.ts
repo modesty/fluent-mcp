@@ -7,7 +7,9 @@ import { SessionAwareCLICommand } from './sessionAwareCommand.js';
  */
 export class BuildCommand extends SessionAwareCLICommand {
   name = 'build_fluent_app';
-  description = 'Build the Fluent (ServiceNow SDK) application located in the current working directory.';
+  description = 'Build a Fluent (ServiceNow SDK) application package from source code. Requires a valid Fluent project directory with now.config.json. Run after init_fluent_app and before deploy_fluent_app. Does NOT require instance authentication.';
+  annotations = { idempotentHint: true };
+  timeoutMs = 60_000;
   arguments: CommandArgument[] = [
     {
       name: 'debug',

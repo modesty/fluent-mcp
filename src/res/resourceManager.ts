@@ -137,7 +137,7 @@ export class ResourceManager {
         },
         async (uri: URL, extra?: { arguments?: { snippetId?: string } }) => {
           try {
-            const metadataType = uri.host;
+            const metadataType = uri.host.toLowerCase();
             const subId = config.hasSubId ? extra?.arguments?.snippetId : undefined;
 
             const result = await this.resourceLoader.getResource(
@@ -255,7 +255,7 @@ export class ResourceManager {
     try {
       const uri = new URL(uriString);
       const scheme = uri.protocol.replace(':', '');
-      const metadataType = uri.host;
+      const metadataType = uri.host.toLowerCase();
 
       const config = RESOURCE_TYPE_CONFIGS.find(c => c.scheme === scheme);
       if (!config) {

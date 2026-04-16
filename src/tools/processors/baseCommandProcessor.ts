@@ -50,6 +50,7 @@ export abstract class BaseCommandProcessor implements CommandProcessor {
     args: string[],
     useMcpCwd?: boolean,
     customWorkingDir?: string,
-    stdinInput?: string
+    stdinInput?: string,
+    timeoutMs?: number
   ): Promise<CommandResult>;
 }

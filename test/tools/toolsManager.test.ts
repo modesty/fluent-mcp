@@ -117,10 +117,11 @@ describe("ToolsManager", () => {
     const formattedSuccess = toolsManager.formatResult(successResult);
     const formattedFail = toolsManager.formatResult(failResult);
     
-    expect(formattedSuccess).toContain("✅");
-    expect(formattedSuccess).toContain("Success output");
-    
-    expect(formattedFail).toContain("❌");
+    // Success: clean output only (no emoji prefix, no "Command executed successfully" wrapper)
+    expect(formattedSuccess).toBe("Success output");
+
+    // Failure: concise error with exit code and output context
+    expect(formattedFail).toContain("Error (exit 1)");
     expect(formattedFail).toContain("Failure output");
     expect(formattedFail).toContain("Error message");
   });
