@@ -1,36 +1,33 @@
-# **Context:** Form API spec: Used to create a Form (`sys_ui_form`) for a ServiceNow table, defining which sections, layout blocks, and fields to display. The Record-based approach is the primary method. A `Form()` fluent API exists in the SDK type definitions but is not yet publicly exported.
+# **Context:** Form API spec: Used to create a Form (`sys_ui_form`) for a ServiceNow table, defining which sections, layout blocks, and fields to display. As of SDK v4.6.0, the declarative `Form()` API is the **primary, publicly supported** approach. The `Record`-based approach remains available as a fallback.
 
-## Record-based approach (primary, publicly supported)
+## `Form()` API (primary — publicly exported in SDK v4.6.0)
 
-Uses the `Record()` function to create individual form records (`sys_ui_view`, `sys_ui_form`, `sys_ui_section`, `sys_ui_form_section`, `sys_ui_element`). See form snippets for complete examples.
-
-## `Form()` API (internal — not yet exported from `@servicenow/sdk/core`)
-
-The `Form()` function creates all necessary ServiceNow records (`sys_ui_form`, `sys_ui_form_section`, `sys_ui_section`, `sys_ui_element`, `sys_ui_annotation`) from a single declarative configuration. **Note:** This API exists in the SDK type definitions but is not yet re-exported from the public `@servicenow/sdk/core` module as of v4.5.0.
+The `Form()` function creates all necessary ServiceNow records (`sys_ui_form`, `sys_ui_form_section`, `sys_ui_section`, `sys_ui_element`, `sys_ui_annotation`) from a single declarative configuration. Imported from `@servicenow/sdk/core`.
 
 ```typescript
 import { Form, default_view } from '@servicenow/sdk/core'
 
 // ─── Predefined Constants ───
 
-// AnnotationType — predefined annotation styling types (maps to sys_ui_annotation_type sys_ids)
-// Use as annotationType value in AnnotationElement
+// AnnotationType — predefined annotation styling type keys (resolve to sys_ui_annotation_type sys_ids)
+// Use as annotationType value in AnnotationElement. Values shown as '' here are placeholder
+// sys_ids; the SDK resolves the keys to the actual sys_id at build time.
 const AnnotationType = {
-    Info_Box_Blue: string,
-    Info_Box_Red: string,
-    Line_Separator: string,
-    Plain_Text: string,
-    Section_Details: string,
-    Section_Plain_Text: string,
-    Section_Separator: string,
-    Text: string,
+    Info_Box_Blue: '',         // string — sys_ui_annotation_type sys_id
+    Info_Box_Red: '',          // string — sys_ui_annotation_type sys_id
+    Line_Separator: '',        // string — sys_ui_annotation_type sys_id
+    Plain_Text: '',            // string — sys_ui_annotation_type sys_id
+    Section_Details: '',       // string — sys_ui_annotation_type sys_id
+    Section_Plain_Text: '',    // string — sys_ui_annotation_type sys_id
+    Section_Separator: '',     // string — sys_ui_annotation_type sys_id
+    Text: '',                  // string — sys_ui_annotation_type sys_id
 }
 
-// Formatter — predefined formatter references (maps to sys_ui_formatter sys_ids)
-// Use as formatterRef value in FormatterElement
+// Formatter — predefined formatter reference keys (resolve to sys_ui_formatter sys_ids)
+// Use as formatterRef value in FormatterElement.
 const Formatter = {
-    Activities_Filtered: string,
-    Attached_Knowledge: string,
+    Activities_Filtered: '',   // string — sys_ui_formatter sys_id
+    Attached_Knowledge: '',    // string — sys_ui_formatter sys_id
 }
 
 // ─── Form Element Types ───
@@ -133,9 +130,9 @@ Form({
 }): Form
 ```
 
-## Legacy API: `Record`-based approach
+## Fallback: `Record`-based approach
 
-The `Record` plugin can still be used as a lower-level fallback when the `Form()` API is not suitable. This approach requires manually creating individual records for `sys_ui_form`, `sys_ui_section`, `sys_ui_form_section`, `sys_ui_element`, and `sys_ui_view`.
+The `Record` plugin can still be used as a lower-level fallback when `Form()` does not cover a specific case. This approach requires manually creating individual records for `sys_ui_form`, `sys_ui_section`, `sys_ui_form_section`, `sys_ui_element`, and `sys_ui_view`. Prefer `Form()` for new development.
 
 ```typescript
 import { Record } from '@servicenow/sdk/core'

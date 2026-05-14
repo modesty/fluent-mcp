@@ -18,26 +18,26 @@ GenericColumn({
 }): GenericColumn // returns a GenericColumn object
 
 // dynamic_value_definition examples
-const example1 = dynamic_value_definitions: {
+const example1_dynamic_value_definitions = {
    type: "dynamic_default", // constant, mandatory
    dynamicDefault: '' // string, function from sys_filter_option_dynamic table, mandatory
 };
 
-const example2 = dynamic_value_definitions: {
+const example2_dynamic_value_definitions = {
    type: "dependent_field", // constant, mandatory
    columnName: get_column_name("") // string, column name from the same table, mandatory
 }
 
-const example3 = dynamic_value_definitions: {
+const example3_dynamic_value_definitions = {
    type: "calculated_value", // constant, mandatory
    calculatedValue: '' // string, function for calculating the value, mandatory
 }
 
-const example4 = dynamic_value_definitions: {
+const example4_dynamic_value_definitions = {
    type: "choices_from_other_table", // constant, mandatory
    table: '', // undefined | string, mandatory
    field: get_column_name("") // string, column name from the specified table, mandatory
-},
+}
 
 const internal_types = [
     'string',

@@ -54,8 +54,8 @@ ReferenceColumn({
  label: '', // string or array of Documentation object
  mandatory: false, // boolean
  maxLength: 0, // number
- readOnly: false // boolean
- referenceTable?: '', // undefined | string
+ readOnly: false, // boolean
+ referenceTable: '', // undefined | string, optional
 }): ReferenceColumn // returns a ReferenceColumn object
 
 DateTimeColumn({
@@ -120,8 +120,8 @@ ListColumn({
  label: '', // string or array of Documentation object
  mandatory: false, // boolean
  maxLength: 0, // number
- readOnly: false // boolean
- referenceTable?: '', // undefined | string
+ readOnly: false, // boolean
+ referenceTable: '', // undefined | string, optional
 }): ListColumn // returns a ListColumn object
 
 FieldNameColumn({
@@ -148,8 +148,8 @@ ScriptColumn({
  label: '', // string or array of Documentation object
  mandatory: false, // boolean
  maxLength: 0, // number
- readOnly: false // boolean
- signature: '', // undefined | string
+ readOnly: false, // boolean
+ signature: '', // undefined | string, optional
 }): ScriptColumn // returns a ScriptColumn object
 
 UserRolesColumn({

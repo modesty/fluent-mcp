@@ -36,6 +36,33 @@ Table({
     scriptableTable: false, // boolean
 }): Table; // returns a Table object
 
+// ─── DICTIONARY OVERRIDES (SDK v4.6.0+) ───
+// To override a column inherited from a parent table, use OverrideColumn() inside the schema of a child table.
+// This creates the underlying `sys_dictionary_override` record automatically — no separate API call needed.
+import { Table, OverrideColumn } from '@servicenow/sdk/core'
+
+export const x_my_app_my_task = Table({
+    name: 'x_my_app_my_task',
+    extends: 'task',
+    schema: {
+        priority: OverrideColumn({
+            baseTable: 'task',     // mandatory — the table the column is inherited from
+            mandatory: true,       // optional — override mandatory
+            default: '1',          // optional — override default value
+            // Other overridable properties: readOnly, readOnlyOption, display, max_length, choice (where supported)
+        }),
+        state: OverrideColumn({
+            baseTable: 'task',
+            mandatory: true,
+            readOnlyOption: 'display_read_only',
+        }),
+        description: OverrideColumn({
+            baseTable: 'task',
+            display: false,
+        }),
+    },
+})
+
 // Creates a new LicensingConfig object
 LicensingConfig({
     licenseModel: 'none', // 'none' | 'fulfiller' | 'producer'

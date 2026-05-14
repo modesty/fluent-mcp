@@ -17,7 +17,7 @@ import {
 
 // ─── SHARED BASE PROPERTIES (all variable types inherit these) ───
 // These are defined in VariableConfig / BaseVariableConfig:
-{
+const _sharedBaseProperties = {
     question: '',           // string, mandatory — label/question shown to the user
     order: 100,             // number, optional — display order within the form
     active: true,           // boolean, optional — whether the variable is active
@@ -194,9 +194,10 @@ LabelVariable({
 })
 
 // Rich text label (HTML-formatted static content)
+// NOTE: RichTextLabelVariable does NOT accept `question`; the content lives in `richText`.
 RichTextLabelVariable({
-    question: '',           // mandatory — rich text / HTML content
-    // + base properties
+    richText: '',           // string, mandatory — rich-text / HTML content
+    // + base properties (excluding `question`)
 })
 
 // HTML content block (embedded HTML in the form)
@@ -206,28 +207,28 @@ HtmlVariable({
 })
 
 // Horizontal line break / separator
+// NOTE: BreakVariable does NOT accept `question` — it's a visual separator only.
 BreakVariable({
-    question: '',           // mandatory
-    // + base properties
+    // base properties only.
 })
 
 // Container start (begin a collapsible section)
+// NOTE: ContainerStartVariable does NOT accept `question` — it carries layout structure only.
 ContainerStartVariable({
-    question: '',           // mandatory — container title
     layout: 'normal',       // 'normal' | '2across' | '2down', optional
     // + base properties
 })
 
 // Container split (divider inside a container)
+// NOTE: ContainerSplitVariable does NOT accept `question`.
 ContainerSplitVariable({
-    question: '',           // mandatory
-    // + base properties
+    // base properties only.
 })
 
 // Container end (close a container section)
+// NOTE: ContainerEndVariable does NOT accept `question` — it just closes a container.
 ContainerEndVariable({
-    question: '',           // mandatory
-    // + base properties
+    // base properties only.
 })
 
 // ─── SPECIAL VARIABLES ───
@@ -235,7 +236,9 @@ ContainerEndVariable({
 // List collector (multi-select from a reference table)
 ListCollectorVariable({
     question: '',           // mandatory
-    // + all base properties
+    listTable: 'incident',  // TableName, mandatory — the table being referenced
+    referenceQual: '',      // string, optional — encoded query to filter the reference list
+    // + base properties
 })
 
 // Numeric scale / rating (e.g., 1-5 satisfaction score)
@@ -247,7 +250,7 @@ NumericScaleVariable({
 // Attachment upload field
 AttachmentVariable({
     question: '',           // mandatory
-    // + all base properties
+    // + base properties
 })
 
 // Embedded UI Page

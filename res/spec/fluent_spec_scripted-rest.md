@@ -12,7 +12,7 @@ const specRestApi = RestApi({
 	policy: '', // '' | 'read' | 'protected'
 	produces: '', // string, comma delimited MIME types, ex. 'application/json,application/xml,text/xml'
 	routes: [], // array of Routes, see the Route spec
-	shortDescription, '', // string
+	shortDescription: '', // string
 	versions: [], // array of Versions, see the Version spec
 }): RestApi; // returns a RestApi object
 
@@ -27,7 +27,7 @@ const Route = {
 	path: '/', // string, path of the resource relative to the base API path, can contain parameters, for example: '/abc/{id}'
 	shortDescription: '', // string
 	consumes: '', // string, defines what the route will consume, defaults to the `consumes` property of the RestApi object
-	enforceAcl, [], // array of strings that represent sys_ids of ACLs to enforce | array of ACL objects (see ACL object spec) to enforce
+	enforceAcl: [], // array of strings that represent sys_ids of ACLs to enforce | array of ACL objects (see ACL object spec) to enforce
 	produces: '', // string, ist of media types that the resource can produce, defaults to the `produces` property of the RestApi object
 	requestExample: '', // string, valid sample request body payload for the route
 	method: 'GET', // 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'

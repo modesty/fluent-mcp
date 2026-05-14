@@ -8,4 +8,4 @@ Always reference the CatalogItemRecordProducer API specification for more detail
 6. Set `redirectUrl: 'generatedRecord'` (default) to take the user to the newly created record after submission. Use `'catalogHomePage'` to redirect to the catalog home instead.
 7. Record producers do NOT use `flow`, `executionPlan`, or `workflow` for fulfillment — the record creation IS the fulfillment. These fields are not applicable to record producers.
 8. All other `CatalogItem` properties (categories, availableFor, variableSets, etc.) apply equally — see the catalog-item instruct for those guidelines.
-9. Export the record producer as a named constant so it can be referenced by `CatalogClientScript` and `CatalogUIPolicy` that apply specifically to record producers.
+9. Export the record producer as a named constant so it can be referenced by `CatalogClientScript` and `CatalogUiPolicy` that apply specifically to record producers.

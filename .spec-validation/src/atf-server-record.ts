@@ -1,0 +1,47 @@
+// Perform a database query to verify if a record matching the conditions set in this step are met
+atf.server.recordQuery({ // all props are mandatory
+  $id: Now.ID[''], // string | guid, mandatory
+  table: '', // table name
+  fieldValues: '', // string, servicenow encoded query
+  enforceSecurity: true, // boolean; defaults to true in SDK v4.5.0
+  assert: 'records_match_query', // 'records_match_query' | 'no_records_match_query';
+});
+
+// Validates that a given record meets the specified conditions on the server-side.
+atf.server.recordValidation({ // all props are mandatory
+  $id: Now.ID[''], // string | guid, mandatory
+  table: '', // table name
+  fieldValues: '', // string, servicenow encoded query
+  recordId: '', // sys_id of the record
+  enforceSecurity: true, // boolean; defaults to true in SDK v4.5.0
+  assert: 'record_validated', // 'record_validated' | 'record_not_found';
+});
+
+// Inserts a record into a table. Specify the field values to set on the new record, outputs the table and the sys_id of the new record.
+atf.server.recordInsert({ // all props are mandatory
+  $id: Now.ID[''], // string | guid, mandatory
+  table: '', // table name
+  fieldValues: {}, // a valid JSON object, field must be snake_case and double-quoted and values must be double-quoted with properly escaped JSON values, example: { "field_one": "value1", "field_two": "value2" }
+  assert: '', // 'record_successfully_inserted' | 'record_not_inserted';
+  enforceSecurity: true, // boolean; defaults to true in SDK v4.5.0
+});
+
+// Changes field values of a record on the server.
+// follow this step with atf.server.recordValidation step to ensure that the changes were applied.
+atf.server.recordUpdate({ // all props are mandatory
+  $id: Now.ID[''], // string | guid, mandatory
+  table: '', // table name
+  fieldValues: {}, // a valid JSON object, field must be snake_case and double-quoted and values must be double-quoted with properly escaped JSON values, example: { "field_name": "value1", "field_two": "value2" }
+  recordId: '', // sys_id of the record
+  assert: 'record_successfully_updated', // 'record_successfully_updated' | 'record_not_updated';
+  enforceSecurity: true, // boolean; defaults to true in SDK v4.5.0
+});
+
+// Deletes a record of a table.
+atf.server.recordDelete({ // all props are mandatory
+  $id: Now.ID[''], // string | guid, mandatory
+  table: '', // table name
+  recordId: '', // sys_id of the record
+  enforceSecurity: true, // boolean; defaults to true in SDK v4.5.0
+  assert: 'record_successfully_deleted', // 'record_successfully_deleted' | 'record_not_deleted';
+});

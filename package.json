@@ -37,6 +37,9 @@
     "lint": "eslint 'src/**/*.ts' --config eslint.config.js",
     "lint:fix": "eslint 'src/**/*.ts' --config eslint.config.js --fix",
     "test": "jest",
+    "validate:snippets": "bash scripts/validate-snippets.sh",
+    "validate:specs": "node scripts/validate-specs.mjs",
+    "validate:instructs": "node scripts/validate-instructs.mjs",
     "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
     "inspect:dev": "npx @modelcontextprotocol/inspector ts-node src/index.ts",
     "inspect:published": "npx @modelcontextprotocol/inspector npx @modesty/fluent-mcp"

@@ -53,25 +53,25 @@ trigger.application.slaTask             // fires for SLA task events
 trigger.application.serviceCatalog // fires when a catalog item request item is created
 
 // ─── TRIGGER INPUTS (vary by trigger type) ───
-// For record triggers:
-{
+// Shape for record triggers:
+const _recordTriggerInputs = {
     table: '',          // string (TableName), mandatory — the table to watch
     condition: '',      // string, optional — encoded query condition to filter which records fire the trigger
     run_flow_in: 'background', // 'any' | 'background' | 'foreground', optional
 }
 
-// For scheduled.daily:
-{
+// Shape for scheduled.daily:
+const _dailyTriggerInputs = {
     time: '00:00:00',   // string, optional — time of day to run (HH:MM:SS)
 }
 
-// For scheduled.repeat:
-{
+// Shape for scheduled.repeat:
+const _repeatTriggerInputs = {
     repeat: Duration({ hours: 1 }), // Duration, mandatory — repeat interval
 }
 
-// For scheduled.runOnce:
-{
+// Shape for scheduled.runOnce:
+const _runOnceTriggerInputs = {
     run_in: '', // string, mandatory — datetime string (YYYY-MM-DD HH:mm:ss)
 }
 
@@ -93,12 +93,30 @@ wfa.action(action.core.askForApproval,   { $id: Now.ID['step'] }, { table: '', r
 
 // Logging and utilities
 wfa.action(action.core.log,        { $id: Now.ID['step'] }, { log_level: 'info', log_message: '' })
-wfa.action(action.core.scriptStep, { $id: Now.ID['step'] }, { script: '' })
+// For inline script logic in v4.6.0, define a Custom Action via Action() and invoke it
+// from the flow with wfa.action(<yourCustomAction>, ...) — see the custom-action spec.
 
 // Service Catalog actions (SDK 4.4.0)
 wfa.action(action.core.getCatalogVariables,      { $id: Now.ID['step'] }, { requested_item: dataPill, template_catalog_item: '' })
 wfa.action(action.core.createCatalogTask,        { $id: Now.ID['step'] }, { ah_requested_item: dataPill })
 wfa.action(action.core.submitCatalogItemRequest, { $id: Now.ID['step'] }, { catalog_item: '' })
+
+// ─── SUBFLOW INVOCATION (wfa.subflow) — SDK 4.5.0+ ───
+// Invoke a defined Subflow from inside a Flow. As of SDK 4.6.0, also callable from inside another Subflow (subflow-of-subflow).
+// In real code, import the exported subflow constant; example shape:
+//   import { mySubflow } from '../subflows/my-subflow.now'
+declare const mySubflow: any  // doc placeholder — replace with the imported subflow constant
+wfa.subflow(mySubflow, { $id: Now.ID['call_subflow'] }, { inputKey: dataPill })
+
+// ─── CUSTOM ACTION STEPS (wfa.action with a custom Action) — SDK 4.6.0+ ───
+// Invoke a Custom Action (created via Action() in @servicenow/sdk/automation) as a flow step.
+// See the custom-action spec/snippets for how to define one.
+//   import { escalateIncident } from '../actions/escalate-incident.now'
+declare const escalateIncident: any  // doc placeholder — replace with the imported custom action
+wfa.action(escalateIncident, { $id: Now.ID['call_action'] }, { incident: dataPill, reason: 'Auto-escalate' })
+
+// Cross-scope: when invoking a Subflow or Custom Action defined in another scope, declare it as
+// an SDK dependency in now.config.json so the type definitions are available at build time.
 
 // ─── FLOW LOGIC ───
 wfa.flowLogic.if(
@@ -126,7 +144,11 @@ wfa.flowLogic.waitForADuration({
 wfa.flowLogic.exitLoop({ $id: Now.ID['exit_id'] })
 wfa.flowLogic.endFlow({ $id: Now.ID['end_id'] })
 wfa.flowLogic.skipIteration({ $id: Now.ID['skip_id'] })
-wfa.flowLogic.setFlowVariables({ $id: Now.ID['set_vars'] }, { varName: value })
+// Signature: setFlowVariables(_definition, _variables, _values)
+//   _definition — { $id: Now.ID['…'] }
+//   _variables  — the FlowSchemaType returned by FlowVariables() in the parent flow config
+//   _values     — partial record of variable assignments
+wfa.flowLogic.setFlowVariables({ $id: Now.ID['set_vars'] }, flowVarSchema, { varName: '' })
 
 // ─── DATA PILLS (wfa.dataPill) ───
 // References output fields from previous steps, with type-safe dot-walking
