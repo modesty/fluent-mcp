@@ -1,11 +1,8 @@
 # Instructions for Fluent Form API
 Always reference the Form API specifications for more details.
 
-## Record-based approach (primary — publicly supported)
-Use the Record API to create form layout records (`sys_ui_view`, `sys_ui_form`, `sys_ui_section`, `sys_ui_form_section`, `sys_ui_element`) individually. Import `Record` and `default_view` from `@servicenow/sdk/core`. See form snippets for complete examples.
-
-## `Form()` API (internal — not yet exported from `@servicenow/sdk/core` as of v4.5.0)
-1. The `Form()` function exists in SDK type definitions but is not yet re-exported from the public module.
+## `Form()` API (primary — publicly supported as of SDK v4.6.0)
+1. As of SDK v4.6.0, the declarative `Form()` API is publicly exported from `@servicenow/sdk/core`. Prefer it for new development. Import: `import { Form, default_view } from '@servicenow/sdk/core'`.
 2. The `Form()` function takes a single configuration object with `table` (mandatory), `view` (mandatory), and `sections` (mandatory, at least one). Optional properties include `user` and `roles`.
 3. Each section has a `caption` (string, must be non-empty) and `content` (array of layout blocks). The first section caption is typically an empty-looking name like the table name; subsequent sections have descriptive captions.
 4. Layout blocks define the column structure: use `{ layout: 'one-column', elements: [...] }` for single-column layouts and `{ layout: 'two-column', leftElements: [...], rightElements: [...] }` for side-by-side layouts. A section can mix both layout types.
@@ -19,9 +16,8 @@ Use the Record API to create form layout records (`sys_ui_view`, `sys_ui_form`, 
 12. Exclude any scripts or duplicate code from your output unless explicitly instructed in the prompt.
 13. Do not add `sys_id` field as element records unless explicitly instructed in the prompt.
 
-## Legacy: `Record`-based approach
-The `Record` plugin approach is still supported for creating forms. When using it:
+## Fallback: `Record`-based approach
+The `Record` plugin approach remains supported as a lower-level fallback. Use it only when modifying existing forms built that way, or when `Form()` does not cover your specific case. When using it:
 - You must manually create individual records for `sys_ui_view`, `sys_ui_form`, `sys_ui_section`, `sys_ui_form_section`, and `sys_ui_element`.
 - Each `sys_ui_section` in the form MUST have a corresponding `sys_ui_form_section` record to link it.
 - Column breaks require manual `.split` / `.end_split` type elements.
-- Prefer the `Form()` API for new development; use `Record` only when modifying existing forms or when the `Form()` API does not cover your use case.

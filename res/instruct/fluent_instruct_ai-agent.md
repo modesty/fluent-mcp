@@ -11,3 +11,6 @@ Always reference the AI Agent API specifications for more details.
 9. Use `memoryCategories` to specify which long-term memory categories the agent can access: 'device_and_software', 'meetings_and_events', 'projects', 'workplace'.
 10. Set `active: false` to disable an agent without removing its definition.
 11. AI Agents are part of the AI Agent Studio framework in ServiceNow and work in conjunction with `AiAgenticWorkflow` definitions for dynamic agentic workflows.
+12. **`securityAcl` is MANDATORY** (SDK v4.6.0). It controls who can invoke the agent. Accepted shapes: `{ type: 'Any authenticated user' }`, `{ type: 'Specific role', roles: [...] }`, or `{ type: 'Public' }`. Do not omit this field — the build will fail.
+13. **Auto-generated ACL records (SDK v4.6.0)**: At build time, the SDK automatically creates the underlying `sys_security_acl` and `sys_security_acl_role` records from `securityAcl`. Do **not** write manual `Acl()` definitions for the agent — let the build handle it. The ACL name is derived as `{domain}.{scope}.{agentName}`.
+14. **`securityAcl` ≠ `runAsUser` / `dataAccess`**: `securityAcl` controls *who can invoke* the agent (access control); `runAsUser` / `dataAccess` controls *which user identity the agent runs under* (execution context). These are separate concerns and both may be needed.

@@ -2,21 +2,23 @@
 
 An [MCP server](https://modelcontextprotocol.io) that brings [ServiceNow Fluent SDK](https://www.servicenow.com/docs/bundle/yokohama-application-development/page/build/servicenow-sdk/concept/servicenow-fluent.html) capabilities to AI-assisted development environments. Enables natural language interaction with ServiceNow SDK commands, API specifications, code snippets, and development resources.
 
+Built for **`@servicenow/sdk` 4.6.0**.
+
 ## Key Features
 
-- **🤖 AI-Powered Error Analysis** - Intelligent diagnosis with root cause, solutions, and prevention tips (MCP Sampling)
-- **Complete SDK Coverage** - ServiceNow SDK commands: `init`, `build`, `install`, `dependencies`, `transform`, `download`, `clean`, `pack`
-- **Rich Resources** - API specifications, code snippets, instructions for 48+ metadata types
+- **Complete SDK Coverage** - ServiceNow SDK commands: `init`, `build`, `install`, `dependencies`, `transform`, `download`, `clean`, `pack`, `explain`
+- **Rich Resources** - API specifications, instructions, and code snippets for **57 ServiceNow metadata types**
+- **API Documentation Lookup** - `explain_fluent_api` returns SDK docs for any Fluent API or guide — no project required
 - **Auto-Authentication** - Automatic auth profile detection and session management via environment variables
 - **Session-Aware** - Maintains working directory and auth context across commands
 
-This MCP server implements the complete [Model Context Protocol](https://modelcontextprotocol.io) specification with the following capabilities:
+This MCP server implements the [Model Context Protocol](https://modelcontextprotocol.io) specification with the following capabilities:
 
 ### Core
 
-- **Resources** - Provides 234+ resources across 48+ ServiceNow metadata types (API specs, instructions, snippets, prompts)
-- **Tools** - Exposes 9 ServiceNow SDK commands as MCP tools with full parameter validation
-- **Prompts** - Offers development workflow templates for common ServiceNow tasks
+- **Resources** - 270+ resources across 57 ServiceNow metadata types (API specs, instructions, snippets, prompts)
+- **Tools** - 10 ServiceNow SDK commands plus resource-lookup tools, with full parameter validation
+- **Prompts** - Development workflow templates for common ServiceNow tasks (`coding_in_fluent`, `create_custom_ui`)
 - **Logging** - Structured logging for debugging and monitoring
 
 ### Client Capabilities (used by this server)
@@ -25,11 +27,6 @@ The server leverages these MCP client capabilities when available:
 
 - **Roots** - Requests workspace roots from the client for context-aware operations
   - Falls back to project root when client doesn't provide roots
-
-- **Sampling** (MCP 2024-11-05) - Leverages client LLM for intelligent error analysis when SDK commands fail
-  - Automatically analyzes command errors >50 characters
-  - Provides structured diagnostics: root cause, solutions, prevention tips
-  - Configurable via `FLUENT_MCP_ENABLE_ERROR_ANALYSIS` environment variable
 
 - **Elicitation** (MCP 2024-11-05) - Interactive parameter collection for complex workflows
   - **`init_fluent_app`** - Prompts for missing project parameters (workingDirectory, template, appName, etc.)
@@ -64,9 +61,10 @@ Create a new Fluent app in ~/projects/time-off-tracker to manage employee PTO re
 |------|-------------|----------------|
 | `sdk_info` | Get SDK version or help | `flag` (-v/-h), `command` (optional for -h) |
 | `get-api-spec` | Get API spec or list all metadata types | `metadataType` (optional, omit to list all) |
+| `explain_fluent_api` | Look up Fluent SDK documentation for any API or guide. No Fluent project required. | `topic` (optional API/guide name or tag keyword — required unless `list=true`), `list` (boolean — list topics), `peek` (boolean — brief summary), `format` (`pretty`\|`raw`), `source` (optional project path override), `debug` (optional) |
 | `init_fluent_app` | Initialize or convert ServiceNow app | `workingDirectory` (required), `template`, `from` (optional) |
 | `build_fluent_app` | Build the application | `debug` (optional) |
-| `deploy_fluent_app` | Deploy to ServiceNow instance | `auth` (auto-injected), `debug` (optional) |
+| `deploy_fluent_app` | Deploy to ServiceNow instance. Supports `--skip-flow-activation`. | `auth` (auto-injected), `debug` (optional), `skipFlowActivation` (optional) |
 | `fluent_transform` | Convert XML to Fluent TypeScript | `from`, `auth` (auto-injected) |
 | `download_fluent_dependencies` | Download dependencies and type definitions | `auth` (auto-injected) |
 | `download_fluent_app` | Download metadata from instance | `directory`, `incremental` (optional) |
@@ -74,6 +72,22 @@ Create a new Fluent app in ~/projects/time-off-tracker to manage employee PTO re
 | `pack_fluent_app` | Create installable artifact | `source` (optional) |
 
 > **Note:** Authentication is automatically configured at startup via environment variables. The `auth` parameter is auto-injected from the session for commands that require instance access. Use `init_fluent_app` to establish working directory context for subsequent commands.
+
+#### Looking up Fluent APIs with `explain_fluent_api`
+
+`explain_fluent_api` wraps `now-sdk explain` and returns SDK documentation for any Fluent API class **or** topic guide. It works from any directory — no Fluent project required.
+
+| Invocation | Result |
+|---|---|
+| `explain_fluent_api({ topic: 'BusinessRule' })` | Full API reference for `BusinessRule` |
+| `explain_fluent_api({ topic: 'BusinessRule', peek: true })` | Brief summary of `BusinessRule` |
+| `explain_fluent_api({ topic: 'BusinessRule', format: 'raw' })` | Full API reference as plain markdown (good for piping into other tools) |
+| `explain_fluent_api({ list: true })` | Full topic index (all APIs and guides) |
+| `explain_fluent_api({ list: true, topic: 'atf' })` | Topic index filtered to entries matching `atf` |
+
+`topic` matches an API name (e.g. `BusinessRule`, `Acl`), a guide name (e.g. `business-rule-guide`, `atf-guide`), or a tag keyword (e.g. `flow`, `atf`, `email`). The SDK resolves by exact name first, then by tag.
+
+> **v4.6.0 implementation note:** earlier versions of this tool created a hidden scaffold directory at `.explain-scaffold/` to satisfy SDK 4.5.0's project-context requirement. SDK 4.6.0 self-resolves documentation, so the scaffold layer has been removed; the legacy directory (if present from a prior install) is safe to delete.
 
 ## Resources
 
@@ -88,21 +102,43 @@ Standardized URI patterns following MCP specification:
 
 ### Supported Metadata Types
 
-**Core Types:** `acl`, `application-menu`, `business-rule`, `client-script`, `cross-scope-privilege`, `email-notification`, `form`, `import-set`, `list`, `property`, `role`, `scheduled-script`, `script-action`, `script-include`, `scripted-rest`, `service-portal`, `sla`, `table`, `ui-action`, `ui-page`, `ui-policy`, `user-preference`
+57 metadata types across the following categories:
+
+**Core Types:** `acl`, `application-menu`, `business-rule`, `client-script`, `cross-scope-privilege`, `form`, `import-set`, `instance-scan`, `list`, `property`, `role`, `scheduled-script`, `script-action`, `script-include`, `scripted-rest`, `sla`, `table`, `ui-action`, `ui-page`, `ui-policy`, `user-preference`
 
 **Table Types:** `column`, `column-generic`
 
 **Service Catalog:** `catalog-item`, `catalog-item-record-producer`, `catalog-ui-policy`, `catalog-client-script`, `catalog-variable`, `variable-set`
 
-**Automation & Workflow:** `flow`
+**Email:** `email-notification`, `inbound-email-action`
+
+**Automation & Workflow:** `flow`, `custom-action`
+
+**AI & Now Assist:** `ai-agent`, `ai-agent-workflow`, `now-assist-skill-config`
+
+**Service Portal:** `service-portal`, `sp-header-footer`, `sp-page-route-map`
 
 **Workspace & Analytics:** `workspace`, `dashboard`
 
-**ATF (Automated Test Framework):** `atf-appnav`, `atf-catalog-action`, `atf-catalog-validation`, `atf-catalog-variable`, `atf-email`, `atf-form`, `atf-form-action`, `atf-form-declarative-action`, `atf-form-field`, `atf-reporting`, `atf-rest-api`, `atf-rest-assert-payload`, `atf-server`, `atf-server-catalog-item`, `atf-server-record`
+**ATF (Automated Test Framework):** `atf-appnav`, `atf-catalog-action`, `atf-catalog-validation`, `atf-catalog-variable`, `atf-email`, `atf-form`, `atf-form-action`, `atf-form-declarative-action`, `atf-form-field`, `atf-form-sp`, `atf-reporting`, `atf-rest-api`, `atf-rest-assert-payload`, `atf-server`, `atf-server-catalog-item`, `atf-server-record`
+
+### What's new in 4.6.0
+
+This release of the MCP server tracks `@servicenow/sdk` 4.6.0 and adds support for the following Fluent APIs and SDK enhancements:
+
+- **New metadata types**: `custom-action` (`sys_hub_action_type_definition`), `inbound-email-action` (`sys_email_action`), `sp-header-footer` (`sp_header_footer`), `sp-page-route-map` (`sp_page_route_map`).
+- **Declarative Form API** — new form-configuration capability on the existing `Form` API.
+- **Subflow-of-subflow** — Flows and Subflows can call other Subflows as steps.
+- **Custom Actions in flows** — Reusable custom actions usable as steps inside Flows and Subflows; supports cross-scope references via SDK dependencies.
+- **AIAF auto-ACL** — ACLs are automatically generated for `AiAgent` and `AiAgenticWorkflow` records at build time.
+- **NASK enhancements** — Standard outputs (`response`, `provider`, `errorcode`, `status`, `error`) are auto-generated when `outputs` is omitted; expanded input types (`glide_record`, `simple_array`, `json_object`, `json_array`); optional `tableName` for `glide_record`; optional `truncate` flag for scalar types.
+- **Table dictionary overrides** — The `Table` API directly supports `sys_dictionary_override` records.
+- **ScheduledScript modules** — Script fields support modules.
+- **`explain` command** — Tag-based topic search, `--list` topic index, `--peek` summaries, `--format=raw` markdown output. Now resolves docs without a Fluent project.
 
 ## Configuration
 
-**Requirements:** Node.js 22.15.1+, npm 11.4.1+
+**Requirements:** Node.js 20.18.0+, npm 11.4.1+, `@servicenow/sdk` 4.6.0
 
 ### MCP Client Setup
 
@@ -143,8 +179,6 @@ Add to your MCP client configuration file:
 | `SN_AUTH_TYPE` | Authentication method: `basic` or `oauth` | `oauth` |
 | `SN_USER_NAME` | Username for basic auth (informational) | - |
 | `SN_PASSWORD` | Password for basic auth (informational) | - |
-| `FLUENT_MCP_ENABLE_ERROR_ANALYSIS` | Enable AI error analysis | `true` |
-| `FLUENT_MCP_MIN_ERROR_LENGTH` | Minimum error length for analysis | `50` |
 
 > **Note:** The server automatically detects existing auth profiles matching `SN_INSTANCE_URL` at startup. If a matching profile is found, it's stored in the session and auto-injected into SDK commands. If no profile exists, you'll be prompted to run the auth command manually.
 
@@ -219,7 +253,7 @@ npm run build && npm run inspect
 3. **Test Version:**
    - Set `flag` parameter to `-v`
    - Click **Execute**
-   - Verify response shows version number (e.g., "4.0.1")
+   - Verify response shows the SDK version (e.g., `4.6.0`)
 4. **Test Help:**
    - Set `flag` parameter to `-h`
    - Set `command` parameter to `build`

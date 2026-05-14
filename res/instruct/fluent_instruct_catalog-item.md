@@ -7,6 +7,6 @@ Always reference the CatalogItem API specification for more details.
 5. When using `variableSets`, always assign the `VariableSet` to a named export before referencing it in `CatalogItem`. This allows `CatalogUiPolicy` and `CatalogClientScript` to reference specific variable names via dot notation on the variable set's `variables` property.
 6. `mandatoryAttachment: true` and `hideAttachment: true` are mutually exclusive — setting both will cause a build error.
 7. `requestMethod` controls the label on the order button: `'order'` → "Order Now", `'request'` → "Request", `'submit'` → "Submit".
-8. Export `CatalogItem` as a named constant to enable referencing by `CatalogUIPolicy`, `CatalogClientScript`, and Flows.
+8. Export `CatalogItem` as a named constant to enable referencing by `CatalogUiPolicy`, `CatalogClientScript`, and Flows.
 9. Use `availableFor` and `notAvailableFor` with `user_criteria` sys_ids to control who can see and order the item.
 10. The `roles` property restricts who can view the item (based on user role), while `availableFor` controls ordering eligibility via user criteria.

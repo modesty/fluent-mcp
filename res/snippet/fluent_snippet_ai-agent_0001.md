@@ -10,6 +10,11 @@ AiAgent({
 	active: true,
 	agentType: 'internal',
 	channel: 'nap_and_va',
+	securityAcl: {
+		$id: Now.ID['agent_it_support_acl'],
+		type: 'Specific role',
+		roles: ['itil'],
+	},
 	tools: [
 		{
 			name: 'Reset Password',

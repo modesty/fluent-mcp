@@ -13,3 +13,6 @@ Always reference the Flow API specification for more details.
 11. Service Catalog trigger and catalog actions (`getCatalogVariables`, `createCatalogTask`, `submitCatalogItemRequest`) require SDK 4.4.0 or later.
 12. The `protection: 'read'` option makes the flow read-protected (cannot be directly edited on the instance). Omit or use `''` for no protection.
 13. **SDK v4.5.0**: Flows and subflows are now auto-published during `install` by default. Use the `--skip-flow-activation` flag on the install command to disable this behavior.
+14. **SDK v4.6.0**: Subflow invocation expanded — Subflows can now call other Subflows as steps (subflow-of-subflow). Use `wfa.subflow(<importedSubflow>, { $id }, { …inputs })` from inside a Subflow body just as you would from a Flow.
+15. **SDK v4.6.0**: Custom Actions (created via `Action()` in `@servicenow/sdk/automation`) are usable as Flow / Subflow steps via `wfa.action(<importedCustomAction>, { $id }, { …inputs })`. Inputs and outputs are typed from the Action definition.
+16. **SDK v4.6.0**: Cross-scope Subflow and Custom Action references are supported — declare the dependency in `now.config.json` under `dependencies.<scope>.{subflows|actions}` and run `now-sdk dependencies` to pull type definitions before referencing them.

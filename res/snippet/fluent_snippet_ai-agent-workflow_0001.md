@@ -8,6 +8,11 @@ AiAgenticWorkflow({
 	description: 'Automated workflow for triaging incoming incidents by analyzing symptoms, categorizing, and routing to appropriate teams',
 	active: true,
 	executionMode: 'copilot',
+	securityAcl: {
+		$id: Now.ID['workflow_incident_triage_acl'],
+		type: 'Specific role',
+		roles: ['itil'],
+	},
 	team: {
 		$id: Now.ID['team_incident_triage'],
 		name: 'Incident Triage Team',
@@ -34,6 +39,7 @@ AiAgenticWorkflow({
 			targetTable: 'incident',
 			triggerFlowDefinitionType: 'record_create',
 			triggerCondition: 'priority=1^ORpriority=2',
+			objectiveTemplate: 'Triage incident ${number}',
 		},
 	],
 	dataAccess: {

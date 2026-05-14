@@ -7,7 +7,6 @@ atf.rest.sendRestRequest({ // each of the following props are mandatory
   body: '', // string, ex. "{data_one: 'value1', data_field: 'value2', data_three: 'value3'}"
   mutualAuth: get_sys_id('sys_certificate',''), // sys_id | Record&lt;'sys_certificate'&gt;
   auth: '',// '' | 'basic' | 'mutual'
-  mutualAuth: get_sys_id('sys_certificate',''), // sys_id | Record&lt;'sys_certificate'&gt;
   basicAuthentication: get_sys_id('sys_auth_profile_basic', ''), // sys_id | Record&lt;'sys_auth_profile_basic'&gt;
   method: 'get', // 'get' | 'post' | 'put' | 'delete' | 'patch'
   queryParameters: {}, // object, snake_case name value pairs, ex.: { field_one: 'value1', field_two: 'value2' }

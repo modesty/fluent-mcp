@@ -42,6 +42,14 @@ Fluent (ServiceNow SDK) is a TypeScript-based domain-specific language that allo
 4. **Validate Early**: Test your code locally before deploying to instances
 5. **Use SDK Commands**: Utilize the ServiceNow SDK CLI for efficient workflows
 6. **ServiceNow Glide Script**: ServiceNow scripting are usually used in `script` properties in Fluent APIs, write them inline in ServiceNow Scripting in ES5 syntax, not TypeScript
+7. **SDK v4.6.0 capabilities** — when generating code, take advantage of these additions where applicable:
+    - **Declarative Form API** publicly exported from `@servicenow/sdk/core` — prefer `Form({ table, view, sections })` over manual `Record({ table: 'sys_ui_form', … })` chains.
+    - **Subflow-of-subflow** — Subflows can call other Subflows via `wfa.subflow(<importedSubflow>, …)`.
+    - **Custom Actions in flows** — define reusable actions with `Action()` from `@servicenow/sdk/automation`, invoke from flows via `wfa.action(<importedAction>, …)`. Cross-scope references work through `now.config.json` SDK dependencies.
+    - **AIAF auto-ACL** — `AiAgent` / `AiAgenticWorkflow` build automatically generates `sys_security_acl` and `sys_security_acl_role` records from the mandatory `securityAcl` property. Do not author manual `Acl()` records for agents.
+    - **NASK** — when `outputs` is omitted, the SDK auto-generates `response`, `provider`, `errorcode`, `status`, `error`. New `dataType` values: `glide_record` (requires `tableName`), `simple_array`, `json_object`, `json_array`.
+    - **Table dictionary overrides** — use `OverrideColumn({ baseTable, … })` inside a child table's `schema` instead of authoring `sys_dictionary_override` records by hand.
+    - **InboundEmailAction**, **SPHeaderFooter**, **SPPageRouteMap** — new dedicated APIs for these metadata types (see their per-type specs).
 
 ## Working with Specific Metadata Types
 

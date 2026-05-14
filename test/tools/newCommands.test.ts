@@ -218,36 +218,66 @@ describe('New SDK Commands', () => {
       const command = new ExplainCommand(mockProcessor as any);
 
       expect(command.name).toBe('explain_fluent_api');
-      expect(command.description).toContain('Display documentation for a Fluent API');
+      expect(command.description).toContain('Look up Fluent SDK documentation');
+      expect(command.description).toContain('no authentication or active Fluent project required');
       expect(command.annotations).toEqual({ readOnlyHint: true, idempotentHint: true });
-      expect(command.arguments).toHaveLength(3);
+      expect(command.arguments).toHaveLength(6);
 
-      // Check required api argument
-      const apiArg = command.arguments.find(arg => arg.name === 'api');
-      expect(apiArg).toBeDefined();
-      expect(apiArg?.required).toBe(true);
-      expect(apiArg?.type).toBe('string');
+      // topic is optional in v4.6.0 (required only when list=false)
+      const topicArg = command.arguments.find(arg => arg.name === 'topic');
+      expect(topicArg).toBeDefined();
+      expect(topicArg?.required).toBe(false);
+      expect(topicArg?.type).toBe('string');
 
-      // Check optional source argument
+      const listArg = command.arguments.find(arg => arg.name === 'list');
+      expect(listArg).toBeDefined();
+      expect(listArg?.required).toBe(false);
+      expect(listArg?.type).toBe('boolean');
+
+      const peekArg = command.arguments.find(arg => arg.name === 'peek');
+      expect(peekArg).toBeDefined();
+      expect(peekArg?.required).toBe(false);
+      expect(peekArg?.type).toBe('boolean');
+
+      const formatArg = command.arguments.find(arg => arg.name === 'format');
+      expect(formatArg).toBeDefined();
+      expect(formatArg?.required).toBe(false);
+      expect(formatArg?.type).toBe('string');
+
       const sourceArg = command.arguments.find(arg => arg.name === 'source');
       expect(sourceArg).toBeDefined();
       expect(sourceArg?.required).toBe(false);
       expect(sourceArg?.type).toBe('string');
 
-      // Check optional debug argument
       const debugArg = command.arguments.find(arg => arg.name === 'debug');
       expect(debugArg).toBeDefined();
       expect(debugArg?.required).toBe(false);
       expect(debugArg?.type).toBe('boolean');
     });
 
-    test('should execute explain command with explicit source', async () => {
+    test('should execute basic topic lookup without --source', async () => {
+      const command = new ExplainCommand(mockProcessor as any);
+
+      const result = await command.execute({ topic: 'BusinessRule' });
+
+      expect(result.success).toBe(true);
+      expect(mockProcessor.process).toHaveBeenCalledWith(
+        'npx',
+        ['now-sdk', 'explain', 'BusinessRule'],
+        false,
+        '/mock/working/dir',
+        undefined,
+        15000
+      );
+    });
+
+    test('should pass --source when explicitly provided', async () => {
       const command = new ExplainCommand(mockProcessor as any);
 
       const result = await command.execute({
-        api: 'Acl',
+        topic: 'Acl',
         source: './src',
-        debug: true
+        debug: true,
       });
 
       expect(result.success).toBe(true);
@@ -256,57 +286,81 @@ describe('New SDK Commands', () => {
         ['now-sdk', 'explain', 'Acl', '--source', './src', '--debug'],
         false,
         '/mock/working/dir',
-        undefined, // stdinInput
-        15000     // timeoutMs
+        undefined,
+        15000
       );
     });
 
-    test('should use working directory when it is a valid Fluent project', async () => {
+    test('should pass --list when list=true (no topic required)', async () => {
       const command = new ExplainCommand(mockProcessor as any);
-      // Mock the private method to report the working dir as a valid Fluent project
-      jest.spyOn(command as any, 'isFluentProject').mockResolvedValue(true);
 
-      const result = await command.execute({ api: 'BusinessRule' });
+      const result = await command.execute({ list: true });
 
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
-        ['now-sdk', 'explain', 'BusinessRule'],
+        ['now-sdk', 'explain', '--list'],
         false,
         '/mock/working/dir',
-        undefined, // stdinInput
-        15000     // timeoutMs
+        undefined,
+        15000
       );
     });
 
-    test('should fall back to scaffold when working directory is not a Fluent project', async () => {
+    test('should combine --list with a topic filter', async () => {
       const command = new ExplainCommand(mockProcessor as any);
-      jest.spyOn(command as any, 'isFluentProject').mockResolvedValue(false);
-      jest.spyOn(command as any, 'ensureScaffoldDir').mockResolvedValue('/mock/scaffold');
 
-      const result = await command.execute({ api: 'Table' });
+      const result = await command.execute({ list: true, topic: 'flow' });
 
       expect(result.success).toBe(true);
-      // Should inject --source pointing to the scaffold directory
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
-        ['now-sdk', 'explain', 'Table', '--source', '/mock/scaffold'],
+        ['now-sdk', 'explain', 'flow', '--list'],
         false,
         '/mock/working/dir',
-        undefined, // stdinInput
-        15000     // timeoutMs
+        undefined,
+        15000
       );
     });
 
-    test('should return error when scaffold creation fails', async () => {
+    test('should pass --peek and --format=raw', async () => {
       const command = new ExplainCommand(mockProcessor as any);
-      jest.spyOn(command as any, 'isFluentProject').mockResolvedValue(false);
-      jest.spyOn(command as any, 'ensureScaffoldDir').mockResolvedValue(undefined);
 
-      const result = await command.execute({ api: 'BusinessRule' });
+      const result = await command.execute({
+        topic: 'BusinessRule',
+        peek: true,
+        format: 'raw',
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockProcessor.process).toHaveBeenCalledWith(
+        'npx',
+        ['now-sdk', 'explain', 'BusinessRule', '--format', 'raw', '--peek'],
+        false,
+        '/mock/working/dir',
+        undefined,
+        15000
+      );
+    });
+
+    test('should return error when neither topic nor list is provided', async () => {
+      const command = new ExplainCommand(mockProcessor as any);
+
+      const result = await command.execute({});
 
       expect(result.success).toBe(false);
-      expect(result.output).toContain('scaffold');
+      expect(result.output).toContain('Provide a topic');
+      expect(mockProcessor.process).not.toHaveBeenCalled();
+    });
+
+    test('should reject invalid format value', async () => {
+      const command = new ExplainCommand(mockProcessor as any);
+
+      const result = await command.execute({ topic: 'BusinessRule', format: 'json' });
+
+      expect(result.success).toBe(false);
+      expect(result.output).toContain('Invalid format');
+      expect(mockProcessor.process).not.toHaveBeenCalled();
     });
   });
 

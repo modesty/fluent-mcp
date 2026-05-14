@@ -22,7 +22,7 @@ atf.server.createUser({ // all props are mandatory
 // Logs a message that can contain a variable or other information pertaining to the test. This message will be stored as a step result upon test completion.
 atf.server.log({
     $id: Now.ID[''], // string | guid, mandatory
-    log: ''; // string
+    log: '', // string
 }): void;
 
 // Perform a database query to verify if a record matching the conditions set in this step are met

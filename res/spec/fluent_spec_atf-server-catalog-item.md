@@ -4,7 +4,7 @@
 atf.server.searchForCatalogItem({ // all props are mandatory
     $id: Now.ID[''], // string | guid, mandatory
     searchInPortal: true, // boolean;
-    searchTerm: '', string;
+    searchTerm: '', // string
     catalog: get_sys_id('sc_catalog', ''), // sys_id | Record&lt;'sc_catalog'&gt;;
     category: get_sys_id('sc_category', ''), // sys_id | Record&lt;'sc_category'&gt;;
     assertItem: get_sys_id('sc_cat_item', ''), // sys_id | Record&lt;'sc_cat_item'&gt;;
