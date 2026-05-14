@@ -130,3 +130,12 @@ Fluent MCP is a Model Context Protocol (MCP) server that provides ServiceNow SDK
 3. What specific error handling strategies should be implemented for different failure scenarios?
 4. How should resource caching be handled for optimal performance?
 5. What logging strategy should be implemented for debugging purposes?
+
+## SDK Version Compatibility
+
+The MCP server tracks a specific minor version of `@servicenow/sdk` to ensure that exposed APIs, metadata types, and CLI behavior remain in sync with the SDK reality. Each SDK upgrade is captured as a phase-by-phase plan under `doc/upgrade-sdk-<version>-plan.md`.
+
+| MCP version | `@servicenow/sdk` | Upgrade plan |
+|-------------|-------------------|--------------|
+| 0.2.0       | 4.6.0             | `doc/upgrade-sdk-4.6.0-plan.md` |
+| 0.1.x       | 4.5.0             | n/a (initial release line) |

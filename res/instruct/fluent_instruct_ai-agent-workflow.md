@@ -10,3 +10,4 @@ Always reference the AI Agentic Workflow API specifications for more details.
 8. Use `contextProcessingScript` to transform or enrich context before the workflow executes. Supports inline functions or `Now.include()` for external files.
 9. Set `active: false` to disable a workflow without removing its definition.
 10. AI Agentic Workflows are part of the AI Agent Studio framework and enable multi-agent collaboration with trigger-driven automation.
+11. **Auto-generated ACL records (SDK v4.6.0)**: At build time, the SDK automatically creates the underlying `sys_security_acl` and `sys_security_acl_role` records for the workflow's access controls. Do **not** write manual `Acl()` definitions for the workflow — let the build handle it.
