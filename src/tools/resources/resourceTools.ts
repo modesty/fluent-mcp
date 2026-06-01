@@ -2,10 +2,25 @@
  * MCP tools for accessing ServiceNow metadata resources (API specs, snippets, instructions)
  * and checking authentication status
  */
+import { z } from 'zod';
 import { ResourceLoader } from '../../utils/resourceLoader.js';
 import { CLICommand, CommandArgument, CommandResult, CommandResultFactory, ResourceType } from '../../utils/types.js';
 import { SessionManager } from '../../utils/sessionManager.js';
 import logger from '../../utils/logger.js';
+
+/**
+ * Shared MCP output schema for the metadata resource read tools
+ * (get-api-spec, get-snippet, get-instruct). Extra keys are stripped by Zod,
+ * so a single shape covers fetch + listing modes.
+ */
+const RESOURCE_OUTPUT_SCHEMA = {
+  content: z.string().describe('The resource content (markdown).'),
+  resourceType: z.string().describe('Resource type: spec | snippet | instruct.'),
+  metadataType: z.string().optional().describe('The ServiceNow metadata type, when a specific resource was returned.'),
+  snippetId: z.string().optional().describe('The returned snippet id (snippets only).'),
+  additionalSnippetIds: z.array(z.string()).optional().describe('Other available snippet ids (snippets only).'),
+  availableTypes: z.array(z.string()).optional().describe('All available metadata types (listing mode).'),
+};
 
 /**
  * Base class for resource access commands
@@ -14,6 +29,7 @@ export abstract class BaseResourceCommand implements CLICommand {
   abstract name: string;
   abstract description: string;
   abstract resourceType: ResourceType;
+  outputSchema = RESOURCE_OUTPUT_SCHEMA;
 
   protected resourceLoader: ResourceLoader;
 
@@ -86,7 +102,11 @@ export abstract class BaseResourceCommand implements CLICommand {
       );
     }
 
-    return CommandResultFactory.success(result.content);
+    return CommandResultFactory.success(result.content, 0, {
+      content: result.content,
+      resourceType: this.resourceType,
+      metadataType,
+    });
   }
 
   /**
@@ -140,7 +160,11 @@ export class GetApiSpecCommand extends BaseResourceCommand {
         }
 
         const output = `Available Fluent metadata types (${metadataTypes.length}):\n${metadataTypes.join('\n')}\n\nUse get-api-spec with a specific metadataType to fetch its API specification.`;
-        return CommandResultFactory.success(output);
+        return CommandResultFactory.success(output, 0, {
+          content: output,
+          resourceType: this.resourceType,
+          availableTypes: metadataTypes,
+        });
       } catch (error) {
         logger.error('Error listing metadata types', CommandResultFactory.normalizeError(error));
         return CommandResultFactory.fromError(error);
@@ -211,7 +235,13 @@ export class GetSnippetCommand extends BaseResourceCommand {
       ? `\n\nAdditional snippets available: ${snippetIds.slice(1).join(', ')}`
       : '';
 
-    return CommandResultFactory.success(result.content + additionalInfo);
+    return CommandResultFactory.success(result.content + additionalInfo, 0, {
+      content: result.content,
+      resourceType: this.resourceType,
+      metadataType,
+      snippetId: snippetIds[0],
+      ...(snippetIds.length > 1 && { additionalSnippetIds: snippetIds.slice(1) }),
+    });
   }
 }
 
@@ -252,6 +282,16 @@ export class CheckAuthStatusCommand implements CLICommand {
   description = 'Check current ServiceNow authentication status. Returns the cached auto-auth validation result as JSON including status, profile alias, instance host, auth type, and any required user action. Call this before commands that require authentication (deploy_fluent_app, fluent_transform, download_fluent_dependencies, download_fluent_app) to verify credentials are configured.';
   annotations = { readOnlyHint: true, idempotentHint: true };
   arguments: CommandArgument[] = [];
+  outputSchema = {
+    status: z.string().describe("Auth status: 'authenticated' | 'not_authenticated' | 'validation_error' | 'skipped' | 'unknown'."),
+    message: z.string().describe('Human-readable status message.'),
+    alias: z.string().optional().describe('The matched auth profile alias.'),
+    host: z.string().optional().describe('The ServiceNow instance host.'),
+    authType: z.string().optional().describe("Auth type: 'oauth' | 'basic'."),
+    isDefault: z.boolean().optional().describe('Whether this is the default auth profile.'),
+    actionRequired: z.string().optional().describe('A shell command to run if manual auth setup is needed.'),
+    timestamp: z.string().optional().describe('ISO timestamp of the validation.'),
+  };
 
   /**
    * This command doesn't use a command processor
@@ -270,15 +310,20 @@ export class CheckAuthStatusCommand implements CLICommand {
       const authResult = sessionManager.getAuthValidationResult();
 
       if (!authResult) {
-        return CommandResultFactory.success(JSON.stringify({
+        const unknownStatus = {
           status: 'unknown',
           message: 'Auth validation has not been performed yet. This may happen if the server just started or SN_INSTANCE_URL is not configured.',
           timestamp: new Date().toISOString(),
-        }, null, 2));
+        };
+        return CommandResultFactory.success(JSON.stringify(unknownStatus, null, 2), 0, unknownStatus);
       }
 
-      // Return the auth result as formatted JSON
-      return CommandResultFactory.success(JSON.stringify(authResult, null, 2));
+      // Return the auth result as formatted JSON plus structured content
+      return CommandResultFactory.success(
+        JSON.stringify(authResult, null, 2),
+        0,
+        { ...authResult }
+      );
     } catch (error) {
       logger.error('Error checking auth status', CommandResultFactory.normalizeError(error));
       return CommandResultFactory.fromError(error);

@@ -64,7 +64,7 @@ export class InitCommand extends BaseCLICommand {
       name: 'template',
       type: 'string',
       required: false,
-      description: 'For creation only (required): Template to use for the project. Choices: "base", "javascript.react", "typescript.basic", "typescript.react", "javascript.basic". Not needed for conversion.',
+      description: 'For creation only (required): Template to use for the project. Choices: "base", "javascript.basic", "javascript.react", "typescript.basic", "typescript.react", "typescript.vue". Not needed for conversion.',
     },
     {
       name: 'auth',

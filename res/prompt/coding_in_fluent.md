@@ -50,6 +50,15 @@ Fluent (ServiceNow SDK) is a TypeScript-based domain-specific language that allo
     - **NASK** — when `outputs` is omitted, the SDK auto-generates `response`, `provider`, `errorcode`, `status`, `error`. New `dataType` values: `glide_record` (requires `tableName`), `simple_array`, `json_object`, `json_array`.
     - **Table dictionary overrides** — use `OverrideColumn({ baseTable, … })` inside a child table's `schema` instead of authoring `sys_dictionary_override` records by hand.
     - **InboundEmailAction**, **SPHeaderFooter**, **SPPageRouteMap** — new dedicated APIs for these metadata types (see their per-type specs).
+8. **SDK v4.7.0 capabilities** — when generating code, take advantage of these additions where applicable:
+    - **DataPolicy** — new API from `@servicenow/sdk/core` for `sys_data_policy2`. Enforces mandatory / read-only field rules **server-side** (cannot be bypassed via API, import, or web service). Prefer it over UI Policy for security/data-integrity rules. See the `data-policy` spec.
+    - **Flow error handling & parallelism** — `wfa.flowLogic.tryCatch({ $id }, { try, catch })`, `wfa.flowLogic.doInParallel({ $id }, ...blocks)`, and `wfa.flowLogic.appendToFlowVariables({ $id }, params.flowVariables, { arrayVar: … })`. Datapills captured inside a tryCatch/doInParallel block are not visible outside — persist via `setFlowVariables`.
+    - **Flow stages** — declare `stages` in the `Flow` config with `FlowStage({ label, value, … })` and activate them in the body with `wfa.stage(params.stages.<key>)` for progress tracking.
+    - **Table augments** — add columns to an existing platform/cross-scope table with `Table({ augments: '<table>', schema })`; only `augments` + `schema` are allowed and added columns must be prefixed `u_`.
+    - **AI Agent** — new optional `agentDescriptor` (`'require_caller_id'` | `'created_by_ai_agent_advisor'` | `'created_by_build_agent'`); `dataAccess` now takes `roleMap` (role names, preferred) or `roleList` (role sys_ids).
+    - **NASK** — `securityControls` now takes `roleMap` (role names, preferred) in addition to `roleRestrictions` (role sys_ids); supply at least one.
+    - **`$override` (universal field override)** — escape hatch on Fluent constructors to set columns the typed API does not model: `$override: { db_column_name: value }` where values are `string | boolean | number` and keys are **database column names** (snake_case). No type-checking; prefer the typed property whenever the field is modeled. Use for customer-added `x_`/`u_` columns or fields owned by another app.
+    - **`protectionPolicy`** — added to APIs backed by `sys_policy` (e.g. `Action`, `Subflow`, business logic APIs). Set `protectionPolicy: 'read'` to read-protect the artifact's body; `''` (default) means no protection.
 
 ## Working with Specific Metadata Types
 

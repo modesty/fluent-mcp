@@ -76,6 +76,7 @@ export enum ServiceNowMetadataType {
   CROSS_SCOPE_PRIVILEGE = 'cross-scope-privilege',
   CUSTOM_ACTION = 'custom-action',
   DASHBOARD = 'dashboard',
+  DATA_POLICY = 'data-policy',
   EMAIL_NOTIFICATION = 'email-notification',
   FLOW = 'flow',
   FORM = 'form',

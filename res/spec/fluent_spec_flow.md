@@ -3,7 +3,7 @@
 ```typescript
 // Creates a Flow (`sys_hub_flow`)
 // Import from @servicenow/sdk/automation, NOT @servicenow/sdk/core
-import { Flow, wfa, trigger, action } from '@servicenow/sdk/automation'
+import { Flow, FlowStage, wfa, trigger, action } from '@servicenow/sdk/automation'
 
 Flow(
     // 1. Flow definition config
@@ -16,6 +16,9 @@ Flow(
         flowPriority: 'LOW',    // 'LOW' | 'MEDIUM' | 'HIGH', optional — execution priority
         protection: 'read',     // 'read' | '', optional — 'read' makes flow read-protected
         flowVariables: {},      // Record<string, FlowValueType>, optional — typed flow-level variables accessible throughout the flow body
+        stages: {               // Record<string, FlowStage>, optional (SDK v4.7.0+) — named stages for progress tracking (`sys_hub_flow_stage`)
+            // <key>: FlowStage({ label, value, duration?, alwaysShow?, states? }) — value must match the property key; activate in body via wfa.stage(params.stages.<key>)
+        },
     },
     // 2. Trigger instance — created via wfa.trigger()
     wfa.trigger(
@@ -144,6 +147,34 @@ wfa.flowLogic.waitForADuration({
 wfa.flowLogic.exitLoop({ $id: Now.ID['exit_id'] })
 wfa.flowLogic.endFlow({ $id: Now.ID['end_id'] })
 wfa.flowLogic.skipIteration({ $id: Now.ID['skip_id'] })
+
+// ─── ERROR HANDLING & PARALLELISM — SDK v4.7.0+ ───
+// tryCatch: run a try block, run the catch block only if the try block errors. Blocks can be nested.
+wfa.flowLogic.tryCatch(
+    { $id: Now.ID['tc_id'], annotation: '' }, // { $id: string, annotation?: string }
+    {
+        try: () => { /* actions to attempt */ },
+        catch: () => { /* actions when the try block fails */ },
+    }
+)
+// doInParallel: run two or more blocks in parallel. Cannot be nested inside another doInParallel.
+// Datapills captured inside a block are not visible outside — persist via setFlowVariables to read them later.
+wfa.flowLogic.doInParallel(
+    { $id: Now.ID['parallel_id'], annotation: '' }, // { $id: string, annotation?: string }
+    () => { /* block 1 */ },
+    () => { /* block 2 */ } // ...one or more () => void blocks
+)
+// appendToFlowVariables: append element(s) to an Array.Object flow variable
+// (declared via FlowArray({ elementType: FlowObject(...) })). Pass params.flowVariables as the schema.
+wfa.flowLogic.appendToFlowVariables(
+    { $id: Now.ID['append_id'], annotation: '' },
+    params.flowVariables,                 // the flow variables schema
+    { collectedItems: { name: '', id: 0 } } // single element, array of elements, data pill, or template string
+)
+
+// ─── STAGE ACTIVATION (wfa.stage) — SDK v4.7.0+ ───
+// Marks the start of a declared stage; all subsequent actions belong to it until the next wfa.stage() call.
+wfa.stage(params.stages.triage) // params.stages.<key> must match a stage declared in the config `stages` object
 // Signature: setFlowVariables(_definition, _variables, _values)
 //   _definition — { $id: Now.ID['…'] }
 //   _variables  — the FlowSchemaType returned by FlowVariables() in the parent flow config

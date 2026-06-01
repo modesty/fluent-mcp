@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * validate-instructs.mjs — cross-check every res/instruct/*.md against the
- * SDK 4.6.0 documentation surface returned by `now-sdk explain`.
+ * SDK 4.7.1 documentation surface returned by `now-sdk explain`.
  *
  * Why: instruct files are prose with backtick-quoted API names, property names,
  * enum literals, and import paths. They drift silently when the SDK renames or
@@ -350,7 +350,7 @@ async function main() {
     const lines = [];
     lines.push('# Instruct Validation Report');
     lines.push('');
-    lines.push(`Validated against \`now-sdk explain\` corpus from **${topics.length}** SDK 4.6.0 topics.`);
+    lines.push(`Validated against \`now-sdk explain\` corpus from **${topics.length}** SDK 4.7.1 topics.`);
     lines.push('');
     lines.push(`- **${fileResults.length}** instruct files scanned`);
     lines.push(`- **${okFiles.length}** clean (all backtick tokens resolved)`);

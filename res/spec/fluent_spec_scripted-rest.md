@@ -9,7 +9,8 @@ const specRestApi = RestApi({
 	consumes: '', // string, comma delimited MIME types, ex. 'application/json,application/xml,text/xml'
 	docLink: '', // string
 	enforceAcl: [], // array of strings that represent sys_ids of ACLs to enforce | array of ACL objects (see ACL object spec) to enforce
-	policy: '', // '' | 'read' | 'protected'
+	protectionPolicy: '', // '' | 'read' | 'protected', optional (SDK v4.7.0+) — 'read'/'protected' read-protects the API body
+	policy: '', // '' | 'read' | 'protected' — DEPRECATED, use `protectionPolicy` instead
 	produces: '', // string, comma delimited MIME types, ex. 'application/json,application/xml,text/xml'
 	routes: [], // array of Routes, see the Route spec
 	shortDescription: '', // string

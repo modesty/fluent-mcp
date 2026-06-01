@@ -55,6 +55,7 @@ export const VALID_TEMPLATES = [
   'typescript.basic',
   'typescript.react',
   'javascript.basic',
+  'typescript.vue',
 ] as const;
 
 export type ValidTemplate = (typeof VALID_TEMPLATES)[number];

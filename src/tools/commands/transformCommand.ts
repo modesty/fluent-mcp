@@ -7,7 +7,7 @@ import { SessionAwareCLICommand } from './sessionAwareCommand.js';
  */
 export class TransformCommand extends SessionAwareCLICommand {
   name = 'fluent_transform';
-  description = 'Download and convert XML metadata records from a ServiceNow instance or local path into Fluent source code. Requires instance authentication when downloading from instance (auto-injected from session, or pass auth explicitly). Use preview to inspect output without saving. Use from for local XML files, or omit to pull from instance.';
+  description = 'Download and convert XML metadata records from a ServiceNow instance or local path into Fluent source code. Requires instance authentication when downloading from instance (auto-injected from session, or pass auth explicitly). Use from for local XML files, or omit to pull from instance. Use table (SDK v4.7.0+) to transform by table hierarchy, optionally with id to target a specific record and its relationships.';
   annotations = { openWorldHint: true };
   timeoutMs = 60_000;
   arguments: CommandArgument[] = [
@@ -30,10 +30,16 @@ export class TransformCommand extends SessionAwareCLICommand {
       description: 'Credential alias to use for authentication with instance (auto-injected from session if not provided)',
     },
     {
-      name: 'preview',
-      type: 'boolean',
+      name: 'table',
+      type: 'string',
       required: false,
-      description: 'Preview fluent output and any transform errors without saving, default false',
+      description: 'Comma-separated table names to transform by table hierarchy (SDK v4.7.0+). Combine with id to transform a specific record and its relationships.',
+    },
+    {
+      name: 'id',
+      type: 'string',
+      required: false,
+      description: 'sys_id of a specific record to transform (used with table, SDK v4.7.0+).',
     },
     {
       name: 'debug',
@@ -48,7 +54,8 @@ export class TransformCommand extends SessionAwareCLICommand {
       from: '--from',
       directory: '--directory',
       auth: '--auth',
-      preview: '--preview',
+      table: '--table',
+      id: '--id',
     });
   }
 }

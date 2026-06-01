@@ -1,0 +1,11 @@
+# Instructions for Fluent DataPolicy API
+Always reference the DataPolicy API specifications for more details.
+1. Import `DataPolicy` from `@servicenow/sdk/core`. The `$id` field is mandatory and must be unique, typically using `Now.ID['value']`. The `table` field is mandatory and must be a known table name (`keyof Tables`).
+2. Use Data Policy for **server-side** enforcement that cannot be bypassed via API, import sets, SOAP/REST, or direct database access. Prefer it over UI Policy whenever the rule is a security or data-integrity requirement rather than just a UX hint. UI Policy only governs the client form.
+3. Define field rules in the `rules` object, keyed by field name. Each rule needs its own unique `$id`. Set `mandatory` and/or `readOnly` to `true`/`false` to enforce, or leave as `'ignore'` (the default) to keep the current state unchanged. A field may have only one rule.
+4. Use dot-walk notation in rule keys to enforce rules on fields in referenced tables — e.g. `'caller_id.email'` makes the caller's email mandatory. This enforces validation across table relationships.
+5. Use `conditions` (an encoded query, e.g. `'state=6^ORstate=7'`) to apply the policy only when the record matches. `reverseIfFalse` defaults to `true`, so fields revert to their normal state when the condition no longer holds (e.g. resolution fields become editable again if a record re-opens).
+6. `applyToImportSets` and `applyToSOAP` default to `true` — import-set transforms and web-service operations are covered without extra configuration. Set them to `false` only to deliberately exclude those channels.
+7. Set `inherit: true` to apply the policy to a parent table (e.g. `task`) so all child tables (`incident`, `problem`, `change`) inherit it automatically without redefining the policy on each.
+8. Set `useAsUiPolicyOnClient: true` to additionally mirror the rules as a client-side UI Policy for immediate user feedback. For layered validation, pair a `DataPolicy` (server-side enforcement) with a separate `UiPolicy` (client-side visibility/messages).
+9. Use `$override` only as a last resort to set columns the API does not model (custom `x_`/`u_` fields); keys are database column names and values are not type-checked.
