@@ -15,14 +15,14 @@ import { AuthValidationResult } from '../types.js';
  *
  * Rules:
  * 1. If SN_INSTANCE_URL is not set -> return skipped status
- * 2. List existing auth profiles via `npx now-sdk auth --list`
+ * 2. List existing auth profiles via the bundled SDK CLI (`auth --list`)
  *    - If a profile's host matches SN_INSTANCE_URL -> use that profile
  *    - Store the auth alias in session for use by all SDK commands
- * 3. If no matching profile found -> attempt to add auth profile automatically
- *    - For basic auth: uses SN_USER_NAME/SN_USERNAME and SN_PASSWORD env vars
- *    - For OAuth: opens browser for authentication
- *    - If successful, store the auth alias in session
- *    - If failed, return not_authenticated with setup instructions
+ * 3. If no matching profile found -> add a profile only when it can complete
+ *    non-interactively (basic auth with SN_USER_NAME/SN_USERNAME + SN_PASSWORD).
+ *    OAuth and credential-less basic are not auto-added at startup; instead a
+ *    single not_authenticated NOTICE is emitted with the manual command.
+ *    - If add succeeds, store the auth alias in session
  *
  * @returns AuthValidationResult with structured auth status for client notification
  */
@@ -156,6 +156,24 @@ async function attemptAddAuthProfile(
   const alias = deriveAliasFromInstance(instUrl);
   const authCommand = buildAuthCommand(instUrl, authType, alias);
 
+  // Only auto-add when it can complete non-interactively. Adding otherwise
+  // guarantees a failed/blocked spawn at startup (basic prompts for creds;
+  // oauth opens a browser), whose noise we want to avoid.
+  if (!canAutoAdd(authType)) {
+    const setupHint = getAuthSetupHint(authType);
+    logger.notice(`No matching auth profile for ${host}; manual authentication required`, {
+      authType,
+    });
+    return createResult({
+      status: 'not_authenticated',
+      host,
+      authType,
+      message: `No matching auth profile found. ${setupHint}`,
+      actionRequired: authCommand,
+      timestamp,
+    });
+  }
+
   logger.debug('No matching auth profile found, attempting to add automatically', {
     instUrl,
     authType,
@@ -188,13 +206,12 @@ async function attemptAddAuthProfile(
       });
     }
 
-    // Auth add failed - return instructions for manual setup
+    // Auth add failed - return instructions for manual setup.
+    // Keep the WARNING concise; full CLI output stays at DEBUG via the runner.
     const setupHint = getAuthSetupHint(authType);
 
-    logger.warn('Auto-auth failed to add profile', {
+    logger.warn('Auto-auth could not add profile', {
       exitCode: addRes.exitCode,
-      output: addRes.output,
-      error: addRes.error?.message,
     });
 
     return createResult({
@@ -221,6 +238,19 @@ async function attemptAddAuthProfile(
       timestamp,
     });
   }
+}
+
+/**
+ * Whether a profile can be added non-interactively at startup.
+ * - basic: requires SN_USER_NAME/SN_USERNAME + SN_PASSWORD (piped to the CLI).
+ * - oauth: never — it requires a browser/interactive flow not suitable for
+ *   an unattended server start.
+ */
+function canAutoAdd(authType: string): boolean {
+  if (authType !== 'basic') return false;
+  const username = process.env.SN_USER_NAME?.trim() || process.env.SN_USERNAME?.trim();
+  const password = process.env.SN_PASSWORD;
+  return !!username && !!password;
 }
 
 /**

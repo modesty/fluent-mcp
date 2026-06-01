@@ -63,7 +63,7 @@ describe("AuthCommand", () => {
     expect(mockCmdWriter.process).toHaveBeenCalledWith(
       "npx",
       expect.arrayContaining([
-        "now-sdk",
+        "@servicenow/sdk",
         "auth",
         "--add",
         "foo",
@@ -98,7 +98,7 @@ describe("AuthCommand", () => {
     await authCommand.execute(args);
     expect(mockCmdWriter.process).toHaveBeenCalledWith(
       "npx",
-      expect.arrayContaining(["now-sdk", "auth", "--list", "--help", "--version"]),
+      expect.arrayContaining(["@servicenow/sdk", "auth", "--list", "--help", "--version"]),
       false,
       "/mock/working/dir",
       undefined, // stdinInput (not needed for list/help/version)

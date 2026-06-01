@@ -67,7 +67,7 @@ describe('New SDK Commands', () => {
       expect(result.output).toContain('Mock command output');
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
-        ['now-sdk', 'download', 'my-app'],
+        ['-y', '@servicenow/sdk', 'download', 'my-app'],
         false,
         '/mock/working/dir',
         undefined, // stdinInput
@@ -88,7 +88,7 @@ describe('New SDK Commands', () => {
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
-        ['now-sdk', 'download', 'my-app', '--source', './src', '--incremental', '--debug'],
+        ['-y', '@servicenow/sdk', 'download', 'my-app', '--source', './src', '--incremental', '--debug'],
         false,
         '/mock/working/dir',
         undefined, // stdinInput
@@ -127,7 +127,7 @@ describe('New SDK Commands', () => {
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
-        ['now-sdk', 'clean'],
+        ['-y', '@servicenow/sdk', 'clean'],
         false,
         '/mock/working/dir',
         undefined, // stdinInput
@@ -146,7 +146,7 @@ describe('New SDK Commands', () => {
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
-        ['now-sdk', 'clean', '--source', 'src', '--debug'],
+        ['-y', '@servicenow/sdk', 'clean', '--source', 'src', '--debug'],
         false,
         '/mock/working/dir',
         undefined, // stdinInput
@@ -185,7 +185,7 @@ describe('New SDK Commands', () => {
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
-        ['now-sdk', 'pack'],
+        ['-y', '@servicenow/sdk', 'pack'],
         false,
         '/mock/working/dir',
         undefined, // stdinInput
@@ -204,7 +204,7 @@ describe('New SDK Commands', () => {
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
-        ['now-sdk', 'pack', '--source', './build', '--debug'],
+        ['-y', '@servicenow/sdk', 'pack', '--source', './build', '--debug'],
         false,
         '/mock/working/dir',
         undefined, // stdinInput
@@ -263,7 +263,7 @@ describe('New SDK Commands', () => {
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
-        ['now-sdk', 'explain', 'BusinessRule'],
+        ['-y', '@servicenow/sdk', 'explain', 'BusinessRule'],
         false,
         '/mock/working/dir',
         undefined,
@@ -283,7 +283,7 @@ describe('New SDK Commands', () => {
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
-        ['now-sdk', 'explain', 'Acl', '--source', './src', '--debug'],
+        ['-y', '@servicenow/sdk', 'explain', 'Acl', '--source', './src', '--debug'],
         false,
         '/mock/working/dir',
         undefined,
@@ -299,7 +299,7 @@ describe('New SDK Commands', () => {
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
-        ['now-sdk', 'explain', '--list'],
+        ['-y', '@servicenow/sdk', 'explain', '--list'],
         false,
         '/mock/working/dir',
         undefined,
@@ -315,7 +315,7 @@ describe('New SDK Commands', () => {
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
-        ['now-sdk', 'explain', 'flow', '--list'],
+        ['-y', '@servicenow/sdk', 'explain', 'flow', '--list'],
         false,
         '/mock/working/dir',
         undefined,
@@ -335,7 +335,7 @@ describe('New SDK Commands', () => {
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
-        ['now-sdk', 'explain', 'BusinessRule', '--format', 'raw', '--peek'],
+        ['-y', '@servicenow/sdk', 'explain', 'BusinessRule', '--format', 'raw', '--peek'],
         false,
         '/mock/working/dir',
         undefined,

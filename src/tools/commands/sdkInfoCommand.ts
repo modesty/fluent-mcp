@@ -1,6 +1,7 @@
 import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { BaseCLICommand } from './baseCommand.js';
 import { getProjectRootPath } from '../../config.js';
+import { resolveSdkCli } from '../../utils/sdkCli.js';
 
 /**
  * ServiceNow SDK information command that accepts SDK flags
@@ -32,13 +33,13 @@ export class SdkInfoCommand extends BaseCLICommand {
    * Get command and working directory for ServiceNow SDK execution
    */
   private getSdkCommand(): { command: string; baseArgs: string[]; workingDirectory: string } {
-    // Use the project root path where @servicenow/sdk is installed
-    const projectRoot = getProjectRootPath();
+    // Resolve the bundled SDK CLI so version/help work regardless of cwd.
+    const { command, baseArgs } = resolveSdkCli();
 
     return {
-      command: 'npx',
-      baseArgs: ['now-sdk'],
-      workingDirectory: projectRoot
+      command,
+      baseArgs,
+      workingDirectory: getProjectRootPath(),
     };
   }
 

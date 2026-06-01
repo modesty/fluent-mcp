@@ -58,7 +58,7 @@ describe('InstallCommand', () => {
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
-        ['now-sdk', 'install'],
+        ['-y', '@servicenow/sdk', 'install'],
         false,
         '/mock/working/dir',
         undefined, // stdinInput
@@ -73,7 +73,7 @@ describe('InstallCommand', () => {
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
-        ['now-sdk', 'install', '--skip-flow-activation'],
+        ['-y', '@servicenow/sdk', 'install', '--skip-flow-activation'],
         false,
         '/mock/working/dir',
         undefined, // stdinInput
@@ -101,7 +101,7 @@ describe('InstallCommand', () => {
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
         'npx',
-        ['now-sdk', 'install', '--auth', 'my-alias', '--skip-flow-activation', '--debug'],
+        ['-y', '@servicenow/sdk', 'install', '--auth', 'my-alias', '--skip-flow-activation', '--debug'],
         false,
         '/mock/working/dir',
         undefined, // stdinInput

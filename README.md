@@ -182,8 +182,13 @@ Add to your MCP client configuration file:
 | `SN_AUTH_TYPE` | Authentication method: `basic` or `oauth` | `oauth` |
 | `SN_USER_NAME` | Username for basic auth (informational) | - |
 | `SN_PASSWORD` | Password for basic auth (informational) | - |
+| `FLUENT_MCP_LOG_TO_STDERR` | Also mirror logs to stderr (`1`/`true`/`yes`) for headless debugging | off |
 
-> **Note:** The server automatically detects existing auth profiles matching `SN_INSTANCE_URL` at startup. If a matching profile is found, it's stored in the session and auto-injected into SDK commands. If no profile exists, you'll be prompted to run the auth command manually.
+> **Note:** The server automatically detects existing auth profiles matching `SN_INSTANCE_URL` at startup. If a matching profile is found, it's stored in the session and auto-injected into SDK commands. A new profile is added automatically only when it can complete non-interactively (basic auth with `SN_USER_NAME`/`SN_USERNAME` + `SN_PASSWORD`); otherwise the server emits a single notice with the manual `auth --add` command to run.
+
+#### Logging
+
+Once connected, the server sends all logs to the MCP client as `notifications/message` (the standard MCP logging channel), so they render with the correct severity in your client's UI. Only pre-connection bootstrap lines are written to stderr. Set `FLUENT_MCP_LOG_TO_STDERR=1` to additionally mirror every log line to stderr when running headless or debugging outside an MCP client. Use the client's `logging/setLevel` request to adjust verbosity at runtime (default `info`; set `debug` to see raw SDK CLI output).
 
 #### CI/CD (non-interactive) authentication — SDK v4.7.0+
 
