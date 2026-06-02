@@ -150,16 +150,23 @@ export class ToolsManager {
       inputSchema = schema;
     }
 
-    // Register with MCP server
+    // Register with MCP server.
+    // Wrap the output shape in z.object() so the schema survives bundling — the
+    // SDK's raw-shape detection (isZodRawShapeCompat) can misfire on a minified
+    // bundle, dropping the advertised outputSchema; a concrete ZodObject is robust.
     this.mcpServer.registerTool(
       command.name,
       {
         title: command.name,
         description: command.description,
         inputSchema: inputSchema,
+        ...(command.outputSchema && { outputSchema: z.object(command.outputSchema) }),
         ...(command.annotations && { annotations: command.annotations }),
       },
       async (args: { [x: string]: any }, _extra: unknown) => {
+        // Emit progress notifications for long-running commands when the client
+        // supplied a progressToken. Best-effort: never let progress break the tool.
+        const endProgress = this.startProgress(command, _extra);
         try {
           const result = await command.execute(args);
 
@@ -173,6 +180,9 @@ export class ToolsManager {
 
           return {
             content: [{ type: 'text' as const, text: formattedOutput }],
+            // structuredContent is only valid on success (the SDK skips validation on errors);
+            // omit it on failure so tools with an outputSchema don't fail output validation.
+            ...(result.success && result.structuredContent && { structuredContent: result.structuredContent }),
             isError: !result.success
           };
         } catch (error) {
@@ -183,9 +193,51 @@ export class ToolsManager {
             content: [{ type: 'text' as const, text: `Error: ${normalizedError.message}` }],
             isError: true
           };
+        } finally {
+          endProgress();
         }
       }
     );
+  }
+
+  /** Commands at or above this timeout are treated as long-running for progress reporting. */
+  private static readonly LONG_RUNNING_THRESHOLD_MS = 30_000;
+  /** Interval between progress heartbeats for long-running commands. */
+  private static readonly PROGRESS_HEARTBEAT_MS = 3_000;
+
+  /**
+   * Start best-effort progress notifications for a long-running command.
+   * Emits an initial progress, then periodic heartbeats with an indeterminate
+   * total, until the returned cleanup function is called (which sends a final
+   * progress). No-ops unless the client supplied a `progressToken` and the
+   * command is long-running. Never throws.
+   * @returns A cleanup function to call when the command completes.
+   */
+  private startProgress(command: CLICommand, extra: unknown): () => void {
+    const progressToken = (extra as { _meta?: { progressToken?: string | number } })?._meta?.progressToken;
+    const sendNotification = (extra as { sendNotification?: (n: unknown) => Promise<unknown> })?.sendNotification;
+    const isLongRunning = (command.timeoutMs ?? 0) >= ToolsManager.LONG_RUNNING_THRESHOLD_MS;
+
+    if (progressToken === undefined || typeof sendNotification !== 'function' || !isLongRunning) {
+      return () => { /* no-op */ };
+    }
+
+    let progress = 0;
+    const emit = (message: string) => {
+      // Indeterminate progress: increment a counter, omit total so clients render a spinner.
+      sendNotification({
+        method: 'notifications/progress',
+        params: { progressToken, progress: ++progress, message },
+      }).catch((err) => logger.debug(`Progress notification failed for '${command.name}': ${err}`));
+    };
+
+    emit(`Running ${command.name}…`);
+    const interval = setInterval(() => emit(`Still running ${command.name}…`), ToolsManager.PROGRESS_HEARTBEAT_MS);
+
+    return () => {
+      clearInterval(interval);
+      emit(`Finished ${command.name}`);
+    };
   }
 
   /**

@@ -15,6 +15,7 @@ Action(
     description: '',          // string, optional — human-readable description
     category: '',             // string, optional — category for grouping in flow designer
     access: 'public',         // 'public' | 'private', optional — controls cross-scope visibility
+    protectionPolicy: '',     // 'read' | '', optional (SDK v4.7.0+) — if 'read', the action body is read-protected in the runtime (default: '')
     inputs: {                 // Record<string, Column>, optional — typed input parameter definitions
       // e.g. incidentRef: ReferenceColumn({ label: 'Incident', referenceTable: 'incident', mandatory: true }),
       // e.g. reason: StringColumn({ label: 'Reason', mandatory: true }),

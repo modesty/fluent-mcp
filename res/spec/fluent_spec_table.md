@@ -36,6 +36,20 @@ Table({
     scriptableTable: false, // boolean
 }): Table; // returns a Table object
 
+// ─── TABLE AUGMENTS (SDK v4.7.0+) ───
+// Add columns to an EXISTING platform or cross-scope table (owned by another scope) without creating a new table.
+// Set `augments` to the target table name; when set, ONLY `schema` is allowed — all other table-level properties
+// (name, extends, label, display, audit, etc.) are rejected by the TypeScript compiler. The build produces
+// `sys_dictionary` records for each column but does NOT create a `sys_db_object` (the table already exists).
+// Added columns MUST be prefixed with `u_` (the compiler enforces this when augmenting). The exported variable name should match the augmented table name.
+export const incident = Table({
+    augments: 'incident',          // string, mandatory in augment mode — the full name of the existing table to extend
+    schema: {                       // only `schema` is configurable alongside `augments`
+        u_escalation_reason: StringColumn({ label: 'Escalation Reason', maxLength: 500 }),
+        u_reviewed: BooleanColumn({ label: 'Reviewed' }),
+    },
+})
+
 // ─── DICTIONARY OVERRIDES (SDK v4.6.0+) ───
 // To override a column inherited from a parent table, use OverrideColumn() inside the schema of a child table.
 // This creates the underlying `sys_dictionary_override` record automatically — no separate API call needed.

@@ -1,0 +1,38 @@
+/**
+ * Tests for resolveSdkCli. Uses the real implementation (the global mock in
+ * setup.js is bypassed via jest.requireActual) so we verify it locates the
+ * bundled @servicenow/sdk CLI in this repo.
+ */
+import fs from 'node:fs';
+
+const { resolveSdkCli, resetSdkCliCache } = jest.requireActual(
+  '../../src/utils/sdkCli.js'
+) as typeof import('../../src/utils/sdkCli.js');
+
+describe('resolveSdkCli', () => {
+  beforeEach(() => resetSdkCliCache());
+  afterEach(() => resetSdkCliCache());
+
+  it('resolves the bundled SDK CLI as a `node <bin>` invocation', () => {
+    const { command, baseArgs } = resolveSdkCli();
+
+    expect(command).toBe('node');
+    expect(baseArgs).toHaveLength(1);
+    const binPath = baseArgs[0];
+    expect(binPath.endsWith('bin/index.js')).toBe(true);
+    expect(binPath).toContain('@servicenow/sdk');
+    expect(fs.existsSync(binPath)).toBe(true);
+  });
+
+  it('never returns the bare `now-sdk` token', () => {
+    const { command, baseArgs } = resolveSdkCli();
+    expect(command).not.toBe('now-sdk');
+    expect(baseArgs).not.toContain('now-sdk');
+  });
+
+  it('memoizes the resolution', () => {
+    const first = resolveSdkCli();
+    const second = resolveSdkCli();
+    expect(second).toBe(first);
+  });
+});

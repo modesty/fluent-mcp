@@ -7,6 +7,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { BaseCLICommand } from './baseCommand.js';
 import { FluentAppValidator } from '../../utils/fluentAppValidator.js';
 import { SessionManager } from '../../utils/sessionManager.js';
+import { resolveSdkCli } from '../../utils/sdkCli.js';
 import logger from '../../utils/logger.js';
 import {
   InitElicitator,
@@ -64,7 +65,7 @@ export class InitCommand extends BaseCLICommand {
       name: 'template',
       type: 'string',
       required: false,
-      description: 'For creation only (required): Template to use for the project. Choices: "base", "javascript.react", "typescript.basic", "typescript.react", "javascript.basic". Not needed for conversion.',
+      description: 'For creation only (required): Template to use for the project. Choices: "base", "javascript.basic", "javascript.react", "typescript.basic", "typescript.react", "typescript.vue". Not needed for conversion.',
     },
     {
       name: 'auth',
@@ -184,8 +185,8 @@ export class InitCommand extends BaseCLICommand {
   /**
    * Build SDK arguments for conversion
    */
-  private buildConversionArgs(data: ConversionElicitationData): string[] {
-    const sdkArgs = ['-y', '@servicenow/sdk', 'init'];
+  private buildConversionArgs(data: ConversionElicitationData, baseArgs: string[]): string[] {
+    const sdkArgs = [...baseArgs, 'init'];
     sdkArgs.push('--from', data.from);
     const auth = this.getAuthAlias(data.auth);
     if (auth) sdkArgs.push('--auth', auth);
@@ -196,8 +197,8 @@ export class InitCommand extends BaseCLICommand {
   /**
    * Build SDK arguments for creation
    */
-  private buildCreationArgs(data: CreationElicitationData): string[] {
-    const sdkArgs = ['-y', '@servicenow/sdk', 'init'];
+  private buildCreationArgs(data: CreationElicitationData, baseArgs: string[]): string[] {
+    const sdkArgs = [...baseArgs, 'init'];
 
     const appNameArg = typeof data.appName === 'string' && !/^".*"$/.test(data.appName)
       ? `"${data.appName}"`
@@ -254,12 +255,13 @@ export class InitCommand extends BaseCLICommand {
 
       const workingDirectory = workingDirResult;
 
-      // Step 4: Build and execute SDK command
+      // Step 4: Build and execute SDK command using the bundled CLI
+      const { command, baseArgs } = resolveSdkCli();
       const sdkArgs = intent === 'conversion'
-        ? this.buildConversionArgs(elicitedData as ConversionElicitationData)
-        : this.buildCreationArgs(elicitedData as CreationElicitationData);
+        ? this.buildConversionArgs(elicitedData as ConversionElicitationData, baseArgs)
+        : this.buildCreationArgs(elicitedData as CreationElicitationData, baseArgs);
 
-      const result = await this.commandProcessor.process('npx', sdkArgs, false, workingDirectory);
+      const result = await this.commandProcessor.process(command, sdkArgs, false, workingDirectory);
       logger.info(`Executed init command in directory: ${workingDirectory} - ${JSON.stringify(result)}`);
 
       if (result.success) {

@@ -1,5 +1,6 @@
 import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { SessionAwareCLICommand } from './sessionAwareCommand.js';
+import { resolveSdkCli } from '../../utils/sdkCli.js';
 import logger from '../../utils/logger.js';
 
 /**
@@ -81,7 +82,10 @@ export class AuthCommand extends SessionAwareCLICommand {
       return CommandResultFactory.error('Provide only one of --add, --list, --delete, or --use');
     }
 
-    const sdkArgs = ['now-sdk', 'auth'];
+    // Resolve the bundled SDK CLI so auth works from any cwd (auth is a global
+    // operation, not tied to a Fluent project directory).
+    const { command, baseArgs } = resolveSdkCli();
+    const sdkArgs = [...baseArgs, 'auth'];
 
     // Handle different auth operations
     if (typeof args.add === 'string') {
@@ -139,6 +143,6 @@ export class AuthCommand extends SessionAwareCLICommand {
       }
     }
 
-    return await this.executeWithSessionWorkingDirectory('npx', sdkArgs, false, stdinInput);
+    return await this.executeWithSessionWorkingDirectory(command, sdkArgs, false, stdinInput);
   }
 }

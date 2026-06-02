@@ -1,6 +1,7 @@
 /**
  * Type definitions for utility functions
  */
+import type { ZodRawShape } from 'zod';
 
 // Domain Models
 export interface CommandArgument {
@@ -35,6 +36,12 @@ export interface CommandResult {
   error?: Error;
   /** AI-powered error analysis (optional, only when enabled and applicable) */
   errorAnalysis?: ErrorAnalysis;
+  /**
+   * Optional structured payload for tools that declare an `outputSchema`.
+   * Returned to MCP clients as `structuredContent` alongside the text content.
+   * Only consumed on success; ignored on error results.
+   */
+  structuredContent?: { [key: string]: unknown };
 }
 
 /**
@@ -111,6 +118,12 @@ export interface CommandMetadata {
   /** Command-specific timeout in milliseconds. Overrides the default process timeout. */
   timeoutMs?: number;
   _meta?: { [key: string]: unknown };
+  /**
+   * Optional MCP output schema (a Zod raw shape). When set, the tool advertises
+   * an `outputSchema` and its successful results must include `structuredContent`
+   * matching this shape (the MCP SDK validates this).
+   */
+  outputSchema?: ZodRawShape;
 }
 
 export interface CLICommand extends CommandExecutor, CommandMetadata {
@@ -133,10 +146,11 @@ export const CommandResultFactory = {
   },
 
   /**
-   * Create a success result
+   * Create a success result, optionally with structured content for tools that
+   * declare an MCP output schema.
    */
-  success(output: string, exitCode = 0): CommandResult {
-    return { exitCode, success: true, output };
+  success(output: string, exitCode = 0, structuredContent?: { [key: string]: unknown }): CommandResult {
+    return { exitCode, success: true, output, ...(structuredContent && { structuredContent }) };
   },
 
   /**

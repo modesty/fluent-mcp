@@ -2,6 +2,7 @@ import { CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { BaseCLICommand } from './baseCommand.js';
 import { SessionManager } from '../../utils/sessionManager.js';
 import { resolveWorkingDirectory } from '../../utils/rootContext.js';
+import { resolveSdkCli } from '../../utils/sdkCli.js';
 import logger from '../../utils/logger.js';
 
 /**
@@ -103,8 +104,10 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
       }
     }
 
-    // Build the full SDK command args: ['now-sdk', 'subcommand', ...flags, ...positional]
-    const sdkArgs: string[] = ['now-sdk', sdkCommand];
+    // Build the full SDK command args using the bundled CLI so commands work
+    // regardless of cwd: [<base>, 'subcommand', ...positional, ...flags]
+    const { command, baseArgs } = resolveSdkCli();
+    const sdkArgs: string[] = [...baseArgs, sdkCommand];
 
     // Add positional arguments first (before flags)
     sdkArgs.push(...positionalArgs);
@@ -131,6 +134,6 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
     // Add common flags (like --debug)
     this.appendCommonFlags(sdkArgs, args);
 
-    return this.executeWithSessionWorkingDirectory('npx', sdkArgs, false, undefined, this.timeoutMs);
+    return this.executeWithSessionWorkingDirectory(command, sdkArgs, false, undefined, this.timeoutMs);
   }
 }

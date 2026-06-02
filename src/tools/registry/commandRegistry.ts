@@ -1,4 +1,5 @@
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
 import { CLICommand } from '../../utils/types.js';
 
 /**
@@ -27,6 +28,15 @@ export class CommandRegistry {
         description: command.description,
         ...(command.annotations && { annotations: command.annotations }),
         ...(command._meta && { _meta: command._meta }),
+        // Advertise an output schema for tools that declare one (read/info tools that
+        // return structuredContent). This custom tools/list handler is the source of
+        // truth, so the schema must be emitted here (not only via registerTool).
+        ...(command.outputSchema && {
+          // zod v4 native JSON-Schema conversion yields `{ type: 'object', ... }`,
+          // which MCP's Tool.outputSchema requires (the v3 zod-to-json-schema package
+          // mis-converts zod v4 and omits `type`).
+          outputSchema: z.toJSONSchema(z.object(command.outputSchema)) as Tool['outputSchema'],
+        }),
         inputSchema: {
           type: 'object',
           properties: command.arguments.reduce(

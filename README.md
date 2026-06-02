@@ -2,12 +2,12 @@
 
 An [MCP server](https://modelcontextprotocol.io) that brings [ServiceNow Fluent SDK](https://www.servicenow.com/docs/bundle/yokohama-application-development/page/build/servicenow-sdk/concept/servicenow-fluent.html) capabilities to AI-assisted development environments. Enables natural language interaction with ServiceNow SDK commands, API specifications, code snippets, and development resources.
 
-Built for **`@servicenow/sdk` 4.6.0**.
+Built for **`@servicenow/sdk` 4.7.1**.
 
 ## Key Features
 
 - **Complete SDK Coverage** - ServiceNow SDK commands: `init`, `build`, `install`, `dependencies`, `transform`, `download`, `clean`, `pack`, `explain`
-- **Rich Resources** - API specifications, instructions, and code snippets for **57 ServiceNow metadata types**
+- **Rich Resources** - API specifications, instructions, and code snippets for **58 ServiceNow metadata types**
 - **API Documentation Lookup** - `explain_fluent_api` returns SDK docs for any Fluent API or guide — no project required
 - **Auto-Authentication** - Automatic auth profile detection and session management via environment variables
 - **Session-Aware** - Maintains working directory and auth context across commands
@@ -16,10 +16,10 @@ This MCP server implements the [Model Context Protocol](https://modelcontextprot
 
 ### Core
 
-- **Resources** - 270+ resources across 57 ServiceNow metadata types (API specs, instructions, snippets, prompts)
-- **Tools** - 10 ServiceNow SDK commands plus resource-lookup tools, with full parameter validation
+- **Resources** - 275+ resources across 58 ServiceNow metadata types (API specs, instructions, snippets, prompts)
+- **Tools** - 10 ServiceNow SDK commands plus resource-lookup tools, with full parameter validation. Read tools (`get-api-spec`, `get-snippet`, `get-instruct`, `check_auth_status`) declare an `outputSchema` and return `structuredContent` for programmatic consumers
 - **Prompts** - Development workflow templates for common ServiceNow tasks (`coding_in_fluent`, `create_custom_ui`)
-- **Logging** - Structured logging for debugging and monitoring
+- **Logging & Progress** - Structured logging for debugging and monitoring; progress notifications for long-running commands (build, install, transform, download) when the client supplies a progress token
 
 ### Client Capabilities (used by this server)
 
@@ -28,7 +28,7 @@ The server leverages these MCP client capabilities when available:
 - **Roots** - Requests workspace roots from the client for context-aware operations
   - Falls back to project root when client doesn't provide roots
 
-- **Elicitation** (MCP 2024-11-05) - Interactive parameter collection for complex workflows
+- **Elicitation** - Interactive parameter collection for complex workflows
   - **`init_fluent_app`** - Prompts for missing project parameters (workingDirectory, template, appName, etc.)
   - Supports both creation and conversion workflows with smart validation
   - Handles user acceptance/rejection of elicited data
@@ -65,7 +65,7 @@ Create a new Fluent app in ~/projects/time-off-tracker to manage employee PTO re
 | `init_fluent_app` | Initialize or convert ServiceNow app | `workingDirectory` (required), `template`, `from` (optional) |
 | `build_fluent_app` | Build the application | `debug` (optional) |
 | `deploy_fluent_app` | Deploy to ServiceNow instance. Supports `--skip-flow-activation`. | `auth` (auto-injected), `debug` (optional), `skipFlowActivation` (optional) |
-| `fluent_transform` | Convert XML to Fluent TypeScript | `from`, `auth` (auto-injected) |
+| `fluent_transform` | Convert XML to Fluent TypeScript | `from`, `table` (comma-separated, transform by hierarchy), `id` (specific record, with `table`), `auth` (auto-injected) |
 | `download_fluent_dependencies` | Download dependencies and type definitions | `auth` (auto-injected) |
 | `download_fluent_app` | Download metadata from instance | `directory`, `incremental` (optional) |
 | `clean_fluent_app` | Clean output directory | `source` (optional) |
@@ -87,8 +87,6 @@ Create a new Fluent app in ~/projects/time-off-tracker to manage employee PTO re
 
 `topic` matches an API name (e.g. `BusinessRule`, `Acl`), a guide name (e.g. `business-rule-guide`, `atf-guide`), or a tag keyword (e.g. `flow`, `atf`, `email`). The SDK resolves by exact name first, then by tag.
 
-> **v4.6.0 implementation note:** earlier versions of this tool created a hidden scaffold directory at `.explain-scaffold/` to satisfy SDK 4.5.0's project-context requirement. SDK 4.6.0 self-resolves documentation, so the scaffold layer has been removed; the legacy directory (if present from a prior install) is safe to delete.
-
 ## Resources
 
 Standardized URI patterns following MCP specification:
@@ -102,9 +100,9 @@ Standardized URI patterns following MCP specification:
 
 ### Supported Metadata Types
 
-57 metadata types across the following categories:
+58 metadata types across the following categories:
 
-**Core Types:** `acl`, `application-menu`, `business-rule`, `client-script`, `cross-scope-privilege`, `form`, `import-set`, `instance-scan`, `list`, `property`, `role`, `scheduled-script`, `script-action`, `script-include`, `scripted-rest`, `sla`, `table`, `ui-action`, `ui-page`, `ui-policy`, `user-preference`
+**Core Types:** `acl`, `application-menu`, `business-rule`, `client-script`, `cross-scope-privilege`, `data-policy`, `form`, `import-set`, `instance-scan`, `list`, `property`, `role`, `scheduled-script`, `script-action`, `script-include`, `scripted-rest`, `sla`, `table`, `ui-action`, `ui-page`, `ui-policy`, `user-preference`
 
 **Table Types:** `column`, `column-generic`
 
@@ -122,23 +120,28 @@ Standardized URI patterns following MCP specification:
 
 **ATF (Automated Test Framework):** `atf-appnav`, `atf-catalog-action`, `atf-catalog-validation`, `atf-catalog-variable`, `atf-email`, `atf-form`, `atf-form-action`, `atf-form-declarative-action`, `atf-form-field`, `atf-form-sp`, `atf-reporting`, `atf-rest-api`, `atf-rest-assert-payload`, `atf-server`, `atf-server-catalog-item`, `atf-server-record`
 
-### What's new in 4.6.0
+### What's new in 4.7.x
 
-This release of the MCP server tracks `@servicenow/sdk` 4.6.0 and adds support for the following Fluent APIs and SDK enhancements:
+This release of the MCP server tracks `@servicenow/sdk` 4.7.1 and adds support for the following Fluent APIs and SDK enhancements:
 
-- **New metadata types**: `custom-action` (`sys_hub_action_type_definition`), `inbound-email-action` (`sys_email_action`), `sp-header-footer` (`sp_header_footer`), `sp-page-route-map` (`sp_page_route_map`).
-- **Declarative Form API** — new form-configuration capability on the existing `Form` API.
-- **Subflow-of-subflow** — Flows and Subflows can call other Subflows as steps.
-- **Custom Actions in flows** — Reusable custom actions usable as steps inside Flows and Subflows; supports cross-scope references via SDK dependencies.
-- **AIAF auto-ACL** — ACLs are automatically generated for `AiAgent` and `AiAgenticWorkflow` records at build time.
-- **NASK enhancements** — Standard outputs (`response`, `provider`, `errorcode`, `status`, `error`) are auto-generated when `outputs` is omitted; expanded input types (`glide_record`, `simple_array`, `json_object`, `json_array`); optional `tableName` for `glide_record`; optional `truncate` flag for scalar types.
-- **Table dictionary overrides** — The `Table` API directly supports `sys_dictionary_override` records.
-- **ScheduledScript modules** — Script fields support modules.
-- **`explain` command** — Tag-based topic search, `--list` topic index, `--peek` summaries, `--format=raw` markdown output. Now resolves docs without a Fluent project.
+- **New metadata type**: `data-policy` — the `DataPolicy` API (`sys_data_policy2`) for server-side mandatory/read-only field enforcement that cannot be bypassed via API, import, or web service.
+- **Flow error handling & parallelism** — `wfa.flowLogic.tryCatch`, `wfa.flowLogic.doInParallel`, and `wfa.flowLogic.appendToFlowVariables` (append to `Array.Object` flow variables).
+- **Flow stages** — declare `stages` with `FlowStage({ label, value, … })` and activate them in the body via `wfa.stage(...)` for progress tracking.
+- **Table augments** — add columns to an existing platform/cross-scope table via `Table({ augments: '<table>', schema })`; added columns must be `u_`-prefixed.
+- **AI Agent** — new `agentDescriptor`; `dataAccess` accepts `roleMap` (role names) or `roleList` (role sys_ids).
+- **NASK** — `securityControls` accepts `roleMap` (role names) alongside `roleRestrictions` (role sys_ids).
+- **Universal field override (`$override`)** — escape hatch on Fluent constructors to set unmodeled columns by DB column name.
+- **Protection policy** — `protectionPolicy` documented on `sys_policy`-backed APIs (Action, Subflow, business rules, scripted REST, etc.).
+- **CLI** — `fluent_transform` gains `--table`/`--id` (transform by table hierarchy); `init` gains the `typescript.vue` template; OAuth `client_credentials` for CI/CD via `SN_SDK_*` env vars (see Configuration).
+- **MCP** — read tools now return `structuredContent` (with declared `outputSchema`); long-running commands emit progress notifications.
+
+### Previously (4.6.0)
+
+Added `custom-action`, `inbound-email-action`, `sp-header-footer`, and `sp-page-route-map` metadata types; the declarative `Form` API; subflow-of-subflow and custom actions in flows; AIAF auto-ACL generation; NASK output/input-type enhancements; `Table` dictionary overrides; and a project-free `explain` command with tag search, `--list`, `--peek`, and `--format=raw`.
 
 ## Configuration
 
-**Requirements:** Node.js 20.18.0+, npm 11.4.1+, `@servicenow/sdk` 4.6.0
+**Requirements:** Node.js 20.18.0+, npm 11.4.1+, `@servicenow/sdk` 4.7.1
 
 ### MCP Client Setup
 
@@ -179,8 +182,27 @@ Add to your MCP client configuration file:
 | `SN_AUTH_TYPE` | Authentication method: `basic` or `oauth` | `oauth` |
 | `SN_USER_NAME` | Username for basic auth (informational) | - |
 | `SN_PASSWORD` | Password for basic auth (informational) | - |
+| `FLUENT_MCP_LOG_TO_STDERR` | Also mirror logs to stderr (`1`/`true`/`yes`) for headless debugging | off |
 
-> **Note:** The server automatically detects existing auth profiles matching `SN_INSTANCE_URL` at startup. If a matching profile is found, it's stored in the session and auto-injected into SDK commands. If no profile exists, you'll be prompted to run the auth command manually.
+> **Note:** The server automatically detects existing auth profiles matching `SN_INSTANCE_URL` at startup. If a matching profile is found, it's stored in the session and auto-injected into SDK commands. A new profile is added automatically only when it can complete non-interactively (basic auth with `SN_USER_NAME`/`SN_USERNAME` + `SN_PASSWORD`); otherwise the server emits a single notice with the manual `auth --add` command to run.
+
+#### Logging
+
+Once connected, the server sends all logs to the MCP client as `notifications/message` (the standard MCP logging channel), so they render with the correct severity in your client's UI. Only pre-connection bootstrap lines are written to stderr. Set `FLUENT_MCP_LOG_TO_STDERR=1` to additionally mirror every log line to stderr when running headless or debugging outside an MCP client. Use the client's `logging/setLevel` request to adjust verbosity at runtime (default `info`; set `debug` to see raw SDK CLI output).
+
+#### CI/CD (non-interactive) authentication — SDK v4.7.0+
+
+For headless pipelines, the ServiceNow SDK CLI reads credentials directly from `SN_SDK_*` environment variables (the MCP server inherits and passes these through to spawned commands — no extra configuration needed). Set `SN_SDK_NODE_ENV=SN_SDK_CI_INSTALL` to enable CI mode, then:
+
+| Variable | Required | Value |
+|----------|----------|-------|
+| `SN_SDK_NODE_ENV` | yes | `SN_SDK_CI_INSTALL` |
+| `SN_SDK_AUTH_TYPE` | for oauth | `basic` (default) or `oauth` |
+| `SN_SDK_INSTANCE_URL` | yes | Full instance URL |
+| `SN_SDK_USER` / `SN_SDK_USER_PWD` | basic | Username / password |
+| `SN_SDK_OAUTH_CLIENT_ID` / `SN_SDK_OAUTH_CLIENT_SECRET` | oauth | OAuth `client_credentials` app credentials |
+
+OAuth uses the `client_credentials` grant against `/oauth_token.do`. See the SDK's `ci-integration` guide (via `explain_fluent_api`) for instance setup details.
 
 ## Usage Examples
 
@@ -253,7 +275,7 @@ npm run build && npm run inspect
 3. **Test Version:**
    - Set `flag` parameter to `-v`
    - Click **Execute**
-   - Verify response shows the SDK version (e.g., `4.6.0`)
+   - Verify response shows the SDK version (e.g., `4.7.1`)
 4. **Test Help:**
    - Set `flag` parameter to `-h`
    - Set `command` parameter to `build`

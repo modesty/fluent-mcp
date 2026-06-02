@@ -43,16 +43,35 @@ export interface LogEntry {
 }
 
 /**
+ * Whether routine logs should be mirrored to stderr even after the MCP server
+ * is connected. Controlled by FLUENT_MCP_LOG_TO_STDERR (truthy = on).
+ */
+function isStderrMirroringEnabled(): boolean {
+  const flag = process.env.FLUENT_MCP_LOG_TO_STDERR;
+  if (!flag) return false;
+  const normalized = flag.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes';
+}
+
+/**
  * Logger class that outputs formatted JSON logs to stderr or a file
  * to avoid interfering with MCP's stdio transport
  */
 export class Logger {
   private logLevel: LogLevel;
   private mcpServer?: McpServer;
+  /**
+   * When true, every log entry is also mirrored to stderr even after the MCP
+   * server is connected. Opt-in via FLUENT_MCP_LOG_TO_STDERR for headless
+   * debugging. Default off so MCP clients (e.g. VS Code) don't paint routine
+   * INFO logs as `[warning] [server stderr]`.
+   */
+  private readonly mirrorToStderr: boolean;
 
   constructor() {
     const config = getConfig();
     this.logLevel = (config.logLevel as LogLevel) || LogLevel.INFO;
+    this.mirrorToStderr = isStderrMirroringEnabled();
   }
 
   /**
@@ -100,19 +119,40 @@ export class Logger {
   }
 
   /**
-   * Write a log entry to the configured output (stderr or file)
+   * Write a log entry to the active output channel.
+   *
+   * Routing rules:
+   * - Once an MCP server is connected, emit through `notifications/message`
+   *   ONLY. The MCP client renders these with the correct severity, so a
+   *   second copy on stderr (which clients paint as `[warning]`) would be
+   *   noisy and misleading.
+   * - Before the server connects (bootstrap), or if sending the notification
+   *   throws, fall back to stderr so nothing is lost.
+   * - If `FLUENT_MCP_LOG_TO_STDERR` is set, always mirror to stderr for
+   *   headless debugging regardless of connection state.
    */
   private writeLogEntry(level: LogLevel, entry: LogEntry): void {
-    // Format the log entry as JSON for human readability
-    const logJson = `[${entry.timestamp}] [${entry.level.toUpperCase()}]: ${
-      entry.message
-    } ${JSON.stringify(entry.context || {})}`;
+    const connected = !!this.mcpServer;
 
-    // all human readable logs go to stderr
-    process.stderr.write(`${logJson}\n`);
+    if (connected) {
+      const sent = this.sendMcpNotification(level, entry.message, entry.context);
+      if (this.mirrorToStderr || !sent) {
+        this.writeToStderr(this.formatForStderr(entry));
+      }
+      return;
+    }
 
-    // send log notifications to MCP server if available
-    this.sendMcpNotification(level, entry.message, entry.context);
+    // Pre-connection bootstrap: stderr is the only channel available.
+    this.writeToStderr(this.formatForStderr(entry));
+  }
+
+  /**
+   * Render a log entry as a single human-readable stderr line.
+   */
+  private formatForStderr(entry: LogEntry): string {
+    return `[${entry.timestamp}] [${entry.level.toUpperCase()}]: ${entry.message} ${JSON.stringify(
+      entry.context || {}
+    )}`;
   }
 
   /**
@@ -123,34 +163,39 @@ export class Logger {
   }
 
   /**
-   * Send a log message as an MCP notification
-   * @param level Log level
-   * @param message Log message
-   * @param data Optional structured data
-   * @param loggerName Optional logger name (defaults to 'fluent-mcp')
+   * Send a log message as an MCP `notifications/message`.
+   *
+   * The MCP spec shape is `{ level, logger?, data }` — there is no top-level
+   * `message` field, and `data` carries the content the client renders. We
+   * fold the message into `data` so the client always shows something
+   * meaningful (a plain string when there's no context, or an object that
+   * includes `message` alongside the context fields).
+   *
+   * @returns true if the notification was sent, false otherwise (no server
+   *          connected, or the send threw). Callers use this to decide whether
+   *          to fall back to stderr.
    */
   private sendMcpNotification(
     level: LogLevel,
     message: string,
-    data?: Record<string, unknown>,
+    context?: Record<string, unknown>,
     loggerName: string = 'fluent-mcp'
-  ): void {
-    if (!this.mcpServer) return;
+  ): boolean {
+    if (!this.mcpServer) return false;
 
-    // Construct notification params according to MCP protocol
-    const params = {
-      level,
-      logger: loggerName,
-      message,
-      ...(data ? { data } : {}),
-    };
+    const data =
+      context && Object.keys(context).length > 0 ? { message, ...context } : message;
+
+    const params = { level, logger: loggerName, data };
 
     try {
       // Send notification via MCP - this goes to stdout via the MCP server
       this.mcpServer.server.notification({ method: 'notifications/message', params });
+      return true;
     } catch (err) {
       // If notification fails, fallback to stderr
       this.writeToStderr(`Failed to send MCP notification: ${err}`);
+      return false;
     }
   }
 
@@ -168,12 +213,14 @@ export class Logger {
     data: Record<string, unknown>,
     loggerName: string
   ): void {
-    // Also write to stderr for debugging
-    const logJson = `[${new Date().toISOString()}] [${level.toUpperCase()}] [${loggerName}]: ${message} ${JSON.stringify(data)}`;
-    this.writeToStderr(logJson);
+    const sent = this.sendMcpNotification(level, message, data, loggerName);
 
-    // Send MCP notification with custom logger name
-    this.sendMcpNotification(level, message, data, loggerName);
+    // Mirror to stderr only when the notification couldn't be delivered, or
+    // when stderr mirroring is explicitly enabled for debugging.
+    if (this.mirrorToStderr || !sent) {
+      const logJson = `[${new Date().toISOString()}] [${level.toUpperCase()}] [${loggerName}]: ${message} ${JSON.stringify(data)}`;
+      this.writeToStderr(logJson);
+    }
   }
 
   /**

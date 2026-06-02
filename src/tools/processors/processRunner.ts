@@ -40,7 +40,7 @@ export class NodeProcessRunner implements ProcessRunner {
         shell: true,
         cwd, env, signal
       };
-      logger.info(`Spawning child process: ${command} ${args.join(' ')}`, { cwd });
+      logger.debug(`Spawning child process: ${command} ${args.join(' ')}`, { cwd });
 
       let child;
       try {
@@ -108,7 +108,7 @@ export class NodeProcessRunner implements ProcessRunner {
         const text = data.toString();
         stdout += text;
         // Log real-time output for debugging
-        logger.info(`[STDOUT] ${text.trim()}`);
+        logger.debug(`[STDOUT] ${text.trim()}`);
 
         // Accumulate stdout for prompt detection if we have stdin to write
         if (stdinInput && !stdinState.inputComplete) {
@@ -122,12 +122,12 @@ export class NodeProcessRunner implements ProcessRunner {
         const text = data.toString();
         stderr += text;
         // Log real-time errors for debugging
-        logger.info(`[STDERR] ${text.trim()}`);
+        logger.debug(`[STDERR] ${text.trim()}`);
       });
 
       child.on('close', (code: number | null) => {
         clearTimeout(timeoutId);
-        logger.info(`Process exited with code ${code}: ${command} ${args.join(' ')}`);
+        logger.debug(`Process exited with code ${code}: ${command} ${args.join(' ')}`);
         resolve({
           stdout: stdout.trim(),
           stderr: stderr.trim(),

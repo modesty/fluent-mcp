@@ -7,17 +7,24 @@ AiAgent({
   name: '', // string, mandatory - human-readable name shown in the UI, must be unique within scope
   description: '', // string, mandatory - brief explanation of what the agent does and when to use it
   agentRole: '', // string, mandatory - describes the agent's role or purpose (e.g., 'IT Support Assistant', 'HR Onboarding Guide')
+  securityAcl: {}, // SecurityAclUserAccessConfig, MANDATORY - auto-generates `sys_security_acl` + `sys_security_acl_role` records controlling who can invoke the agent
+    // Shape: { $id: Now.ID['…'], type: 'Specific role' | …, roles: string[] (role names or sys_ids) }
   active: true, // boolean, optional - controls whether the agent is available for use (default: true)
+  agentDescriptor: '', // AiAgentDescriptorType | '', optional (SDK v4.7.0+) - classifies how the agent was created / its access requirement; set on `sn_aia_agent_config`
+    // Values: 'require_caller_id' | 'created_by_ai_agent_advisor' | 'created_by_build_agent'. Defaults to ''
   agentType: '', // 'internal' | 'external' | 'voice' | 'aia_internal', optional - specifies agent type (default: 'internal')
   channel: '', // 'nap' | 'nap_and_va', optional - where the agent is available: Now Assist Panel only or both Now Assist and Virtual Agent (default: 'nap_and_va')
-  acl: '', // string | Acl | Record<'sys_security_acl'>, optional - access control list determining which users can execute this agent
   advancedMode: false, // boolean, optional - enables advanced configuration options (default: false)
   agentLearning: false, // boolean, optional - allows the agent to learn from interactions and improve over time (default: false)
   agentConfigSysOverrides: '', // string | Record<'sn_aia_agent_config'>, optional - reference to overrides for agent config
   compiledHandbook: '', // string, optional - compiled handbook for the agent
   condition: '', // string, optional - condition table reference
   contextProcessingScript: '', // function | string, optional - server-side script that transforms or enriches context before agent executes (supports Now.include())
-  dataAccess: {}, // DataAccessConfigType, optional - configures which roles can access data through this agent
+  dataAccess: {}, // DataAccessConfigType, optional (MANDATORY when runAsUser is NOT set) - which roles the agent inherits from the invoking user
+    // Provide at least one of (SDK v4.7.0+):
+    //   roleMap: [],  // string[] of role NAMES (e.g. ['itil','admin']) - preferred; resolved at build time via `sys_agent_access_role_mapping`
+    //   roleList: [], // string[] of role SYS_IDS (e.g. ['282bf1fac6112285017366cb5f867469']) - legacy path
+    //   description: '' // string, optional
   docUrl: '', // string, optional - link to external documentation or help content
   external: false, // boolean, optional - whether the agent is external
   externalAgentConfiguration: '', // string | Record<'sn_aia_external_agent_configuration'>, optional - reference to external agent configuration

@@ -20,7 +20,9 @@ NowAssistSkillConfig(
     securityControls: {}, // SecurityControls, MANDATORY - defines user access and role restrictions
       // securityControls: {
       //   userAccess: { type: 'authenticated' } | { type: 'roles', roles: (string | Role | Record<'sys_user_role'>)[] },
-      //   roleRestrictions: (string | Role | Record<'sys_user_role'>)[] // MANDATORY, at least one role
+      //   // Provide at least one of the following role lists (SDK v4.7.0+):
+      //   roleMap?: (string | Role | Record<'sys_user_role'>)[],         // role NAMES - preferred (ZP10/AP3+); maps to `sys_agent_access_role_mapping`
+      //   roleRestrictions?: (string | Role | Record<'sys_user_role'>)[] // role SYS_IDS - legacy path; maps to the `role_list` glide_list column
       // }
     skillSettings: {}, // SkillSettings, optional - provider configurations for pre/postprocessing
       // skillSettings: { providers: [{ $id, name, order?, preprocessor | postprocessor (exactly one) }] }

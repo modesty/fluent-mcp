@@ -36,8 +36,8 @@ export class CLIExecutor extends BaseCommandProcessor {
     try {
       const cwd = this.resolveCommandWorkingDirectory(useMcpCwd, customWorkingDir);
 
-      // Better logging with clear working directory information
-      logger.info(`Executing command: ${command} ${args.join(' ')}`, { cwd });
+      // Command invocation detail is verbose; outcomes surface via CommandResult.
+      logger.debug(`Executing command: ${command} ${args.join(' ')}`, { cwd });
 
       const result = await this.processRunner.run(command, args, cwd, stdinInput, timeoutMs);
 
