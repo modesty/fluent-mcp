@@ -86,7 +86,6 @@ export function createSessionManagerMock(overrides?: Record<string, unknown>) {
 export function createRootContextMock(overrides?: Record<string, unknown>) {
   return {
     getPrimaryRootPath: jest.fn().mockReturnValue('/mock/root'),
-    getPrimaryRootPathFrom: jest.fn().mockReturnValue('/mock/root'),
     resolveWorkingDirectory: jest.fn().mockReturnValue('/mock/root'),
     setRoots: jest.fn(),
     ...overrides,

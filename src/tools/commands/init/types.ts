@@ -57,5 +57,3 @@ export const VALID_TEMPLATES = [
   'javascript.basic',
   'typescript.vue',
 ] as const;
-
-export type ValidTemplate = (typeof VALID_TEMPLATES)[number];

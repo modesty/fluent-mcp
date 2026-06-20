@@ -197,32 +197,3 @@ function getEnvVar(envVarName: string, defaultValue: string): string {
   return process.env[envVarName] || defaultValue;
 }
 
-/**
- * Validate that the configuration is valid
- * @param config Configuration object to validate
- * @returns True if the configuration is valid, false otherwise
- */
-export function validateConfig(config: McpServerConfig): boolean {
-  // Check resource paths exist
-  const resourcePathExists = (path: string): boolean => {
-    try {
-      return fs.existsSync(path) && fs.statSync(path).isDirectory();
-    } catch (error) {
-      console.error('Error checking resource path', error);
-      return false;
-    }
-  };
-
-  const validResourcePaths =
-    resourcePathExists(config.resourcePaths.spec) &&
-    resourcePathExists(config.resourcePaths.snippet) &&
-    resourcePathExists(config.resourcePaths.instruct);
-
-  if (!validResourcePaths) {
-    // console.warn("One or more resource paths do not exist or are not directories");
-    return false;
-  }
-
-  // Add additional validation as needed
-  return true;
-}
