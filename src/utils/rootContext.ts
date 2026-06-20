@@ -33,15 +33,6 @@ export function getPrimaryRootPath(): string {
 }
 
 /**
- * Resolve a primary root path from a provided roots array, fallback to project root
- */
-export function getPrimaryRootPathFrom(
-  providedRoots?: { uri: string; name?: string }[]
-): string {
-  return resolveUriToPath(providedRoots?.[0]?.uri) ?? getProjectRootPath();
-}
-
-/**
  * Resolve the working directory from instance roots, falling back to global roots and project root.
  * This is the canonical way to determine the working directory for CLI commands.
  * 

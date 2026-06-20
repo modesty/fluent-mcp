@@ -188,6 +188,27 @@ export function getConfig(): McpServerConfig {
 }
 
 /**
+ * Find configured resource directories that are missing or are not directories.
+ * The server cannot serve specs/snippets/instructions without these, so a
+ * non-empty result is a fatal misconfiguration (broken install, or a bad
+ * FLUENT_MCP_RESOURCE_PATH_* override).
+ * @param config Configuration whose resourcePaths are checked
+ * @returns The resource paths that do not resolve to an existing directory
+ *          (empty array when all are present)
+ */
+export function findMissingResourcePaths(config: McpServerConfig): string[] {
+  const isDirectory = (dirPath: string): boolean => {
+    try {
+      return fs.existsSync(dirPath) && fs.statSync(dirPath).isDirectory();
+    } catch {
+      return false;
+    }
+  };
+
+  return Object.values(config.resourcePaths).filter((dirPath) => !isDirectory(dirPath));
+}
+
+/**
  * Get a configuration value from environment variables, falling back to default if not found
  * @param envVarName Environment variable name
  * @param defaultValue Default value to use if environment variable is not set
@@ -197,32 +218,3 @@ function getEnvVar(envVarName: string, defaultValue: string): string {
   return process.env[envVarName] || defaultValue;
 }
 
-/**
- * Validate that the configuration is valid
- * @param config Configuration object to validate
- * @returns True if the configuration is valid, false otherwise
- */
-export function validateConfig(config: McpServerConfig): boolean {
-  // Check resource paths exist
-  const resourcePathExists = (path: string): boolean => {
-    try {
-      return fs.existsSync(path) && fs.statSync(path).isDirectory();
-    } catch (error) {
-      console.error('Error checking resource path', error);
-      return false;
-    }
-  };
-
-  const validResourcePaths =
-    resourcePathExists(config.resourcePaths.spec) &&
-    resourcePathExists(config.resourcePaths.snippet) &&
-    resourcePathExists(config.resourcePaths.instruct);
-
-  if (!validResourcePaths) {
-    // console.warn("One or more resource paths do not exist or are not directories");
-    return false;
-  }
-
-  // Add additional validation as needed
-  return true;
-}

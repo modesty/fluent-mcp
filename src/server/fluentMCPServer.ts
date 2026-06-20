@@ -10,7 +10,7 @@ import {
   InitializedNotificationSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { getConfig, getProjectRootPath } from '../config.js';
+import { getConfig, getProjectRootPath, findMissingResourcePaths } from '../config.js';
 import { ServerStatus } from '../types.js';
 import { CommandResultFactory } from '../utils/types.js';
 import loggingManager from '../utils/loggingManager.js';
@@ -100,6 +100,27 @@ export class FluentMcpServer {
   // Auth notification handling delegated to AuthNotificationHandler (SRP)
 
   /**
+   * Run auto-auth validation exactly once, regardless of which initialization
+   * path (delayed fallback or notifications/initialized) reaches it first.
+   * @param reason Context for the log line, identifying the triggering path
+   */
+  private async triggerAutoAuthOnce(reason: string): Promise<void> {
+    if (this.autoAuthTriggered) {
+      return;
+    }
+    this.autoAuthTriggered = true;
+    logger.info(`Triggering auto-auth validation${reason}...`);
+    try {
+      const result = await autoValidateAuthIfConfigured(this.toolsManager);
+      this.authNotificationHandler.handleAuthResult(result);
+    } catch (error) {
+      logger.warn('Auto-auth validation failed', {
+        error: CommandResultFactory.normalizeError(error).message,
+      });
+    }
+  }
+
+  /**
    * Schedule a delayed initialization to ensure roots and auth are set up
    * This provides a fallback if the client doesn't send proper notifications
    */
@@ -133,18 +154,7 @@ export class FluentMcpServer {
         }
 
         // Trigger auth validation if not already triggered
-        if (!this.autoAuthTriggered) {
-          this.autoAuthTriggered = true;
-          logger.info('Triggering auto-auth validation...');
-          try {
-            const result = await autoValidateAuthIfConfigured(this.toolsManager);
-            this.authNotificationHandler.handleAuthResult(result);
-          } catch (error) {
-            logger.warn('Auto-auth validation failed', {
-              error: CommandResultFactory.normalizeError(error).message,
-            });
-          }
-        }
+        await this.triggerAutoAuthOnce('');
       } catch (error) {
         logger.error('Error during delayed initialization',
           CommandResultFactory.normalizeError(error)
@@ -317,18 +327,7 @@ export class FluentMcpServer {
       }
 
       // Trigger auth validation via the proper initialization path
-      if (!this.autoAuthTriggered) {
-        this.autoAuthTriggered = true;
-        logger.info('Triggering auto-auth validation after client initialization...');
-        try {
-          const result = await autoValidateAuthIfConfigured(this.toolsManager);
-          this.authNotificationHandler.handleAuthResult(result);
-        } catch (error) {
-          logger.warn('Auto-auth validation failed', {
-            error: CommandResultFactory.normalizeError(error).message,
-          });
-        }
-      }
+      await this.triggerAutoAuthOnce(' after client initialization');
     });
 
     // Set up handler for roots/list_changed notification
@@ -427,18 +426,6 @@ export class FluentMcpServer {
   }
 
   /**
-   * Remove a root from the list of roots
-   * @param uri The URI of the root to remove
-   */
-  async removeRoot(uri: string): Promise<void> {
-    const updatedRoots = this.roots.filter(root => root.uri !== uri);
-
-    if (updatedRoots.length !== this.roots.length) {
-      await this.updateRoots(updatedRoots);
-    }
-  }
-
-  /**
    * Get the current list of roots
    * @returns The list of roots
    */
@@ -458,6 +445,19 @@ export class FluentMcpServer {
     try {
       this.status = ServerStatus.INITIALIZING;
       loggingManager.logServerStarting();
+
+      // Fail fast on a broken install before accepting connections: the resource
+      // directories ship with the package (package.json "files": ["dist","res"]),
+      // so a missing one means a corrupt install or a bad
+      // FLUENT_MCP_RESOURCE_PATH_* override that would silently degrade the server.
+      const missingResourcePaths = findMissingResourcePaths(this.config);
+      if (missingResourcePaths.length > 0) {
+        throw new Error(
+          `Missing required resource directories: ${missingResourcePaths.join(', ')}. ` +
+          'Verify the installation includes the res/ directory, or correct the ' +
+          'FLUENT_MCP_RESOURCE_PATH_SPEC/SNIPPET/INSTRUCT environment overrides.'
+        );
+      }
 
       if (!this.mcpServer) {
         throw new Error('MCP server not properly initialized');
