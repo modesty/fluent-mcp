@@ -86,12 +86,15 @@ function setupScaffold() {
     'Now', 'TemplateValue', 'Duration', 'Time', 'default_view', 'get_sys_id',
     'get_column_name', 'wfa', 'trigger', 'action', 'actionStep', '_params', 'params',
     // SDK API surface (top-level constructors and namespaces)
-    'Acl', 'AiAgent', 'AiAgenticWorkflow', 'ApplicationMenu', 'BusinessRule',
-    'ClientScript', 'CrossScopePrivilege', 'DataPolicy', 'Documentation', 'ImportSet',
-    'LicensingConfig', 'List', 'NowAssistSkillConfig', 'Property', 'RestApi',
+    'Acl', 'AiAgent', 'AiAgenticWorkflow', 'Alias', 'AliasTemplate',
+    'ApplicationMenu', 'BusinessRule',
+    'ClientScript', 'CrossScopePrivilege', 'DataLookup', 'DataPolicy', 'Documentation',
+    'ImportSet', 'LicensingConfig', 'List', 'NowAssistSkillConfig', 'Property',
+    'RestApi', 'RestMessage', 'RetryPolicy',
     'Role', 'UiPolicy', 'UserPreference', 'atf', 'Record',
     // Flow / automation surface (also exported from '@servicenow/sdk/automation')
     'Flow', 'FlowStage', 'Subflow', 'Table',
+    'PlaybookDefinition', 'PlaybookTriggerTypes', 'ActivityDefinitions',
     // Instance Scan check types
     'LinterCheck', 'ScriptOnlyCheck', 'ColumnTypeCheck', 'TableCheck',
     // Service Portal types
