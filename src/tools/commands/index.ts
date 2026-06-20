@@ -12,3 +12,4 @@ export * from './downloadCommand.js';
 export * from './cleanCommand.js';
 export * from './packCommand.js';
 export * from './explainCommand.js';
+export * from './queryCommand.js';
