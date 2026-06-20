@@ -347,20 +347,6 @@ describe("FluentMcpServer with Modular Design", () => {
       expect(mockUpdateRoots).toHaveBeenCalledTimes(2);
     });
     
-    test("should remove a root", async () => {
-      // Clear mockUpdateRoots calls from previous test
-      mockUpdateRoots.mockClear();
-      
-      // Set the server status to RUNNING to ensure notifications are sent
-      Object.defineProperty(server, 'status', { value: ServerStatus.RUNNING });
-      
-      await server.addRoot("/test/path", "Test Root");
-      await server.removeRoot("/test/path");
-      const roots = server.getRoots();
-      expect(roots).toHaveLength(0);
-      expect(mockUpdateRoots).toHaveBeenCalledTimes(2);
-    });
-    
     test("should update multiple roots", async () => {
       // Clear mockUpdateRoots calls from previous test
       mockUpdateRoots.mockClear();

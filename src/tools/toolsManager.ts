@@ -6,7 +6,7 @@ import { NodeProcessRunner } from './processors/processRunner.js';
 import { CLIExecutor } from './processors/cliExecutor.js';
 import { CLICmdWriter } from './processors/cliCmdWriter.js';
 import { BaseCommandProcessor } from './processors/baseCommandProcessor.js';
-import { CLICommand, CommandProcessor, CommandResult, CommandResultFactory } from '../utils/types.js';
+import { CLICommand, CommandResult, CommandResultFactory } from '../utils/types.js';
 import logger from '../utils/logger.js';
 import {
   GetApiSpecCommand,
@@ -23,7 +23,6 @@ export class ToolsManager {
   private commandRegistry: CommandRegistry;
   private mcpServer: McpServer;
   private cliExecutor!: CLIExecutor;
-  private cliCmdWriter!: CLICmdWriter;
 
   /**
    * Create a new ToolsManager
@@ -47,9 +46,8 @@ export class ToolsManager {
     // Create both types of command processors
     const cliExecutor = new CLIExecutor(processRunner);
     const cliCmdWriter = new CLICmdWriter(); // CLICmdWriter doesn't need processRunner
-    // Store shared processors for later use (e.g., server-internal invocations)
+    // Store the executor for later use (e.g., server-internal auth invocations)
     this.cliExecutor = cliExecutor;
-    this.cliCmdWriter = cliCmdWriter;
 
     // Create commands with appropriate processors for each type
     // InitCommand will use CLICmdWriter, others will use CLIExecutor
@@ -268,28 +266,11 @@ export class ToolsManager {
   }
 
   /**
-   * Get a command by name
-   * @param name The command name
-   * @returns The command or undefined if not found
-   */
-  getCommand(name: string): CLICommand | undefined {
-    return this.commandRegistry.getCommand(name);
-  }
-
-  /**
    * Get all commands as MCP tools
    * @returns List of MCP tools
    */
   getMCPTools(): Record<string, unknown>[] {
     return this.commandRegistry.toMCPTools();
-  }
-
-  /**
-   * Get the command registry
-   * @returns The command registry
-   */
-  getCommandRegistry(): CommandRegistry {
-    return this.commandRegistry;
   }
 
   /**
@@ -333,13 +314,6 @@ export class ToolsManager {
 
     // Log only once at this level after all updates are complete
     logger.info('Updated roots in all CLI tools', { roots });
-  }
-
-  /**
-   * Get the shared CLI executor used by registered commands
-   */
-  getExecutorProcessor(): CommandProcessor {
-    return this.cliExecutor;
   }
 
   /**
