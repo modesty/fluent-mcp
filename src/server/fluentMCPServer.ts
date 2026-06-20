@@ -10,7 +10,7 @@ import {
   InitializedNotificationSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { getConfig, getProjectRootPath } from '../config.js';
+import { getConfig, getProjectRootPath, findMissingResourcePaths } from '../config.js';
 import { ServerStatus } from '../types.js';
 import { CommandResultFactory } from '../utils/types.js';
 import loggingManager from '../utils/loggingManager.js';
@@ -445,6 +445,19 @@ export class FluentMcpServer {
     try {
       this.status = ServerStatus.INITIALIZING;
       loggingManager.logServerStarting();
+
+      // Fail fast on a broken install before accepting connections: the resource
+      // directories ship with the package (package.json "files": ["dist","res"]),
+      // so a missing one means a corrupt install or a bad
+      // FLUENT_MCP_RESOURCE_PATH_* override that would silently degrade the server.
+      const missingResourcePaths = findMissingResourcePaths(this.config);
+      if (missingResourcePaths.length > 0) {
+        throw new Error(
+          `Missing required resource directories: ${missingResourcePaths.join(', ')}. ` +
+          'Verify the installation includes the res/ directory, or correct the ' +
+          'FLUENT_MCP_RESOURCE_PATH_SPEC/SNIPPET/INSTRUCT environment overrides.'
+        );
+      }
 
       if (!this.mcpServer) {
         throw new Error('MCP server not properly initialized');

@@ -21,6 +21,7 @@ jest.mock('../src/config.js', () => ({
       commandTimeoutMs: 30000,
     },
   }),
+  findMissingResourcePaths: jest.fn().mockReturnValue([]),
 }));
 
 // Globally mock logger to suppress stderr output during tests

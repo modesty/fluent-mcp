@@ -61,7 +61,8 @@ jest.mock('../../src/config.js', () => ({
       instruct: "/mock/path/to/instruct",
     }
   }),
-  getProjectRootPath: jest.fn().mockReturnValue("/mock/project/root")
+  getProjectRootPath: jest.fn().mockReturnValue("/mock/project/root"),
+  findMissingResourcePaths: jest.fn().mockReturnValue([])
 }));
 
 // Mock the ToolsManager
@@ -73,26 +74,6 @@ jest.mock("../../src/tools/toolsManager.js", () => {
       getMCPTools: jest.fn().mockReturnValue([
         { id: "mock-tool", title: "Mock Tool", description: "A mock tool for testing" }
       ]),
-      getCommand: jest.fn().mockImplementation((name) => {
-        if (name === "mock-tool") {
-          return {
-            name: "mock-tool",
-            description: "A mock tool for testing",
-            execute: jest.fn().mockResolvedValue({ success: true, output: "Mock output" })
-          };
-        }
-        return undefined;
-      }),
-      formatResult: jest.fn().mockImplementation((result) => {
-        if (result.success) {
-          return result.output;
-        } else {
-          const errorMsg = result.error || 'Unknown error';
-          return result.output
-            ? `Error (exit ${result.exitCode}): ${errorMsg}\n\nOutput:\n${result.output}`
-            : `Error (exit ${result.exitCode}): ${errorMsg}`;
-        }
-      }),
       updateRoots: mockUpdateRoots
     })),
     mockUpdateRoots
@@ -178,7 +159,16 @@ describe("FluentMcpServer with Modular Design", () => {
     expect(ToolsManager).toHaveBeenCalled();
     expect(ResourceManager).toHaveBeenCalled();
   });
-  
+
+  test("should fail fast when required resource directories are missing", async () => {
+    const { findMissingResourcePaths } = require("../../src/config.js");
+    // Simulate a broken install: a configured resource directory cannot be resolved.
+    findMissingResourcePaths.mockReturnValueOnce(["/mock/path/to/spec"]);
+
+    await expect(server.start()).rejects.toThrow(/Missing required resource directories/);
+    expect(server.getStatus()).toBe(ServerStatus.STOPPED);
+  });
+
   test("should request roots from client and handle response", async () => {
     // Get the direct reference to the mockRequest exported from the mock
     const { mockRequest } = require('@modelcontextprotocol/sdk/server/mcp.js');

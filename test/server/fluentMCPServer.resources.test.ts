@@ -66,7 +66,8 @@ jest.mock('../../src/config.js', () => ({
       instruct: "/mock/path/to/instruct",
     }
   }),
-  getProjectRootPath: jest.fn().mockReturnValue("/mock/project/root")
+  getProjectRootPath: jest.fn().mockReturnValue("/mock/project/root"),
+  findMissingResourcePaths: jest.fn().mockReturnValue([])
 }));
 
 // Mock the ResourceLoader
