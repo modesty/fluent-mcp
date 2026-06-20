@@ -10,7 +10,7 @@ Table({
     display: '', // string
     extensible: false, // boolean
     liveFeed: false, // boolean
-    accessibleFrom: 'package_private', // 'public' | 'package_private'
+    accessibleFrom: 'package_private', // 'public' | 'package_private' (defaults to 'public' as of SDK 4.8.0; 'package_private' restricts cross-scope read access but hides the table from some platform features such as Business Rules)
     callerAccess: 'none', // 'none' | 'tracking' | 'restricted'
     actions: [], // array of 'read' | 'update' | 'delete' | 'create'
     allowWebServiceAccess: false, // boolean

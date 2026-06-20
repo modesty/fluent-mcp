@@ -130,6 +130,32 @@ describe('SDK v4.8.0 Types - Integration Tests', () => {
     });
   });
 
+  describe('Existing resource updates (v4.8.0)', () => {
+    it('acl spec should document field typing and $meta installMethod', () => {
+      const content = read(SPEC_DIR, 'fluent_spec_acl.md');
+      expect(content).toContain('SystemColumns');
+      expect(content).toContain('$meta');
+      expect(content).toContain('installMethod');
+    });
+
+    it('user-preference spec should document $override and $meta', () => {
+      const content = read(SPEC_DIR, 'fluent_spec_user-preference.md');
+      expect(content).toContain('$override');
+      expect(content).toContain('$meta');
+    });
+
+    it('table spec should note the accessibleFrom public default', () => {
+      const content = read(SPEC_DIR, 'fluent_spec_table.md');
+      expect(content).toContain('SDK 4.8.0');
+      expect(content).toContain('public');
+    });
+
+    it("scheduled-script spec should NOT claim a $meta property (not in installed SDK)", () => {
+      const content = read(SPEC_DIR, 'fluent_spec_scheduled-script.md');
+      expect(content).not.toContain('$meta');
+    });
+  });
+
   describe('CLI tool updates (v4.8.0) — query command', () => {
     it('should register the query_fluent_records command in the factory', () => {
       const mockExecutor = { process: jest.fn() };
