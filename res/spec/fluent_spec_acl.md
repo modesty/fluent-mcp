@@ -9,7 +9,7 @@ const specAcl = Acl({
     type: 'record', // mandatory, typed string: `record`, `rest_endpoint`, `ui_page`, `processor`, `graphql`, `pd_action`, `ux_data_broker`, `ux_page`, `ux_route`, `client_callable_flow_object`, `client_callable_script_include`
     operation: 'read', // mandatory, typed string: `execute`, `create`, `read`, `write`, `delete`, `conditional_table_query_range`, `data_fabric`, `query_match`, `query_range`, `edit_task_relations`, `edit_ci_relations`, `save_as_template`, `add_to_list`, `report_on`, `list_edit`, `report_view`, `personalize_choices`
     table: '', // mandatory if `type` is `record`
-    field: '*', // mandatory if `type` is `record`: `*` or comma delimited list of field names
+    field: '*', // for field-level `record` ACLs: a schema field name, a system column, or the wildcard `*` (type: keyof FullSchema<T> | SystemColumns | '*', SDK 4.8.0+ accepts custom column names)
     appliesTo: '', // ServiceNow encoded query, only applicable if `type` is `record`
     roles: [get_sys_id('sys_user_role', '')], // array of Record<'sys_user_role'>, either sys_id for existing roles or Role object for new roles
     decisionType: 'allow', // typed string, `allow`|`deny`
@@ -20,5 +20,6 @@ const specAcl = Acl({
     localOrExisting: 'Local', // typed string, 'Local'|'Existing': if `Local`: A security attribute based on the `condition` property that is saved only for the ACL it is created in; if `Existing`: An existing security attribute to reference in the `security_attribute` property
     protectionPolicy: 'read', // typed string (added SDK 4.4.0): 'read' | 'protected' — controls edit/view access for other developers
     dataBroker: '', // string | Record<'sys_ux_data_broker'>, optional — reference to UX data broker, applicable when `type` is `ux_data_broker`
+    $meta: { installMethod: 'once' }, // optional (SDK 4.8.0+): { installMethod: 'first install' | 'demo' | 'once' } — load the record only in specific circumstances
 }): Acl; // returns an Acl object
 ```

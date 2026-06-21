@@ -44,7 +44,7 @@ AiAgenticWorkflow({
 	],
 	dataAccess: {
 		description: 'Access for incident triage roles',
-		roleList: [Now.ID['role_incident_manager']],
+		roleMap: ['itil', 'incident_manager'],
 	},
 })
 ```

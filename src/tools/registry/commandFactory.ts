@@ -11,6 +11,7 @@ import {
   CleanCommand,
   PackCommand,
   ExplainCommand,
+  QueryCommand,
 } from '../commands/index.js';
 
 /**
@@ -47,6 +48,7 @@ export class CommandFactory {
       new CleanCommand(executor),
       new PackCommand(executor),
       new ExplainCommand(executor),
+      new QueryCommand(executor),
     ];
   }
 }

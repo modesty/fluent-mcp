@@ -1,0 +1,11 @@
+# Instructions for Fluent RestMessage API
+Always reference the RestMessage API specifications for more details.
+1. Import `RestMessage` from `@servicenow/sdk/core`. `$id` (use `Now.ID['key']`), `name`, and `endpoint` are mandatory. Define one or more `functions` so the message is actually callable.
+2. Use a RestMessage to define a reusable **outbound HTTP integration**. Call it from server-side scripts via `new sn_ws.RESTMessageV2('<name>', '<functionName>')` — the `name` and each function `name` are case-sensitive and must match exactly.
+3. Set shared concerns at the message level: `endpoint` (base URL), `authenticationType`, `headers` (sent with every function). Override per function via the function's own `endpoint`, `authenticationType`, `basicAuthProfile`/`oauthProfile`, and `headers` (function headers add to, not replace, message headers).
+4. For authentication, set `authenticationType` to `'basic'` (then `basicAuthProfile` = sys_id of `sys_auth_profile_basic`) or `'oauth2'` (then `oauthProfile` = sys_id of `oauth_entity_profile`). Functions default to `'inheritFromParent'`. Legacy inline basic-auth user/password fields are not exposed — use an auth profile.
+5. Each function needs a unique `name` and an uppercase `httpMethod` (`'GET'`, `'POST'`, `'PUT'`, `'PATCH'`, `'DELETE'`, `'HEAD'`). Put the request body in `content` for `POST`/`PUT`/`PATCH`.
+6. Use `${varName}` placeholders in `endpoint`, `content`, headers, and query-param values, and **declare each one** in the function's `variables` array (each needs its own `$id`). Undeclared placeholders will not be substitutable.
+7. Choose `escapeType` per variable: `'noEscaping'` (default) for JSON bodies, `'escapeXml'` for XML bodies. At runtime, prefer `setStringParameterNoEscape(name, value)` for JSON because `setStringParameter` always XML-escapes.
+8. Add `queryParams` for `?key=value` pairs (set `value` to a static string or a `${var}`, and `order` to control sequence). Route a function through a MID server by setting `midServer` to an `ecc_agent` sys_id. Set `lock: true` to prevent editing a function on the instance.
+9. Each header, variable, and query param requires its own unique `$id` (`Now.ID['...']`) since each becomes its own platform record.
