@@ -1,15 +1,20 @@
-import { CommandArgument, CommandResult } from '../../utils/types.js';
+import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { SessionAwareCLICommand } from './sessionAwareCommand.js';
 
 /**
- * Characters that would let an encoded-query value break out of the single-quote
- * wrapping applied before the value reaches the shell, or inject control flow.
- * Inside POSIX single quotes every other character (including the relational
- * operators `<` `>` and `^` that encoded queries rely on) is literal, so we only
- * need to reject the single quote, backslash, and control characters.
+ * Characters that would let an encoded-query value break out of the shell
+ * quoting applied before the value reaches the shell, or inject control flow.
+ *
+ * The query is wrapped in single quotes on POSIX shells and double quotes on
+ * Windows `cmd.exe` (see {@link QueryCommand.quoteEncodedQuery}). Inside either
+ * wrapper the relational operators encoded queries rely on (`<`, `>`, `^`) are
+ * literal. To stay safe regardless of which wrapper is used, we reject every
+ * character that could break out of *either* quote style — single quote, double
+ * quote, backtick, backslash — plus control characters. None of these are valid
+ * in a ServiceNow encoded query, so nothing legitimate is lost.
  */
 // eslint-disable-next-line no-control-regex -- control characters are intentionally rejected
-const UNSAFE_QUERY_PATTERN = /['\\\x00-\x1f]/;
+const UNSAFE_QUERY_PATTERN = /["'`\\\x00-\x1f]/;
 
 /**
  * Command to run a read-only Table REST API query against a ServiceNow instance
@@ -124,7 +129,7 @@ export class QueryCommand extends SessionAwareCLICommand {
    */
   protected validateArgs(args: Record<string, unknown>): void {
     const query = args.query;
-    if (typeof query !== 'string') {
+    if (typeof query !== 'string' || query.trim() === '') {
       throw new Error("Missing required argument 'query'. It must be a non-empty encoded query string.");
     }
 
@@ -145,13 +150,26 @@ export class QueryCommand extends SessionAwareCLICommand {
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
     this.validateArgs(args);
 
-    const table = this.sanitizeStringArg(args.table, 'table');
-    // Single-quote-wrap the validated encoded query so the shell treats relational
-    // operators (`<`, `>`, `^`) as literal text rather than redirections.
-    const quotedQuery = `'${String(args.query)}'`;
+    // This tool reads from a live ServiceNow instance, so it requires authentication.
+    // Resolve the alias from the explicit `auth` arg or the session, and fail fast
+    // with an actionable message rather than letting the SDK CLI error opaquely.
+    const providedAuth = typeof args.auth === 'string' ? args.auth : undefined;
+    const resolvedAuth = this.resolveAuthAlias(providedAuth);
+    if (!resolvedAuth) {
+      return CommandResultFactory.error(
+        'query_fluent_records requires authentication to a ServiceNow instance, but no credential alias was found. ' +
+        "Pass 'auth' with a stored profile alias, or set SN_INSTANCE_URL so a matching auth profile is loaded into the session at startup. " +
+        "Use the ServiceNow SDK 'now-sdk auth --add <instance>' command to create a profile."
+      );
+    }
 
-    // Default to a machine-readable JSON envelope.
-    const mappedArgs = { ...args, query: quotedQuery, output: args.output ?? 'json' };
+    const table = this.sanitizeStringArg(args.table, 'table');
+    // Wrap the validated encoded query so the shell treats relational operators
+    // (`<`, `>`, `^`) as literal text rather than redirections/escapes.
+    const quotedQuery = this.quoteEncodedQuery(String(args.query));
+
+    // Default to a machine-readable JSON envelope; inject the resolved auth alias.
+    const mappedArgs = { ...args, auth: resolvedAuth, query: quotedQuery, output: args.output ?? 'json' };
 
     // `--exclude-reference-link` defaults to true in the CLI; the only meaningful
     // override is to INCLUDE reference links, which yargs expresses as the
@@ -180,5 +198,17 @@ export class QueryCommand extends SessionAwareCLICommand {
       },
       prefixFlags
     );
+  }
+
+  /**
+   * Wrap a validated encoded query so the active shell treats it as a single
+   * literal token. `validateArgs` has already rejected every character that
+   * could break out of either quote style, so here we only pick the wrapper the
+   * platform shell understands: POSIX `sh` groups with single quotes; Windows
+   * `cmd.exe` (used by the runner's `shell: true`) does not honor single quotes
+   * but does suppress `<`, `>`, `|`, `&`, and `^` inside double quotes.
+   */
+  private quoteEncodedQuery(query: string): string {
+    return process.platform === 'win32' ? `"${query}"` : `'${query}'`;
   }
 }
