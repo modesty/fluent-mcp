@@ -2,12 +2,12 @@
 
 An [MCP server](https://modelcontextprotocol.io) that brings [ServiceNow Fluent SDK](https://www.servicenow.com/docs/bundle/yokohama-application-development/page/build/servicenow-sdk/concept/servicenow-fluent.html) capabilities to AI-assisted development environments. Enables natural language interaction with ServiceNow SDK commands, API specifications, code snippets, and development resources.
 
-Built for **`@servicenow/sdk` 4.7.1**.
+Built for **`@servicenow/sdk` 4.8.0**.
 
 ## Key Features
 
-- **Complete SDK Coverage** - ServiceNow SDK commands: `init`, `build`, `install`, `dependencies`, `transform`, `download`, `clean`, `pack`, `explain`
-- **Rich Resources** - API specifications, instructions, and code snippets for **58 ServiceNow metadata types**
+- **Complete SDK Coverage** - ServiceNow SDK commands: `init`, `build`, `install`, `dependencies`, `transform`, `download`, `clean`, `pack`, `explain`, `query`
+- **Rich Resources** - API specifications, instructions, and code snippets for **64 ServiceNow metadata types**
 - **API Documentation Lookup** - `explain_fluent_api` returns SDK docs for any Fluent API or guide — no project required
 - **Auto-Authentication** - Automatic auth profile detection and session management via environment variables
 - **Session-Aware** - Maintains working directory and auth context across commands
@@ -16,8 +16,8 @@ This MCP server implements the [Model Context Protocol](https://modelcontextprot
 
 ### Core
 
-- **Resources** - 275+ resources across 58 ServiceNow metadata types (API specs, instructions, snippets, prompts)
-- **Tools** - 10 ServiceNow SDK commands plus resource-lookup tools, with full parameter validation. Read tools (`get-api-spec`, `get-snippet`, `get-instruct`, `check_auth_status`) declare an `outputSchema` and return `structuredContent` for programmatic consumers
+- **Resources** - 300+ resources across 64 ServiceNow metadata types (API specs, instructions, snippets, prompts)
+- **Tools** - 11 ServiceNow SDK commands plus resource-lookup tools, with full parameter validation. Read tools (`get-api-spec`, `get-snippet`, `get-instruct`, `check_auth_status`) declare an `outputSchema` and return `structuredContent` for programmatic consumers
 - **Prompts** - Development workflow templates for common ServiceNow tasks (`coding_in_fluent`, `create_custom_ui`)
 - **Logging & Progress** - Structured logging for debugging and monitoring; progress notifications for long-running commands (build, install, transform, download) when the client supplies a progress token
 
@@ -70,6 +70,7 @@ Create a new Fluent app in ~/projects/time-off-tracker to manage employee PTO re
 | `download_fluent_app` | Download metadata from instance | `directory`, `incremental` (optional) |
 | `clean_fluent_app` | Clean output directory | `source` (optional) |
 | `pack_fluent_app` | Create installable artifact | `source` (optional) |
+| `query_fluent_records` | Read-only Table REST query against an instance (returns a JSON envelope) | `table` (required), `query` (required encoded query), `fields`, `limit`, `offset`, `displayValue`, `auth` (auto-injected) |
 
 > **Note:** Authentication is automatically configured at startup via environment variables. The `auth` parameter is auto-injected from the session for commands that require instance access. Use `init_fluent_app` to establish working directory context for subsequent commands.
 
@@ -100,7 +101,7 @@ Standardized URI patterns following MCP specification:
 
 ### Supported Metadata Types
 
-58 metadata types across the following categories:
+64 metadata types across the following categories:
 
 **Core Types:** `acl`, `application-menu`, `business-rule`, `client-script`, `cross-scope-privilege`, `data-policy`, `form`, `import-set`, `instance-scan`, `list`, `property`, `role`, `scheduled-script`, `script-action`, `script-include`, `scripted-rest`, `sla`, `table`, `ui-action`, `ui-page`, `ui-policy`, `user-preference`
 
@@ -110,7 +111,9 @@ Standardized URI patterns following MCP specification:
 
 **Email:** `email-notification`, `inbound-email-action`
 
-**Automation & Workflow:** `flow`, `custom-action`
+**Automation & Workflow:** `flow`, `custom-action`, `playbook`
+
+**Integration & Connections:** `alias`, `alias-template`, `retry-policy`, `rest-message`, `data-lookup`
 
 **AI & Now Assist:** `ai-agent`, `ai-agent-workflow`, `now-assist-skill-config`
 
@@ -120,9 +123,22 @@ Standardized URI patterns following MCP specification:
 
 **ATF (Automated Test Framework):** `atf-appnav`, `atf-catalog-action`, `atf-catalog-validation`, `atf-catalog-variable`, `atf-email`, `atf-form`, `atf-form-action`, `atf-form-declarative-action`, `atf-form-field`, `atf-form-sp`, `atf-reporting`, `atf-rest-api`, `atf-rest-assert-payload`, `atf-server`, `atf-server-catalog-item`, `atf-server-record`
 
-### What's new in 4.7.x
+### What's new in 4.8.x
 
-This release of the MCP server tracks `@servicenow/sdk` 4.7.1 and adds support for the following Fluent APIs and SDK enhancements:
+This release of the MCP server tracks `@servicenow/sdk` 4.8.0 and adds support for the following Fluent APIs and SDK enhancements:
+
+- **New metadata type**: `playbook` — the `PlaybookDefinition` API (`sys_pd_process_definition`, from `@servicenow/sdk/automation`) for guided, record-driven multi-step processes with lanes, activities, triggers, and inputs/outputs.
+- **New metadata type**: `rest-message` — the `RestMessage` API (`sys_rest_message`) for outbound HTTP integrations with shared auth/headers and callable functions.
+- **New metadata types**: `alias` and `alias-template` — the `Alias` (`sys_alias`) and `AliasTemplate` (`sys_alias_templates`) APIs for Connection & Credential aliases and reusable connection-setup templates.
+- **New metadata type**: `retry-policy` — the `RetryPolicy` API (`sys_retry_policy`) controlling transient-failure handling for connections (fixed-interval, exponential-backoff, or `Retry-After`).
+- **New metadata type**: `data-lookup` — the `DataLookup` API (`dl_definition`) that auto-copies field values from a matcher table to a source record.
+- **Declarative deletion (`Now.del()`)** — top-level statement to remove records by coalesce keys or sys_id.
+- **Type enhancements** — `$override` on `DataPolicy`/`UserPreference`; `$meta.installMethod` on `Record`/`Acl`/`Alias`/`UserPreference`; ACL `field` accepts known field names, system columns, or `'*'`; `Table` `accessibleFrom` now defaults to `'public'`.
+- **New CLI tool** — `query_fluent_records` wraps `now-sdk query` for read-only Table REST queries (JSON envelope output).
+
+### Previously (4.7.x)
+
+This release of the MCP server tracks `@servicenow/sdk` 4.8.0 and adds support for the following Fluent APIs and SDK enhancements:
 
 - **New metadata type**: `data-policy` — the `DataPolicy` API (`sys_data_policy2`) for server-side mandatory/read-only field enforcement that cannot be bypassed via API, import, or web service.
 - **Flow error handling & parallelism** — `wfa.flowLogic.tryCatch`, `wfa.flowLogic.doInParallel`, and `wfa.flowLogic.appendToFlowVariables` (append to `Array.Object` flow variables).
@@ -141,7 +157,7 @@ Added `custom-action`, `inbound-email-action`, `sp-header-footer`, and `sp-page-
 
 ## Configuration
 
-**Requirements:** Node.js 20.18.0+, npm 11.4.1+, `@servicenow/sdk` 4.7.1
+**Requirements:** Node.js 20.18.0+, npm 11.4.1+, `@servicenow/sdk` 4.8.0
 
 ### MCP Client Setup
 
@@ -275,7 +291,7 @@ npm run build && npm run inspect
 3. **Test Version:**
    - Set `flag` parameter to `-v`
    - Click **Execute**
-   - Verify response shows the SDK version (e.g., `4.7.1`)
+   - Verify response shows the SDK version (e.g., `4.8.0`)
 4. **Test Help:**
    - Set `flag` parameter to `-h`
    - Set `command` parameter to `build`
