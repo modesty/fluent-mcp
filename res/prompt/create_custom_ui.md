@@ -1,17 +1,13 @@
 ---
 title: "Create a Custom UI with Fluent (ServiceNow SDK)"
-description: "Guide for creating custom UIs with React, Svelte, Vue.js, or SolidJS using the Fluent (ServiceNow SDK) UiPage API"
+description: "Guide for creating custom UIs with React (18.2.0) using the Fluent (ServiceNow SDK) UiPage API"
 ---
 
-# Create a Custom UI with Framework You Choose
+# Create a Custom UI with React
 
-Starting Fluent v4, you can create custom UIs using frameworks of your choice, such as React, Svelte, Vue.js, or SolidJS. This guide will walk you through the steps to set up a custom UI project.
+Fluent (ServiceNow SDK) lets you build front-end applications that run on ServiceNow. **Current UI Page guidance mandates React:** use [React](https://react.dev/) 18.2.0 together with the `@servicenow/react-components` library. Do not use vanilla JavaScript, jQuery, or another framework for a supported UI Page implementation.
 
-Fluent (ServiceNow SDK) supports building front-end applications with standard frameworks to run on ServiceNow! For this first release, we are natively supporting [React](https://react.dev/) out of the box, and we are aiming to support a "bring your own front end" (BYOF) approach. This new feature will let you use a more modern development experience for building UI applications.
-
-To get started building front ends, simply choose a template with included front-end framework support such as now-sdk + fullstack React when running init to get started!
-
-This is just the beginning of the BYOF support we are adding to the SDK and we will be following up soon with more support for providing your own bundler and tooling for other frameworks like Svelte, Vue, etc...
+To get started, choose a React template when running `init` — the SDK ships full-stack `javascript.react` and `typescript.react` templates. The CLI also exposes a `typescript.vue` template, but template availability is a technical capability, not a statement of UI Page support. Follow the installed UI Page guidance and use React for new UI Pages.
 
 ## How does it work
 
@@ -73,13 +69,11 @@ if (rootElement) {
 When you are ready, just build and install then open the UI Page on the instance to view your application!
 
 - React Sample: https://github.com/ServiceNow/sdk-examples/tree/main/react-ui-page-ts-sample
-- Svelte Sample: https://github.com/ServiceNow/sdk-examples/tree/main/svelte-ui-page-sample
-- Vue Sample: https://github.com/ServiceNow/sdk-examples/tree/main/vue-ui-page-sample
-- SolidJS Sample: https://github.com/ServiceNow/sdk-examples/tree/main/solidjs-ui-page-sample
+- Vue Sample (CLI template capability; not the supported UI Page path): https://github.com/ServiceNow/sdk-examples/tree/main/vue-ui-page-sample
 
 ## Limitations
 
-- Only hash routing is currently supported by UI Pages.
+- Client-side routing must use query strings (`?view=details`) via `URLSearchParams`. NEVER use hash-based routing (`#/path`) — it is not supported by UI Pages.
 - Maximum file size of assets is limited to the `com.glide.attachment.max_size` system property
 - Preloading content linked from HTML isn't supported (`rel="preload"`)
 - Relative style sheets linked from HTML aren't supported (`rel="stylesheet"`). Import your style sheets into code instead (`import "path/to/style-sheet"`)

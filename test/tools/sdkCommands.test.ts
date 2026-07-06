@@ -134,8 +134,8 @@ describe('SDK Command Tools', () => {
 
     // Verify the command was called with expected arguments
     expect(mockRunner.run).toHaveBeenCalledWith(
-      'npx',  // Resolved SDK CLI (mocked to npx fallback in tests)
-      expect.arrayContaining(['@servicenow/sdk', 'auth', '--help']),  // Args with resolved base
+      process.execPath,
+      expect.arrayContaining(['/test/node_modules/@servicenow/sdk/bin/index.js', 'auth', '--help']),
       expect.any(String),  // Working directory should be provided (project root path)
       undefined, // stdinInput
       10000     // timeoutMs

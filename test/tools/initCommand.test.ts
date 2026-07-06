@@ -344,10 +344,9 @@ describe("InitCommand", () => {
     await initCommand.execute(args);
     
     expect(mockExecutor.process).toHaveBeenCalledWith(
-      'npx',
+      process.execPath,
       [
-        '-y',
-        '@servicenow/sdk', 
+        '/test/node_modules/@servicenow/sdk/bin/index.js',
         'init', 
         '--from', 'a1b2c3d4e5f6789012345678901234ab',
         '--auth', 'test-auth'
@@ -373,10 +372,9 @@ describe("InitCommand", () => {
     
     // SDK v4.5.0: init no longer injects --auth for creation (only for conversion)
     expect(mockExecutor.process).toHaveBeenCalledWith(
-      'npx',
+      process.execPath,
       [
-        '-y',
-        '@servicenow/sdk',
+        '/test/node_modules/@servicenow/sdk/bin/index.js',
         'init',
         '--appName', '"Test App"',
         '--packageName', 'test-app',
@@ -576,7 +574,7 @@ describe("InitCommand", () => {
     
     // Should execute conversion flow
     expect(mockExecutor.process).toHaveBeenCalledWith(
-      'npx',
+      process.execPath,
       expect.arrayContaining(['--from', 'a1b2c3d4e5f6789012345678901234ab']),
       false,
       '/valid-dir'
@@ -596,7 +594,7 @@ describe("InitCommand", () => {
     
     // Should execute creation flow
     expect(mockExecutor.process).toHaveBeenCalledWith(
-      'npx',
+      process.execPath,
       expect.arrayContaining(['--appName', '"Test App"']),
       false,
       '/valid-dir'

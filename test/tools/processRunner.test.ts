@@ -22,8 +22,10 @@ describe('NodeProcessRunner logging level', () => {
 
   it('logs spawn, stdout, and exit at DEBUG — not INFO', async () => {
     const runner = new NodeProcessRunner();
-    // `shell: true`, so pass a plain shell command (avoids quoting pitfalls).
-    const result = await runner.run('echo', ['hello-from-child']);
+    const result = await runner.run(
+      process.execPath,
+      ['-e', "process.stdout.write('hello-from-child')"]
+    );
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('hello-from-child');
@@ -41,13 +43,43 @@ describe('NodeProcessRunner logging level', () => {
 
   it('logs child stderr at DEBUG', async () => {
     const runner = new NodeProcessRunner();
-    // Redirect echo's stdout to stderr via the shell.
-    await runner.run('echo', ['err-from-child', '1>&2']);
+    await runner.run(process.execPath, ['-e', "process.stderr.write('err-from-child')"]);
 
     const debugText = joinCalls(mockedLogger.debug);
     expect(debugText).toContain('[STDERR]');
 
     const infoText = joinCalls(mockedLogger.info);
     expect(infoText).not.toContain('[STDERR]');
+  });
+});
+
+describe('NodeProcessRunner shell-free execution (H1 injection defense)', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('passes spaces, globs, metacharacters, and newlines through as inert literals', async () => {
+    const runner = new NodeProcessRunner();
+    // Spaces, `;`, `$()`, a newline, `|`, and `>` — all of which a shell would
+    // interpret as syntax. Shell-free, they must survive verbatim as one argv[1].
+    const payload = 'a b;*.ts?c$(whoami)\nrm|x>y';
+    const result = await runner.run(
+      process.execPath,
+      ['-e', 'process.stdout.write(process.argv[1])', payload]
+    );
+
+    expect(result.exitCode).toBe(0);
+    // No command substitution ran, no split on spaces/newlines, no redirection.
+    expect(result.stdout).toBe(payload);
+  });
+
+  it('does not execute an injected command via `$( )` substitution', async () => {
+    const runner = new NodeProcessRunner();
+    // If a shell interpreted this, `whoami` would run and its output would appear.
+    const payload = '$(whoami)';
+    const result = await runner.run(
+      process.execPath,
+      ['-e', 'process.stdout.write(process.argv[1])', payload]
+    );
+
+    expect(result.stdout).toBe('$(whoami)');
   });
 });

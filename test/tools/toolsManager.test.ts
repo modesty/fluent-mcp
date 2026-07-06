@@ -5,6 +5,7 @@
  * This file only tests the ToolsManager-specific functionality
  */
 import { ToolsManager } from "../../src/tools/toolsManager.js";
+import { z } from "zod";
 
 // Mock the Model Context Protocol SDK
 jest.mock("@modelcontextprotocol/sdk/server/mcp.js", () => {
@@ -99,6 +100,37 @@ describe("ToolsManager", () => {
 
   test("should initialize and register tools", () => {
     expect(toolsManager).toBeDefined();
+  });
+
+  test("registers every resource tool with a strict object input schema", () => {
+    expect(mockMcpServer.registerTool).toHaveBeenCalledTimes(4);
+
+    for (const [name, config] of mockMcpServer.registerTool.mock.calls) {
+      expect(config.inputSchema).toBeInstanceOf(z.ZodObject);
+      expect(config.inputSchema.safeParse({ undeclared: true }).success).toBe(false);
+
+      if (name === "check_auth_status") {
+        expect(config.inputSchema.safeParse({}).success).toBe(true);
+      }
+    }
+  });
+
+  test("passes empty args, not MCP callback metadata, to a zero-argument command", async () => {
+    const checkAuthRegistration = mockMcpServer.registerTool.mock.calls.find(
+      ([name]: [string]) => name === "check_auth_status"
+    );
+    expect(checkAuthRegistration).toBeDefined();
+
+    const [, , handler] = checkAuthRegistration;
+    const metadata = { _meta: { progressToken: "token" } };
+    await handler({}, metadata);
+
+    const { CheckAuthStatusCommand } = jest.requireMock(
+      "../../src/tools/resources/resourceTools.js"
+    );
+    const command = CheckAuthStatusCommand.mock.results.at(-1).value;
+    expect(command.execute).toHaveBeenCalledWith({});
+    expect(command.execute).not.toHaveBeenCalledWith(metadata);
   });
   
   test("should format command result correctly", () => {

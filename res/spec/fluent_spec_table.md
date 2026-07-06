@@ -41,12 +41,14 @@ Table({
 // Set `augments` to the target table name; when set, ONLY `schema` is allowed — all other table-level properties
 // (name, extends, label, display, audit, etc.) are rejected by the TypeScript compiler. The build produces
 // `sys_dictionary` records for each column but does NOT create a `sys_db_object` (the table already exists).
-// Added columns MUST be prefixed with `u_` (the compiler enforces this when augmenting). The exported variable name should match the augmented table name.
+// Added column names MUST begin with the current app's ownership prefix to avoid collisions with platform fields:
+// `<scope>_` in a named custom scope (e.g. `x_acme_`), or `u_` in global and Store-app contexts.
+// The exported variable name should match the augmented table name.
 export const incident = Table({
     augments: 'incident',          // string, mandatory in augment mode — the full name of the existing table to extend
     schema: {                       // only `schema` is configurable alongside `augments`
-        u_escalation_reason: StringColumn({ label: 'Escalation Reason', maxLength: 500 }),
-        u_reviewed: BooleanColumn({ label: 'Reviewed' }),
+        x_acme_escalation_reason: StringColumn({ label: 'Escalation Reason', maxLength: 500 }),
+        x_acme_reviewed: BooleanColumn({ label: 'Reviewed' }),
     },
 })
 

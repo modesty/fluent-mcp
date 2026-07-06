@@ -1,10 +1,14 @@
 import { CLICommand, CommandArgument, CommandProcessor, CommandResult } from '../../utils/types.js';
 
 /**
- * Dangerous shell characters that could enable command injection
- * These patterns are rejected in string arguments to prevent security vulnerabilities
+ * Dangerous shell characters that could enable command injection.
+ * Rejected in string arguments as defense-in-depth (the primary protection is
+ * spawning the bundled CLI shell-free; see processRunner). Includes newline, CR,
+ * and tab — a newline acts as a command separator in a shell, so it must never
+ * be treated as ordinary whitespace. Space is intentionally allowed: it is
+ * legitimate in file paths and is inert on the shell-free spawn path.
  */
-const DANGEROUS_SHELL_PATTERN = /[;&|`$(){}[\]<>\\]/;
+const DANGEROUS_SHELL_PATTERN = /[;&|`$(){}[\]<>\\\n\r\t]/;
 
 /**
  * Base abstract class for all CLI commands

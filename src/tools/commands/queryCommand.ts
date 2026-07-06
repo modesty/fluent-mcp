@@ -2,28 +2,20 @@ import { CommandArgument, CommandResult, CommandResultFactory } from '../../util
 import { SessionAwareCLICommand } from './sessionAwareCommand.js';
 
 /**
- * Characters that would let an encoded-query value break out of the shell
- * quoting applied before the value reaches the shell, or inject control flow.
- *
- * The query is wrapped in single quotes on POSIX shells and double quotes on
- * Windows `cmd.exe` (see {@link QueryCommand.quoteEncodedQuery}). Inside either
- * wrapper the relational operators encoded queries rely on (`<`, `>`, `^`) are
- * literal. To stay safe regardless of which wrapper is used, we reject every
- * character that could break out of *either* quote style — single quote, double
- * quote, backtick, backslash — plus control characters. None of these are valid
- * in a ServiceNow encoded query, so nothing legitimate is lost.
+ * Control characters can obscure command boundaries in logs and are not valid
+ * encoded-query content. Printable punctuation is allowed because the process
+ * runner passes the query as one literal argv entry without a shell.
  */
 // eslint-disable-next-line no-control-regex -- control characters are intentionally rejected
-const UNSAFE_QUERY_PATTERN = /["'`\\\x00-\x1f]/;
+const UNSAFE_QUERY_PATTERN = /[\x00-\x1f\x7f]/;
 
 /**
  * Command to run a read-only Table REST API query against a ServiceNow instance
  * (SDK v4.8.0+ `now-sdk query`). Returns matching records as a JSON envelope.
  *
  * Auth is auto-injected from the session. The encoded query commonly contains
- * shell-relational operators (`<`, `>`, `^`), so the query value is validated to
- * exclude quote/backslash/control characters and then single-quote-wrapped so the
- * shell treats it as one literal token.
+ * shell-relational operators (`<`, `>`, `^`); it is validated and passed as one
+ * literal argv entry to the shell-free process runner.
  */
 export class QueryCommand extends SessionAwareCLICommand {
   name = 'query_fluent_records';
@@ -118,14 +110,15 @@ export class QueryCommand extends SessionAwareCLICommand {
   ];
 
   /**
-   * Validate query arguments. Reuses the base type/injection checks for the
-   * simple identifier fields, then applies query-specific validation that
-   * permits encoded-query operators while still rejecting shell-injection risks.
+   * Validate query arguments. Reuses the base type checks and conservative
+   * string validation for simple identifier fields, then applies query-specific
+   * validation that permits printable encoded-query operators and punctuation.
    *
    * The base check sanitizes every string arg against the shell-metacharacter
-   * pattern, which would reject the relational operators (`<`, `>`) common in
-   * encoded queries. We therefore hand the base a benign placeholder for `query`
-   * (preserving its required/type checks) and validate the real value here.
+   * pattern, which would reject printable operators (`<`, `>`, `&`, and others)
+   * that are legitimate query data on the shell-free execution path. We hand the
+   * base a benign placeholder for `query` (preserving its required/type checks)
+   * and reject only control characters in the real value.
    */
   protected validateArgs(args: Record<string, unknown>): void {
     const query = args.query;
@@ -137,7 +130,7 @@ export class QueryCommand extends SessionAwareCLICommand {
 
     if (UNSAFE_QUERY_PATTERN.test(query)) {
       throw new Error(
-        "Invalid characters in argument 'query': single quotes, backslashes, and control characters are not allowed."
+        "Invalid characters in argument 'query': control characters are not allowed."
       );
     }
 
@@ -164,26 +157,30 @@ export class QueryCommand extends SessionAwareCLICommand {
     }
 
     const table = this.sanitizeStringArg(args.table, 'table');
-    // Wrap the validated encoded query so the shell treats relational operators
-    // (`<`, `>`, `^`) as literal text rather than redirections/escapes.
-    const quotedQuery = this.quoteEncodedQuery(String(args.query));
 
-    // Default to a machine-readable JSON envelope; inject the resolved auth alias.
-    const mappedArgs = { ...args, auth: resolvedAuth, query: quotedQuery, output: args.output ?? 'json' };
+    // The encoded query is a literal argv entry. Do not add shell quotes: with
+    // shell=false they would reach now-sdk as data and change query semantics.
+    // It lives only in this CLI token list so executeSdkCommand can re-validate
+    // the raw value in mappedArgs without emitting a duplicate --query flag.
+    const queryToken = String(args.query);
 
     // `--exclude-reference-link` defaults to true in the CLI; the only meaningful
     // override is to INCLUDE reference links, which yargs expresses as the
     // `--no-` negation. Inject it explicitly (flag order is irrelevant to yargs).
-    const prefixFlags: string[] = [table];
+    const prefixFlags: string[] = [table, '--query', queryToken];
     if (args.excludeReferenceLink === false) {
       prefixFlags.push('--no-exclude-reference-link');
     }
+
+    // Default to a machine-readable JSON envelope; inject the resolved auth alias.
+    // `query` stays RAW in the args map (for re-validation); the flag is emitted
+    // via prefixFlags above, so it is intentionally absent from the flag mapping.
+    const mappedArgs = { ...args, auth: resolvedAuth, output: args.output ?? 'json' };
 
     return this.executeSdkCommand(
       'query',
       mappedArgs,
       {
-        query: '--query',
         fields: '--fields',
         limit: '--limit',
         offset: '--offset',
@@ -198,17 +195,5 @@ export class QueryCommand extends SessionAwareCLICommand {
       },
       prefixFlags
     );
-  }
-
-  /**
-   * Wrap a validated encoded query so the active shell treats it as a single
-   * literal token. `validateArgs` has already rejected every character that
-   * could break out of either quote style, so here we only pick the wrapper the
-   * platform shell understands: POSIX `sh` groups with single quotes; Windows
-   * `cmd.exe` (used by the runner's `shell: true`) does not honor single quotes
-   * but does suppress `<`, `>`, `|`, `&`, and `^` inside double quotes.
-   */
-  private quoteEncodedQuery(query: string): string {
-    return process.platform === 'win32' ? `"${query}"` : `'${query}'`;
   }
 }

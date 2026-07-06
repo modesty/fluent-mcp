@@ -7,7 +7,9 @@
  * roots that are not Fluent projects, so `npx` tries to fetch a registry
  * package literally named `now-sdk` → 404. fluent-mcp bundles
  * `@servicenow/sdk`, so we resolve and run its bundled CLI directly regardless
- * of cwd, falling back to `npx -y @servicenow/sdk` only if resolution fails.
+ * of cwd. Since the SDK is a runtime dependency, failure to resolve it indicates
+ * a broken installation and must fail closed rather than downloading code at
+ * execution time.
  */
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -18,14 +20,11 @@ import logger from './logger.js';
 
 /** A resolved CLI invocation: the executable plus its leading arguments. */
 export interface SdkCliInvocation {
-  /** The command to spawn (`node` for the bundled CLI, or `npx`). */
+  /** The current Node.js executable used to run the bundled CLI. */
   command: string;
-  /** Leading args before the SDK subcommand (e.g. the bin path, or `-y @servicenow/sdk`). */
+  /** Leading args before the SDK subcommand (the bundled CLI entry path). */
   baseArgs: string[];
 }
-
-/** Robust fallback that fetches/uses the published package by name. */
-const NPX_FALLBACK: SdkCliInvocation = { command: 'npx', baseArgs: ['-y', '@servicenow/sdk'] };
 
 let cached: SdkCliInvocation | undefined;
 
@@ -61,20 +60,23 @@ function resolveBundledSdkBin(): string | undefined {
 }
 
 /**
- * Resolve how to invoke the SDK CLI. Prefers the bundled copy (`node <bin>`),
- * falls back to `npx -y @servicenow/sdk`. Result is cached for the process.
+ * Resolve how to invoke the bundled SDK CLI. The result is cached for the
+ * process.
+ *
+ * @throws Error when the required runtime dependency cannot be resolved.
  */
 export function resolveSdkCli(): SdkCliInvocation {
   if (cached) return cached;
 
   const binPath = resolveBundledSdkBin();
-  if (binPath) {
-    logger.debug(`Resolved bundled ServiceNow SDK CLI: ${binPath}`);
-    cached = { command: 'node', baseArgs: [binPath] };
-  } else {
-    logger.debug('Bundled ServiceNow SDK CLI not found; falling back to npx -y @servicenow/sdk');
-    cached = NPX_FALLBACK;
+  if (!binPath) {
+    throw new Error(
+      'Unable to resolve the bundled @servicenow/sdk CLI. ' +
+      'The fluent-mcp installation is incomplete; reinstall its dependencies before running SDK commands.'
+    );
   }
+  logger.debug(`Resolved bundled ServiceNow SDK CLI: ${binPath}`);
+  cached = { command: process.execPath, baseArgs: [binPath] };
   return cached;
 }
 

@@ -27,10 +27,13 @@ jest.mock('../src/config.js', () => ({
 // Globally mock logger to suppress stderr output during tests
 jest.mock('../src/utils/logger.js', () => require('./mocks/index.js').createLoggerMock());
 
-// Globally mock SDK CLI resolution to a deterministic, valid invocation so
-// command tests assert stable args. Real resolution is covered in
+// Globally mock SDK CLI resolution to a deterministic invocation so legacy
+// command tests assert stable args. Production resolution is covered in
 // test/utils/sdkCli.test.ts (which un-mocks this module).
 jest.mock('../src/utils/sdkCli.js', () => ({
-  resolveSdkCli: jest.fn(() => ({ command: 'npx', baseArgs: ['-y', '@servicenow/sdk'] })),
+  resolveSdkCli: jest.fn(() => ({
+    command: process.execPath,
+    baseArgs: ['/test/node_modules/@servicenow/sdk/bin/index.js'],
+  })),
   resetSdkCliCache: jest.fn(),
 }));

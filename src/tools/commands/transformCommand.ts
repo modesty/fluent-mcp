@@ -8,7 +8,9 @@ import { SessionAwareCLICommand } from './sessionAwareCommand.js';
 export class TransformCommand extends SessionAwareCLICommand {
   name = 'fluent_transform';
   description = 'Download and convert XML metadata records from a ServiceNow instance or local path into Fluent source code. Requires instance authentication when downloading from instance (auto-injected from session, or pass auth explicitly). Use from for local XML files, or omit to pull from instance. Use table (SDK v4.7.0+) to transform by table hierarchy, optionally with id to target a specific record and its relationships.';
-  annotations = { openWorldHint: true };
+  // Writes/overwrites generated Fluent source in the working directory, so it can
+  // clobber local edits — flag as destructive so clients confirm before running.
+  annotations = { openWorldHint: true, destructiveHint: true };
   timeoutMs = 60_000;
   arguments: CommandArgument[] = [
     {
