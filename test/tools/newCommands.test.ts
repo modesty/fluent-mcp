@@ -66,8 +66,8 @@ describe('New SDK Commands', () => {
       expect(result.success).toBe(true);
       expect(result.output).toContain('Mock command output');
       expect(mockProcessor.process).toHaveBeenCalledWith(
-        'npx',
-        ['-y', '@servicenow/sdk', 'download', 'my-app'],
+        process.execPath,
+        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'download', 'my-app'],
         false,
         '/mock/working/dir',
         undefined, // stdinInput
@@ -87,8 +87,8 @@ describe('New SDK Commands', () => {
 
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
-        'npx',
-        ['-y', '@servicenow/sdk', 'download', 'my-app', '--source', './src', '--incremental', '--debug'],
+        process.execPath,
+        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'download', 'my-app', '--source', './src', '--incremental', '--debug'],
         false,
         '/mock/working/dir',
         undefined, // stdinInput
@@ -126,8 +126,8 @@ describe('New SDK Commands', () => {
 
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
-        'npx',
-        ['-y', '@servicenow/sdk', 'clean'],
+        process.execPath,
+        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'clean'],
         false,
         '/mock/working/dir',
         undefined, // stdinInput
@@ -145,8 +145,8 @@ describe('New SDK Commands', () => {
 
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
-        'npx',
-        ['-y', '@servicenow/sdk', 'clean', '--source', 'src', '--debug'],
+        process.execPath,
+        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'clean', '--source', 'src', '--debug'],
         false,
         '/mock/working/dir',
         undefined, // stdinInput
@@ -184,8 +184,8 @@ describe('New SDK Commands', () => {
 
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
-        'npx',
-        ['-y', '@servicenow/sdk', 'pack'],
+        process.execPath,
+        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'pack'],
         false,
         '/mock/working/dir',
         undefined, // stdinInput
@@ -203,8 +203,8 @@ describe('New SDK Commands', () => {
 
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
-        'npx',
-        ['-y', '@servicenow/sdk', 'pack', '--source', './build', '--debug'],
+        process.execPath,
+        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'pack', '--source', './build', '--debug'],
         false,
         '/mock/working/dir',
         undefined, // stdinInput
@@ -262,8 +262,8 @@ describe('New SDK Commands', () => {
 
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
-        'npx',
-        ['-y', '@servicenow/sdk', 'explain', 'BusinessRule'],
+        process.execPath,
+        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', 'BusinessRule'],
         false,
         '/mock/working/dir',
         undefined,
@@ -282,8 +282,8 @@ describe('New SDK Commands', () => {
 
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
-        'npx',
-        ['-y', '@servicenow/sdk', 'explain', 'Acl', '--source', './src', '--debug'],
+        process.execPath,
+        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', 'Acl', '--source', './src', '--debug'],
         false,
         '/mock/working/dir',
         undefined,
@@ -298,8 +298,8 @@ describe('New SDK Commands', () => {
 
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
-        'npx',
-        ['-y', '@servicenow/sdk', 'explain', '--list'],
+        process.execPath,
+        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', '--list'],
         false,
         '/mock/working/dir',
         undefined,
@@ -314,8 +314,8 @@ describe('New SDK Commands', () => {
 
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
-        'npx',
-        ['-y', '@servicenow/sdk', 'explain', 'flow', '--list'],
+        process.execPath,
+        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', 'flow', '--list'],
         false,
         '/mock/working/dir',
         undefined,
@@ -334,8 +334,8 @@ describe('New SDK Commands', () => {
 
       expect(result.success).toBe(true);
       expect(mockProcessor.process).toHaveBeenCalledWith(
-        'npx',
-        ['-y', '@servicenow/sdk', 'explain', 'BusinessRule', '--format', 'raw', '--peek'],
+        process.execPath,
+        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', 'BusinessRule', '--format', 'raw', '--peek'],
         false,
         '/mock/working/dir',
         undefined,

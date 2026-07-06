@@ -1,6 +1,6 @@
 /**
  * Tests for the SDK v4.8.0 `query` command wrapper (QueryCommand).
- * Verifies metadata, argv construction (positional table + shell-quoted encoded
+ * Verifies metadata, argv construction (positional table + literal encoded
  * query + JSON envelope default), the `--no-exclude-reference-link` negation, the
  * required-authentication gate, and the query-specific validation that permits
  * encoded-query operators while rejecting shell-injection characters.
@@ -18,10 +18,6 @@ jest.mock('../../src/utils/sessionManager.js', () =>
     getAuthAlias: jest.fn().mockReturnValue('session-alias'),
   })
 );
-
-// The encoded query is single-quoted on POSIX shells and double-quoted on Windows.
-const Q = process.platform === 'win32' ? '"' : "'";
-const quoted = (query: string) => `${Q}${query}${Q}`;
 
 describe('QueryCommand', () => {
   let mockProcessor: { process: jest.Mock };
@@ -46,17 +42,17 @@ describe('QueryCommand', () => {
     expect(required).toEqual(['table', 'query']);
   });
 
-  test('should build argv with positional table, shell-quoted query, JSON envelope, and session auth', async () => {
+  test('should build argv with positional table, literal query, JSON envelope, and session auth', async () => {
     const command = new QueryCommand(mockProcessor as never);
 
     const result = await command.execute({ table: 'incident', query: 'active=true^priority<=2' });
 
     expect(result.success).toBe(true);
     expect(mockProcessor.process).toHaveBeenCalledWith(
-      'npx',
+      process.execPath,
       [
-        '-y', '@servicenow/sdk', 'query', 'incident',
-        '--query', quoted('active=true^priority<=2'),
+        '/test/node_modules/@servicenow/sdk/bin/index.js', 'query', 'incident',
+        '--query', 'active=true^priority<=2',
         '--output', 'json',
         '--auth', 'session-alias',
       ],
@@ -92,9 +88,13 @@ describe('QueryCommand', () => {
     });
 
     const argv = mockProcessor.process.mock.calls[0][1] as string[];
-    expect(argv.slice(0, 4)).toEqual(['-y', '@servicenow/sdk', 'query', 'sys_user']);
+    expect(argv.slice(0, 3)).toEqual([
+      '/test/node_modules/@servicenow/sdk/bin/index.js',
+      'query',
+      'sys_user',
+    ]);
     expect(argv).toEqual(expect.arrayContaining([
-      '--query', quoted('active=true'),
+      '--query', 'active=true',
       '--fields', 'name,email',
       '--limit', '50',
       '--offset', '10',
@@ -140,25 +140,19 @@ describe('QueryCommand', () => {
     expect(argv).toEqual(expect.arrayContaining(['--auth', 'explicit-alias']));
   });
 
-  test('should reject encoded queries containing single quotes (shell-escape break-out)', async () => {
+  test.each([
+    "name=O'Reilly",
+    'name="quoted"&active=true',
+    'path=foo\\bar',
+    'name=`literal`$(whoami);*.ts',
+  ])('should pass printable punctuation as one literal query argv entry: %s', async (query) => {
     const command = new QueryCommand(mockProcessor as never);
-    await expect(command.execute({ table: 'incident', query: "name=';rm -rf /" }))
-      .rejects.toThrow(/Invalid characters in argument 'query'/);
-    expect(mockProcessor.process).not.toHaveBeenCalled();
-  });
+    const result = await command.execute({ table: 'incident', query });
 
-  test('should reject encoded queries containing double quotes (Windows break-out)', async () => {
-    const command = new QueryCommand(mockProcessor as never);
-    await expect(command.execute({ table: 'incident', query: 'name="x"&calc' }))
-      .rejects.toThrow(/Invalid characters in argument 'query'/);
-    expect(mockProcessor.process).not.toHaveBeenCalled();
-  });
-
-  test('should reject encoded queries containing a backslash', async () => {
-    const command = new QueryCommand(mockProcessor as never);
-    await expect(command.execute({ table: 'incident', query: 'name=foo\\bar' }))
-      .rejects.toThrow(/Invalid characters in argument 'query'/);
-    expect(mockProcessor.process).not.toHaveBeenCalled();
+    expect(result.success).toBe(true);
+    const argv = mockProcessor.process.mock.calls[0][1] as string[];
+    const queryIndex = argv.indexOf('--query');
+    expect(argv[queryIndex + 1]).toBe(query);
   });
 
   test('should reject encoded queries containing control characters', async () => {

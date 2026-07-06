@@ -27,6 +27,10 @@ import {
 export class InitCommand extends BaseCLICommand {
   name = 'init_fluent_app';
   description = 'Initialize a new Fluent (ServiceNow SDK) application or convert an existing scoped application. Set intent to "creation" for a new app (requires appName, packageName, scopeName, template) or "conversion" to convert from an instance sys_id or local directory (requires from, and auth for instance conversion). The workingDirectory must be an empty directory. After init, use build_fluent_app to compile.';
+  // Creates a local project directory and sets the session working directory; for
+  // conversion it also reads from an instance. Non-idempotent (a second run on a
+  // populated directory is refused), and open-world for the conversion path.
+  annotations = { openWorldHint: true, idempotentHint: false };
 
   private elicitator: InitElicitator;
 

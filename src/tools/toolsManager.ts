@@ -15,6 +15,7 @@ import {
   CheckAuthStatusCommand
 } from './resources/resourceTools.js';
 import { setRoots as setRootContextRoots } from '../utils/rootContext.js';
+import { buildInputZodSchema } from './toolSchema.js';
 
 /**
  * Manager for handling MCP tools registration and execution
@@ -105,48 +106,10 @@ export class ToolsManager {
   private registerToolFromCommand(command: CLICommand): void {
     if (!this.mcpServer) return;
 
-    // Convert command arguments to Zod schema
-    const schema: Record<string, z.ZodTypeAny> = {};
-
-    // Build schema from command arguments
-    for (const arg of command.arguments) {
-      let zodType: z.ZodTypeAny;
-
-      // Map command argument types to Zod types with descriptions for JSON Schema.
-      // Optional args use .nullable().optional() because LLMs commonly send null
-      // for "not provided" parameters, and z.string().optional() rejects null.
-      switch (arg.type) {
-        case 'string':
-          zodType = z.string().describe(arg.description);
-          break;
-        case 'number':
-          zodType = z.number().describe(arg.description);
-          break;
-        case 'boolean':
-          zodType = z.boolean().describe(arg.description);
-          break;
-        case 'array':
-          zodType = z.array(z.any()).describe(arg.description);
-          break;
-        default:
-          zodType = z.any().describe(arg.description);
-      }
-
-      // Make optional if not required — also accept null since LLMs often send null
-      if (!arg.required) {
-        zodType = zodType.nullable().optional();
-      }
-
-      schema[arg.name] = zodType;
-    }
-
-
-    // Create schema for MCP - use raw schema object, let MCP handle the z.object() wrapping
-    let inputSchema: any = undefined;
-    if (Object.keys(schema).length > 0) {
-      // Pass raw schema object, MCP will wrap it properly
-      inputSchema = schema;
-    }
+    // Build the enforced input schema from the single source of truth shared with
+    // the advertised tools/list schema (commandRegistry.toMCPTools), so the two
+    // can never drift. See src/tools/toolSchema.ts.
+    const inputSchema = buildInputZodSchema(command.arguments);
 
     // Register with MCP server.
     // Wrap the output shape in z.object() so the schema survives bundling — the

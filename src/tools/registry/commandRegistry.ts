@@ -1,6 +1,7 @@
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { CLICommand } from '../../utils/types.js';
+import { buildInputJsonSchema } from '../toolSchema.js';
 
 /**
  * Stores and retrieves commands, converts to MCP Tool format
@@ -37,22 +38,9 @@ export class CommandRegistry {
           // mis-converts zod v4 and omits `type`).
           outputSchema: z.toJSONSchema(z.object(command.outputSchema)) as Tool['outputSchema'],
         }),
-        inputSchema: {
-          type: 'object',
-          properties: command.arguments.reduce(
-            (props, arg) => {
-              props[arg.name] = {
-                type: arg.type === 'array' ? 'array' : arg.type,
-                description: arg.description,
-              };
-              return props;
-            },
-            {} as Record<string, { type: string; description: string }>
-          ),
-          required: command.arguments
-            .filter((arg) => arg.required)
-            .map((arg) => arg.name),
-        }
+        // Advertised input schema is derived from the SAME Zod shape enforced on
+        // tools/call (see src/tools/toolSchema.ts), so advertised == enforced.
+        inputSchema: buildInputJsonSchema(command.arguments),
       };
 
       // Add annotations if they exist

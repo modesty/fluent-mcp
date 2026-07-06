@@ -90,23 +90,40 @@ describe('SDK v4.7.0 Types - Integration Tests', () => {
   });
 
   describe('Updated Table resources (v4.7.0)', () => {
-    it('spec should document the augments mode and u_ prefix requirement', () => {
-      const content = read(SPEC_DIR, 'fluent_spec_table.md');
-      expect(content).toContain('augments');
-      expect(content).toContain('SDK v4.7.0');
-      expect(content).toContain('u_');
+    const tableAugmentResources = [
+      read(PROJECT_ROOT, 'README.md'),
+      read(PROMPT_DIR, 'coding_in_fluent.md'),
+      read(SPEC_DIR, 'fluent_spec_table.md'),
+      read(INSTRUCT_DIR, 'fluent_instruct_table.md'),
+      read(SNIPPET_DIR, 'fluent_snippet_table_0005.md'),
+    ];
+
+    it('documents ownership prefixes for named, global, and Store-app contexts everywhere', () => {
+      for (const content of tableAugmentResources) {
+        expect(content).toContain('ownership prefix');
+        expect(content).toMatch(/<scope>_/);
+        expect(content).toContain('x_acme_');
+        expect(content).toContain('`u_`');
+        expect(content).toContain('global and Store-app contexts');
+      }
     });
 
-    it('instruct should document table augments', () => {
-      const content = read(INSTRUCT_DIR, 'fluent_instruct_table.md');
-      expect(content).toContain('SDK v4.7.0');
-      expect(content).toContain('augments');
+    it('documents augments mode in each served table resource', () => {
+      for (const content of [
+        read(PROMPT_DIR, 'coding_in_fluent.md'),
+        read(SPEC_DIR, 'fluent_spec_table.md'),
+        read(INSTRUCT_DIR, 'fluent_instruct_table.md'),
+        read(SNIPPET_DIR, 'fluent_snippet_table_0005.md'),
+      ]) {
+        expect(content).toContain('augments');
+      }
     });
 
-    it('snippet 0005 should use augments with u_-prefixed columns', () => {
+    it('uses named-scope fields in snippet 0005', () => {
       const content = read(SNIPPET_DIR, 'fluent_snippet_table_0005.md');
       expect(content).toContain("augments: 'incident'");
-      expect(content).toContain('u_');
+      expect(content).toContain('x_acme_');
+      expect(content).not.toMatch(/^\s*u_/m);
     });
   });
 

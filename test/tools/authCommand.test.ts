@@ -61,9 +61,9 @@ describe("AuthCommand", () => {
     const result = await authCommand.execute(args);
 
     expect(mockCmdWriter.process).toHaveBeenCalledWith(
-      "npx",
+      process.execPath,
       expect.arrayContaining([
-        "@servicenow/sdk",
+        "/test/node_modules/@servicenow/sdk/bin/index.js",
         "auth",
         "--add",
         "foo",
@@ -97,8 +97,8 @@ describe("AuthCommand", () => {
     const args = { list: true, help: true, version: true };
     await authCommand.execute(args);
     expect(mockCmdWriter.process).toHaveBeenCalledWith(
-      "npx",
-      expect.arrayContaining(["@servicenow/sdk", "auth", "--list", "--help", "--version"]),
+      process.execPath,
+      expect.arrayContaining(["/test/node_modules/@servicenow/sdk/bin/index.js", "auth", "--list", "--help", "--version"]),
       false,
       "/mock/working/dir",
       undefined, // stdinInput (not needed for list/help/version)

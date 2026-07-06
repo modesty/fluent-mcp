@@ -35,12 +35,15 @@ export class NodeProcessRunner implements ProcessRunner {
         logger.warn(`Command execution timed out after ${effectiveTimeout}ms: ${command} ${args.join(' ')}`);
       }, effectiveTimeout);
 
+      // Commands and arguments are always separate argv entries. Never infer a
+      // shell requirement from an arbitrary command string: doing so would turn
+      // otherwise-literal user input into executable shell syntax.
       const options: SpawnOptionsWithoutStdio = {
         stdio: 'pipe',
-        shell: true,
+        shell: false,
         cwd, env, signal
       };
-      logger.debug(`Spawning child process: ${command} ${args.join(' ')}`, { cwd });
+      logger.debug(`Spawning child process (shell=false): ${command} ${args.join(' ')}`, { cwd });
 
       let child;
       try {

@@ -143,7 +143,7 @@ This release of the MCP server tracks `@servicenow/sdk` 4.8.0 and adds support f
 - **New metadata type**: `data-policy` — the `DataPolicy` API (`sys_data_policy2`) for server-side mandatory/read-only field enforcement that cannot be bypassed via API, import, or web service.
 - **Flow error handling & parallelism** — `wfa.flowLogic.tryCatch`, `wfa.flowLogic.doInParallel`, and `wfa.flowLogic.appendToFlowVariables` (append to `Array.Object` flow variables).
 - **Flow stages** — declare `stages` with `FlowStage({ label, value, … })` and activate them in the body via `wfa.stage(...)` for progress tracking.
-- **Table augments** — add columns to an existing platform/cross-scope table via `Table({ augments: '<table>', schema })`; added columns must be `u_`-prefixed.
+- **Table augments** — add columns to an existing platform/cross-scope table via `Table({ augments: '<table>', schema })`; added columns must use the current app's ownership prefix: `<scope>_` in a named custom scope (for example, `x_acme_`), or `u_` in global and Store-app contexts.
 - **AI Agent** — new `agentDescriptor`; `dataAccess` accepts `roleMap` (role names) or `roleList` (role sys_ids).
 - **NASK** — `securityControls` accepts `roleMap` (role names) alongside `roleRestrictions` (role sys_ids).
 - **Universal field override (`$override`)** — escape hatch on Fluent constructors to set unmodeled columns by DB column name.

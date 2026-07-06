@@ -96,6 +96,14 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
     flagMapping: Record<string, string | { flag: string; hasValue: boolean }> = {},
     positionalArgs: string[] = []
   ): Promise<CommandResult> {
+    // Defense-in-depth: validate/sanitize the caller's args before they become CLI
+    // tokens. The root injection defense is spawning shell-free (see processRunner);
+    // validation still rejects unexpected control characters at the command
+    // boundary. Run before auth injection so trusted session aliases aren't
+    // re-validated. Commands needing special characters (e.g. the query command's
+    // encoded operators) override validateArgs.
+    this.validateArgs(args);
+
     // Auto-resolve auth from session if 'auth' is mapped but not provided
     if ('auth' in flagMapping && !args.auth) {
       const sessionAuth = this.resolveAuthAlias();
