@@ -133,9 +133,9 @@ Fluent MCP is a Model Context Protocol (MCP) server that provides ServiceNow SDK
 
 ## SDK Version Compatibility
 
-The MCP server tracks a specific minor version of `@servicenow/sdk` to ensure that exposed APIs, metadata types, and CLI behavior remain in sync with the SDK reality. Each SDK upgrade is captured as a phase-by-phase plan under `doc/upgrade-sdk-<version>-plan.md`.
+The MCP server tracks a specific minor version of `@servicenow/sdk` to ensure that exposed APIs, metadata types, and CLI behavior remain in sync with the SDK reality. Each SDK upgrade is captured as a phase-by-phase plan under `.mosey/upgrade-sdk-<version>-plan.md`.
 
 | MCP version | `@servicenow/sdk` | Upgrade plan |
 |-------------|-------------------|--------------|
-| 0.2.0       | 4.6.0             | `doc/upgrade-sdk-4.6.0-plan.md` |
+| 0.2.0       | 4.6.0             | `.mosey/upgrade-sdk-4.6.0-plan.md` |
 | 0.1.x       | 4.5.0             | n/a (initial release line) |

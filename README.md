@@ -2,7 +2,7 @@
 
 An [MCP server](https://modelcontextprotocol.io) that brings [ServiceNow Fluent SDK](https://www.servicenow.com/docs/bundle/yokohama-application-development/page/build/servicenow-sdk/concept/servicenow-fluent.html) capabilities to AI-assisted development environments. Enables natural language interaction with ServiceNow SDK commands, API specifications, code snippets, and development resources.
 
-Built for **`@servicenow/sdk` 4.8.0**.
+Built for **`@servicenow/sdk` 4.8.1**.
 
 ## Key Features
 
@@ -157,7 +157,7 @@ Added `custom-action`, `inbound-email-action`, `sp-header-footer`, and `sp-page-
 
 ## Configuration
 
-**Requirements:** Node.js 20.18.0+, npm 11.4.1+, `@servicenow/sdk` 4.8.0
+**Requirements:** Node.js 20.18.0+, npm 11.4.1+, `@servicenow/sdk` 4.8.1
 
 ### MCP Client Setup
 
@@ -291,7 +291,7 @@ npm run build && npm run inspect
 3. **Test Version:**
    - Set `flag` parameter to `-v`
    - Click **Execute**
-   - Verify response shows the SDK version (e.g., `4.8.0`)
+   - Verify response shows the SDK version (e.g., `4.8.1`)
 4. **Test Help:**
    - Set `flag` parameter to `-h`
    - Set `command` parameter to `build`
