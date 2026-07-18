@@ -20,8 +20,7 @@ const example_section_1 = Record({ // create a first section to store the standa
     $id: Now.ID['section_1'],
     table: 'sys_ui_section',
     data: {
-        name: 'incident',
-        table: 'incident',
+        name: 'incident', // the table name the section is for (sys_ui_section has no separate `table` column)
         view: default_view,
         caption: '' // no caption for the first section
     }
@@ -31,8 +30,7 @@ const example_section_2 = Record({ // create a second section to store some addi
     $id: Now.ID['section_2'],
     table: 'sys_ui_section',
     data: {
-        name: 'incident',
-        table: 'incident',
+        name: 'incident', // the table name the section is for (sys_ui_section has no separate `table` column)
         view: default_view,
         caption: 'Additional fields'
     }

@@ -71,6 +71,13 @@ Fluent (ServiceNow SDK) is a TypeScript-based domain-specific language that allo
     - **ACL `field`** — the ACL `field` property accepts known schema field names, system columns, or the wildcard `'*'` (`keyof FullSchema<T> | SystemColumns | '*'`).
     - **Table `accessibleFrom`** — defaults to `'public'`; set `'package_private'` only to restrict cross-scope read access (note that doing so removes the table from some platform features such as Business Rules).
     - **CLI `now-sdk query`** — new read-only Table REST query command (surfaced as the `query_fluent_records` MCP tool) for inspecting instance data without leaving the terminal.
+10. **SDK v4.9.0 capabilities** — when generating code, take advantage of these additions where applicable:
+    - **UI Test Script (TestingLibrary) ATF step** — `atf.uiTestScript.runTest({ $id, script })` runs a TestingLibrary test body in the client test runner to test custom UI components (Angular/React widgets, embedded SPAs, custom workspaces, `now-*` web components) that the standard `atf.form.*` / `atf.catalog.*` steps cannot reach. Prefer `script: Now.include('./file.script.js')`; inside the body `screen`/`user`/`sn_atf`/`expect`/`waitFor`/`within`/`steps`/`params` are injected (no imports). See the `atf-ui-test-script` spec.
+    - **Multi-language choice labels** — a choice field's `choices` value may be an **array of `ChoiceConfig`** objects, each with a `language` (BCP 47) key, producing one translated `sys_choice` record per language: `choices: { 1: [{ label: 'Critical', language: 'en' }, { label: 'Critique', language: 'fr' }] }`. See the `column` spec.
+    - **`protectionPolicy` on AI Agent & AI Agentic Workflow** — `AiAgent` and `AiAgenticWorkflow` accept `protectionPolicy: 'read' | 'protected'` to control post-install edit/view access for other developers (same values as other `sys_policy`-backed APIs).
+    - **`Role.federatedId`** — the `Role` API accepts an optional `federatedId` string used to match a role to an externally federated role during identity federation.
+    - **Table index platform columns** — a table `index` entry's `element` may reference platform default columns (e.g. `'sys_created_on'`) in addition to custom columns.
+    - **Now Assist Skill Kit providers** — new LLM providers are selectable by name: `'Now LLM LTS Generic'`, `'Google Cloud Vertex AI'`, `'Amazon Bedrock'` (the `provider`/`model` fields are free strings — newer platform models are selectable by name).
 
 ## Working with Specific Metadata Types
 

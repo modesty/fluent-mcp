@@ -66,6 +66,7 @@ export enum ServiceNowMetadataType {
   ATF_SERVER = 'atf-server',
   ATF_SERVER_CATALOG_ITEM = 'atf-server-catalog-item',
   ATF_SERVER_RECORD = 'atf-server-record',
+  ATF_UI_TEST_SCRIPT = 'atf-ui-test-script',
   BUSINESS_RULE = 'business-rule',
   CATALOG_CLIENT_SCRIPT = 'catalog-client-script',
   CATALOG_ITEM = 'catalog-item',

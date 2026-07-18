@@ -10,6 +10,7 @@ AiAgent({
   securityAcl: {}, // SecurityAclUserAccessConfig, MANDATORY - auto-generates `sys_security_acl` + `sys_security_acl_role` records controlling who can invoke the agent
     // Shape: { $id: Now.ID['…'], type: 'Specific role' | …, roles: string[] (role names or sys_ids) }
   active: true, // boolean, optional - controls whether the agent is available for use (default: true)
+  protectionPolicy: '', // 'read' | 'protected', optional (SDK v4.9.0+) - post-install access control for other developers: 'read' = others can view but not change the configuration; 'protected' = others cannot change the record; omit to allow customization
   agentDescriptor: '', // AiAgentDescriptorType | '', optional (SDK v4.7.0+) - classifies how the agent was created / its access requirement; set on `sn_aia_agent_config`
     // Values: 'require_caller_id' | 'created_by_ai_agent_advisor' | 'created_by_build_agent'. Defaults to ''
   agentType: '', // 'internal' | 'external' | 'voice' | 'aia_internal', optional - specifies agent type (default: 'internal')

@@ -32,8 +32,10 @@ NowAssistSkillConfig(
   // Second argument: Prompt Configuration
   {
     providers: [], // ProviderPromptConfig[], mandatory - at least one provider with prompts
-      // Each provider: { provider: string (e.g., 'Now LLM Service', 'Azure OpenAI', 'Open AI', 'Google Gemini', 'AWS Claude'), providerAPI?: object, prompts: PromptSettings[], defaultPrompt?: string, defaultPromptVersion?: number }
+      // Each provider: { provider: string, providerAPI?: object, prompts: PromptSettings[], defaultPrompt?: string, defaultPromptVersion?: number }
+      // `provider` is a free string; known providers (SDK v4.9.0): 'Now LLM Service', 'Now LLM Generic', 'Now LLM LTS Generic', 'Azure OpenAI', 'Open AI', 'Google Gemini', 'Google Cloud Vertex AI', 'AWS Claude', 'Amazon Bedrock', 'IBM Watson', 'Perplexity', 'Aleph Alpha', 'Custom LLM Provider'
       // Each prompt: { $id, name, versions: [{ $id, model: string, temperature?: number, maxTokens?: number, promptState?: 'draft'|'published'|'test', prompt: string | ((p) => string) }] }
+      //   `model` is a free string naming a platform-available model (e.g. 'llm_generic_small_v2', 'gpt-4o-mini'); newer models are selectable by name as the platform/provider adds them.
       // In prompt builder callbacks, access inputs via p.input.fieldName and tool outputs via p.tool.ToolName.output
     defaultProvider: '', // string, optional - name of default provider (must match a provider's name)
   }

@@ -7,6 +7,7 @@ AiAgenticWorkflow({
   name: '', // string, mandatory - display name of the AI Agentic Workflow
   description: '', // string, mandatory - description of the AI Agentic Workflow
   active: true, // boolean, optional - whether the workflow is active (default: true)
+  protectionPolicy: '', // 'read' | 'protected', optional (SDK v4.9.0+) - post-install access control for other developers: 'read' = others can view but not change the configuration; 'protected' = others cannot change the record; omit to allow customization
   executionMode: '', // 'copilot' | 'autopilot', optional - execution mode (default: 'copilot')
   recordType: '', // 'custom' | 'template' | 'aia_internal', optional - record type classification (default: 'template')
   contextProcessingScript: '', // function | string, optional - script that processes context for the workflow (supports Now.include())
