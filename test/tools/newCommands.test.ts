@@ -71,7 +71,8 @@ describe('New SDK Commands', () => {
         false,
         '/mock/working/dir',
         undefined, // stdinInput
-        60000     // timeoutMs
+        180000,   // timeoutMs
+        undefined  // signal
       );
     });
 
@@ -92,7 +93,8 @@ describe('New SDK Commands', () => {
         false,
         '/mock/working/dir',
         undefined, // stdinInput
-        60000     // timeoutMs
+        180000,   // timeoutMs
+        undefined  // signal
       );
     });
   });
@@ -131,7 +133,8 @@ describe('New SDK Commands', () => {
         false,
         '/mock/working/dir',
         undefined, // stdinInput
-        15000     // timeoutMs
+        15000,    // timeoutMs
+        undefined  // signal
       );
     });
 
@@ -150,7 +153,8 @@ describe('New SDK Commands', () => {
         false,
         '/mock/working/dir',
         undefined, // stdinInput
-        15000     // timeoutMs
+        15000,    // timeoutMs
+        undefined  // signal
       );
     });
   });
@@ -189,7 +193,8 @@ describe('New SDK Commands', () => {
         false,
         '/mock/working/dir',
         undefined, // stdinInput
-        30000     // timeoutMs
+        30000,    // timeoutMs
+        undefined  // signal
       );
     });
 
@@ -208,7 +213,8 @@ describe('New SDK Commands', () => {
         false,
         '/mock/working/dir',
         undefined, // stdinInput
-        30000     // timeoutMs
+        30000,    // timeoutMs
+        undefined  // signal
       );
     });
   });
@@ -267,7 +273,8 @@ describe('New SDK Commands', () => {
         false,
         '/mock/working/dir',
         undefined,
-        15000
+        15000,
+        undefined
       );
     });
 
@@ -287,7 +294,8 @@ describe('New SDK Commands', () => {
         false,
         '/mock/working/dir',
         undefined,
-        15000
+        15000,
+        undefined
       );
     });
 
@@ -303,7 +311,8 @@ describe('New SDK Commands', () => {
         false,
         '/mock/working/dir',
         undefined,
-        15000
+        15000,
+        undefined
       );
     });
 
@@ -319,7 +328,8 @@ describe('New SDK Commands', () => {
         false,
         '/mock/working/dir',
         undefined,
-        15000
+        15000,
+        undefined
       );
     });
 
@@ -339,7 +349,8 @@ describe('New SDK Commands', () => {
         false,
         '/mock/working/dir',
         undefined,
-        15000
+        15000,
+        undefined
       );
     });
 

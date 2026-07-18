@@ -12,7 +12,9 @@ export class InstallCommand extends SessionAwareCLICommand {
   // publish flows, bump versions, overwrite records). Clients use destructiveHint
   // to gate/confirm before running.
   annotations = { openWorldHint: true, destructiveHint: true, idempotentHint: false };
-  timeoutMs = 120_000;
+  // Instance deploys of large apps routinely exceed two minutes; on timeout the
+  // runner now returns partial output and the client can cancel early (P0.2/P0.3).
+  timeoutMs = 300_000;
   arguments: CommandArgument[] = [
     {
       name: 'auth',
@@ -34,10 +36,10 @@ export class InstallCommand extends SessionAwareCLICommand {
     }
   ];
 
-  async execute(args: Record<string, unknown>): Promise<CommandResult> {
+  async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
     return this.executeSdkCommand('install', args, {
       auth: '--auth',
       skipFlowActivation: { flag: '--skip-flow-activation', hasValue: false },
-    });
+    }, [], signal);
   }
 }

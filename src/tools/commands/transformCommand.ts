@@ -11,7 +11,8 @@ export class TransformCommand extends SessionAwareCLICommand {
   // Writes/overwrites generated Fluent source in the working directory, so it can
   // clobber local edits — flag as destructive so clients confirm before running.
   annotations = { openWorldHint: true, destructiveHint: true };
-  timeoutMs = 60_000;
+  // Instance transforms by table hierarchy can be large; raised for headroom (P0.2).
+  timeoutMs = 180_000;
   arguments: CommandArgument[] = [
     {
       name: 'from',
@@ -51,13 +52,13 @@ export class TransformCommand extends SessionAwareCLICommand {
     }
   ];
 
-  async execute(args: Record<string, unknown>): Promise<CommandResult> {
+  async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
     return this.executeSdkCommand('transform', args, {
       from: '--from',
       directory: '--directory',
       auth: '--auth',
       table: '--table',
       id: '--id',
-    });
+    }, [], signal);
   }
 }

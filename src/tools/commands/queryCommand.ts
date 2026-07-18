@@ -140,7 +140,7 @@ export class QueryCommand extends SessionAwareCLICommand {
     }
   }
 
-  async execute(args: Record<string, unknown>): Promise<CommandResult> {
+  async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
     this.validateArgs(args);
 
     // This tool reads from a live ServiceNow instance, so it requires authentication.
@@ -193,7 +193,8 @@ export class QueryCommand extends SessionAwareCLICommand {
         noCount: { flag: '--no-count', hasValue: false },
         queryNoDomain: { flag: '--query-no-domain', hasValue: false },
       },
-      prefixFlags
+      prefixFlags,
+      signal
     );
   }
 }

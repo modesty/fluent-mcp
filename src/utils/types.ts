@@ -77,7 +77,15 @@ export interface ProcessResult {
 
 // Abstractions (Dependency Inversion)
 export interface ProcessRunner {
-  run(command: string, args: string[], cwd?: string, stdinInput?: string, timeoutMs?: number): Promise<ProcessResult>;
+  run(
+    command: string,
+    args: string[],
+    cwd?: string,
+    stdinInput?: string,
+    timeoutMs?: number,
+    /** Abort signal from the MCP client; aborting kills the child process. */
+    signal?: AbortSignal
+  ): Promise<ProcessResult>;
 }
 
 /**
@@ -90,12 +98,20 @@ export interface CommandProcessor {
     useMcpCwd?: boolean,
     customWorkingDir?: string,
     stdinInput?: string,
-    timeoutMs?: number
+    timeoutMs?: number,
+    /** Abort signal from the MCP client; propagated to the process runner. */
+    signal?: AbortSignal
   ): Promise<CommandResult>;
 }
 
 export interface CommandExecutor {
-  execute(args: Record<string, unknown>): Promise<CommandResult>;
+  /**
+   * @param args Tool arguments.
+   * @param signal Optional abort signal from the MCP client (`tools/call`
+   *   cancellation). Commands that spawn a child process propagate it so the
+   *   child is killed on cancellation; others ignore it.
+   */
+  execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult>;
 }
 
 /**

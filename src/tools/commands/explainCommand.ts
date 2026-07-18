@@ -55,7 +55,7 @@ export class ExplainCommand extends SessionAwareCLICommand {
     },
   ];
 
-  async execute(args: Record<string, unknown>): Promise<CommandResult> {
+  async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
     this.validateArgs(args);
 
     if (!args.list && !args.topic) {
@@ -84,7 +84,8 @@ export class ExplainCommand extends SessionAwareCLICommand {
         list: { flag: '--list', hasValue: false },
         peek: { flag: '--peek', hasValue: false },
       },
-      positionals
+      positionals,
+      signal
     );
   }
 }

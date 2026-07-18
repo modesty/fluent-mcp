@@ -5,6 +5,7 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { parseCommandTimeoutOverride } from './utils/commandTimeout.js';
 
 /**
  * Find the project root by examining the module path.
@@ -75,8 +76,18 @@ export interface McpServerConfig {
   servicenowSdk: {
     /** Path to ServiceNow SDK CLI */
     cliPath: string;
-    /** Default timeout for SDK CLI commands in milliseconds */
+    /**
+     * Fallback timeout (ms) for SDK CLI commands that do not declare their own.
+     * Per-command timeouts (e.g. deploy/build) normally supersede this.
+     */
     commandTimeoutMs: number;
+    /**
+     * Operator global timeout override (ms) from `FLUENT_MCP_COMMAND_TIMEOUT_MS`.
+     * When set, it wins over every per-command timeout — the escape hatch for
+     * large apps whose deploy/build exceeds the built-in defaults. Undefined
+     * unless the env var is present and a positive integer.
+     */
+    commandTimeoutOverrideMs?: number;
   };
 
   /** Sampling configuration for AI-powered features */
@@ -155,13 +166,13 @@ export function getConfig(): McpServerConfig {
         ENV_VAR.SERVICENOW_SDK_CLI_PATH,
         defaultConfig.servicenowSdk.cliPath
       ),
-      commandTimeoutMs: parseInt(
-        getEnvVar(
-          ENV_VAR.COMMAND_TIMEOUT_MS,
-          defaultConfig.servicenowSdk.commandTimeoutMs.toString()
-        ),
-        10
-      ),
+      commandTimeoutMs: defaultConfig.servicenowSdk.commandTimeoutMs,
+      // FLUENT_MCP_COMMAND_TIMEOUT_MS is an operator override, not the base
+      // default: only honor it when present and a positive integer.
+      ...(() => {
+        const override = parseCommandTimeoutOverride(process.env[ENV_VAR.COMMAND_TIMEOUT_MS]);
+        return override !== undefined ? { commandTimeoutOverrideMs: override } : {};
+      })(),
     },
     sampling: {
       enableErrorAnalysis: getEnvVar(

@@ -20,9 +20,10 @@ export class CLIExecutor extends BaseCommandProcessor {
     useMcpCwd: boolean = false,
     customWorkingDir?: string,
     stdinInput?: string,
-    timeoutMs?: number
+    timeoutMs?: number,
+    signal?: AbortSignal
   ): Promise<CommandResult> {
-    return this.execute(command, args, useMcpCwd, customWorkingDir, stdinInput, timeoutMs);
+    return this.execute(command, args, useMcpCwd, customWorkingDir, stdinInput, timeoutMs, signal);
   }
 
   async execute(
@@ -31,7 +32,8 @@ export class CLIExecutor extends BaseCommandProcessor {
     useMcpCwd: boolean = false,
     customWorkingDir?: string,
     stdinInput?: string,
-    timeoutMs?: number
+    timeoutMs?: number,
+    signal?: AbortSignal
   ): Promise<CommandResult> {
     try {
       const cwd = this.resolveCommandWorkingDirectory(useMcpCwd, customWorkingDir);
@@ -39,7 +41,7 @@ export class CLIExecutor extends BaseCommandProcessor {
       // Command invocation detail is verbose; outcomes surface via CommandResult.
       logger.debug(`Executing command: ${command} ${args.join(' ')}`, { cwd });
 
-      const result = await this.processRunner.run(command, args, cwd, stdinInput, timeoutMs);
+      const result = await this.processRunner.run(command, args, cwd, stdinInput, timeoutMs, signal);
 
       return {
         success: result.exitCode === 0,

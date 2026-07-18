@@ -138,7 +138,8 @@ describe('SDK Command Tools', () => {
       expect.arrayContaining(['/test/node_modules/@servicenow/sdk/bin/index.js', 'auth', '--help']),
       expect.any(String),  // Working directory should be provided (project root path)
       undefined, // stdinInput
-      10000     // timeoutMs
+      10000,    // timeoutMs
+      undefined  // signal
     );
 
     // Restore the original run method
