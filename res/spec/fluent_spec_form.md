@@ -165,8 +165,7 @@ const example_section = Record({
     $id: Now.ID['my_section'],
     table: 'sys_ui_section',
     data: {
-        name: '',      // string — table name the section is for
-        table: '',     // string — table name
+        name: '',      // string — table name the section is for (sys_ui_section has no separate `table` column)
         view: example_view, // Record<'sys_ui_view'> | sys_id string | default_view
         caption: ''    // string, optional — section title
     }

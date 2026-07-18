@@ -2,12 +2,12 @@
 
 An [MCP server](https://modelcontextprotocol.io) that brings [ServiceNow Fluent SDK](https://www.servicenow.com/docs/bundle/yokohama-application-development/page/build/servicenow-sdk/concept/servicenow-fluent.html) capabilities to AI-assisted development environments. Enables natural language interaction with ServiceNow SDK commands, API specifications, code snippets, and development resources.
 
-Built for **`@servicenow/sdk` 4.8.1**.
+Built for **`@servicenow/sdk` 4.9.0**.
 
 ## Key Features
 
 - **Complete SDK Coverage** - ServiceNow SDK commands: `init`, `build`, `install`, `dependencies`, `transform`, `download`, `clean`, `pack`, `explain`, `query`
-- **Rich Resources** - API specifications, instructions, and code snippets for **64 ServiceNow metadata types**
+- **Rich Resources** - API specifications, instructions, and code snippets for **65 ServiceNow metadata types**
 - **API Documentation Lookup** - `explain_fluent_api` returns SDK docs for any Fluent API or guide — no project required
 - **Auto-Authentication** - Automatic auth profile detection and session management via environment variables
 - **Session-Aware** - Maintains working directory and auth context across commands
@@ -101,7 +101,7 @@ Standardized URI patterns following MCP specification:
 
 ### Supported Metadata Types
 
-64 metadata types across the following categories:
+65 metadata types across the following categories:
 
 **Core Types:** `acl`, `application-menu`, `business-rule`, `client-script`, `cross-scope-privilege`, `data-policy`, `form`, `import-set`, `instance-scan`, `list`, `property`, `role`, `scheduled-script`, `script-action`, `script-include`, `scripted-rest`, `sla`, `table`, `ui-action`, `ui-page`, `ui-policy`, `user-preference`
 
@@ -121,9 +121,22 @@ Standardized URI patterns following MCP specification:
 
 **Workspace & Analytics:** `workspace`, `dashboard`
 
-**ATF (Automated Test Framework):** `atf-appnav`, `atf-catalog-action`, `atf-catalog-validation`, `atf-catalog-variable`, `atf-email`, `atf-form`, `atf-form-action`, `atf-form-declarative-action`, `atf-form-field`, `atf-form-sp`, `atf-reporting`, `atf-rest-api`, `atf-rest-assert-payload`, `atf-server`, `atf-server-catalog-item`, `atf-server-record`
+**ATF (Automated Test Framework):** `atf-appnav`, `atf-catalog-action`, `atf-catalog-validation`, `atf-catalog-variable`, `atf-email`, `atf-form`, `atf-form-action`, `atf-form-declarative-action`, `atf-form-field`, `atf-form-sp`, `atf-reporting`, `atf-rest-api`, `atf-rest-assert-payload`, `atf-server`, `atf-server-catalog-item`, `atf-server-record`, `atf-ui-test-script`
 
-### What's new in 4.8.x
+### What's new in 4.9.0
+
+This release of the MCP server tracks `@servicenow/sdk` 4.9.0 — a maintenance and bug-fix release (Flow, ClientScript, ImportSet, SLA transform/build reliability) with select authoring-surface additions:
+
+- **New metadata type**: `atf-ui-test-script` — the `atf.uiTestScript.runTest()` ATF step runs a TestingLibrary test body in the client test runner to test custom UI components (Angular/React widgets, embedded SPAs, custom workspaces, `now-*` web components) that the standard `atf.form.*` / `atf.catalog.*` steps cannot reach.
+- **Multi-language choice labels** — a choice field's `choices` value may be an array of `ChoiceConfig` objects, each with a `language` (BCP 47) key, producing one translated `sys_choice` record per language.
+- **`protectionPolicy` on AI Agent & AI Agentic Workflow** — `AiAgent` and `AiAgenticWorkflow` accept `protectionPolicy: 'read' | 'protected'` for post-install access control.
+- **`Role.federatedId`** — optional identifier to match a role to an externally federated role during identity federation.
+- **Table index platform columns** — a table `index` entry's `element` may reference platform default columns (for example, `sys_created_on`).
+- **Now Assist Skill Kit providers** — new LLM providers selectable by name: `Now LLM LTS Generic`, `Google Cloud Vertex AI`, `Amazon Bedrock`.
+
+> Source-of-truth note: two release-note claims are not corroborated by the installed package and were treated as corrections — Form `table_field.field` is documented as a schema column name (not loosened to "any string"), and the four named NASK model strings appear nowhere in the package (`model` is a free string). See `.mosey/upgrade-sdk-4.9.0.md`.
+
+### Previously (4.8.x)
 
 This release of the MCP server tracks `@servicenow/sdk` 4.8.0 and adds support for the following Fluent APIs and SDK enhancements:
 
@@ -138,7 +151,7 @@ This release of the MCP server tracks `@servicenow/sdk` 4.8.0 and adds support f
 
 ### Previously (4.7.x)
 
-This release of the MCP server tracks `@servicenow/sdk` 4.8.0 and adds support for the following Fluent APIs and SDK enhancements:
+This release of the MCP server tracked `@servicenow/sdk` 4.7.x and added support for the following Fluent APIs and SDK enhancements:
 
 - **New metadata type**: `data-policy` — the `DataPolicy` API (`sys_data_policy2`) for server-side mandatory/read-only field enforcement that cannot be bypassed via API, import, or web service.
 - **Flow error handling & parallelism** — `wfa.flowLogic.tryCatch`, `wfa.flowLogic.doInParallel`, and `wfa.flowLogic.appendToFlowVariables` (append to `Array.Object` flow variables).
@@ -157,7 +170,7 @@ Added `custom-action`, `inbound-email-action`, `sp-header-footer`, and `sp-page-
 
 ## Configuration
 
-**Requirements:** Node.js 20.18.0+, npm 11.4.1+, `@servicenow/sdk` 4.8.1
+**Requirements:** Node.js 20.18.0+, npm 11.4.1+, `@servicenow/sdk` 4.9.0
 
 ### MCP Client Setup
 
@@ -291,7 +304,7 @@ npm run build && npm run inspect
 3. **Test Version:**
    - Set `flag` parameter to `-v`
    - Click **Execute**
-   - Verify response shows the SDK version (e.g., `4.8.1`)
+   - Verify response shows the SDK version (e.g., `4.9.0`)
 4. **Test Help:**
    - Set `flag` parameter to `-h`
    - Set `command` parameter to `build`

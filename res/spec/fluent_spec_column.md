@@ -44,6 +44,15 @@ ChoiceColumn({
  readOnly: false // boolean
 }): ChoiceColumn // returns a ChoiceColumn object
 
+// ─── Choice values (`choices`) — applies to ChoiceColumn and any column exposing `choices` ───
+// `choices` is `Record<string | number, string | ChoiceConfig | ChoiceConfig[]>`. Each KEY is the STORED value; the value is:
+//   • a plain label string, e.g. { 1: 'High' }
+//   • a ChoiceConfig object: { label: 'High', sequence?: number, hint?: string, inactive?: boolean, dependentValue?: string | number, inactiveOnUpdate?: boolean, synonyms?: string[] }
+//   • an ARRAY of ChoiceConfig — produces MULTIPLE `sys_choice` records for the same stored value. Use this to supply
+//     labels in MULTIPLE LANGUAGES (SDK v4.9.0+) via the `language` key, or to define dependent-value variants:
+//       choices: { 1: [ { label: 'Critical', sequence: 1, language: 'en' }, { label: 'Critique', sequence: 1, language: 'fr' } ] }
+//   `language` is a BCP 47 tag (e.g. 'en', 'fr'); defaults to the project's `defaultLanguage` in now.config.json.
+
 ReferenceColumn({
  active: false, // boolean
  attributes: {}, // object, snake_case name value pairs, see attribute list

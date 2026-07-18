@@ -7,6 +7,7 @@ Role({
     assignableBy: '', // string, mandatory
     canDelegate: true, // boolean, mandatory
     elevatedPrivilege: false, // boolean, mandatory
+    federatedId: '', // string, optional (SDK v4.9.0+) - identifier used to match this role to an externally federated role during identity federation
     grantable: true, // boolean, mandatory
     containsRoles: [get_sys_id('sys_user_role', '')], // array of Record<'sys_user_role'>, optional, either sys_id or Role object
     scopedAdmin: false, // boolean, mandatory

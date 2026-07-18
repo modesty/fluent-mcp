@@ -25,7 +25,7 @@ Table({
         {
             name: '', // string, mandatory
             unique: false, // boolean, mandatory
-            element: '', // string | string[], mandatory
+            element: '', // string | string[], mandatory - column name(s) making up the index; accepts custom columns and platform default columns (e.g. 'sys_created_on', 'sys_updated_on') as of SDK v4.9.0
         }
     ],
     autoNumber: { // Auto-numbering configuration
