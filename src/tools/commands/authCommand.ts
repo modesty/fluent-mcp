@@ -68,7 +68,7 @@ export class AuthCommand extends SessionAwareCLICommand {
     },
   ];
 
-  async execute(args: Record<string, unknown>): Promise<CommandResult> {
+  async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
     this.validateArgs(args);
 
     // Validate mutually exclusive primary actions: add | list | delete | use
@@ -143,6 +143,6 @@ export class AuthCommand extends SessionAwareCLICommand {
       }
     }
 
-    return await this.executeWithSessionWorkingDirectory(command, sdkArgs, false, stdinInput);
+    return await this.executeWithSessionWorkingDirectory(command, sdkArgs, false, stdinInput, undefined, signal);
   }
 }

@@ -62,7 +62,8 @@ describe('InstallCommand', () => {
         false,
         '/mock/working/dir',
         undefined, // stdinInput
-        120000    // timeoutMs
+        300000,   // timeoutMs
+        undefined  // signal
       );
     });
 
@@ -77,7 +78,8 @@ describe('InstallCommand', () => {
         false,
         '/mock/working/dir',
         undefined, // stdinInput
-        120000    // timeoutMs
+        300000,   // timeoutMs
+        undefined  // signal
       );
     });
 
@@ -105,7 +107,8 @@ describe('InstallCommand', () => {
         false,
         '/mock/working/dir',
         undefined, // stdinInput
-        120000    // timeoutMs
+        300000,   // timeoutMs
+        undefined  // signal
       );
     });
   });

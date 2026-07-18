@@ -25,9 +25,9 @@ export class PackCommand extends SessionAwareCLICommand {
     }
   ];
 
-  async execute(args: Record<string, unknown>): Promise<CommandResult> {
+  async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
     return this.executeSdkCommand('pack', args, {
       source: '--source',
-    });
+    }, [], signal);
   }
 }

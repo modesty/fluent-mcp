@@ -54,6 +54,7 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
    * @param useMcpCwd Whether to use the MCP's current working directory
    * @param stdinInput Optional stdin input for interactive commands
    * @param timeoutMs Optional command-specific timeout (falls back to this.timeoutMs)
+   * @param signal Optional abort signal from the MCP client (kills the child on cancel)
    * @returns The command result
    */
   protected async executeWithSessionWorkingDirectory(
@@ -61,7 +62,8 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
     args: string[],
     useMcpCwd: boolean = false,
     stdinInput?: string,
-    timeoutMs?: number
+    timeoutMs?: number,
+    signal?: AbortSignal
   ): Promise<CommandResult> {
     const workingDirectory = this.getWorkingDirectory();
 
@@ -74,7 +76,7 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
     const effectiveTimeout = timeoutMs ?? this.timeoutMs;
 
     try {
-      return await this.commandProcessor.process(command, args, useMcpCwd, workingDirectory, stdinInput, effectiveTimeout);
+      return await this.commandProcessor.process(command, args, useMcpCwd, workingDirectory, stdinInput, effectiveTimeout, signal);
     } catch (error) {
       return CommandResultFactory.fromError(error);
     }
@@ -88,13 +90,15 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
    * @param args The command arguments object
    * @param flagMapping Optional mapping of arg names to CLI flags
    * @param positionalArgs Optional positional arguments to append at the end
+   * @param signal Optional abort signal from the MCP client (kills the child on cancel)
    * @returns The command result
    */
   protected async executeSdkCommand(
     sdkCommand: string,
     args: Record<string, unknown>,
     flagMapping: Record<string, string | { flag: string; hasValue: boolean }> = {},
-    positionalArgs: string[] = []
+    positionalArgs: string[] = [],
+    signal?: AbortSignal
   ): Promise<CommandResult> {
     // Defense-in-depth: validate/sanitize the caller's args before they become CLI
     // tokens. The root injection defense is spawning shell-free (see processRunner);
@@ -142,6 +146,6 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
     // Add common flags (like --debug)
     this.appendCommonFlags(sdkArgs, args);
 
-    return this.executeWithSessionWorkingDirectory(command, sdkArgs, false, undefined, this.timeoutMs);
+    return this.executeWithSessionWorkingDirectory(command, sdkArgs, false, undefined, this.timeoutMs, signal);
   }
 }

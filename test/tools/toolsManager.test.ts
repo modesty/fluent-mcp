@@ -129,8 +129,11 @@ describe("ToolsManager", () => {
       "../../src/tools/resources/resourceTools.js"
     );
     const command = CheckAuthStatusCommand.mock.results.at(-1).value;
-    expect(command.execute).toHaveBeenCalledWith({});
+    // First arg is the tool args ({}), second is the (absent) abort signal — never
+    // the MCP callback metadata object.
+    expect(command.execute).toHaveBeenCalledWith({}, undefined);
     expect(command.execute).not.toHaveBeenCalledWith(metadata);
+    expect(command.execute.mock.calls[0][0]).toEqual({});
   });
   
   test("should format command result correctly", () => {

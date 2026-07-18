@@ -10,7 +10,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { getProjectRootPath } from '../config.js';
 import logger from '../utils/logger.js';
-import { CommandResultFactory } from '../utils/types.js';
+import { CommandResultFactory, ResourceType } from '../utils/types.js';
+import { ResourceLoader } from '../utils/resourceLoader.js';
+import { ServiceNowMetadataType } from '../types.js';
 import loggingManager from '../utils/loggingManager.js';
 
 
@@ -21,6 +23,10 @@ export class PromptManager {
   private mcpServer: McpServer;
   private prompts: Map<string, Prompt> = new Map();
   private promptContents: Map<string, string> = new Map();
+  private resourceLoader: ResourceLoader;
+
+  /** Single source of truth for the supported metadata types (see src/types.ts). */
+  private static readonly ALL_METADATA_TYPES: string[] = Object.values(ServiceNowMetadataType);
 
   /**
    * Create a new PromptManager
@@ -28,6 +34,7 @@ export class PromptManager {
    */
   constructor(mcpServer: McpServer) {
     this.mcpServer = mcpServer;
+    this.resourceLoader = new ResourceLoader();
   }
 
   /**
@@ -97,21 +104,7 @@ export class PromptManager {
         // Process any arguments
         let processedContent = content;
         if (name === 'coding_in_fluent' && args?.metadata_list) {
-          const metadataList = Array.isArray(args.metadata_list) ? args.metadata_list : [args.metadata_list];
-          // Add section for each metadata type
-          const metadataTypesContent = metadataList
-            .map(type => `### ${type.toUpperCase()}\n\nFor working with ${type}, follow these guidelines:\n\n- Use the appropriate Fluent API methods\n- Reference the specific instructions for ${type} in the documentation\n`)
-            .join('\n');
-          
-          // Replace placeholder if it exists, or append
-          if (processedContent.includes('You are currently interested in working with the following metadata types:')) {
-            processedContent = processedContent.replace(
-              'You are currently interested in working with the following metadata types:',
-              `You are currently interested in working with the following metadata types:\n\n${metadataTypesContent}`
-            );
-          } else {
-            processedContent += `\n\n## Selected Metadata Types\n\n${metadataTypesContent}`;
-          }
+          processedContent = await this.renderCodingInFluent(content, args.metadata_list);
         }
 
         // Construct the prompt messages
@@ -136,6 +129,86 @@ export class PromptManager {
         throw error;
       }
     });
+  }
+
+  /**
+   * Render the `coding_in_fluent` prompt for the requested metadata types.
+   * For each requested type it injects a real authoring summary drawn from the
+   * shipped instruction resource plus explicit pointers to the resource tools
+   * (`get-api-spec`/`get-instruct`/`get-snippet`) and URIs (`sn-spec://` etc.),
+   * then appends the complete, enum-derived catalog of supported types. This
+   * replaces the previous generic "Use the appropriate Fluent API methods" stubs
+   * and the stale hardcoded type list (plan P0.1).
+   * @param baseContent The prompt body (without frontmatter).
+   * @param rawList The `metadata_list` argument (string or array of strings).
+   * @returns The rendered prompt content.
+   */
+  private async renderCodingInFluent(baseContent: string, rawList: unknown): Promise<string> {
+    const requested = (Array.isArray(rawList) ? rawList : [rawList])
+      .map(value => String(value).trim().toLowerCase())
+      .filter(value => value.length > 0);
+
+    const sections = await Promise.all(requested.map(type => this.renderTypeSection(type)));
+
+    const total = PromptManager.ALL_METADATA_TYPES.length;
+    const catalog =
+      `---\n\nAll ${total} supported metadata types (call \`get-api-spec\` with no arguments to list them at any time):\n\n` +
+      `${PromptManager.ALL_METADATA_TYPES.join(', ')}.`;
+
+    const selected = sections.length > 0
+      ? `\n\n## Selected Metadata Types\n\n${sections.join('\n\n')}`
+      : '';
+
+    return `${baseContent}${selected}\n\n${catalog}`;
+  }
+
+  /**
+   * Render one metadata type's guidance block: a concise summary from its
+   * instruction resource (when available) followed by explicit tool/URI pointers.
+   * Unknown types get an actionable correction instead of a stub.
+   */
+  private async renderTypeSection(type: string): Promise<string> {
+    if (!PromptManager.ALL_METADATA_TYPES.includes(type)) {
+      return `### ${type}\n\n\`${type}\` is not a recognized Fluent metadata type. ` +
+        `Call \`get-api-spec\` with no arguments to see all ${PromptManager.ALL_METADATA_TYPES.length} supported types.`;
+    }
+
+    const pointers =
+      'Fetch full details on demand: `get-api-spec`, `get-instruct`, and `get-snippet` ' +
+      `(metadataType: "${type}") — or read \`sn-spec://${type}\`, \`sn-instruct://${type}\`, \`sn-snippet://${type}/0001\`.`;
+
+    let summary = '';
+    try {
+      const instruct = await this.resourceLoader.getResource(ResourceType.INSTRUCT, type);
+      if (instruct.found) {
+        summary = PromptManager.summarizeInstruct(instruct.content);
+      }
+    } catch (error) {
+      // A missing/unreadable instruct resource must not break prompt rendering;
+      // the tool/URI pointers below still guide the caller to the content.
+      logger.debug(`Instruct summary unavailable for '${type}': ${CommandResultFactory.normalizeError(error).message}`);
+    }
+
+    const body = summary ? `${summary}\n\n${pointers}` : pointers;
+    return `### ${type}\n\n${body}`;
+  }
+
+  /**
+   * Extract a concise summary from an instruction resource: the first couple of
+   * substantive guidance lines, skipping the heading and the boilerplate
+   * "Always reference ..." lead-in. Bounded so a multi-type prompt stays compact.
+   */
+  private static summarizeInstruct(content: string, maxChars = 600): string {
+    const points: string[] = [];
+    for (const raw of content.split('\n')) {
+      const line = raw.trim();
+      if (!line || line.startsWith('#')) continue;
+      if (/^always reference/i.test(line)) continue;
+      points.push(line);
+      if (points.length >= 2) break;
+    }
+    const summary = points.join(' ');
+    return summary.length > maxChars ? `${summary.slice(0, maxChars).trimEnd()}…` : summary;
   }
 
   /**

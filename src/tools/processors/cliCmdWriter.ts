@@ -17,7 +17,8 @@ export class CLICmdWriter extends BaseCommandProcessor {
     useMcpCwd: boolean = false,
     customWorkingDir?: string,
     _stdinInput?: string, // Not used by writer, but kept for interface compatibility
-    _timeoutMs?: number   // Not used by writer, but kept for interface compatibility
+    _timeoutMs?: number,  // Not used by writer, but kept for interface compatibility
+    _signal?: AbortSignal // Not used by writer (no child process to cancel)
   ): Promise<CommandResult> {
     return this.execute(command, args, useMcpCwd, customWorkingDir);
   }

@@ -128,8 +128,11 @@ export class ToolsManager {
         // Emit progress notifications for long-running commands when the client
         // supplied a progressToken. Best-effort: never let progress break the tool.
         const endProgress = this.startProgress(command, _extra);
+        // Propagate MCP client cancellation: aborting `tools/call` fires this
+        // signal, which threads down to the spawned child so it is killed (P0.3).
+        const signal = (_extra as { signal?: AbortSignal })?.signal;
         try {
-          const result = await command.execute(args);
+          const result = await command.execute(args, signal);
 
           // Format the output: clean on success, concise error context on failure
           const formattedOutput = this.formatResult({

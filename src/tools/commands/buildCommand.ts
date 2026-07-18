@@ -9,7 +9,8 @@ export class BuildCommand extends SessionAwareCLICommand {
   name = 'build_fluent_app';
   description = 'Build a Fluent (ServiceNow SDK) application package from source code. Requires a valid Fluent project directory with now.config.json. Run after init_fluent_app and before deploy_fluent_app. Does NOT require instance authentication.';
   annotations = { idempotentHint: true };
-  timeoutMs = 60_000;
+  // Large-app builds can exceed one minute; raised for headroom (P0.2).
+  timeoutMs = 180_000;
   arguments: CommandArgument[] = [
     {
       name: 'debug',
@@ -19,7 +20,7 @@ export class BuildCommand extends SessionAwareCLICommand {
     }
   ];
 
-  async execute(args: Record<string, unknown>): Promise<CommandResult> {
-    return this.executeSdkCommand('build', args);
+  async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
+    return this.executeSdkCommand('build', args, {}, [], signal);
   }
 }

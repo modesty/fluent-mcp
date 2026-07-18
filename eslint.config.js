@@ -17,6 +17,7 @@ const nodeGlobals = {
   setInterval: 'readonly',
   clearInterval: 'readonly',
   AbortController: 'readonly',
+  AbortSignal: 'readonly',
   URL: 'readonly',
   global: 'readonly',
 };

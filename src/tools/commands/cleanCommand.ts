@@ -25,9 +25,9 @@ export class CleanCommand extends SessionAwareCLICommand {
     }
   ];
 
-  async execute(args: Record<string, unknown>): Promise<CommandResult> {
+  async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
     return this.executeSdkCommand('clean', args, {
       source: '--source',
-    });
+    }, [], signal);
   }
 }

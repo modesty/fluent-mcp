@@ -11,7 +11,8 @@ export class DownloadCommand extends SessionAwareCLICommand {
   // Expands downloaded metadata into a local directory, overwriting existing files
   // there — flag as destructive so clients confirm before running.
   annotations = { openWorldHint: true, destructiveHint: true };
-  timeoutMs = 60_000;
+  // Full-app metadata downloads can be large; raised for headroom (P0.2).
+  timeoutMs = 180_000;
   arguments: CommandArgument[] = [
     {
       name: 'directory',
@@ -39,7 +40,7 @@ export class DownloadCommand extends SessionAwareCLICommand {
     }
   ];
 
-  async execute(args: Record<string, unknown>): Promise<CommandResult> {
+  async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
     return this.executeSdkCommand(
       'download',
       args,
@@ -47,7 +48,8 @@ export class DownloadCommand extends SessionAwareCLICommand {
         source: '--source',
         incremental: { flag: '--incremental', hasValue: false },
       },
-      [args.directory as string]  // positional argument
+      [args.directory as string],  // positional argument
+      signal
     );
   }
 }

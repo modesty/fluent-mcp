@@ -43,7 +43,7 @@ export class SdkInfoCommand extends BaseCLICommand {
     };
   }
 
-  async execute(args: Record<string, unknown>): Promise<CommandResult> {
+  async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
     // Validate base args (type checking and shell injection protection)
     this.validateArgs(args);
 
@@ -93,7 +93,7 @@ export class SdkInfoCommand extends BaseCLICommand {
     }
 
     try {
-      const result = await this.commandProcessor.process(sdkCommand, sdkArgs, false, workingDirectory, undefined, this.timeoutMs);
+      const result = await this.commandProcessor.process(sdkCommand, sdkArgs, false, workingDirectory, undefined, this.timeoutMs, signal);
 
       if (result.exitCode === 0) {
         return CommandResultFactory.success(this.formatOutput(result.output, flag, command));

@@ -75,7 +75,8 @@ describe("AuthCommand", () => {
       false,
       "/mock/working/dir",
       undefined, // stdinInput (credentials not set in env)
-      undefined  // timeoutMs
+      undefined, // timeoutMs
+      undefined  // signal
     );
     expect(result.success).toBe(true);
   });
@@ -102,7 +103,8 @@ describe("AuthCommand", () => {
       false,
       "/mock/working/dir",
       undefined, // stdinInput (not needed for list/help/version)
-      undefined  // timeoutMs
+      undefined, // timeoutMs
+      undefined  // signal
     );
   });
 

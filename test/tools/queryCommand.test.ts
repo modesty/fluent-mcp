@@ -59,7 +59,8 @@ describe('QueryCommand', () => {
       false,
       '/mock/working/dir',
       undefined,
-      60000
+      60000,
+      undefined
     );
   });
 
