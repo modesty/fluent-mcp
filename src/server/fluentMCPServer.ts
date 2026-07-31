@@ -5,12 +5,10 @@ import {
   ListToolsRequestSchema,
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
-  ListRootsRequestSchema,
-  RootsListChangedNotificationSchema,
   InitializedNotificationSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { getConfig, getProjectRootPath, findMissingResourcePaths } from '../config.js';
+import { getConfig, findMissingResourcePaths } from '../config.js';
 import { ServerStatus } from '../types.js';
 import { CommandResultFactory } from '../utils/types.js';
 import loggingManager from '../utils/loggingManager.js';
@@ -18,16 +16,14 @@ import logger from '../utils/logger.js';
 import { ToolsManager } from '../tools/toolsManager.js';
 import { ResourceManager } from '../res/resourceManager.js';
 import { PromptManager } from '../prompts/promptManager.js';
-import { autoValidateAuthIfConfigured } from './fluentInstanceAuth.js';
-import { SamplingManager } from '../utils/samplingManager.js';
-import { AuthNotificationHandler } from './authNotificationHandler.js';
 import { McpResourceNotFoundError, McpInternalError } from '../utils/mcpErrors.js';
 
-/** Delay before fallback initialization if client doesn't send notifications */
-const INITIALIZATION_DELAY_MS = 1000;
-
-/** Timeout for client roots request before using fallback */
-const CLIENT_ROOTS_TIMEOUT_MS = 2000;
+const SERVER_INSTRUCTIONS = [
+  'Use explain_fluent_api for SDK APIs and guides, get-api-spec for metadata-type schemas,',
+  'get-instruct for authoring guidance, and get-snippet for focused examples.',
+  'For application work, run init_fluent_app, then build_fluent_app, then deploy_fluent_app.',
+  'Instance authentication is validated lazily, cached in the session, and injected when a command needs it.',
+].join(' ');
 
 /**
  * Implementation of the Model Context Protocol server for Fluent (ServiceNow SDK) 
@@ -40,14 +36,10 @@ export class FluentMcpServer {
   private toolsManager: ToolsManager;
   private resourceManager: ResourceManager;
   private promptManager: PromptManager;
-  private samplingManager: SamplingManager;
   private config: ReturnType<typeof getConfig>;
   private status: ServerStatus = ServerStatus.STOPPED;
   private roots: { uri: string; name?: string }[] = [];
-  private autoAuthTriggered = false;
-  private authNotificationHandler: AuthNotificationHandler;
   private initializationPromise: Promise<void>;
-  private delayedInitTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * Create a new MCP server instance
@@ -67,23 +59,19 @@ export class FluentMcpServer {
         capabilities: {
           tools: {},
           resources: {}, // Enable resources capability
-          logging: {},   // Enable logging capability
-          // Note: 'elicitation', 'sampling', and 'roots' are ClientCapabilities, not ServerCapabilities
+          // Note: 'elicitation' and 'roots' are ClientCapabilities, not ServerCapabilities
           // in MCP SDK v1.25+. Servers don't declare these - clients do.
           // The server can still USE these features by making requests to the client.
-          prompts: {
-            listChanged: true, // Enable prompt list change notifications
-          },
+          prompts: {},
         },
+        instructions: SERVER_INSTRUCTIONS,
       }
     );
 
-    // Initialize managers for tools, resources, prompts, and sampling
+    // Initialize managers for tools, resources, and prompts
     this.toolsManager = new ToolsManager(this.mcpServer);
     this.resourceManager = new ResourceManager(this.mcpServer);
     this.promptManager = new PromptManager(this.mcpServer);
-    this.samplingManager = new SamplingManager(this.mcpServer);
-    this.authNotificationHandler = new AuthNotificationHandler();
 
     // Initialize resources and prompts, then set up handlers
     // Store the promise so start() can await it before accepting connections
@@ -97,81 +85,22 @@ export class FluentMcpServer {
     });
   }
 
-  // Auth notification handling delegated to AuthNotificationHandler (SRP)
-
-  /**
-   * Run auto-auth validation exactly once, regardless of which initialization
-   * path (delayed fallback or notifications/initialized) reaches it first.
-   * @param reason Context for the log line, identifying the triggering path
-   */
-  private async triggerAutoAuthOnce(reason: string): Promise<void> {
-    if (this.autoAuthTriggered) {
-      return;
-    }
-    this.autoAuthTriggered = true;
-    logger.info(`Triggering auto-auth validation${reason}...`);
-    try {
-      const result = await autoValidateAuthIfConfigured(this.toolsManager);
-      this.authNotificationHandler.handleAuthResult(result);
-    } catch (error) {
-      logger.warn('Auto-auth validation failed', {
-        error: CommandResultFactory.normalizeError(error).message,
-      });
-    }
-  }
-
-  /**
-   * Schedule a delayed initialization to ensure roots and auth are set up
-   * This provides a fallback if the client doesn't send proper notifications
-   */
-  private scheduleDelayedInitialization(): void {
-    // Prevent scheduling multiple fallback timers
-    if (this.delayedInitTimeoutId !== null) {
-      return;
-    }
-
-    // Give the client some time to send notifications, then fallback
-    this.delayedInitTimeoutId = setTimeout(async () => {
-      try {
-        // Only initialize if roots haven't been set up yet
-        if (this.roots.length === 0) {
-          logger.info('No roots received from client after delay, using fallback initialization...');
-
-          // Try to request from client first, with short timeout
-          try {
-            await Promise.race([
-              this.requestRootsFromClient(),
-              new Promise<void>((_, reject) =>
-                setTimeout(() => reject(new Error('Client roots request timeout')), CLIENT_ROOTS_TIMEOUT_MS)
-              )
-            ]);
-          } catch (error) {
-            // If client doesn't respond, use project root as fallback
-            logger.warn(`Client did not provide roots, using project root fallback: ${error}`);
-            const projectRoot = getProjectRootPath();
-            await this.addRoot(`file://${projectRoot}`, 'Project Root (Fallback)');
-          }
-        }
-
-        // Trigger auth validation if not already triggered
-        await this.triggerAutoAuthOnce('');
-      } catch (error) {
-        logger.error('Error during delayed initialization',
-          CommandResultFactory.normalizeError(error)
-        );
-      }
-    }, INITIALIZATION_DELAY_MS);
-  }
-
   /**
    * Request the list of roots from the client
    * This is called after the client sends the notifications/initialized notification
-   * or when a roots/list_changed notification is received
    * @returns Promise that resolves when roots are updated
    */
   private async requestRootsFromClient(): Promise<void> {
     if (!this.mcpServer?.server) {
       logger.warn('Cannot request roots - MCP server not available');
+      return;
+    }
+
+    // roots/list is a client capability. Do not send a server-initiated
+    // request to clients that did not advertise roots support; older clients
+    // commonly complete initialization without that capability.
+    if (!this.mcpServer.server.getClientCapabilities?.()?.roots) {
+      logger.debug('Skipping roots/list request: client does not advertise roots capability');
       return;
     }
 
@@ -205,30 +134,17 @@ export class FluentMcpServer {
         await this.updateRoots(roots);
       } else {
         logger.warn('Client responded to roots/list but provided no roots');
-
-        // Fall back to project root if no valid roots received
-        if (this.roots.length === 0) {
-          const projectRoot = getProjectRootPath();
-          logger.info('Using project root as fallback', { projectRoot });
-          await this.addRoot(projectRoot, 'Project Root');
-        }
       }
     } catch (error) {
       logger.error('Error requesting roots from client',
         CommandResultFactory.normalizeError(error)
       );
 
-      // Fall back to project root if request fails
-      if (this.roots.length === 0) {
-        const projectRoot = getProjectRootPath();
-        logger.info('Using project root as fallback after error', { projectRoot });
-        await this.addRoot(projectRoot, 'Project Root');
-      }
     }
   }
 
   /**
-   * Set up MCP protocol handlers for tools, resources, prompts, and logging
+   * Set up MCP protocol handlers for tools, resources, and prompts.
    */
   private setupHandlers(): void {
     const server = this.mcpServer?.server;
@@ -237,11 +153,6 @@ export class FluentMcpServer {
     // Set up the tools/list handler
     server.setRequestHandler(ListToolsRequestSchema, async () => {
       const tools = this.toolsManager.getMCPTools();
-
-      // Start a delayed initialization process to ensure roots and auth are set up
-      // even if the client doesn't send proper notifications
-      this.scheduleDelayedInitialization();
-
       return { tools };
     });
 
@@ -295,50 +206,15 @@ export class FluentMcpServer {
     // Set up prompts handlers
     this.promptManager.setupHandlers();
 
-    // Set up roots/list handler
-    server.setRequestHandler(ListRootsRequestSchema, async () => {
-      logger.debug('Received roots/list request, returning current roots');
-      return {
-        roots: this.roots,
-      };
-    });
-
     // Set up handler for notifications/initialized
     server.setNotificationHandler(InitializedNotificationSchema, async () => {
       logger.info('Received notifications/initialized notification from client');
-
-      // Cancel the delayed initialization fallback since proper init is happening
-      if (this.delayedInitTimeoutId !== null) {
-        clearTimeout(this.delayedInitTimeoutId);
-        this.delayedInitTimeoutId = null;
-        logger.debug('Cancelled delayed initialization fallback - proper init received');
-      }
-
-      // Mark client as initialized and send any pending notifications
-      this.authNotificationHandler.markClientInitialized();
 
       // Request the list of roots from the client now that initialization is complete
       try {
         await this.requestRootsFromClient();
       } catch (error) {
         logger.error('Failed to request roots after initialization notification',
-          CommandResultFactory.normalizeError(error)
-        );
-      }
-
-      // Trigger auth validation via the proper initialization path
-      await this.triggerAutoAuthOnce(' after client initialization');
-    });
-
-    // Set up handler for roots/list_changed notification
-    server.setNotificationHandler(RootsListChangedNotificationSchema, async () => {
-      logger.info('Received notifications/roots/list_changed notification from client');
-
-      // When a root list change notification is received, request the updated roots list
-      try {
-        await this.requestRootsFromClient();
-      } catch (error) {
-        logger.error('Failed to request updated roots after notification',
           CommandResultFactory.normalizeError(error)
         );
       }
@@ -378,17 +254,9 @@ export class FluentMcpServer {
       if (this.status === ServerStatus.RUNNING || this.status === ServerStatus.INITIALIZING) {
         // Update roots in tools manager
         this.toolsManager.updateRoots(this.roots);
-        // Notify clients if server is running
-        if (this.status === ServerStatus.RUNNING && this.mcpServer?.server) {
-          // Use the SDK's notification method for roots/list_changed
-          await this.mcpServer.server.notification({
-            method: 'notifications/roots/list_changed'
-          });
-          // Log the root change only once at this level
+        if (this.status === ServerStatus.RUNNING) {
           loggingManager.logRootsChanged(this.roots);
         }
-        // Note: Auto-auth is triggered via scheduleDelayedInitialization() only,
-        // which provides a single, predictable entry point for auth validation
       }
     }
   }
@@ -473,9 +341,6 @@ export class FluentMcpServer {
 
       // Connect the server to the stdio transport
       await this.mcpServer.connect(transport);
-
-      // Configure logging manager with MCP server
-      loggingManager.configure(this.mcpServer);
 
       // Note: Resources are handled by manual handlers in setupHandlers() that use
       // resourceManager.listResources() and resourceManager.readResource().

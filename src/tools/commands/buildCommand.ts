@@ -1,5 +1,5 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
-import { SessionAwareCLICommand } from './sessionAwareCommand.js';
+import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 
 /**
  * Command to build a Fluent (ServiceNow SDK) application
@@ -12,6 +12,7 @@ export class BuildCommand extends SessionAwareCLICommand {
   // Large-app builds can exceed one minute; raised for headroom (P0.2).
   timeoutMs = 180_000;
   arguments: CommandArgument[] = [
+    WORKING_DIRECTORY_ARGUMENT,
     {
       name: 'debug',
       type: 'boolean',

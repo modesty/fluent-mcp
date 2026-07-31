@@ -1,5 +1,7 @@
 import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
-import { SessionAwareCLICommand } from './sessionAwareCommand.js';
+import { BaseCLICommand } from './baseCommand.js';
+import { resolveSdkCli } from '../../utils/sdkCli.js';
+import { getProjectRootPath } from '../../config.js';
 
 /**
  * Command to display documentation for a Fluent SDK topic.
@@ -11,7 +13,7 @@ import { SessionAwareCLICommand } from './sessionAwareCommand.js';
  *
  * `topic` is optional — required only when `list` is not true.
  */
-export class ExplainCommand extends SessionAwareCLICommand {
+export class ExplainCommand extends BaseCLICommand {
   name = 'explain_fluent_api';
   description = 'Look up Fluent SDK documentation for any API or guide. Accepts a topic name (e.g., "BusinessRule", "Acl") or a keyword/tag (e.g., "flow", "atf"). Set list=true to enumerate available topics (optionally combined with topic to filter). Set peek=true for a brief summary. Set format="raw" for plain markdown. Read-only; no authentication or active Fluent project required. Use get-api-spec for metadata-type specifications and get-snippet for code examples.';
   annotations = { readOnlyHint: true, idempotentHint: true };
@@ -70,21 +72,27 @@ export class ExplainCommand extends SessionAwareCLICommand {
       );
     }
 
-    const positionals: string[] = [];
+    const { command, baseArgs } = resolveSdkCli();
+    const sdkArgs = [...baseArgs, 'explain'];
     if (args.topic) {
-      positionals.push(args.topic as string);
+      sdkArgs.push(args.topic as string);
     }
 
-    return this.executeSdkCommand(
-      'explain',
-      args,
-      {
-        source: '--source',
-        format: '--format',
-        list: { flag: '--list', hasValue: false },
-        peek: { flag: '--peek', hasValue: false },
-      },
-      positionals,
+    if (args.source) sdkArgs.push('--source', args.source as string);
+    if (args.format) sdkArgs.push('--format', args.format as string);
+    if (args.list) sdkArgs.push('--list');
+    if (args.peek) sdkArgs.push('--peek');
+    this.appendCommonFlags(sdkArgs, args);
+
+    // `now-sdk explain` self-resolves its documentation. Use the installed
+    // package directory as a neutral cwd so this tool never requires a project.
+    return this.commandProcessor.process(
+      command,
+      sdkArgs,
+      false,
+      getProjectRootPath(),
+      undefined,
+      this.timeoutMs,
       signal
     );
   }

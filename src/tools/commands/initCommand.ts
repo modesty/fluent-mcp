@@ -1,7 +1,13 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { CommandArgument, CommandProcessor, CommandResult, CommandResultFactory } from '../../utils/types.js';
+import {
+  CommandArgument,
+  CommandProcessor,
+  CommandResult,
+  CommandResultFactory,
+  EnsureAuthValidated,
+} from '../../utils/types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { BaseCLICommand } from './baseCommand.js';
@@ -33,6 +39,7 @@ export class InitCommand extends BaseCLICommand {
   annotations = { openWorldHint: true, idempotentHint: false };
 
   private elicitator: InitElicitator;
+  private readonly ensureAuthValidated: EnsureAuthValidated;
 
   arguments: CommandArgument[] = [
     {
@@ -91,9 +98,14 @@ export class InitCommand extends BaseCLICommand {
     },
   ];
 
-  constructor(commandProcessor: CommandProcessor, mcpServer?: McpServer) {
+  constructor(
+    commandProcessor: CommandProcessor,
+    mcpServer?: McpServer,
+    ensureAuthValidated: EnsureAuthValidated = async () => {}
+  ) {
     super(commandProcessor);
     this.elicitator = new InitElicitator(mcpServer);
+    this.ensureAuthValidated = ensureAuthValidated;
   }
 
   /**
@@ -175,25 +187,40 @@ export class InitCommand extends BaseCLICommand {
   /**
    * Get the auth alias from session or from the provided data
    */
-  private getAuthAlias(providedAuth?: string): string | undefined {
+  private async getAuthAlias(providedAuth?: string): Promise<string | undefined> {
     if (providedAuth) {
       return providedAuth;
     }
-    const sessionAuth = SessionManager.getInstance().getAuthAlias();
+    const sessionManager = SessionManager.getInstance();
+    const sessionAuth = sessionManager.getAuthAlias();
     if (sessionAuth) {
       logger.debug(`Auto-injecting auth alias from session: ${sessionAuth}`);
+      return sessionAuth;
     }
-    return sessionAuth;
+
+    await this.ensureAuthValidated();
+    return sessionManager.getAuthAlias();
   }
 
   /**
    * Build SDK arguments for conversion
    */
-  private buildConversionArgs(data: ConversionElicitationData, baseArgs: string[]): string[] {
+  private async buildConversionArgs(data: ConversionElicitationData, baseArgs: string[]): Promise<string[]> {
     const sdkArgs = [...baseArgs, 'init'];
     sdkArgs.push('--from', data.from);
-    const auth = this.getAuthAlias(data.auth);
-    if (auth) sdkArgs.push('--auth', auth);
+
+    // A local-path conversion is entirely local and must not trigger profile
+    // discovery. An exact sys_id reads from an instance and therefore needs
+    // the explicit/session/lazy-validated auth resolution path. An explicit
+    // alias is honored even for a local path, but getAuthAlias returns it
+    // without invoking lazy validation.
+    const convertsFromInstance = InitValidator.isSysId(data.from);
+    const hasExplicitAuth = typeof data.auth === 'string' && data.auth.trim() !== '';
+    if (convertsFromInstance || hasExplicitAuth) {
+      const auth = await this.getAuthAlias(data.auth);
+      if (auth) sdkArgs.push('--auth', auth);
+    }
+
     if (data.debug) sdkArgs.push('--debug');
     return sdkArgs;
   }
@@ -262,7 +289,7 @@ export class InitCommand extends BaseCLICommand {
       // Step 4: Build and execute SDK command using the bundled CLI
       const { command, baseArgs } = resolveSdkCli();
       const sdkArgs = intent === 'conversion'
-        ? this.buildConversionArgs(elicitedData as ConversionElicitationData, baseArgs)
+        ? await this.buildConversionArgs(elicitedData as ConversionElicitationData, baseArgs)
         : this.buildCreationArgs(elicitedData as CreationElicitationData, baseArgs);
 
       const result = await this.commandProcessor.process(command, sdkArgs, false, workingDirectory);

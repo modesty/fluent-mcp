@@ -35,9 +35,6 @@ export function createLoggerMock() {
     critical: jest.fn(),
     alert: jest.fn(),
     emergency: jest.fn(),
-    setMcpServer: jest.fn(),
-    setupLoggingHandlers: jest.fn(),
-    sendNotification: jest.fn(),
     __esModule: true,
     default: {
       LogLevel,
@@ -49,9 +46,6 @@ export function createLoggerMock() {
       critical: jest.fn(),
       alert: jest.fn(),
       emergency: jest.fn(),
-      setMcpServer: jest.fn(),
-      setupLoggingHandlers: jest.fn(),
-      sendNotification: jest.fn(),
     },
   };
 }

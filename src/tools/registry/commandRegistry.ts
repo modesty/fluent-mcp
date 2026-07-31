@@ -23,7 +23,11 @@ export class CommandRegistry {
 
   // Convert to MCP Tool format
   toMCPTools(): Tool[] {
-    return this.getAllCommands().map((command) => {
+    const commandsByName = this.getAllCommands().sort((left, right) =>
+      left.name < right.name ? -1 : left.name > right.name ? 1 : 0
+    );
+
+    return commandsByName.map((command) => {
       const tool: Tool = {
         name: command.name,
         description: command.description,
@@ -33,13 +37,12 @@ export class CommandRegistry {
         // return structuredContent). This custom tools/list handler is the source of
         // truth, so the schema must be emitted here (not only via registerTool).
         ...(command.outputSchema && {
-          // zod v4 native JSON-Schema conversion yields `{ type: 'object', ... }`,
-          // which MCP's Tool.outputSchema requires (the v3 zod-to-json-schema package
-          // mis-converts zod v4 and omits `type`).
+          // Zod v4's native conversion yields the object schema shape MCP requires.
           outputSchema: z.toJSONSchema(z.object(command.outputSchema)) as Tool['outputSchema'],
         }),
         // Advertised input schema is derived from the SAME Zod shape enforced on
-        // tools/call (see src/tools/toolSchema.ts), so advertised == enforced.
+        // tools/call (see src/tools/toolSchema.ts), so canonical types and
+        // required fields cannot drift.
         inputSchema: buildInputJsonSchema(command.arguments),
       };
 

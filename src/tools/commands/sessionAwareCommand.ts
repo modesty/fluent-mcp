@@ -1,33 +1,94 @@
-import { CommandResult, CommandResultFactory } from '../../utils/types.js';
+import path from 'node:path';
+import {
+  CommandArgument,
+  CommandProcessor,
+  CommandResult,
+  CommandResultFactory,
+  EnsureAuthValidated,
+} from '../../utils/types.js';
 import { BaseCLICommand } from './baseCommand.js';
 import { SessionManager } from '../../utils/sessionManager.js';
 import { resolveWorkingDirectory } from '../../utils/rootContext.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
 import logger from '../../utils/logger.js';
+import { getConfig } from '../../config.js';
+
+export const WORKING_DIRECTORY_ARGUMENT: CommandArgument = {
+  name: 'workingDirectory',
+  type: 'string',
+  required: false,
+  description:
+    'Absolute path to the Fluent project for this call. Overrides the initialized session, FLUENT_MCP_WORKING_DIR, and transitional MCP Roots.',
+};
 
 /**
  * Base class for commands that use the session working directory with root context fallback
  * Extends BaseCLICommand and adds working directory handling, auth resolution, and timeout support
  */
 export abstract class SessionAwareCLICommand extends BaseCLICommand {
-  /**
-   * Get the working directory from the session, or use the root context as fallback.
-   * Priority: session working directory > root context > project root
-   * @returns The working directory to use for the command
-   */
-  protected getWorkingDirectory(): string | undefined {
-    const sessionManager = SessionManager.getInstance();
-    const sessionDir = sessionManager.getWorkingDirectory();
+  constructor(
+    commandProcessor: CommandProcessor,
+    private readonly ensureAuthValidated: EnsureAuthValidated = async () => {}
+  ) {
+    super(commandProcessor);
+  }
 
-    if (sessionDir) {
-      logger.debug(`Using session working directory: ${sessionDir}`);
-      return sessionDir;
+  /**
+   * Resolve the Fluent project directory without guessing from process cwd or the
+   * installed package location.
+  * @returns The working directory to use for the command
+  */
+  protected getWorkingDirectory(explicitWorkingDirectory?: unknown): string | undefined {
+    // MCP clients commonly serialize an omitted optional value as null. Empty
+    // strings have the same meaning for this optional context argument. Treat
+    // both as absent so the documented fallback chain remains usable; any
+    // other explicitly supplied value must still be validated and rejected.
+    const hasExplicitWorkingDirectory = explicitWorkingDirectory !== undefined &&
+      explicitWorkingDirectory !== null &&
+      !(typeof explicitWorkingDirectory === 'string' && explicitWorkingDirectory.trim() === '');
+
+    if (hasExplicitWorkingDirectory) {
+      return this.validateWorkingDirectory(explicitWorkingDirectory, "'workingDirectory' tool argument");
     }
 
-    // Fallback to root context using canonical resolution
-    const fallbackDir = resolveWorkingDirectory();
-    logger.debug(`No session working directory, using root context: ${fallbackDir}`);
-    return fallbackDir;
+    const sessionManager = SessionManager.getInstance();
+    const sessionDir = sessionManager.getWorkingDirectory();
+    if (sessionDir) {
+      const resolved = this.validateWorkingDirectory(sessionDir, 'initialized session');
+      logger.debug(`Using session working directory: ${resolved}`);
+      return resolved;
+    }
+
+    const configuredDir = getConfig().workingDirectory;
+    if (configuredDir !== undefined) {
+      const resolved = this.validateWorkingDirectory(configuredDir, 'FLUENT_MCP_WORKING_DIR');
+      logger.debug(`Using FLUENT_MCP_WORKING_DIR: ${resolved}`);
+      return resolved;
+    }
+
+    const rootDir = resolveWorkingDirectory();
+    if (rootDir) {
+      const resolved = this.validateWorkingDirectory(rootDir, 'transitional MCP Roots');
+      logger.debug(`Using transitional MCP root: ${resolved}`);
+      return resolved;
+    }
+
+    return undefined;
+  }
+
+  private validateWorkingDirectory(value: unknown, source: string): string {
+    if (typeof value !== 'string' || value.trim() === '') {
+      throw new Error(`${source} must be a non-empty absolute path.`);
+    }
+
+    const directory = path.normalize(value.trim());
+    if (!path.isAbsolute(directory)) {
+      throw new Error(`${source} must be an absolute path: ${value}`);
+    }
+    if (path.parse(directory).root === directory) {
+      throw new Error(`${source} must not be the filesystem root: ${directory}`);
+    }
+    return directory;
   }
 
   /**
@@ -36,15 +97,23 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
    * @param providedAuth Explicit auth alias from command args
    * @returns The resolved auth alias, or undefined if none available
    */
-  protected resolveAuthAlias(providedAuth?: string): string | undefined {
+  protected async resolveAuthAlias(providedAuth?: string): Promise<string | undefined> {
     if (providedAuth) {
       return providedAuth;
     }
-    const sessionAuth = SessionManager.getInstance().getAuthAlias();
+    const sessionManager = SessionManager.getInstance();
+    const sessionAuth = sessionManager.getAuthAlias();
     if (sessionAuth) {
       logger.debug(`Auto-injecting auth alias from session: ${sessionAuth}`);
+      return sessionAuth;
     }
-    return sessionAuth;
+
+    await this.ensureAuthValidated();
+    const validatedAuth = sessionManager.getAuthAlias();
+    if (validatedAuth) {
+      logger.debug(`Auto-injecting validated auth alias from session: ${validatedAuth}`);
+    }
+    return validatedAuth;
   }
 
   /**
@@ -63,19 +132,18 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
     useMcpCwd: boolean = false,
     stdinInput?: string,
     timeoutMs?: number,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    explicitWorkingDirectory?: unknown
   ): Promise<CommandResult> {
-    const workingDirectory = this.getWorkingDirectory();
-
-    if (!workingDirectory) {
-      return CommandResultFactory.error(
-        'No working directory found. Please run the init command first to set up a working directory, or ensure MCP root context is configured.'
-      );
-    }
-
-    const effectiveTimeout = timeoutMs ?? this.timeoutMs;
-
     try {
+      const workingDirectory = this.getWorkingDirectory(explicitWorkingDirectory);
+      if (!workingDirectory) {
+        return CommandResultFactory.error(
+          "No Fluent project working directory is configured. Pass the 'workingDirectory' tool argument with an absolute path, run init_fluent_app to initialize the session, or set FLUENT_MCP_WORKING_DIR to an absolute path."
+        );
+      }
+
+      const effectiveTimeout = timeoutMs ?? this.timeoutMs;
       return await this.commandProcessor.process(command, args, useMcpCwd, workingDirectory, stdinInput, effectiveTimeout, signal);
     } catch (error) {
       return CommandResultFactory.fromError(error);
@@ -110,7 +178,7 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
 
     // Auto-resolve auth from session if 'auth' is mapped but not provided
     if ('auth' in flagMapping && !args.auth) {
-      const sessionAuth = this.resolveAuthAlias();
+      const sessionAuth = await this.resolveAuthAlias();
       if (sessionAuth) {
         args = { ...args, auth: sessionAuth };
       }
@@ -146,6 +214,14 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
     // Add common flags (like --debug)
     this.appendCommonFlags(sdkArgs, args);
 
-    return this.executeWithSessionWorkingDirectory(command, sdkArgs, false, undefined, this.timeoutMs, signal);
+    return this.executeWithSessionWorkingDirectory(
+      command,
+      sdkArgs,
+      false,
+      undefined,
+      this.timeoutMs,
+      signal,
+      args.workingDirectory
+    );
   }
 }

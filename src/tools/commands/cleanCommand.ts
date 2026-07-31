@@ -1,5 +1,5 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
-import { SessionAwareCLICommand } from './sessionAwareCommand.js';
+import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 
 /**
  * Command to clean output directory of a Fluent (ServiceNow SDK) application
@@ -11,6 +11,7 @@ export class CleanCommand extends SessionAwareCLICommand {
   annotations = { destructiveHint: true, idempotentHint: true };
   timeoutMs = 15_000;
   arguments: CommandArgument[] = [
+    WORKING_DIRECTORY_ARGUMENT,
     {
       name: 'source',
       type: 'string',

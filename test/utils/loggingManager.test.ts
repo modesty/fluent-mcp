@@ -16,8 +16,6 @@ jest.mock("../../src/utils/logger.js", () => {
     critical: jest.fn(),
     alert: jest.fn(),
     emergency: jest.fn(),
-    setMcpServer: jest.fn(),
-    setupLoggingHandlers: jest.fn(),
     __esModule: true,
     default: {
       debug: jest.fn(),
@@ -28,33 +26,16 @@ jest.mock("../../src/utils/logger.js", () => {
       critical: jest.fn(),
       alert: jest.fn(),
       emergency: jest.fn(),
-      setMcpServer: jest.fn(),
-      setupLoggingHandlers: jest.fn()
     }
   };
 });
 
 describe("LoggingManager", () => {
   let loggingManager: LoggingManager;
-  let mockServer: any;
   
   beforeEach(() => {
     jest.clearAllMocks();
     loggingManager = new LoggingManager();
-    mockServer = {
-      server: { 
-        notification: jest.fn() 
-      }
-    };
-  });
-
-  test("should configure logger with MCP server", () => {
-    // Act
-    loggingManager.configure(mockServer);
-    
-    // Assert
-    expect(logger.setMcpServer).toHaveBeenCalledWith(mockServer);
-    expect(logger.setupLoggingHandlers).toHaveBeenCalled();
   });
 
   test("should log server starting", () => {
@@ -65,6 +46,35 @@ describe("LoggingManager", () => {
     expect(logger.info).toHaveBeenCalledWith(
       "Starting MCP server...",
       expect.objectContaining({ version: expect.any(String) })
+    );
+  });
+
+  test.each([
+    ["authenticated", "info"],
+    ["skipped", "debug"],
+    ["not_authenticated", "notice"],
+    ["validation_error", "warn"],
+  ] as const)("should log %s auth status at %s severity", (status, method) => {
+    loggingManager.logAuthValidationResult({
+      status,
+      message: `Auth status: ${status}`,
+      timestamp: "2026-07-29T00:00:00.000Z",
+      alias: "dev",
+      host: "dev.example.com",
+      authType: "oauth",
+      actionRequired: "now-sdk auth --add https://dev.example.com",
+    });
+
+    expect(logger[method]).toHaveBeenCalledWith(
+      `Auth status: ${status}`,
+      {
+        status,
+        timestamp: "2026-07-29T00:00:00.000Z",
+        alias: "dev",
+        host: "dev.example.com",
+        authType: "oauth",
+        actionRequired: "now-sdk auth --add https://dev.example.com",
+      }
     );
   });
 

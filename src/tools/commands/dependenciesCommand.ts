@@ -1,5 +1,5 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
-import { SessionAwareCLICommand } from './sessionAwareCommand.js';
+import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 
 /**
  * Command to manage dependencies in a Fluent (ServiceNow SDK) application
@@ -11,6 +11,7 @@ export class DependenciesCommand extends SessionAwareCLICommand {
   annotations = { openWorldHint: true };
   timeoutMs = 60_000;
   arguments: CommandArgument[] = [
+    WORKING_DIRECTORY_ARGUMENT,
     {
       name: 'auth',
       type: 'string',

@@ -39,11 +39,11 @@ describe('InstallCommand', () => {
       expect(skipArg?.description).toContain('flow activation');
     });
 
-    test('should have three arguments: auth, skipFlowActivation, debug', () => {
+    test('should advertise workingDirectory, auth, skipFlowActivation, and debug', () => {
       const command = new InstallCommand(mockProcessor as any);
-      expect(command.arguments).toHaveLength(3);
-
       const argNames = command.arguments.map(arg => arg.name);
+      expect(argNames).toHaveLength(4);
+      expect(argNames).toContain('workingDirectory');
       expect(argNames).toContain('auth');
       expect(argNames).toContain('skipFlowActivation');
       expect(argNames).toContain('debug');

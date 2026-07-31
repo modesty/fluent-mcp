@@ -5,8 +5,7 @@ import { CommandRegistry } from './registry/commandRegistry.js';
 import { NodeProcessRunner } from './processors/processRunner.js';
 import { CLIExecutor } from './processors/cliExecutor.js';
 import { CLICmdWriter } from './processors/cliCmdWriter.js';
-import { BaseCommandProcessor } from './processors/baseCommandProcessor.js';
-import { CLICommand, CommandResult, CommandResultFactory } from '../utils/types.js';
+import { CLICommand, CommandResult, CommandResultFactory, EnsureAuthValidated } from '../utils/types.js';
 import logger from '../utils/logger.js';
 import {
   GetApiSpecCommand,
@@ -16,6 +15,8 @@ import {
 } from './resources/resourceTools.js';
 import { setRoots as setRootContextRoots } from '../utils/rootContext.js';
 import { buildInputZodSchema } from './toolSchema.js';
+import { autoValidateAuthIfConfigured } from '../server/fluentInstanceAuth.js';
+import loggingManager from '../utils/loggingManager.js';
 
 /**
  * Manager for handling MCP tools registration and execution
@@ -24,6 +25,21 @@ export class ToolsManager {
   private commandRegistry: CommandRegistry;
   private mcpServer: McpServer;
   private cliExecutor!: CLIExecutor;
+  private authValidationPromise?: Promise<void>;
+  private readonly ensureAuthValidated: EnsureAuthValidated = () => {
+    if (!this.authValidationPromise) {
+      this.authValidationPromise = autoValidateAuthIfConfigured(this)
+        .then((result) => {
+          loggingManager.logAuthValidationResult(result);
+        })
+        .catch((error) => {
+          logger.warn('Auto-auth validation failed', {
+            error: CommandResultFactory.normalizeError(error).message,
+          });
+        });
+    }
+    return this.authValidationPromise;
+  };
 
   /**
    * Create a new ToolsManager
@@ -53,7 +69,12 @@ export class ToolsManager {
     // Create commands with appropriate processors for each type
     // InitCommand will use CLICmdWriter, others will use CLIExecutor
     // Note: AuthCommand is not exposed to MCP clients - it's used internally for auto-auth validation
-    const commands = CommandFactory.createCommands(cliExecutor, cliCmdWriter, this.mcpServer);
+    const commands = CommandFactory.createCommands(
+      cliExecutor,
+      cliCmdWriter,
+      this.mcpServer,
+      this.ensureAuthValidated
+    );
 
     commands.forEach((command) => {
       this.commandRegistry.register(command);
@@ -86,7 +107,7 @@ export class ToolsManager {
       this.registerToolFromCommand(getInstructCommand);
 
       // Register auth status check tool
-      const checkAuthStatusCommand = new CheckAuthStatusCommand();
+      const checkAuthStatusCommand = new CheckAuthStatusCommand(this.ensureAuthValidated);
       this.commandRegistry.register(checkAuthStatusCommand);
       this.registerToolFromCommand(checkAuthStatusCommand);
 
@@ -107,8 +128,8 @@ export class ToolsManager {
     if (!this.mcpServer) return;
 
     // Build the enforced input schema from the single source of truth shared with
-    // the advertised tools/list schema (commandRegistry.toMCPTools), so the two
-    // can never drift. See src/tools/toolSchema.ts.
+    // the advertised tools/list schema (commandRegistry.toMCPTools), so canonical
+    // types and required fields cannot drift. See src/tools/toolSchema.ts.
     const inputSchema = buildInputZodSchema(command.arguments);
 
     // Register with MCP server.
@@ -249,42 +270,18 @@ export class ToolsManager {
       return;
     }
 
-    // Get all the commands
-    const commands = this.commandRegistry.getAllCommands();
-
-    // Collect unique command processors that support roots
-    const processors = new Set<BaseCommandProcessor>();
-
-    for (const command of commands) {
-      const processor = command.getCommandProcessor();
-      if (processor instanceof BaseCommandProcessor) {
-        processors.add(processor);
-      }
-    }
-
-    // Log details about the update process
-    logger.debug('Updating roots in CLI tools', {
-      processorCount: processors.size,
-      commandCount: commands.length,
+    logger.debug('Updating transitional MCP root context', {
       rootCount: roots.length,
       rootPaths: roots.map(r => r.uri)
     });
 
-    // Update roots in each unique processor instance
-    processors.forEach(processor => {
-      processor.setRoots(roots);
-    });
-
-    // Also update global RootContext for modules that don't participate in the command registry
     setRootContextRoots(roots);
-
-    // Log only once at this level after all updates are complete
-    logger.info('Updated roots in all CLI tools', { roots });
+    logger.info('Updated transitional MCP root context', { roots });
   }
 
   /**
    * Execute the AuthCommand using the shared executor (not the writer)
-   * Used internally by server for auto-auth validation at startup.
+   * Used internally for lazy auto-auth validation.
    * Note: AuthCommand is not exposed to MCP clients - authentication is managed
    * via environment variables (SN_INSTANCE_URL, SN_AUTH_TYPE) and the auth alias
    * is stored in session for use by all SDK commands.

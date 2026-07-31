@@ -5,14 +5,16 @@ import type { CommandArgument } from '../utils/types.js';
 /**
  * Single source of truth for a tool's INPUT schema.
  *
- * A tool is described in two places that must agree:
+ * A tool is described in two places that must share one contract:
  *  - **enforced** on `tools/call` — `ToolsManager` passes this strict Zod object to
  *    `mcpServer.registerTool()`, which validates incoming arguments against it;
- *  - **advertised** on `tools/list` — `CommandRegistry.toMCPTools()` emits JSON
- *    Schema so clients know what to send.
+ *  - **advertised** on `tools/list` — `CommandRegistry.toMCPTools()` emits the
+ *    canonical JSON Schema so clients know what to send.
  *
- * Deriving both from {@link buildInputZodSchema} guarantees advertised == enforced
- * (previously the two were hand-built independently and could drift).
+ * Deriving both from {@link buildInputZodSchema} keeps the canonical types and
+ * required set aligned. The enforced schema additionally accepts null for
+ * optional values as an input compatibility behavior; that normalization is
+ * intentionally not exposed as a nullable union to clients.
  */
 
 /**
@@ -45,10 +47,18 @@ export function buildInputZodShape(args: CommandArgument[]): z.ZodRawShape {
         zodType = z.any().describe(arg.description);
     }
 
-    // Optional args use .nullable().optional() because LLMs commonly send null
-    // for "not provided" parameters, and z.string().optional() rejects null.
+    // LLMs commonly send null for "not provided" parameters. Normalize that
+    // compatibility value before applying .optional(): using
+    // .nullable().optional() would advertise every optional property as
+    // anyOf[value, null], which the MCP Inspector (and some other clients)
+    // cannot render as a normal form field. The advertised schema therefore
+    // describes the actual value type while the enforced schema still accepts
+    // null and treats it as omitted.
     if (!arg.required) {
-      zodType = zodType.nullable().optional();
+      zodType = z.preprocess(
+        (value) => value === null ? undefined : value,
+        zodType.optional()
+      );
     }
 
     shape[arg.name] = zodType;
@@ -75,7 +85,9 @@ export function buildInputZodSchema(args: CommandArgument[]): z.ZodObject<z.ZodR
  * `tools/list`, derived from the exact Zod object enforced on `tools/call`.
  *
  * Uses zod v4's native JSON-Schema conversion (`z.toJSONSchema`) rather than the
- * v3 `zod-to-json-schema` package, which mis-converts zod v4 shapes.
+ * legacy conversion packages, which can mis-convert zod v4 shapes.
+ * Optional properties advertise their canonical value type while the matching
+ * enforced schema accepts null as an omitted-value compatibility form.
  * @param args The command's declared arguments
  * @returns A JSON Schema object suitable for `Tool.inputSchema`
  */

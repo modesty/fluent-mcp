@@ -1,5 +1,5 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
-import { SessionAwareCLICommand } from './sessionAwareCommand.js';
+import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 
 /**
  * Command to download application metadata from a ServiceNow instance
@@ -14,6 +14,13 @@ export class DownloadCommand extends SessionAwareCLICommand {
   // Full-app metadata downloads can be large; raised for headroom (P0.2).
   timeoutMs = 180_000;
   arguments: CommandArgument[] = [
+    WORKING_DIRECTORY_ARGUMENT,
+    {
+      name: 'auth',
+      type: 'string',
+      required: false,
+      description: 'Credential alias to use for authentication with instance (auto-injected from session if not provided)',
+    },
     {
       name: 'directory',
       type: 'string',
@@ -46,6 +53,7 @@ export class DownloadCommand extends SessionAwareCLICommand {
       args,
       {
         source: '--source',
+        auth: '--auth',
         incremental: { flag: '--incremental', hasValue: false },
       },
       [args.directory as string],  // positional argument

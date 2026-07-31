@@ -5,6 +5,7 @@ import { SessionManager } from "../../src/utils/sessionManager.js";
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import fs from "node:fs";
 import os from "node:os";
+import path from "node:path";
 
 // Create a virtual filesystem helper
 interface FluentAppInfo {
@@ -456,13 +457,89 @@ describe("InitCommand", () => {
 
   test('should validate local path for conversion', async () => {
     mockFs.markAsFluentApp('/existing-path', 'x_existing_scope', 'existing-package');
+    const ensureAuthValidated = jest.fn().mockResolvedValue(undefined);
+    const localConversionCommand = new InitCommand(
+      mockExecutor,
+      mockMcpServer as McpServer,
+      ensureAuthValidated
+    );
     const args = {
       workingDirectory: '/valid-dir',
       from: '/existing-path'
     };
 
-    await initCommand.execute(args);
+    await localConversionCommand.execute(args);
     expect(mockExecutor.process).toHaveBeenCalled();
+    expect(ensureAuthValidated).not.toHaveBeenCalled();
+    expect(mockExecutor.process).toHaveBeenCalledWith(
+      process.execPath,
+      expect.not.arrayContaining(['--auth']),
+      false,
+      '/valid-dir'
+    );
+  });
+
+  test('should recognize a bare relative local path without triggering auth validation', async () => {
+    mockFs.markAsFluentApp(path.resolve('existing-path'), 'x_existing_scope', 'existing-package');
+    const ensureAuthValidated = jest.fn().mockResolvedValue(undefined);
+    const localConversionCommand = new InitCommand(
+      mockExecutor,
+      mockMcpServer as McpServer,
+      ensureAuthValidated
+    );
+
+    await localConversionCommand.execute({
+      workingDirectory: '/valid-dir',
+      from: 'existing-path',
+    });
+
+    expect(ensureAuthValidated).not.toHaveBeenCalled();
+    expect(mockExecutor.process).toHaveBeenCalledWith(
+      process.execPath,
+      expect.not.arrayContaining(['--auth']),
+      false,
+      '/valid-dir'
+    );
+  });
+
+  test('should honor an explicit auth alias for a local conversion without lazy validation', async () => {
+    mockFs.markAsFluentApp('/existing-path', 'x_existing_scope', 'existing-package');
+    const ensureAuthValidated = jest.fn().mockResolvedValue(undefined);
+    const localConversionCommand = new InitCommand(
+      mockExecutor,
+      mockMcpServer as McpServer,
+      ensureAuthValidated
+    );
+
+    await localConversionCommand.execute({
+      workingDirectory: '/valid-dir',
+      from: '/existing-path',
+      auth: 'explicit-local-auth',
+    });
+
+    expect(ensureAuthValidated).not.toHaveBeenCalled();
+    expect(mockExecutor.process).toHaveBeenCalledWith(
+      process.execPath,
+      expect.arrayContaining(['--auth', 'explicit-local-auth']),
+      false,
+      '/valid-dir'
+    );
+  });
+
+  test('should lazily validate auth for sys_id conversion without an alias', async () => {
+    const ensureAuthValidated = jest.fn().mockResolvedValue(undefined);
+    const instanceConversionCommand = new InitCommand(
+      mockExecutor,
+      mockMcpServer as McpServer,
+      ensureAuthValidated
+    );
+
+    await instanceConversionCommand.execute({
+      workingDirectory: '/valid-dir',
+      from: 'a1b2c3d4e5f6789012345678901234ab'
+    });
+
+    expect(ensureAuthValidated).toHaveBeenCalledTimes(1);
   });
 
   test('should fail validation for non-existent local path', async () => {

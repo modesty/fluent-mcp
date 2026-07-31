@@ -4,7 +4,6 @@
 import { FluentMcpServer } from "../../src/server/fluentMCPServer.js";
 import { ResourceLoader } from "../../src/utils/resourceLoader.js";
 import { ResourceType } from "../../src/utils/types.js";
-import { patchLoggerForTests } from "../utils/loggerPatch.js";
 
 // Mock the Model Context Protocol SDK
 jest.mock("@modelcontextprotocol/sdk/server/mcp.js", () => {
@@ -185,8 +184,6 @@ describe("FluentMcpServer Resource Capability", () => {
   
   beforeEach(() => {
     jest.clearAllMocks();
-    // Patch the logger to handle missing notification function
-    patchLoggerForTests();
   });
 
   test("should initialize with resource capability", async () => {
@@ -204,8 +201,12 @@ describe("FluentMcpServer Resource Capability", () => {
       }),
       expect.objectContaining({
         capabilities: expect.objectContaining({
-          resources: expect.anything()
-        })
+          resources: expect.anything(),
+          prompts: {},
+        }),
+        instructions: expect.stringContaining(
+          "Use explain_fluent_api for SDK APIs and guides"
+        ),
       })
     );
   });

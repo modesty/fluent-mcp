@@ -5,7 +5,6 @@ import { FluentMcpServer } from "../../src/server/fluentMCPServer.js";
 import { ToolsManager } from "../../src/tools/toolsManager.js";
 import { ResourceManager } from "../../src/res/resourceManager.js";
 import { ServerStatus } from "../../src/types.js";
-import { patchLoggerForTests } from "../utils/loggerPatch.js";
 
 // Mock the Model Context Protocol SDK
 jest.mock("@modelcontextprotocol/sdk/server/mcp.js", () => {
@@ -15,6 +14,7 @@ jest.mock("@modelcontextprotocol/sdk/server/mcp.js", () => {
   const mockSetRequestHandler = jest.fn();
   const mockSetNotificationHandler = jest.fn();
   const mockRequest = jest.fn();
+  const mockGetClientCapabilities = jest.fn().mockReturnValue({ roots: {} });
   const mockConnect = jest.fn();
   const mockClose = jest.fn();
   const mockNotification = jest.fn();
@@ -23,6 +23,7 @@ jest.mock("@modelcontextprotocol/sdk/server/mcp.js", () => {
     __esModule: true,
     mockSetNotificationHandler,
     mockRequest,
+    mockGetClientCapabilities,
     McpServer: jest.fn().mockImplementation(() => ({
       registerResource: mockRegisterResource,
       registerTool: mockRegisterTool,
@@ -32,7 +33,8 @@ jest.mock("@modelcontextprotocol/sdk/server/mcp.js", () => {
         setRequestHandler: mockSetRequestHandler,
         setNotificationHandler: mockSetNotificationHandler,
         notification: mockNotification,
-        request: mockRequest
+        request: mockRequest,
+        getClientCapabilities: mockGetClientCapabilities,
       }
     })),
     ResourceTemplate: jest.fn().mockImplementation((template, options) => ({
@@ -128,18 +130,12 @@ jest.mock("../../src/utils/logger.js", () => {
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
-    setMcpServer: jest.fn(),
-    setupLoggingHandlers: jest.fn(),
-    sendNotification: jest.fn(),
     __esModule: true,
     default: {
       debug: jest.fn(),
       info: jest.fn(),
       warn: jest.fn(),
       error: jest.fn(),
-      setMcpServer: jest.fn(),
-      setupLoggingHandlers: jest.fn(),
-      sendNotification: jest.fn()
     }
   };
 });
@@ -149,8 +145,8 @@ describe("FluentMcpServer with Modular Design", () => {
   
   beforeEach(() => {
     jest.clearAllMocks();
-    // Patch the logger to handle missing notification function
-    patchLoggerForTests();
+    const { mockGetClientCapabilities } = require('@modelcontextprotocol/sdk/server/mcp.js');
+    mockGetClientCapabilities.mockReturnValue({ roots: {} });
     server = new FluentMcpServer();
   });
 
@@ -171,7 +167,8 @@ describe("FluentMcpServer with Modular Design", () => {
 
   test("should request roots from client and handle response", async () => {
     // Get the direct reference to the mockRequest exported from the mock
-    const { mockRequest } = require('@modelcontextprotocol/sdk/server/mcp.js');
+    const { mockRequest, mockGetClientCapabilities } = require('@modelcontextprotocol/sdk/server/mcp.js');
+    mockGetClientCapabilities.mockReturnValue({ roots: {} });
     
     // Clear any previous calls
     mockRequest.mockClear();
@@ -209,56 +206,27 @@ describe("FluentMcpServer with Modular Design", () => {
     expect(roots[1].uri).toBe('file:///mock/client/root2');
     expect(roots[1].name).toBe('Client Root 2');
   });
-  
-  test("should handle notifications for root changes", async () => {
-    // Since we've confirmed that the notification handler calls requestRootsFromClient,
-    // we can test the notification flow by directly testing requestRootsFromClient
-    
-    // Create a new server instance for clean test
-    jest.clearAllMocks();
-    patchLoggerForTests();
-    server = new FluentMcpServer();
-    
-    // Set up request mock
-    const { mockRequest } = require('@modelcontextprotocol/sdk/server/mcp.js');
-    
-    // Clear any previous calls
+
+  test("should not request roots when the client does not advertise the capability", async () => {
+    const { mockRequest, mockGetClientCapabilities } = require('@modelcontextprotocol/sdk/server/mcp.js');
     mockRequest.mockClear();
-    
-    // Setup mock responses for roots/list
-    mockRequest.mockImplementation((request: { method: string }, schema: any) => {
-      if (request.method === 'roots/list') {
-        return {
-          roots: [
-            { uri: 'file:///mock/client/root1', name: 'Client Root 1' },
-            { uri: 'file:///mock/client/root2', name: 'Client Root 2' }
-          ]
-        };
-      }
-      return {};
-    });
-    
-    // Start the server to initialize roots
+    mockGetClientCapabilities.mockReturnValue({});
+
     await server.start();
-    
-    // Directly call requestRootsFromClient instead of trying to trigger the notification handler
     await (server as any).requestRootsFromClient();
-    
-    // Verify that requestRootsFromClient was called and roots were updated
-    const roots = server.getRoots();
-    expect(roots).toHaveLength(2);
-    expect(roots[0].uri).toBe('file:///mock/client/root1');
-    expect(roots[1].uri).toBe('file:///mock/client/root2');
+
+    expect(mockRequest).not.toHaveBeenCalled();
+    expect(server.getRoots()).toEqual([]);
   });
   
   test("should handle invalid response format from roots/list", async () => {
     // Create a completely new server for this test
     jest.clearAllMocks();
-    patchLoggerForTests();
     server = new FluentMcpServer();
     
     // Mock an invalid response format
-    const { mockRequest } = require('@modelcontextprotocol/sdk/server/mcp.js');
+    const { mockRequest, mockGetClientCapabilities } = require('@modelcontextprotocol/sdk/server/mcp.js');
+    mockGetClientCapabilities.mockReturnValue({ roots: {} });
     
     // Clear previous mock implementations
     mockRequest.mockReset();
@@ -276,10 +244,9 @@ describe("FluentMcpServer with Modular Design", () => {
     // Directly call requestRootsFromClient instead of trying to trigger the notification handler
     await (server as any).requestRootsFromClient();
     
-    // Should fallback to project root
+    // Invalid roots must not silently become the installed package directory.
     const roots = server.getRoots();
-    expect(roots).toHaveLength(1);
-    expect(roots[0].uri).toBe('/mock/project/root');
+    expect(roots).toEqual([]);
   });
   
   describe("Root capability", () => {
@@ -290,19 +257,17 @@ describe("FluentMcpServer with Modular Design", () => {
       mockUpdateRoots.mockClear();
     });
     
-    test("should initialize with project root on start", async () => {
+    test("should not invent a package-directory root when the client has none", async () => {
+      const { mockGetClientCapabilities } = require('@modelcontextprotocol/sdk/server/mcp.js');
+      mockGetClientCapabilities.mockReturnValue({});
       await server.start();
       
       // Directly call requestRootsFromClient instead of trying to trigger the notification handler
       await (server as any).requestRootsFromClient();
       
       const roots = server.getRoots();
-      expect(roots).toHaveLength(1);
-      expect(roots[0].uri).toBe("/mock/project/root");
-      expect(roots[0].name).toBe("Project Root");
-      // Since we're now updating the roots in ToolsManager as part of addRoot
-      // during server.start, we just verify it was called at least once
-      expect(mockUpdateRoots).toHaveBeenCalled();
+      expect(roots).toEqual([]);
+      expect(mockUpdateRoots).not.toHaveBeenCalled();
     });
     
     test("should add a new root", async () => {

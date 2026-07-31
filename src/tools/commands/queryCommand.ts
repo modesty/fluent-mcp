@@ -1,5 +1,5 @@
 import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
-import { SessionAwareCLICommand } from './sessionAwareCommand.js';
+import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 
 /**
  * Control characters can obscure command boundaries in logs and are not valid
@@ -23,6 +23,7 @@ export class QueryCommand extends SessionAwareCLICommand {
   annotations = { readOnlyHint: true, openWorldHint: true };
   timeoutMs = 60_000;
   arguments: CommandArgument[] = [
+    WORKING_DIRECTORY_ARGUMENT,
     {
       name: 'table',
       type: 'string',
@@ -147,11 +148,11 @@ export class QueryCommand extends SessionAwareCLICommand {
     // Resolve the alias from the explicit `auth` arg or the session, and fail fast
     // with an actionable message rather than letting the SDK CLI error opaquely.
     const providedAuth = typeof args.auth === 'string' ? args.auth : undefined;
-    const resolvedAuth = this.resolveAuthAlias(providedAuth);
+    const resolvedAuth = await this.resolveAuthAlias(providedAuth);
     if (!resolvedAuth) {
       return CommandResultFactory.error(
         'query_fluent_records requires authentication to a ServiceNow instance, but no credential alias was found. ' +
-        "Pass 'auth' with a stored profile alias, or set SN_INSTANCE_URL so a matching auth profile is loaded into the session at startup. " +
+        "Pass 'auth' with a stored profile alias, or set SN_INSTANCE_URL so lazy validation can load a matching profile into the session. " +
         "Use the ServiceNow SDK 'now-sdk auth --add <instance>' command to create a profile."
       );
     }

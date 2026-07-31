@@ -1,13 +1,14 @@
 import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
-import { SessionAwareCLICommand } from './sessionAwareCommand.js';
+import { BaseCLICommand } from './baseCommand.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
 import logger from '../../utils/logger.js';
+import { getProjectRootPath } from '../../config.js';
 
 /**
  * Command to prepare shell command for ServiceNow SDK authentication
  * Handles adding, listing, deleting, and selecting auth profiles
  */
-export class AuthCommand extends SessionAwareCLICommand {
+export class AuthCommand extends BaseCLICommand {
   name = 'manage_fluent_auth';
   description = 'Manage Fluent (ServiceNow SDK) authentication to instance with credential profiles, use this to add, list, delete, or switch between authentication profiles';
   arguments: CommandArgument[] = [
@@ -143,6 +144,16 @@ export class AuthCommand extends SessionAwareCLICommand {
       }
     }
 
-    return await this.executeWithSessionWorkingDirectory(command, sdkArgs, false, stdinInput, undefined, signal);
+    // Auth profiles are global SDK state, not Fluent-project state. The package
+    // directory is an intentional neutral cwd for the bundled CLI.
+    return await this.commandProcessor.process(
+      command,
+      sdkArgs,
+      false,
+      getProjectRootPath(),
+      stdinInput,
+      undefined,
+      signal
+    );
   }
 }

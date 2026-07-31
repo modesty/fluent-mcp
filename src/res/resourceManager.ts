@@ -2,6 +2,7 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import { ResourceLoader } from '../utils/resourceLoader.js';
 import { ResourceType, CommandResultFactory } from '../utils/types.js';
 import logger from '../utils/logger.js';
+import { McpResourceNotFoundError } from '../utils/mcpErrors.js';
 
 /**
  * Configuration for a resource type, capturing all per-type differences
@@ -147,12 +148,10 @@ export class ResourceManager {
             );
 
             if (!result.found) {
-              return {
-                contents: [{
-                  uri: uri.href,
-                  text: `${config.label} not found for ${metadataType}`,
-                }],
-              };
+              throw new McpResourceNotFoundError(
+                uri.href,
+                `${config.label} not found for ${metadataType}`
+              );
             }
 
             return {
@@ -162,6 +161,10 @@ export class ResourceManager {
               }],
             };
           } catch (error) {
+            if (error instanceof McpResourceNotFoundError) {
+              throw error;
+            }
+
             logger.error(`Error reading ${config.label.toLowerCase()} resource for ${uri.href}`,
               CommandResultFactory.normalizeError(error)
             );
@@ -291,13 +294,10 @@ export class ResourceManager {
     );
 
     if (!result.found) {
-      return {
-        contents: [{
-          uri: uri.href,
-          text: `${config.label} not found for ${metadataType}`,
-          mimeType: 'text/plain',
-        }],
-      };
+      throw new McpResourceNotFoundError(
+        uri.href,
+        `${config.label} not found for ${metadataType}`
+      );
     }
 
     return {
