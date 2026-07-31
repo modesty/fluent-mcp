@@ -1,4 +1,4 @@
-import { CommandProcessor, CLICommand } from '../../utils/types.js';
+import { CommandProcessor, CLICommand, EnsureAuthValidated } from '../../utils/types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
   SdkInfoCommand,
@@ -26,10 +26,15 @@ export class CommandFactory {
    * @returns An array of command instances
    *
    * Note: AuthCommand is not exposed to MCP clients. Authentication is handled
-   * automatically at startup via environment variables (SN_INSTANCE_URL, SN_AUTH_TYPE).
+   * lazily via environment variables (SN_INSTANCE_URL, SN_AUTH_TYPE) when first needed.
    * The auth alias is stored in the session and used by all SDK commands.
    */
-  static createCommands(executor: CommandProcessor, writer?: CommandProcessor, mcpServer?: McpServer): CLICommand[] {
+  static createCommands(
+    executor: CommandProcessor,
+    writer?: CommandProcessor,
+    mcpServer?: McpServer,
+    ensureAuthValidated: EnsureAuthValidated = async () => {}
+  ): CLICommand[] {
     // If no writer is provided, use the executor for all commands
     const textProcessor = writer || executor;
 
@@ -38,17 +43,17 @@ export class CommandFactory {
       new SdkInfoCommand(executor),
 
       // SDK Command Tools (actual SDK subcommands)
-      // Note: AuthCommand removed - auth is handled via env vars at startup
-      new InitCommand(textProcessor, mcpServer), // Uses writer to generate text instead of executing
-      new BuildCommand(executor),
-      new InstallCommand(executor),
-      new TransformCommand(executor),
-      new DependenciesCommand(textProcessor), // Uses writer to generate text instead of executing
-      new DownloadCommand(executor),
-      new CleanCommand(executor),
-      new PackCommand(executor),
+      // Note: AuthCommand removed - auth is handled lazily via env vars
+      new InitCommand(textProcessor, mcpServer, ensureAuthValidated), // Uses writer to generate text instead of executing
+      new BuildCommand(executor, ensureAuthValidated),
+      new InstallCommand(executor, ensureAuthValidated),
+      new TransformCommand(executor, ensureAuthValidated),
+      new DependenciesCommand(textProcessor, ensureAuthValidated), // Uses writer to generate text instead of executing
+      new DownloadCommand(executor, ensureAuthValidated),
+      new CleanCommand(executor, ensureAuthValidated),
+      new PackCommand(executor, ensureAuthValidated),
       new ExplainCommand(executor),
-      new QueryCommand(executor),
+      new QueryCommand(executor, ensureAuthValidated),
     ];
   }
 }

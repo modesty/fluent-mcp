@@ -9,8 +9,8 @@ Built for **`@servicenow/sdk` 4.9.0**.
 - **Complete SDK Coverage** - ServiceNow SDK commands: `init`, `build`, `install`, `dependencies`, `transform`, `download`, `clean`, `pack`, `explain`, `query`
 - **Rich Resources** - API specifications, instructions, and code snippets for **65 ServiceNow metadata types**
 - **API Documentation Lookup** - `explain_fluent_api` returns SDK docs for any Fluent API or guide — no project required
-- **Auto-Authentication** - Automatic auth profile detection and session management via environment variables
-- **Session-Aware** - Maintains working directory and auth context across commands
+- **Lazy Auto-Authentication** - Detects and caches an auth profile only when an auth-requiring command or `check_auth_status` needs it
+- **Explicit Project Context** - Resolves each project command from its `workingDirectory` argument, the initialized session, server configuration, or transitional MCP roots
 
 This MCP server implements the [Model Context Protocol](https://modelcontextprotocol.io) specification with the following capabilities:
 
@@ -25,16 +25,16 @@ This MCP server implements the [Model Context Protocol](https://modelcontextprot
 
 The server leverages these MCP client capabilities when available:
 
-- **Roots** - Requests workspace roots from the client for context-aware operations
-  - Falls back to project root when client doesn't provide roots
+- **Roots (transitional)** - Uses the primary workspace root only when no explicit, session, or configured project directory exists
+  - Never guesses from the server process cwd or installed package directory
 
 - **Elicitation** - Interactive parameter collection for complex workflows
   - **`init_fluent_app`** - Prompts for missing project parameters (workingDirectory, template, appName, etc.)
   - Supports both creation and conversion workflows with smart validation
   - Handles user acceptance/rejection of elicited data
 
-- **Session Management** - Tracks working directory per session for multi-project workflows
-- **Root Fallback** - Automatically falls back to MCP root context when no session directory is set
+- **Session Management** - Tracks the directory established by `init_fluent_app` for subsequent project commands
+- **Working Directory Resolution** - `workingDirectory` tool argument → initialized session → `FLUENT_MCP_WORKING_DIR` → transitional MCP root → actionable failure
 - **Error Handling** - Comprehensive error messages with actionable guidance
 - **Type Safety** - Full TypeScript implementation with strict typing
 
@@ -63,16 +63,16 @@ Create a new Fluent app in ~/projects/time-off-tracker to manage employee PTO re
 | `get-api-spec` | Get API spec or list all metadata types | `metadataType` (optional, omit to list all) |
 | `explain_fluent_api` | Look up Fluent SDK documentation for any API or guide. No Fluent project required. | `topic` (optional API/guide name or tag keyword — required unless `list=true`), `list` (boolean — list topics), `peek` (boolean — brief summary), `format` (`pretty`\|`raw`), `source` (optional project path override), `debug` (optional) |
 | `init_fluent_app` | Initialize or convert ServiceNow app | `workingDirectory` (required), `template`, `from` (optional) |
-| `build_fluent_app` | Build the application | `debug` (optional) |
-| `deploy_fluent_app` | Deploy to ServiceNow instance. Supports `--skip-flow-activation`. | `auth` (auto-injected), `debug` (optional), `skipFlowActivation` (optional) |
-| `fluent_transform` | Convert XML to Fluent TypeScript | `from`, `table` (comma-separated, transform by hierarchy), `id` (specific record, with `table`), `auth` (auto-injected) |
-| `download_fluent_dependencies` | Download dependencies and type definitions | `auth` (auto-injected) |
-| `download_fluent_app` | Download metadata from instance | `directory`, `incremental` (optional) |
-| `clean_fluent_app` | Clean output directory | `source` (optional) |
-| `pack_fluent_app` | Create installable artifact | `source` (optional) |
-| `query_fluent_records` | Read-only Table REST query against an instance (returns a JSON envelope) | `table` (required), `query` (required encoded query), `fields`, `limit`, `offset`, `displayValue`, `auth` (auto-injected) |
+| `build_fluent_app` | Build the application | `workingDirectory`, `debug` (optional) |
+| `deploy_fluent_app` | Deploy to ServiceNow instance. Supports `--skip-flow-activation`. | `workingDirectory`, `auth` (auto-injected), `debug`, `skipFlowActivation` (optional) |
+| `fluent_transform` | Convert XML to Fluent TypeScript | `workingDirectory`, `from`, `table` (comma-separated, transform by hierarchy), `id` (specific record, with `table`), `auth` (auto-injected) |
+| `download_fluent_dependencies` | Download dependencies and type definitions | `workingDirectory`, `auth` (auto-injected) |
+| `download_fluent_app` | Download metadata from instance | `workingDirectory`, `directory`, `auth` (auto-injected), `incremental` (optional) |
+| `clean_fluent_app` | Clean output directory | `workingDirectory`, `source` (optional) |
+| `pack_fluent_app` | Create installable artifact | `workingDirectory`, `source` (optional) |
+| `query_fluent_records` | Read-only Table REST query against an instance (returns a JSON envelope) | `workingDirectory`, `table` (required), `query` (required encoded query), `fields`, `limit`, `offset`, `displayValue`, `auth` (auto-injected) |
 
-> **Note:** Authentication is automatically configured at startup via environment variables. The `auth` parameter is auto-injected from the session for commands that require instance access. Use `init_fluent_app` to establish working directory context for subsequent commands.
+> **Note:** Authentication is validated lazily on the first auth-requiring command or `check_auth_status`, then cached for the session. Use `init_fluent_app` to establish project context, pass `workingDirectory` per call, or set `FLUENT_MCP_WORKING_DIR`.
 
 #### Looking up Fluent APIs with `explain_fluent_api`
 
@@ -183,6 +183,7 @@ Add to your MCP client configuration file:
       "command": "npx",
       "args": ["-y", "@modesty/fluent-mcp"],
       "env": {
+        "FLUENT_MCP_WORKING_DIR": "/absolute/path/to/your/fluent-project",
         "SN_INSTANCE_URL": "https://your-instance.service-now.com",
         "SN_AUTH_TYPE": "basic",
         "SN_USER_NAME": "local-username",
@@ -207,17 +208,18 @@ Add to your MCP client configuration file:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `FLUENT_MCP_WORKING_DIR` | Absolute Fluent project path used after the per-call and initialized-session sources | - |
 | `SN_INSTANCE_URL` | ServiceNow instance URL for auto-auth validation | - |
 | `SN_AUTH_TYPE` | Authentication method: `basic` or `oauth` | `oauth` |
 | `SN_USER_NAME` | Username for basic auth (informational) | - |
 | `SN_PASSWORD` | Password for basic auth (informational) | - |
-| `FLUENT_MCP_LOG_TO_STDERR` | Also mirror logs to stderr (`1`/`true`/`yes`) for headless debugging | off |
+| `FLUENT_MCP_LOG_LEVEL` | Minimum stderr log severity (`debug`, `info`, `notice`, `warning`, `error`, etc.) | `info` |
 
-> **Note:** The server automatically detects existing auth profiles matching `SN_INSTANCE_URL` at startup. If a matching profile is found, it's stored in the session and auto-injected into SDK commands. A new profile is added automatically only when it can complete non-interactively (basic auth with `SN_USER_NAME`/`SN_USERNAME` + `SN_PASSWORD`); otherwise the server emits a single notice with the manual `auth --add` command to run.
+> **Note:** On the first auth-requiring command (or `check_auth_status`), the server detects an existing auth profile matching `SN_INSTANCE_URL`, stores it in the session, and auto-injects it. Concurrent first calls share one validation promise. A new profile is added automatically only when setup can complete non-interactively (basic auth with `SN_USER_NAME`/`SN_USERNAME` + `SN_PASSWORD`); otherwise the server emits a single notice with the manual `auth --add` command to run.
 
 #### Logging
 
-Once connected, the server sends all logs to the MCP client as `notifications/message` (the standard MCP logging channel), so they render with the correct severity in your client's UI. Only pre-connection bootstrap lines are written to stderr. Set `FLUENT_MCP_LOG_TO_STDERR=1` to additionally mirror every log line to stderr when running headless or debugging outside an MCP client. Use the client's `logging/setLevel` request to adjust verbosity at runtime (default `info`; set `debug` to see raw SDK CLI output).
+The server writes its complete structured log stream to stderr so stdout remains reserved for MCP protocol traffic. Configure the minimum severity before launch with `FLUENT_MCP_LOG_LEVEL` (default `info`; use `debug` to include raw SDK CLI output). Runtime `logging/setLevel` and `notifications/message` are intentionally not used.
 
 #### CI/CD (non-interactive) authentication — SDK v4.7.0+
 

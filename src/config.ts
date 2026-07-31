@@ -59,8 +59,8 @@ export interface McpServerConfig {
   /** Logging level (debug, info, warn, error) */
   logLevel: string;
 
-  /** Path to log file (if not specified, logs go to stderr) */
-  logFilePath?: string;
+  /** Explicit Fluent project directory for commands when no per-call/session directory exists */
+  workingDirectory?: string;
 
   /** Path to resource directories */
   resourcePaths: {
@@ -90,27 +90,18 @@ export interface McpServerConfig {
     commandTimeoutOverrideMs?: number;
   };
 
-  /** Sampling configuration for AI-powered features */
-  sampling: {
-    /** Enable AI-powered error analysis using MCP Sampling capability */
-    enableErrorAnalysis: boolean;
-    /** Minimum error length to trigger analysis (avoid analyzing trivial errors) */
-    minErrorLength: number;
-  };
 }
 
 // Environment variable names
 const ENV_PREFIX = 'FLUENT_MCP_';
 const ENV_VAR = {
   LOG_LEVEL: `${ENV_PREFIX}LOG_LEVEL`,
-  LOG_FILE_PATH: `${ENV_PREFIX}LOG_FILE_PATH`,
+  WORKING_DIR: `${ENV_PREFIX}WORKING_DIR`,
   RESOURCE_PATH_SPEC: `${ENV_PREFIX}RESOURCE_PATH_SPEC`,
   RESOURCE_PATH_SNIPPET: `${ENV_PREFIX}RESOURCE_PATH_SNIPPET`,
   RESOURCE_PATH_INSTRUCT: `${ENV_PREFIX}RESOURCE_PATH_INSTRUCT`,
   SERVICENOW_SDK_CLI_PATH: `${ENV_PREFIX}SERVICENOW_SDK_CLI_PATH`,
   COMMAND_TIMEOUT_MS: `${ENV_PREFIX}COMMAND_TIMEOUT_MS`,
-  ENABLE_ERROR_ANALYSIS: `${ENV_PREFIX}ENABLE_ERROR_ANALYSIS`,
-  MIN_ERROR_LENGTH: `${ENV_PREFIX}MIN_ERROR_LENGTH`,
 };
 
 /**
@@ -121,7 +112,6 @@ export const defaultConfig: McpServerConfig = {
   version: packageInfo.version,
   description: packageInfo.description,
   logLevel: 'info',
-  // By default, use stderr for logging (no logFilePath)
   resourcePaths: {
     spec: path.resolve(getProjectRootPath(), './res/spec'),
     snippet: path.resolve(getProjectRootPath(), './res/snippet'),
@@ -130,10 +120,6 @@ export const defaultConfig: McpServerConfig = {
   servicenowSdk: {
     cliPath: 'snc', // Default command name if installed globally
     commandTimeoutMs: 30000, // 30 seconds default timeout
-  },
-  sampling: {
-    enableErrorAnalysis: true, // Enable by default
-    minErrorLength: 50, // Only analyze errors with 50+ characters
   },
 };
 
@@ -174,25 +160,11 @@ export function getConfig(): McpServerConfig {
         return override !== undefined ? { commandTimeoutOverrideMs: override } : {};
       })(),
     },
-    sampling: {
-      enableErrorAnalysis: getEnvVar(
-        ENV_VAR.ENABLE_ERROR_ANALYSIS,
-        defaultConfig.sampling.enableErrorAnalysis.toString()
-      ) === 'true',
-      minErrorLength: parseInt(
-        getEnvVar(
-          ENV_VAR.MIN_ERROR_LENGTH,
-          defaultConfig.sampling.minErrorLength.toString()
-        ),
-        10
-      ),
-    },
   };
 
-  // Add optional logFilePath if specified in environment
-  const logFilePath = process.env[ENV_VAR.LOG_FILE_PATH];
-  if (logFilePath) {
-    config.logFilePath = logFilePath;
+  const workingDirectory = process.env[ENV_VAR.WORKING_DIR]?.trim();
+  if (workingDirectory) {
+    config.workingDirectory = workingDirectory;
   }
 
   return config;
@@ -228,4 +200,3 @@ export function findMissingResourcePaths(config: McpServerConfig): string[] {
 function getEnvVar(envVarName: string, defaultValue: string): string {
   return process.env[envVarName] || defaultValue;
 }
-

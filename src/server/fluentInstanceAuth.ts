@@ -1,5 +1,5 @@
 import logger from '../utils/logger.js';
-import { ToolsManager } from '../tools/toolsManager.js';
+import type { ToolsManager } from '../tools/toolsManager.js';
 import { SessionManager } from '../utils/sessionManager.js';
 import { CommandResultFactory } from '../utils/types.js';
 import { AuthValidationResult } from '../types.js';
@@ -20,7 +20,7 @@ import { AuthValidationResult } from '../types.js';
  *    - Store the auth alias in session for use by all SDK commands
  * 3. If no matching profile found -> add a profile only when it can complete
  *    non-interactively (basic auth with SN_USER_NAME/SN_USERNAME + SN_PASSWORD).
- *    OAuth and credential-less basic are not auto-added at startup; instead a
+ *    OAuth and credential-less basic are not auto-added during lazy validation; instead a
  *    single not_authenticated NOTICE is emitted with the manual command.
  *    - If add succeeds, store the auth alias in session
  *
@@ -157,7 +157,7 @@ async function attemptAddAuthProfile(
   const authCommand = buildAuthCommand(instUrl, authType, alias);
 
   // Only auto-add when it can complete non-interactively. Adding otherwise
-  // guarantees a failed/blocked spawn at startup (basic prompts for creds;
+  // guarantees a failed/blocked spawn during lazy validation (basic prompts for creds;
   // oauth opens a browser), whose noise we want to avoid.
   if (!canAutoAdd(authType)) {
     const setupHint = getAuthSetupHint(authType);
@@ -241,10 +241,10 @@ async function attemptAddAuthProfile(
 }
 
 /**
- * Whether a profile can be added non-interactively at startup.
+ * Whether a profile can be added non-interactively during lazy validation.
  * - basic: requires SN_USER_NAME/SN_USERNAME + SN_PASSWORD (piped to the CLI).
  * - oauth: never — it requires a browser/interactive flow not suitable for
- *   an unattended server start.
+ *   an unattended MCP command.
  */
 function canAutoAdd(authType: string): boolean {
   if (authType !== 'basic') return false;

@@ -113,6 +113,21 @@ describe("ResourceManager", () => {
     });
   });
 
+  test("should classify a missing resource instead of returning success text", async () => {
+    const loader = resourceManager.getResourceLoader();
+    (loader.getResource as jest.Mock).mockResolvedValueOnce({
+      content: '',
+      found: false,
+    });
+
+    await expect(
+      resourceManager.readResource('sn-spec://missing')
+    ).rejects.toMatchObject({
+      code: -32602,
+      name: 'McpResourceNotFoundError',
+    });
+  });
+
   test("should register spec resources with valid metadata", async () => {
     await resourceManager.initialize();
     resourceManager.registerAll();

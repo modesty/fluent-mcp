@@ -1,5 +1,5 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
-import { SessionAwareCLICommand } from './sessionAwareCommand.js';
+import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 
 /**
  * Command to transform files in a Fluent (ServiceNow SDK) application
@@ -14,6 +14,7 @@ export class TransformCommand extends SessionAwareCLICommand {
   // Instance transforms by table hierarchy can be large; raised for headroom (P0.2).
   timeoutMs = 180_000;
   arguments: CommandArgument[] = [
+    WORKING_DIRECTORY_ARGUMENT,
     {
       name: 'from',
       type: 'string',
@@ -53,10 +54,17 @@ export class TransformCommand extends SessionAwareCLICommand {
   ];
 
   async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
+    const readsFromInstance = args.from === undefined || args.from === null || args.from === '';
+    const hasExplicitAuth = typeof args.auth === 'string' && args.auth.trim() !== '';
+
+    // A local transform must not trigger lazy auth discovery. An explicitly
+    // supplied alias is still honored, however, so the caller's input is not
+    // silently discarded. The shared executeSdkCommand path only performs
+    // lazy resolution when auth is mapped and no explicit value is present.
     return this.executeSdkCommand('transform', args, {
       from: '--from',
       directory: '--directory',
-      auth: '--auth',
+      ...((readsFromInstance || hasExplicitAuth) && { auth: '--auth' }),
       table: '--table',
       id: '--id',
     }, [], signal);

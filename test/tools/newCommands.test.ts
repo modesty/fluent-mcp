@@ -30,7 +30,14 @@ describe('New SDK Commands', () => {
 
       expect(command.name).toBe('download_fluent_app');
       expect(command.description).toContain('Download application metadata from a ServiceNow instance');
-      expect(command.arguments).toHaveLength(4);
+      expect(command.arguments.map((arg) => arg.name)).toEqual([
+        'workingDirectory',
+        'auth',
+        'directory',
+        'source',
+        'incremental',
+        'debug',
+      ]);
 
       // Check required directory argument
       const directoryArg = command.arguments.find(arg => arg.name === 'directory');
@@ -105,7 +112,11 @@ describe('New SDK Commands', () => {
 
       expect(command.name).toBe('clean_fluent_app');
       expect(command.description).toContain('Delete the build output directory');
-      expect(command.arguments).toHaveLength(2);
+      expect(command.arguments.map((arg) => arg.name)).toEqual([
+        'workingDirectory',
+        'source',
+        'debug',
+      ]);
 
       // Check optional source argument
       const sourceArg = command.arguments.find(arg => arg.name === 'source');
@@ -165,7 +176,11 @@ describe('New SDK Commands', () => {
 
       expect(command.name).toBe('pack_fluent_app');
       expect(command.description).toContain('Package a built Fluent');
-      expect(command.arguments).toHaveLength(2);
+      expect(command.arguments.map((arg) => arg.name)).toEqual([
+        'workingDirectory',
+        'source',
+        'debug',
+      ]);
 
       // Check optional source argument
       const sourceArg = command.arguments.find(arg => arg.name === 'source');
@@ -271,7 +286,7 @@ describe('New SDK Commands', () => {
         process.execPath,
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', 'BusinessRule'],
         false,
-        '/mock/working/dir',
+        '/mock/project/root',
         undefined,
         15000,
         undefined
@@ -292,7 +307,7 @@ describe('New SDK Commands', () => {
         process.execPath,
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', 'Acl', '--source', './src', '--debug'],
         false,
-        '/mock/working/dir',
+        '/mock/project/root',
         undefined,
         15000,
         undefined
@@ -309,7 +324,7 @@ describe('New SDK Commands', () => {
         process.execPath,
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', '--list'],
         false,
-        '/mock/working/dir',
+        '/mock/project/root',
         undefined,
         15000,
         undefined
@@ -326,7 +341,7 @@ describe('New SDK Commands', () => {
         process.execPath,
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', 'flow', '--list'],
         false,
-        '/mock/working/dir',
+        '/mock/project/root',
         undefined,
         15000,
         undefined
@@ -347,7 +362,7 @@ describe('New SDK Commands', () => {
         process.execPath,
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', 'BusinessRule', '--format', 'raw', '--peek'],
         false,
-        '/mock/working/dir',
+        '/mock/project/root',
         undefined,
         15000,
         undefined

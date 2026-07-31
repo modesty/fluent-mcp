@@ -5,6 +5,7 @@ import { CLIExecutor } from '../../src/tools/processors/cliExecutor.js';
 import { CLICmdWriter } from '../../src/tools/processors/cliCmdWriter.js';
 import { NodeProcessRunner } from '../../src/tools/processors/processRunner.js';
 import { CommandResult } from '../../src/utils/types.js';
+import { setRoots } from '../../src/utils/rootContext.js';
 
 // Mock the process runner
 const mockRun = jest.fn();
@@ -30,6 +31,7 @@ describe('CLI Command Tools with Root capability', () => {
     
     cliExecutor = new CLIExecutor(mockProcessRunner);
     cliCmdWriter = new CLICmdWriter();
+    setRoots([]);
   });
   
   describe('CLIExecutor with Root capability', () => {
@@ -39,7 +41,7 @@ describe('CLI Command Tools with Root capability', () => {
         { uri: '/test/root1', name: 'Test Root 1' },
         { uri: '/test/root2', name: 'Test Root 2' }
       ];
-      cliExecutor.setRoots(testRoots);
+      setRoots(testRoots);
 
       // Execute command with useMcpCwd=true
       await cliExecutor.execute('test-command', ['arg1', 'arg2'], true);
@@ -60,7 +62,7 @@ describe('CLI Command Tools with Root capability', () => {
       const testRoots = [
         { uri: '/test/root1', name: 'Test Root 1' }
       ];
-      cliExecutor.setRoots(testRoots);
+      setRoots(testRoots);
 
       // Execute command with custom working directory
       await cliExecutor.execute('test-command', ['arg1'], true, '/custom/dir');
@@ -76,15 +78,15 @@ describe('CLI Command Tools with Root capability', () => {
       );
     });
 
-    test('should fall back to project root when no roots are set', async () => {
+    test('should leave cwd unresolved when no roots are set', async () => {
       // Execute command with useMcpCwd=true but no roots set
       await cliExecutor.execute('test-command', ['arg1'], true);
 
-      // Verify that the project root was used as fallback
+      // Processors do not invent the installed package directory.
       expect(mockRun).toHaveBeenCalledWith(
         'test-command',
         ['arg1'],
-        '/mock/project/root',
+        undefined,
         undefined, // stdinInput
         undefined, // timeoutMs
         undefined  // signal
@@ -98,7 +100,7 @@ describe('CLI Command Tools with Root capability', () => {
       const testRoots = [
         { uri: '/test/root1', name: 'Test Root 1' }
       ];
-      cliCmdWriter.setRoots(testRoots);
+      setRoots(testRoots);
       
       // Generate command text with useMcpCwd=true
       const result = await cliCmdWriter.execute('test-command', ['arg1'], true) as CommandResult;
@@ -112,7 +114,7 @@ describe('CLI Command Tools with Root capability', () => {
       const testRoots = [
         { uri: '/test/root1', name: 'Test Root 1' }
       ];
-      cliCmdWriter.setRoots(testRoots);
+      setRoots(testRoots);
       
       // Generate command text with custom working directory
       const result = await cliCmdWriter.execute('test-command', ['arg1'], true, '/custom/dir') as CommandResult;
@@ -121,12 +123,11 @@ describe('CLI Command Tools with Root capability', () => {
       expect(result.output).toContain('/custom/dir');
     });
     
-    test('should fall back to project root in command text when no roots are set', async () => {
+    test('should omit cwd context when no roots are set', async () => {
       // Generate command text with useMcpCwd=true but no roots set
       const result = await cliCmdWriter.execute('test-command', ['arg1'], true) as CommandResult;
       
-      // Verify that the command text includes the project root
-      expect(result.output).toContain('/mock/project/root');
+      expect(result.output).not.toContain('(in directory:');
     });
   });
 });

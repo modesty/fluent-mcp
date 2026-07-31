@@ -34,6 +34,15 @@ export class InitValidator {
   }
 
   /**
+   * Return whether a conversion source is an instance application sys_id.
+   * Keeping this predicate next to validation prevents command construction
+   * from using a looser path heuristic than the user-facing validator.
+   */
+  static isSysId(value: string): boolean {
+    return /^[a-f0-9]{32}$/i.test(value);
+  }
+
+  /**
    * Validate working directory - must be empty local directory with no package.json or now.config.json
    */
   static async validateWorkingDirectory(workingDirectory: string): Promise<ValidationResult> {
@@ -81,41 +90,38 @@ export class InitValidator {
    * Validate 'from' parameter for conversion
    */
   static async validateFromParameter(from: string): Promise<ValidationResult> {
-    // Check if it's a local file path
-    if (from.includes('/') || from.includes('\\')) {
-      const normalizedPath = InitValidator.normalizePath(from);
+    if (InitValidator.isSysId(from)) {
+      return { valid: true };
+    }
 
-      if (!fs.existsSync(normalizedPath)) {
-        return {
-          valid: false,
-          error: `Local path does not exist: ${normalizedPath}`,
-        };
-      }
+    // Anything that is not an exact sys_id is a local source. This supports
+    // bare relative directory names such as "myapp" instead of classifying
+    // them as instance sources merely because they contain no path separator.
+    const normalizedPath = InitValidator.normalizePath(from);
 
-      // Check if it's a directory containing a ServiceNow app
-      try {
-        const appCheck = await FluentAppValidator.checkFluentAppExists(normalizedPath);
-        if (!appCheck.hasApp && !appCheck.errorMessage) {
-          return {
-            valid: false,
-            error: `Directory ${normalizedPath} does not contain a valid ServiceNow application`,
-          };
-        }
-      } catch (error) {
+    if (!fs.existsSync(normalizedPath)) {
+      return {
+        valid: false,
+        error: from.includes('/') || from.includes('\\')
+          ? `Local path does not exist: ${normalizedPath}`
+          : `sys_id must be a 32-character hexadecimal string or an existing local path: ${normalizedPath}`,
+      };
+    }
+
+    // Check if it's a directory containing a ServiceNow app
+    try {
+      const appCheck = await FluentAppValidator.checkFluentAppExists(normalizedPath);
+      if (!appCheck.hasApp && !appCheck.errorMessage) {
         return {
           valid: false,
-          error: `Failed to validate directory: ${CommandResultFactory.normalizeError(error).message}`,
+          error: `Directory ${normalizedPath} does not contain a valid ServiceNow application`,
         };
       }
-    } else {
-      // Assume it's a sys_id - basic validation (32 character hex string)
-      const sysIdPattern = /^[a-f0-9]{32}$/i;
-      if (!sysIdPattern.test(from)) {
-        return {
-          valid: false,
-          error: 'sys_id must be a 32-character hexadecimal string',
-        };
-      }
+    } catch (error) {
+      return {
+        valid: false,
+        error: `Failed to validate directory: ${CommandResultFactory.normalizeError(error).message}`,
+      };
     }
 
     return { valid: true };

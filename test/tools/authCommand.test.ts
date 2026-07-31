@@ -73,7 +73,7 @@ describe("AuthCommand", () => {
         "bar"
       ]),
       false,
-      "/mock/working/dir",
+      process.cwd(),
       undefined, // stdinInput (credentials not set in env)
       undefined, // timeoutMs
       undefined  // signal
@@ -101,7 +101,7 @@ describe("AuthCommand", () => {
       process.execPath,
       expect.arrayContaining(["/test/node_modules/@servicenow/sdk/bin/index.js", "auth", "--list", "--help", "--version"]),
       false,
-      "/mock/working/dir",
+      process.cwd(),
       undefined, // stdinInput (not needed for list/help/version)
       undefined, // timeoutMs
       undefined  // signal

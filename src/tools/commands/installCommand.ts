@@ -1,5 +1,5 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
-import { SessionAwareCLICommand } from './sessionAwareCommand.js';
+import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 
 /**
  * Command to install a Fluent (ServiceNow SDK) application to a ServiceNow instance
@@ -16,6 +16,7 @@ export class InstallCommand extends SessionAwareCLICommand {
   // runner now returns partial output and the client can cancel early (P0.2/P0.3).
   timeoutMs = 300_000;
   arguments: CommandArgument[] = [
+    WORKING_DIRECTORY_ARGUMENT,
     {
       name: 'auth',
       type: 'string',

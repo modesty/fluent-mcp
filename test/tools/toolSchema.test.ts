@@ -1,7 +1,8 @@
 /**
  * H2 regression guard: the tool INPUT schema advertised on `tools/list`
- * (CommandRegistry.toMCPTools) must agree with the schema enforced on
- * `tools/call` (the Zod shape ToolsManager passes to registerTool).
+ * (CommandRegistry.toMCPTools) must share its canonical contract with the
+ * schema enforced on `tools/call` (the Zod shape ToolsManager passes to
+ * registerTool).
  *
  * Both are now derived from a single source of truth — src/tools/toolSchema.ts —
  * so this test locks in that they can never drift again: same property set, same
@@ -36,7 +37,7 @@ const JSON_TYPE: Record<string, string> = {
   string: 'string', number: 'number', boolean: 'boolean', array: 'array',
 };
 
-describe('Tool input schema — advertised (tools/list) == enforced (tools/call)', () => {
+describe('Tool input schema — advertised (tools/list) and enforced (tools/call)', () => {
   const commands: CLICommand[] = [
     ...CommandFactory.createCommands(mockProcessor, mockProcessor),
     new CheckAuthStatusCommand(),
@@ -49,6 +50,31 @@ describe('Tool input schema — advertised (tools/list) == enforced (tools/call)
 
   it('advertises every registered command', () => {
     expect(advertised.length).toBe(commands.length);
+  });
+
+  it('advertises explicit workingDirectory only on Fluent project commands', () => {
+    const projectCommands = new Set([
+      'build_fluent_app',
+      'clean_fluent_app',
+      'deploy_fluent_app',
+      'download_fluent_app',
+      'download_fluent_dependencies',
+      'fluent_transform',
+      'init_fluent_app',
+      'pack_fluent_app',
+      'query_fluent_records',
+    ]);
+
+    for (const command of commands) {
+      const workingDirectory = command.arguments.find(
+        (argument) => argument.name === 'workingDirectory'
+      );
+      if (projectCommands.has(command.name)) {
+        expect(workingDirectory).toBeDefined();
+      } else {
+        expect(workingDirectory).toBeUndefined();
+      }
+    }
   });
 
   for (const command of commands) {
@@ -75,19 +101,19 @@ describe('Tool input schema — advertised (tools/list) == enforced (tools/call)
         expect(new Set(inputSchema.required ?? [])).toEqual(new Set(requiredNames));
       });
 
-      it('required args are non-null typed; optional args are nullable and omitted from required', () => {
+      it('advertises every argument with a renderer-friendly top-level type', () => {
         for (const arg of command.arguments) {
           const prop = (inputSchema.properties ?? {})[arg.name];
           expect(prop).toBeDefined();
+          expect(prop.type).toBe(JSON_TYPE[arg.type]);
+          expect(prop.description).toBe(arg.description);
+          expect(prop.anyOf).toBeUndefined();
           if (arg.required) {
-            expect(prop.type).toBe(JSON_TYPE[arg.type]);
             expect(inputSchema.required ?? []).toContain(arg.name);
           } else {
-            // Optional args render as anyOf[<type>, null] and are not required.
+            // Optional args remain optional, but null compatibility is handled
+            // by Zod preprocessing rather than being advertised as a union.
             expect(inputSchema.required ?? []).not.toContain(arg.name);
-            const branches = (prop.anyOf ?? []) as Array<{ type?: string }>;
-            expect(branches.some((b) => b.type === 'null')).toBe(true);
-            expect(branches.some((b) => b.type === JSON_TYPE[arg.type])).toBe(true);
           }
         }
       });
@@ -101,6 +127,20 @@ describe('Tool input schema — advertised (tools/list) == enforced (tools/call)
           input[arg.name] = arg.required ? sampleValue(arg.type) : null;
         }
         expect(buildInputZodSchema(command.arguments).safeParse(input).success).toBe(true);
+      });
+
+      it('accepts null for optional arguments as omitted input', () => {
+        const optional = command.arguments.find((arg) => !arg.required);
+        if (!optional) return;
+
+        const input: Record<string, unknown> = {};
+        for (const arg of command.arguments) {
+          if (arg.required) input[arg.name] = sampleValue(arg.type);
+        }
+        input[optional.name] = null;
+
+        const parsed = buildInputZodSchema(command.arguments).safeParse(input);
+        expect(parsed.success).toBe(true);
       });
 
       it('enforced Zod shape rejects input missing a required arg', () => {

@@ -13,18 +13,6 @@ export interface CommandArgument {
 }
 
 /**
- * AI-powered error analysis result
- */
-export interface ErrorAnalysis {
-  /** Root cause of the error */
-  rootCause: string;
-  /** Suggested solutions */
-  suggestions: string[];
-  /** Prevention tips for future */
-  preventionTips: string[];
-}
-
-/**
  * Command execution result
  */
 export interface CommandResult {
@@ -34,8 +22,6 @@ export interface CommandResult {
   output: string;
   /** Error that occurred during execution, if any */
   error?: Error;
-  /** AI-powered error analysis (optional, only when enabled and applicable) */
-  errorAnalysis?: ErrorAnalysis;
   /**
    * Optional structured payload for tools that declare an `outputSchema`.
    * Returned to MCP clients as `structuredContent` alongside the text content.
@@ -113,6 +99,9 @@ export interface CommandExecutor {
    */
   execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult>;
 }
+
+/** Ensures configured ServiceNow authentication has been resolved once. */
+export type EnsureAuthValidated = () => Promise<void>;
 
 /**
  * Metadata annotations for tools: https://modelcontextprotocol.io/docs/concepts/tools

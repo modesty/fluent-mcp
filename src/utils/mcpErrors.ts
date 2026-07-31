@@ -3,7 +3,7 @@
  * The MCP SDK serializes thrown errors using their `code` field.
  *
  * Standard JSON-RPC error codes used by MCP:
- * - -32002: Resource not found
+ * - -32602: Resource not found / invalid resource URI
  * - -32603: Internal error
  *
  * @see https://modelcontextprotocol.io/docs/concepts/resources#error-handling
@@ -28,10 +28,10 @@ export abstract class McpError extends Error {
 
 /**
  * Error thrown when a requested resource is not found
- * JSON-RPC error code: -32002
+ * JSON-RPC error code: -32602
  */
 export class McpResourceNotFoundError extends McpError {
-  readonly code = -32002;
+  readonly code = -32602;
 
   constructor(uri: string, details?: string) {
     super(details ? `Resource not found: ${uri} - ${details}` : `Resource not found: ${uri}`);

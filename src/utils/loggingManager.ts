@@ -3,34 +3,42 @@
  * and abstracts logging operations from the server implementation
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import logger from './logger.js';
 import { CommandResultFactory } from './types.js';
-import { ServerStatus } from '../types.js';
+import { AuthValidationResult, ServerStatus } from '../types.js';
 import { getConfig } from '../config.js';
 
 export class LoggingManager {
-  private mcpServer?: McpServer;
-
   /**
-   * Initialize the logging manager
+   * Log authentication state immediately to stderr through the semantic logger
+   * surface. Only the allow-listed fields are included so credentials can never
+   * leak through an auth result.
    */
-  constructor() {
-    // Nothing to do at initialization
-  }
+  logAuthValidationResult(result: AuthValidationResult): void {
+    const context: Record<string, unknown> = {
+      status: result.status,
+      timestamp: result.timestamp,
+    };
+    if (result.alias) context.alias = result.alias;
+    if (result.host) context.host = result.host;
+    if (result.authType) context.authType = result.authType;
+    if (result.isDefault !== undefined) context.isDefault = result.isDefault;
+    if (result.actionRequired) context.actionRequired = result.actionRequired;
 
-  /**
-   * Configure the logger with an MCP server instance
-   * @param mcpServer The MCP server instance
-   */
-  configure(mcpServer: McpServer): void {
-    this.mcpServer = mcpServer;
-    
-    // Connect logger to MCP server for notifications
-    logger.setMcpServer(mcpServer);
-    
-    // Set up logging/setLevel handler
-    logger.setupLoggingHandlers();
+    switch (result.status) {
+      case 'authenticated':
+        logger.info(result.message, context);
+        break;
+      case 'skipped':
+        logger.debug(result.message, context);
+        break;
+      case 'not_authenticated':
+        logger.notice(result.message, context);
+        break;
+      case 'validation_error':
+        logger.warn(result.message, context);
+        break;
+    }
   }
 
   /**

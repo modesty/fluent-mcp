@@ -4,7 +4,14 @@
  */
 import { z } from 'zod';
 import { ResourceLoader } from '../../utils/resourceLoader.js';
-import { CLICommand, CommandArgument, CommandResult, CommandResultFactory, ResourceType } from '../../utils/types.js';
+import {
+  CLICommand,
+  CommandArgument,
+  CommandResult,
+  CommandResultFactory,
+  EnsureAuthValidated,
+  ResourceType,
+} from '../../utils/types.js';
 import { SessionManager } from '../../utils/sessionManager.js';
 import logger from '../../utils/logger.js';
 
@@ -275,11 +282,11 @@ export class GetInstructCommand extends BaseResourceCommand {
 
 /**
  * Command for checking current authentication status
- * Returns the cached auth validation result from the session
+ * Lazily resolves configured auth once, then returns the cached session result.
  */
 export class CheckAuthStatusCommand implements CLICommand {
   name = 'check_auth_status';
-  description = 'Check current ServiceNow authentication status. Returns the cached auto-auth validation result as JSON including status, profile alias, instance host, auth type, and any required user action. Call this before commands that require authentication (deploy_fluent_app, fluent_transform, download_fluent_dependencies, download_fluent_app) to verify credentials are configured.';
+  description = 'Check current ServiceNow authentication status. Lazily validates configured auth once and returns JSON including status, profile alias, instance host, auth type, and any required user action. Call this before commands that require authentication (deploy_fluent_app, fluent_transform, download_fluent_dependencies, download_fluent_app) to verify credentials are configured.';
   annotations = { readOnlyHint: true, idempotentHint: true };
   arguments: CommandArgument[] = [];
   outputSchema = {
@@ -292,6 +299,10 @@ export class CheckAuthStatusCommand implements CLICommand {
     actionRequired: z.string().optional().describe('A shell command to run if manual auth setup is needed.'),
     timestamp: z.string().optional().describe('ISO timestamp of the validation.'),
   };
+
+  constructor(
+    private readonly ensureAuthValidated: EnsureAuthValidated = async () => {}
+  ) {}
 
   /**
    * This command doesn't use a command processor
@@ -306,13 +317,14 @@ export class CheckAuthStatusCommand implements CLICommand {
    */
   async execute(): Promise<CommandResult> {
     try {
+      await this.ensureAuthValidated();
       const sessionManager = SessionManager.getInstance();
       const authResult = sessionManager.getAuthValidationResult();
 
       if (!authResult) {
         const unknownStatus = {
           status: 'unknown',
-          message: 'Auth validation has not been performed yet. This may happen if the server just started or SN_INSTANCE_URL is not configured.',
+          message: 'Auth validation completed without a cached result.',
           timestamp: new Date().toISOString(),
         };
         return CommandResultFactory.success(JSON.stringify(unknownStatus, null, 2), 0, unknownStatus);

@@ -1,11 +1,7 @@
 /**
  * Logger utility for the MCP server
- * Outputs formatted JSON logs to stderr or a file to avoid interfering with MCP's stdio transport
- * Also supports sending logs as MCP notifications according to the protocol
+ * Outputs structured logs to stderr without interfering with MCP's stdout transport.
  */
-
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { SetLevelRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
 import { getConfig } from '../config.js';
 
@@ -43,49 +39,14 @@ export interface LogEntry {
 }
 
 /**
- * Whether routine logs should be mirrored to stderr even after the MCP server
- * is connected. Controlled by FLUENT_MCP_LOG_TO_STDERR (truthy = on).
- */
-function isStderrMirroringEnabled(): boolean {
-  const flag = process.env.FLUENT_MCP_LOG_TO_STDERR;
-  if (!flag) return false;
-  const normalized = flag.trim().toLowerCase();
-  return normalized === '1' || normalized === 'true' || normalized === 'yes';
-}
-
-/**
- * Logger class that outputs formatted JSON logs to stderr or a file
- * to avoid interfering with MCP's stdio transport
+ * Logger class that writes structured lines to stderr.
  */
 export class Logger {
-  private logLevel: LogLevel;
-  private mcpServer?: McpServer;
-  /**
-   * When true, every log entry is also mirrored to stderr even after the MCP
-   * server is connected. Opt-in via FLUENT_MCP_LOG_TO_STDERR for headless
-   * debugging. Default off so MCP clients (e.g. VS Code) don't paint routine
-   * INFO logs as `[warning] [server stderr]`.
-   */
-  private readonly mirrorToStderr: boolean;
+  private readonly logLevel: LogLevel;
 
   constructor() {
     const config = getConfig();
     this.logLevel = (config.logLevel as LogLevel) || LogLevel.INFO;
-    this.mirrorToStderr = isStderrMirroringEnabled();
-  }
-
-  /**
-   * Get the current log level
-   */
-  public getLogLevel(): LogLevel {
-    return this.logLevel;
-  }
-
-  /**
-   * Set the log level
-   */
-  public setLogLevel(level: LogLevel): void {
-    this.logLevel = level;
   }
 
   /**
@@ -119,30 +80,9 @@ export class Logger {
   }
 
   /**
-   * Write a log entry to the active output channel.
-   *
-   * Routing rules:
-   * - Once an MCP server is connected, emit through `notifications/message`
-   *   ONLY. The MCP client renders these with the correct severity, so a
-   *   second copy on stderr (which clients paint as `[warning]`) would be
-   *   noisy and misleading.
-   * - Before the server connects (bootstrap), or if sending the notification
-   *   throws, fall back to stderr so nothing is lost.
-   * - If `FLUENT_MCP_LOG_TO_STDERR` is set, always mirror to stderr for
-   *   headless debugging regardless of connection state.
+   * Write a structured log entry to stderr.
    */
-  private writeLogEntry(level: LogLevel, entry: LogEntry): void {
-    const connected = !!this.mcpServer;
-
-    if (connected) {
-      const sent = this.sendMcpNotification(level, entry.message, entry.context);
-      if (this.mirrorToStderr || !sent) {
-        this.writeToStderr(this.formatForStderr(entry));
-      }
-      return;
-    }
-
-    // Pre-connection bootstrap: stderr is the only channel available.
+  private writeLogEntry(entry: LogEntry): void {
     this.writeToStderr(this.formatForStderr(entry));
   }
 
@@ -153,92 +93,6 @@ export class Logger {
     return `[${entry.timestamp}] [${entry.level.toUpperCase()}]: ${entry.message} ${JSON.stringify(
       entry.context || {}
     )}`;
-  }
-
-  /**
-   * Set the MCP server instance for sending log notifications
-   */
-  public setMcpServer(server: McpServer): void {
-    this.mcpServer = server;
-  }
-
-  /**
-   * Send a log message as an MCP `notifications/message`.
-   *
-   * The MCP spec shape is `{ level, logger?, data }` — there is no top-level
-   * `message` field, and `data` carries the content the client renders. We
-   * fold the message into `data` so the client always shows something
-   * meaningful (a plain string when there's no context, or an object that
-   * includes `message` alongside the context fields).
-   *
-   * @returns true if the notification was sent, false otherwise (no server
-   *          connected, or the send threw). Callers use this to decide whether
-   *          to fall back to stderr.
-   */
-  private sendMcpNotification(
-    level: LogLevel,
-    message: string,
-    context?: Record<string, unknown>,
-    loggerName: string = 'fluent-mcp'
-  ): boolean {
-    if (!this.mcpServer) return false;
-
-    const data =
-      context && Object.keys(context).length > 0 ? { message, ...context } : message;
-
-    const params = { level, logger: loggerName, data };
-
-    try {
-      // Send notification via MCP - this goes to stdout via the MCP server
-      this.mcpServer.server.notification({ method: 'notifications/message', params });
-      return true;
-    } catch (err) {
-      // If notification fails, fallback to stderr
-      this.writeToStderr(`Failed to send MCP notification: ${err}`);
-      return false;
-    }
-  }
-
-  /**
-   * Send a dedicated notification with custom logger name
-   * Use this for domain-specific notifications (e.g., authentication)
-   * @param level Log level
-   * @param message Log message
-   * @param data Structured data to include
-   * @param loggerName The logger name (e.g., 'authentication')
-   */
-  public sendNotification(
-    level: LogLevel,
-    message: string,
-    data: Record<string, unknown>,
-    loggerName: string
-  ): void {
-    const sent = this.sendMcpNotification(level, message, data, loggerName);
-
-    // Mirror to stderr only when the notification couldn't be delivered, or
-    // when stderr mirroring is explicitly enabled for debugging.
-    if (this.mirrorToStderr || !sent) {
-      const logJson = `[${new Date().toISOString()}] [${level.toUpperCase()}] [${loggerName}]: ${message} ${JSON.stringify(data)}`;
-      this.writeToStderr(logJson);
-    }
-  }
-
-  /**
-   * Set up logging request handlers on the MCP server
-   */
-  public setupLoggingHandlers(): void {
-    if (!this.mcpServer) return;
-
-    // Explicitly register the logging/setLevel handler
-    this.mcpServer.server.setRequestHandler(SetLevelRequestSchema, async (request) => {
-      const level = request.params.level as LogLevel;
-      this.setLogLevel(level);
-      this.info(`Log level set to: ${level}`);
-      return {};
-    });
-
-    // Log the status
-    this.debug('Logging capability enabled with current level: ' + this.logLevel);
   }
 
   /**
@@ -255,7 +109,7 @@ export class Logger {
     }
 
     const entry = this.formatLogEntry(level, message, context);
-    this.writeLogEntry(level, entry);
+    this.writeLogEntry(entry);
   }
 
   /**

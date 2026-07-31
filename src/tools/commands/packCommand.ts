@@ -1,5 +1,5 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
-import { SessionAwareCLICommand } from './sessionAwareCommand.js';
+import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 
 /**
  * Command to pack a Fluent (ServiceNow SDK) application into installable artifact
@@ -11,6 +11,7 @@ export class PackCommand extends SessionAwareCLICommand {
   annotations = { idempotentHint: true };
   timeoutMs = 30_000;
   arguments: CommandArgument[] = [
+    WORKING_DIRECTORY_ARGUMENT,
     {
       name: 'source',
       type: 'string',
