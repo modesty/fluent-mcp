@@ -17,6 +17,37 @@ const SERVER_INSTRUCTIONS = [
   'Instance authentication is validated lazily, cached in the session, and injected when a command needs it.',
 ].join(' ');
 
+/** One hour, in ms. */
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * Cache hints for the cacheable results of protocol revision 2026-07-28
+ * (`ttlMs` / `cacheScope`, SEP-2549).
+ *
+ * Everything this server returns on these six methods is immutable for the
+ * lifetime of the process: a fixed tool set derived from the command registry,
+ * a fixed prompt set, and static markdown bundled in `res/`. None of it can
+ * change without a new release, so a long TTL is safe and saves every client
+ * re-fetching the same content each turn.
+ *
+ * `cacheScope: 'public'` is correct because the payloads are identical for
+ * every caller — they contain no session, instance, or credential state. (The
+ * SDK migration guide's example shows `cacheScope: 'global'`; the installed
+ * package types define `CacheScope = 'public' | 'private'` and throw a
+ * `RangeError` on anything else, so the package wins.)
+ *
+ * Without these, v2 emits the conservative defaults `ttlMs: 0` /
+ * `cacheScope: 'private'`. 2025-era responses are never affected either way.
+ */
+const CACHE_HINTS = {
+  'tools/list': { ttlMs: ONE_HOUR_MS, cacheScope: 'public' },
+  'prompts/list': { ttlMs: ONE_HOUR_MS, cacheScope: 'public' },
+  'resources/list': { ttlMs: ONE_HOUR_MS, cacheScope: 'public' },
+  'resources/templates/list': { ttlMs: ONE_HOUR_MS, cacheScope: 'public' },
+  'resources/read': { ttlMs: ONE_HOUR_MS, cacheScope: 'public' },
+  'server/discover': { ttlMs: ONE_HOUR_MS, cacheScope: 'public' },
+} as const;
+
 /**
  * Implementation of the Model Context Protocol server for Fluent (ServiceNow SDK)
  *
@@ -93,6 +124,7 @@ export class FluentMcpServer {
           prompts: { listChanged: false },
         },
         instructions: SERVER_INSTRUCTIONS,
+        cacheHints: CACHE_HINTS,
       }
     );
 

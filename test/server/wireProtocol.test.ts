@@ -224,6 +224,36 @@ describe('dual-era wire protocol', () => {
       expect(text).toMatch(/bogus|unrecognized|strict/i);
     });
 
+    // ttlMs + cacheScope are required on the cacheable results (SEP-2549).
+    // Everything this server returns on them is immutable for the process
+    // lifetime, so a long public TTL is safe. Without hints, v2 emits the
+    // conservative ttlMs: 0 / cacheScope: 'private'.
+    it.each([
+      ['server/discover', {}],
+      ['tools/list', {}],
+      ['prompts/list', {}],
+      ['resources/list', {}],
+      ['resources/templates/list', {}],
+      ['resources/read', { uri: 'sn-spec://business-rule' }],
+    ])('emits a non-zero public cache hint on %s', async (method, params) => {
+      const res = await wire.modern(method, params);
+
+      expect(res.error).toBeUndefined();
+      expect(res.result.ttlMs).toBeGreaterThan(0);
+      expect(res.result.cacheScope).toBe('public');
+    });
+
+    it('does not cache-hint a non-cacheable result', async () => {
+      // The cacheable list is closed; tools/call must never carry cache fields.
+      const res = await wire.modern('tools/call', {
+        name: 'get-api-spec',
+        arguments: { metadataType: 'business-rule' },
+      });
+
+      expect(res.result.ttlMs).toBeUndefined();
+      expect(res.result.cacheScope).toBeUndefined();
+    });
+
     it('never issues a server-initiated request', async () => {
       await wire.modern('tools/list');
       await wire.modern('resources/list');
@@ -278,6 +308,17 @@ describe('dual-era wire protocol', () => {
       expect(caps.tools?.listChanged).toBeFalsy();
       expect(caps.prompts?.listChanged).toBeFalsy();
       expect(caps.resources?.listChanged).toBeFalsy();
+    });
+
+    it('emits no cache fields on 2025-era results', async () => {
+      // The 2025 codec has no cache code path at all; hints must never leak
+      // onto a legacy response.
+      await wire.legacyInitialize();
+      await wire.notify('notifications/initialized');
+
+      const res = await wire.legacy('tools/list');
+      expect(res.result.ttlMs).toBeUndefined();
+      expect(res.result.cacheScope).toBeUndefined();
     });
 
     it('serves the same tool set as the modern era', async () => {
