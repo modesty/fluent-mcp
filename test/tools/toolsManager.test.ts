@@ -8,7 +8,7 @@ import { ToolsManager } from "../../src/tools/toolsManager.js";
 import { z } from "zod";
 
 // Mock the Model Context Protocol SDK
-jest.mock("@modelcontextprotocol/sdk/server/mcp.js", () => {
+jest.mock("@modelcontextprotocol/server", () => {
   // Create mock implementation for the MCP Server
   const mockRegisterTool = jest.fn();
   
@@ -35,17 +35,23 @@ jest.mock("../../src/tools/registry/commandFactory.js", () => ({
   }
 }));
 jest.mock("../../src/tools/registry/commandRegistry.js", () => {
-  const mockRegister = jest.fn();
   const mockGetCommand = jest.fn();
   const mockToMCPTools = jest.fn().mockReturnValue([
     { id: "mock-command", title: "Mock Command", description: "A mock command for testing" }
   ]);
   return {
-    CommandRegistry: jest.fn().mockImplementation(() => ({
-      register: mockRegister,
-      getCommand: mockGetCommand,
-      toMCPTools: mockToMCPTools
-    }))
+    // Stores what is registered, so getAllCommands() reflects reality: since the
+    // v2 swap, ToolsManager builds the registry in its constructor and iterates
+    // getAllCommands() in registerOn(server).
+    CommandRegistry: jest.fn().mockImplementation(() => {
+      const commands: unknown[] = [];
+      return {
+        register: jest.fn((command: unknown) => { commands.push(command); }),
+        getAllCommands: jest.fn(() => commands),
+        getCommand: mockGetCommand,
+        toMCPTools: mockToMCPTools
+      };
+    })
   };
 });
 
@@ -95,11 +101,28 @@ describe("ToolsManager", () => {
     mockMcpServer = {
       registerTool: jest.fn()
     };
-    toolsManager = new ToolsManager(mockMcpServer);
+    // Construction builds the registry; registerOn() attaches it to a server.
+    // The two are separate because serveStdio may build more than one server
+    // instance per connection.
+    toolsManager = new ToolsManager();
+    toolsManager.registerOn(mockMcpServer);
   });
 
   test("should initialize and register tools", () => {
     expect(toolsManager).toBeDefined();
+  });
+
+  test("registers onto each server instance the factory produces", () => {
+    // A second instance must receive the full tool set, because serveStdio can
+    // discard a probe instance and ask the factory again.
+    const secondServer = { registerTool: jest.fn() };
+    toolsManager.registerOn(secondServer as never);
+
+    expect(secondServer.registerTool).toHaveBeenCalledTimes(
+      mockMcpServer.registerTool.mock.calls.length
+    );
+    expect(secondServer.registerTool.mock.calls.map(([name]: [string]) => name))
+      .toEqual(mockMcpServer.registerTool.mock.calls.map(([name]: [string]) => name));
   });
 
   test("registers every resource tool with a strict object input schema", () => {
@@ -122,18 +145,43 @@ describe("ToolsManager", () => {
     expect(checkAuthRegistration).toBeDefined();
 
     const [, , handler] = checkAuthRegistration;
-    const metadata = { _meta: { progressToken: "token" } };
-    await handler({}, metadata);
+    // v2 hands the handler a ServerContext, not v1's loose `extra` bag: the
+    // abort signal is ctx.mcpReq.signal and the progress token is
+    // ctx.mcpReq._meta.progressToken.
+    const ctx = {
+      mcpReq: {
+        signal: undefined,
+        _meta: { progressToken: "token" },
+        notify: jest.fn().mockResolvedValue(undefined),
+      },
+    };
+    await handler({}, ctx);
 
     const { CheckAuthStatusCommand } = jest.requireMock(
       "../../src/tools/resources/resourceTools.js"
     );
     const command = CheckAuthStatusCommand.mock.results.at(-1).value;
     // First arg is the tool args ({}), second is the (absent) abort signal — never
-    // the MCP callback metadata object.
+    // the MCP handler context object.
     expect(command.execute).toHaveBeenCalledWith({}, undefined);
-    expect(command.execute).not.toHaveBeenCalledWith(metadata);
+    expect(command.execute).not.toHaveBeenCalledWith(ctx);
     expect(command.execute.mock.calls[0][0]).toEqual({});
+  });
+
+  test("threads the MCP abort signal from ctx.mcpReq into the command", async () => {
+    const [, , handler] = mockMcpServer.registerTool.mock.calls.find(
+      ([name]: [string]) => name === "check_auth_status"
+    );
+    const controller = new AbortController();
+    await handler({}, {
+      mcpReq: { signal: controller.signal, _meta: undefined, notify: jest.fn() },
+    });
+
+    const { CheckAuthStatusCommand } = jest.requireMock(
+      "../../src/tools/resources/resourceTools.js"
+    );
+    const command = CheckAuthStatusCommand.mock.results.at(-1).value;
+    expect(command.execute).toHaveBeenCalledWith({}, controller.signal);
   });
   
   test("should format command result correctly", () => {

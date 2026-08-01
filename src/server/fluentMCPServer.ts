@@ -1,11 +1,5 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  ListToolsRequestSchema,
-  ListResourcesRequestSchema,
-  ReadResourceRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
-
+import { serveStdio, StdioServerHandle } from '@modelcontextprotocol/server/stdio';
+import { McpServer, Transport } from '@modelcontextprotocol/server';
 import { getConfig, findMissingResourcePaths } from '../config.js';
 import { ServerStatus } from '../types.js';
 import { CommandResultFactory } from '../utils/types.js';
@@ -24,19 +18,24 @@ const SERVER_INSTRUCTIONS = [
 ].join(' ');
 
 /**
- * Implementation of the Model Context Protocol server for Fluent (ServiceNow SDK) 
+ * Implementation of the Model Context Protocol server for Fluent (ServiceNow SDK)
  *
  * This server provides Fluent (ServiceNow SDK) functionality to AI assistants and developers
  * through the standardized Model Context Protocol interface.
+ *
+ * Speaks **both** protocol eras from one handler set. `serveStdio` owns the era
+ * decision: it inspects the opening message and pins one instance from
+ * `buildServer()` for the connection's lifetime — a 2025-era `initialize` is
+ * served exactly as before, a modern opening as 2026-07-28.
  */
 export class FluentMcpServer {
-  private mcpServer: McpServer;
   private toolsManager: ToolsManager;
   private resourceManager: ResourceManager;
   private promptManager: PromptManager;
   private config: ReturnType<typeof getConfig>;
   private status: ServerStatus = ServerStatus.STOPPED;
   private initializationPromise: Promise<void>;
+  private handle?: StdioServerHandle;
 
   /**
    * Create a new MCP server instance
@@ -45,8 +44,35 @@ export class FluentMcpServer {
     // Initialize server with configuration
     this.config = getConfig();
 
-    // Create MCP server instance with server info from package.json
-    this.mcpServer = new McpServer(
+    // Managers are built once and shared across every McpServer instance the
+    // factory produces: they hold the command registry and the loaded resource
+    // and prompt content, none of which is per-connection state.
+    this.toolsManager = new ToolsManager();
+    this.resourceManager = new ResourceManager();
+    this.promptManager = new PromptManager();
+
+    // Load resource and prompt content once. start() awaits this before
+    // accepting connections so the factory can register synchronously.
+    this.initializationPromise = Promise.all([
+      this.resourceManager.initialize(),
+      this.promptManager.initialize()
+    ]).then(() => { /* content loaded; registration happens per instance */ });
+  }
+
+  /**
+   * Build a fully-registered MCP server instance.
+   *
+   * MUST return a fresh instance on every call. `serveStdio` may invoke its
+   * factory twice for one connection: a `server/discover` opening builds an
+   * optimistic "probe" instance, and if the next message is instead a 2025-era
+   * `initialize`, the entry closes that probe and asks the factory again.
+   * Returning a shared instance would hand back an already-closed server.
+   *
+   * All content loading happens in the constructor, so this method is
+   * synchronous and cheap enough to repeat.
+   */
+  private buildServer(): McpServer {
+    const mcpServer = new McpServer(
       {
         name: this.config.name,
         version: this.config.version,
@@ -54,49 +80,49 @@ export class FluentMcpServer {
       },
       {
         capabilities: {
-          tools: {},
-          resources: {}, // Enable resources capability
-          // Note: 'elicitation' and 'roots' are ClientCapabilities, not ServerCapabilities
-          // in MCP SDK v1.25+. Servers don't declare these - clients do.
-          // The server can still USE these features by making requests to the client.
-          prompts: {},
+          // Every listChanged is explicitly false. v2 defaults each of them to
+          // `true` when it installs the corresponding handler set, which would
+          // advertise three notifications this server never sends — the same
+          // defect W6 fixed for prompts.listChanged, and 2026-07-28 routes
+          // list-change signalling through subscriptions/listen anyway.
+          tools: { listChanged: false },
+          resources: { listChanged: false },
+          // Note: 'elicitation', 'roots' and 'sampling' are ClientCapabilities,
+          // never ServerCapabilities. This server neither declares nor uses
+          // them — 2026-07-28 forbids server-initiated requests entirely.
+          prompts: { listChanged: false },
         },
         instructions: SERVER_INSTRUCTIONS,
       }
     );
 
-    // Initialize managers for tools, resources, and prompts
-    this.toolsManager = new ToolsManager(this.mcpServer);
-    this.resourceManager = new ResourceManager();
-    this.promptManager = new PromptManager(this.mcpServer);
+    // Declaring a capability makes v2's McpServer install its own default
+    // handlers for that capability's methods. Ours are registered afterwards
+    // and replace them by method name; `resources/templates/list` is left to
+    // the SDK's default (an empty template list), which is what keeps the
+    // declared `resources` capability answerable rather than -32601.
+    this.toolsManager.registerOn(mcpServer);
+    this.promptManager.registerOn(mcpServer);
+    this.setupHandlers(mcpServer);
 
-    // Initialize resources and prompts, then set up handlers
-    // Store the promise so start() can await it before accepting connections
-    this.initializationPromise = Promise.all([
-      this.resourceManager.initialize(),
-      this.promptManager.initialize()
-    ]).then(() => {
-      // Set up the handlers after initialization
-      // Resources will be registered during start() to ensure proper timing
-      this.setupHandlers();
-    });
+    return mcpServer;
   }
 
   /**
-   * Set up MCP protocol handlers for tools, resources, and prompts.
+   * Set up MCP protocol handlers for tools and resources on one server instance.
    */
-  private setupHandlers(): void {
-    const server = this.mcpServer?.server;
-    if (!server) return;
+  private setupHandlers(mcpServer: McpServer): void {
+    const server = mcpServer.server;
 
-    // Set up the tools/list handler
-    server.setRequestHandler(ListToolsRequestSchema, async () => {
-      const tools = this.toolsManager.getMCPTools();
-      return { tools };
-    });
+    // tools/list is served from the CommandRegistry rather than from what
+    // registerTool() inferred, because the registry is the single source of
+    // truth for advertised annotations, _meta and outputSchema.
+    server.setRequestHandler('tools/list', async () => ({
+      tools: this.toolsManager.getMCPTools(),
+    }));
 
     // Set up the resources/list handler
-    server.setRequestHandler(ListResourcesRequestSchema, async () => {
+    server.setRequestHandler('resources/list', async () => {
       try {
         const resources = await this.resourceManager.listResources();
         return { resources };
@@ -107,7 +133,7 @@ export class FluentMcpServer {
     });
 
     // Set up the resources/read handler
-    server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    server.setRequestHandler('resources/read', async (request) => {
       const { uri } = request.params;
 
       try {
@@ -140,23 +166,26 @@ export class FluentMcpServer {
       }
     });
 
-    // Set up prompts handlers
-    this.promptManager.setupHandlers();
-
-    // Note: Tool calls are handled by the callbacks registered via mcpServer.registerTool() in ToolsManager.
-    // We don't need a separate setRequestHandler for CallToolRequestSchema as that would conflict.
+    // Note: tools/call is dispatched by the callbacks registered via
+    // registerTool() in ToolsManager, so it is deliberately not handled here.
     //
-    // There is deliberately no `notifications/initialized` handler: its only
+    // There is also deliberately no `notifications/initialized` handler: its only
     // remaining job was to trigger the transitional `roots/list` fetch, and MCP
     // 2026-07-28 both removed the handshake it belongs to and made
     // server-initiated requests illegal. Auth validation is lazy and
     // command-triggered (see ToolsManager.ensureAuthValidated).
+    //
+    // `server/discover` is installed by the SDK itself for modern connections.
   }
 
   /**
    * Start the MCP server
+   * @param transport Optional transport to serve over instead of the process's
+   *   stdio. `ServeStdioOptions.transport` exists for exactly this ("bring your
+   *   own transport"); tests use an `InMemoryTransport` pair so both protocol
+   *   eras can be exercised over the real entry point rather than through mocks.
    */
-  async start(): Promise<void> {
+  async start(transport?: Transport): Promise<void> {
     if (this.status === ServerStatus.RUNNING) {
       loggingManager.logServerAlreadyRunning();
       return;
@@ -179,24 +208,20 @@ export class FluentMcpServer {
         );
       }
 
-      if (!this.mcpServer) {
-        throw new Error('MCP server not properly initialized');
-      }
-
-      // Wait for handlers to be set up before accepting connections
-      // This ensures notification handlers (like notifications/initialized) are registered
-      // before the client can send them, preventing race conditions in auth validation
+      // Load resource and prompt content before accepting connections so the
+      // server factory below can register everything synchronously.
       await this.initializationPromise;
 
-      // Create stdio transport for communication
-      const transport = new StdioServerTransport();
-
-      // Connect the server to the stdio transport
-      await this.mcpServer.connect(transport);
-
-      // Note: resources are served by the handlers in setupHandlers(), which call
-      // resourceManager.listResources() and resourceManager.readResource().
-      // ResourceManager holds no MCP server reference and registers nothing itself.
+      // serveStdio owns the transport and the era decision. legacy: 'serve'
+      // (the default, explicit here) means a 2025-era opening is served from
+      // the same factory rather than rejected.
+      this.handle = serveStdio(() => this.buildServer(), {
+        legacy: 'serve',
+        onerror: (error) => {
+          logger.error('MCP stdio transport error', CommandResultFactory.normalizeError(error));
+        },
+        ...(transport && { transport }),
+      });
 
       this.status = ServerStatus.RUNNING;
       loggingManager.logServerStarted();
@@ -220,9 +245,9 @@ export class FluentMcpServer {
       this.status = ServerStatus.STOPPING;
       loggingManager.logServerStopping();
 
-      if (this.mcpServer) {
-        await this.mcpServer.close();
-      }
+      // Closes the pinned instance (if any) and the underlying transport.
+      await this.handle?.close();
+      this.handle = undefined;
 
       this.status = ServerStatus.STOPPED;
       loggingManager.logServerStopped();

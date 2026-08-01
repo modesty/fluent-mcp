@@ -1,11 +1,4 @@
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import {
-  GetPromptRequestSchema,
-  GetPromptResult,
-  ListPromptsRequestSchema,
-  ListPromptsResult,
-  Prompt,
-} from '@modelcontextprotocol/sdk/types.js';
+import { McpServer, GetPromptResult, ListPromptsResult, Prompt } from '@modelcontextprotocol/server';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { getProjectRootPath } from '../config.js';
@@ -20,7 +13,6 @@ import loggingManager from '../utils/loggingManager.js';
  * Manager for handling MCP prompts registration and access
  */
 export class PromptManager {
-  private mcpServer: McpServer;
   private prompts: Map<string, Prompt> = new Map();
   private promptContents: Map<string, string> = new Map();
   private resourceLoader: ResourceLoader;
@@ -29,11 +21,13 @@ export class PromptManager {
   private static readonly ALL_METADATA_TYPES: string[] = Object.values(ServiceNowMetadataType);
 
   /**
-   * Create a new PromptManager
-   * @param mcpServer The MCP server instance
+   * Create a new PromptManager.
+   *
+   * Prompt content is loaded once by `initialize()` and shared; handlers are
+   * attached per MCP server instance by `registerOn()`, because the stdio entry
+   * may build more than one instance per connection (see ToolsManager).
    */
-  constructor(mcpServer: McpServer) {
-    this.mcpServer = mcpServer;
+  constructor() {
     this.resourceLoader = new ResourceLoader();
   }
 
@@ -61,14 +55,15 @@ export class PromptManager {
   }
 
   /**
-   * Register all prompt handlers with the MCP server
+   * Register the prompt handlers on the given MCP server.
+   * @param mcpServer The MCP server instance to register onto
    */
-  setupHandlers(): void {
-    const server = this.mcpServer?.server;
+  registerOn(mcpServer: McpServer): void {
+    const server = mcpServer?.server;
     if (!server) return;
 
     // Set up the prompts/list handler
-    server.setRequestHandler(ListPromptsRequestSchema, async () => {
+    server.setRequestHandler('prompts/list', async () => {
       try {
         const prompts = Array.from(this.prompts.values());
         return { prompts } as ListPromptsResult;
@@ -79,7 +74,7 @@ export class PromptManager {
     });
 
     // Set up the prompts/get handler
-    server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+    server.setRequestHandler('prompts/get', async (request) => {
       const { name, arguments: args } = request.params;
       
       logger.debug(`GetPromptRequest for prompt: ${name}, args: ${JSON.stringify(args)}`);

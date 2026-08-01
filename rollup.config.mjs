@@ -16,7 +16,7 @@ const external = [
   'url',
   'buffer',
   'stream',
-  /^@modelcontextprotocol\/sdk(?:\/|$)/,
+  /^@modelcontextprotocol\/(?:core|server)(?:\/|$)/,
   '@servicenow/sdk',
   'zod'
 ];

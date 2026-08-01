@@ -12,7 +12,9 @@ jest.mock('../../src/server/fluentInstanceAuth.js', () => ({
 const autoValidate = autoValidateAuthIfConfigured as jest.Mock;
 
 function manager(): ToolsManager {
-  return new ToolsManager({ registerTool: jest.fn() } as never);
+  // No MCP server needed: since the v2 swap, ToolsManager only builds the
+  // command registry at construction. Registration is a separate registerOn().
+  return new ToolsManager();
 }
 
 function processor(): CommandProcessor {
