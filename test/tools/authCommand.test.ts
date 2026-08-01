@@ -3,7 +3,6 @@ import { AuthCommand } from "../../src/tools/commands/authCommand.js";
 import { SessionManager } from "../../src/utils/sessionManager.js";
 
 jest.mock("../../src/utils/sessionManager.js", () => require('../mocks/index.js').createSessionManagerMock());
-jest.mock("../../src/utils/rootContext.js", () => require('../mocks/index.js').createRootContextMock());
 
 // Create mock CLICmdWriter for tests
 function createMockCmdWriter(): CommandProcessor {
@@ -72,7 +71,6 @@ describe("AuthCommand", () => {
         "--alias",
         "bar"
       ]),
-      false,
       process.cwd(),
       undefined, // stdinInput (credentials not set in env)
       undefined, // timeoutMs
@@ -100,7 +98,6 @@ describe("AuthCommand", () => {
     expect(mockCmdWriter.process).toHaveBeenCalledWith(
       process.execPath,
       expect.arrayContaining(["/test/node_modules/@servicenow/sdk/bin/index.js", "auth", "--list", "--help", "--version"]),
-      false,
       process.cwd(),
       undefined, // stdinInput (not needed for list/help/version)
       undefined, // timeoutMs

@@ -14,13 +14,12 @@ export class CLICmdWriter extends BaseCommandProcessor {
   async process(
     command: string,
     args: string[],
-    useMcpCwd: boolean = false,
     customWorkingDir?: string,
     _stdinInput?: string, // Not used by writer, but kept for interface compatibility
     _timeoutMs?: number,  // Not used by writer, but kept for interface compatibility
     _signal?: AbortSignal // Not used by writer (no child process to cancel)
   ): Promise<CommandResult> {
-    return this.execute(command, args, useMcpCwd, customWorkingDir);
+    return this.execute(command, args, customWorkingDir);
   }
 
   /**
@@ -30,11 +29,10 @@ export class CLICmdWriter extends BaseCommandProcessor {
   async execute(
     command: string,
     args: string[],
-    useMcpCwd: boolean = false,
     customWorkingDir?: string,
     _stdinInput?: string // Not used by writer, but kept for interface compatibility
   ): Promise<CommandResult> {
-    return this.getCommandText(command, args, useMcpCwd, customWorkingDir);
+    return this.getCommandText(command, args, customWorkingDir);
   }
 
   /**
@@ -43,11 +41,10 @@ export class CLICmdWriter extends BaseCommandProcessor {
   private getCommandText(
     command: string,
     args: string[],
-    useMcpCwd: boolean = false,
     customWorkingDir?: string
   ): CommandResult {
     try {
-      const cwd = this.resolveCommandWorkingDirectory(useMcpCwd, customWorkingDir);
+      const cwd = this.resolveCommandWorkingDirectory(customWorkingDir);
 
       // Format the command string
       const argsText = args.join(' ');

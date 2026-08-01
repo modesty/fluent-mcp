@@ -10,7 +10,6 @@ import { SessionManager } from '../../src/utils/sessionManager.js';
 
 jest.mock('../../src/utils/logger.js', () => require('../mocks/index.js').createLoggerMock());
 jest.mock('../../src/config.js', () => require('../mocks/index.js').createConfigMock());
-jest.mock('../../src/utils/rootContext.js', () => require('../mocks/index.js').createRootContextMock());
 // Default the session to a resolvable auth alias so the required-auth gate passes;
 // individual tests override getAuthAlias to exercise the unauthenticated path.
 jest.mock('../../src/utils/sessionManager.js', () =>
@@ -56,7 +55,6 @@ describe('QueryCommand', () => {
         '--output', 'json',
         '--auth', 'session-alias',
       ],
-      false,
       '/mock/working/dir',
       undefined,
       60000,

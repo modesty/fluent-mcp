@@ -149,7 +149,6 @@ export class AuthCommand extends BaseCLICommand {
     return await this.commandProcessor.process(
       command,
       sdkArgs,
-      false,
       getProjectRootPath(),
       stdinInput,
       undefined,

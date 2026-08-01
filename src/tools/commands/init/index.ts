@@ -4,4 +4,4 @@
 
 export * from './types.js';
 export * from './initValidator.js';
-export * from './initElicitator.js';
+export * from './initArgsResolver.js';

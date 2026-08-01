@@ -2,7 +2,6 @@ import { CommandProcessor, CommandResult } from "../../src/utils/types.js";
 import { InitCommand } from "../../src/tools/commands/initCommand.js";
 import { FluentAppValidator } from "../../src/utils/fluentAppValidator.js";
 import { SessionManager } from "../../src/utils/sessionManager.js";
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -74,7 +73,6 @@ jest.mock("../../src/utils/sessionManager.js", () => require('../mocks/index.js'
 describe("InitCommand", () => {
   let initCommand: InitCommand;
   let mockExecutor: CommandProcessor;
-  let mockMcpServer: Partial<McpServer>;
 
   afterEach(() => {
     jest.restoreAllMocks();
@@ -159,14 +157,7 @@ describe("InitCommand", () => {
       return { hasApp: false };
     });
     
-    // Create mock MCP server
-    mockMcpServer = {
-      server: {
-        elicitInput: jest.fn()
-      }
-    } as any;
-    
-    initCommand = new InitCommand(mockExecutor, mockMcpServer as McpServer);
+    initCommand = new InitCommand(mockExecutor);
   });
 
   test("should have correct properties", () => {
@@ -202,66 +193,68 @@ describe("InitCommand", () => {
     expect(fromArg?.description).toContain("For conversion");
   });
 
-  test('should use elicitation when no intent can be determined', async () => {
-    // Mock MCP server to return intent selection
-    (mockMcpServer.server!.elicitInput as jest.Mock).mockResolvedValueOnce({
-      action: 'accept',
-      content: { intent: 'creation' }
-    });
-
-    // Mock second elicitation for creation data
-    (mockMcpServer.server!.elicitInput as jest.Mock).mockResolvedValueOnce({
-      action: 'accept',
-      content: { 
-        appName: 'Test App',
-        packageName: 'test-app',
-        scopeName: 'x_test_scope',
-        workingDirectory: '/valid-dir',
-        template: 'javascript.react'
-      }
-    });
-
+  // MCP 2026-07-28 (SEP-2322) removed server-initiated requests, so the tool no
+  // longer asks the client for missing values. Every argument must arrive with
+  // the tools/call, and an incomplete bag must fail with an actionable message
+  // rather than hang on a round trip that is no longer legal.
+  test('should fail with an actionable error when no intent can be determined', async () => {
     const result = await initCommand.execute({});
-    
-    expect(mockMcpServer.server!.elicitInput).toHaveBeenCalledTimes(2);
-    expect(result.success).toBe(true);
-  });
 
-  test('should handle elicitation rejection', async () => {
-    // Mock MCP server to return rejection
-    (mockMcpServer.server!.elicitInput as jest.Mock).mockResolvedValueOnce({
-      action: 'reject',
-      content: null
-    });
-
-    const result = await initCommand.execute({});
-    
-    expect(mockMcpServer.server!.elicitInput).toHaveBeenCalledTimes(1);
     expect(result.success).toBe(false);
-    expect(result.error?.message).toContain('Intent selection is required');
+    expect(result.error?.message).toContain('Cannot determine intent for init_fluent_app');
+    // Names both modes and their required arguments
+    expect(result.error?.message).toContain("intent to 'creation'");
+    expect(result.error?.message).toContain("intent to 'conversion'");
+    expect(result.error?.message).toContain('appName');
+    expect(result.error?.message).toContain('from');
+    // Never reaches the SDK
+    expect(mockExecutor.process).not.toHaveBeenCalled();
   });
 
-  test('should use elicitation for conversion flow', async () => {
-    // Mock MCP server to return intent selection
-    (mockMcpServer.server!.elicitInput as jest.Mock).mockResolvedValueOnce({
-      action: 'accept',
-      content: { intent: 'conversion' }
+  test('should never issue a server-initiated request for missing input', async () => {
+    // Guards the regression the 2026-07-28 migration removed: no code path may
+    // reach back to the client. A bare intent with no data must fail locally.
+    const result = await initCommand.execute({ intent: 'creation' });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toContain('Required parameters for creation are missing');
+    expect(mockExecutor.process).not.toHaveBeenCalled();
+  });
+
+  test('should fail with an actionable error when conversion is missing from', async () => {
+    const result = await initCommand.execute({
+      intent: 'conversion',
+      workingDirectory: '/valid-dir',
     });
 
-    // Mock second elicitation for conversion data
-    (mockMcpServer.server!.elicitInput as jest.Mock).mockResolvedValueOnce({
-      action: 'accept',
-      content: { 
-        from: 'a1b2c3d4e5f6789012345678901234ab',
-        workingDirectory: '/valid-dir',
-        auth: 'test-auth'
-      }
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toContain('Required parameters for conversion are missing: from');
+    expect(mockExecutor.process).not.toHaveBeenCalled();
+  });
+
+  test('should treat null and blank arguments as absent when reporting missing input', async () => {
+    // MCP clients commonly serialize an omitted optional value as null.
+    const result = await initCommand.execute({
+      intent: 'creation',
+      appName: 'Test App',
+      packageName: null,
+      scopeName: '   ',
+      workingDirectory: '/valid-dir',
+      template: 'javascript.react',
     });
 
-    const result = await initCommand.execute({});
-    
-    expect(mockMcpServer.server!.elicitInput).toHaveBeenCalledTimes(2);
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toContain('Required parameters for creation are missing');
+    expect(result.error?.message).toContain('packageName');
+    expect(result.error?.message).toContain('scopeName');
+    expect(result.error?.message).not.toContain('appName');
+  });
+
+  test('should list the valid templates when creation input is incomplete', async () => {
+    const result = await initCommand.execute({ intent: 'creation', appName: 'Test App' });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.message).toContain('typescript.vue');
   });
 
   test('should create directory if it does not exist', async () => {
@@ -319,18 +312,15 @@ describe("InitCommand", () => {
   });
 
   test('should fail when working directory not provided', async () => {
-    // Create InitCommand without MCP server to test error handling
-    const initCommandNoMcp = new InitCommand(mockExecutor);
-    
     const args = {
       appName: 'Test App',
       packageName: 'test-app',
       scopeName: 'x_test_scope',
       template: 'javascript.react'
     };
-    
-    const result = await initCommandNoMcp.execute(args);
-    
+
+    const result = await initCommand.execute(args);
+
     expect(result.success).toBe(false);
     expect(result.error?.message).toContain('Required parameters for creation are missing: workingDirectory');
   });
@@ -352,7 +342,6 @@ describe("InitCommand", () => {
         '--from', 'a1b2c3d4e5f6789012345678901234ab',
         '--auth', 'test-auth'
       ],
-      false,
       '/valid-dir'
     );
     
@@ -382,49 +371,36 @@ describe("InitCommand", () => {
         '--scopeName', 'x_test_scope',
         '--template', 'typescript.react',
       ],
-      false,
       '/valid-dir'
     );
     
     expect(SessionManager.getInstance().setWorkingDirectory).toHaveBeenCalledWith('/valid-dir');
   });
 
-  test('should use elicitation when conversion missing required parameters', async () => {
-    // Mock MCP server to return conversion data
-    (mockMcpServer.server!.elicitInput as jest.Mock).mockResolvedValueOnce({
-      action: 'accept',
-      content: { 
-        from: 'a1b2c3d4e5f6789012345678901234ab',
-        workingDirectory: '/valid-dir',
-        auth: 'test-auth'
-      }
+  test('should succeed for an explicit conversion intent with complete arguments', async () => {
+    const result = await initCommand.execute({
+      intent: 'conversion',
+      from: 'a1b2c3d4e5f6789012345678901234ab',
+      workingDirectory: '/valid-dir',
+      auth: 'test-auth',
     });
 
-    const args = { intent: 'conversion' };
-    const result = await initCommand.execute(args);
-    
-    expect(mockMcpServer.server!.elicitInput).toHaveBeenCalledTimes(1);
     expect(result.success).toBe(true);
+    expect(mockExecutor.process).toHaveBeenCalled();
   });
 
-  test('should use elicitation when creation missing required parameters', async () => {
-    // Mock MCP server to return creation data
-    (mockMcpServer.server!.elicitInput as jest.Mock).mockResolvedValueOnce({
-      action: 'accept',
-      content: { 
-        appName: 'Test App',
-        packageName: 'test-app',
-        scopeName: 'x_test_scope',
-        workingDirectory: '/valid-dir',
-        template: 'javascript.react'
-      }
+  test('should succeed for an explicit creation intent with complete arguments', async () => {
+    const result = await initCommand.execute({
+      intent: 'creation',
+      appName: 'Test App',
+      packageName: 'test-app',
+      scopeName: 'x_test_scope',
+      workingDirectory: '/valid-dir',
+      template: 'javascript.react',
     });
 
-    const args = { intent: 'creation' };
-    const result = await initCommand.execute(args);
-    
-    expect(mockMcpServer.server!.elicitInput).toHaveBeenCalledTimes(1);
     expect(result.success).toBe(true);
+    expect(mockExecutor.process).toHaveBeenCalled();
   });
 
 
@@ -458,11 +434,7 @@ describe("InitCommand", () => {
   test('should validate local path for conversion', async () => {
     mockFs.markAsFluentApp('/existing-path', 'x_existing_scope', 'existing-package');
     const ensureAuthValidated = jest.fn().mockResolvedValue(undefined);
-    const localConversionCommand = new InitCommand(
-      mockExecutor,
-      mockMcpServer as McpServer,
-      ensureAuthValidated
-    );
+    const localConversionCommand = new InitCommand(mockExecutor, ensureAuthValidated);
     const args = {
       workingDirectory: '/valid-dir',
       from: '/existing-path'
@@ -474,7 +446,6 @@ describe("InitCommand", () => {
     expect(mockExecutor.process).toHaveBeenCalledWith(
       process.execPath,
       expect.not.arrayContaining(['--auth']),
-      false,
       '/valid-dir'
     );
   });
@@ -482,11 +453,7 @@ describe("InitCommand", () => {
   test('should recognize a bare relative local path without triggering auth validation', async () => {
     mockFs.markAsFluentApp(path.resolve('existing-path'), 'x_existing_scope', 'existing-package');
     const ensureAuthValidated = jest.fn().mockResolvedValue(undefined);
-    const localConversionCommand = new InitCommand(
-      mockExecutor,
-      mockMcpServer as McpServer,
-      ensureAuthValidated
-    );
+    const localConversionCommand = new InitCommand(mockExecutor, ensureAuthValidated);
 
     await localConversionCommand.execute({
       workingDirectory: '/valid-dir',
@@ -497,7 +464,6 @@ describe("InitCommand", () => {
     expect(mockExecutor.process).toHaveBeenCalledWith(
       process.execPath,
       expect.not.arrayContaining(['--auth']),
-      false,
       '/valid-dir'
     );
   });
@@ -505,11 +471,7 @@ describe("InitCommand", () => {
   test('should honor an explicit auth alias for a local conversion without lazy validation', async () => {
     mockFs.markAsFluentApp('/existing-path', 'x_existing_scope', 'existing-package');
     const ensureAuthValidated = jest.fn().mockResolvedValue(undefined);
-    const localConversionCommand = new InitCommand(
-      mockExecutor,
-      mockMcpServer as McpServer,
-      ensureAuthValidated
-    );
+    const localConversionCommand = new InitCommand(mockExecutor, ensureAuthValidated);
 
     await localConversionCommand.execute({
       workingDirectory: '/valid-dir',
@@ -521,18 +483,13 @@ describe("InitCommand", () => {
     expect(mockExecutor.process).toHaveBeenCalledWith(
       process.execPath,
       expect.arrayContaining(['--auth', 'explicit-local-auth']),
-      false,
       '/valid-dir'
     );
   });
 
   test('should lazily validate auth for sys_id conversion without an alias', async () => {
     const ensureAuthValidated = jest.fn().mockResolvedValue(undefined);
-    const instanceConversionCommand = new InitCommand(
-      mockExecutor,
-      mockMcpServer as McpServer,
-      ensureAuthValidated
-    );
+    const instanceConversionCommand = new InitCommand(mockExecutor, ensureAuthValidated);
 
     await instanceConversionCommand.execute({
       workingDirectory: '/valid-dir',
@@ -653,7 +610,6 @@ describe("InitCommand", () => {
     expect(mockExecutor.process).toHaveBeenCalledWith(
       process.execPath,
       expect.arrayContaining(['--from', 'a1b2c3d4e5f6789012345678901234ab']),
-      false,
       '/valid-dir'
     );
   });
@@ -673,7 +629,6 @@ describe("InitCommand", () => {
     expect(mockExecutor.process).toHaveBeenCalledWith(
       process.execPath,
       expect.arrayContaining(['--appName', '"Test App"']),
-      false,
       '/valid-dir'
     );
   });

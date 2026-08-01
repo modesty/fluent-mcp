@@ -1,11 +1,9 @@
-import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   ListToolsRequestSchema,
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
-  InitializedNotificationSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { getConfig, findMissingResourcePaths } from '../config.js';
@@ -38,7 +36,6 @@ export class FluentMcpServer {
   private promptManager: PromptManager;
   private config: ReturnType<typeof getConfig>;
   private status: ServerStatus = ServerStatus.STOPPED;
-  private roots: { uri: string; name?: string }[] = [];
   private initializationPromise: Promise<void>;
 
   /**
@@ -70,7 +67,7 @@ export class FluentMcpServer {
 
     // Initialize managers for tools, resources, and prompts
     this.toolsManager = new ToolsManager(this.mcpServer);
-    this.resourceManager = new ResourceManager(this.mcpServer);
+    this.resourceManager = new ResourceManager();
     this.promptManager = new PromptManager(this.mcpServer);
 
     // Initialize resources and prompts, then set up handlers
@@ -83,64 +80,6 @@ export class FluentMcpServer {
       // Resources will be registered during start() to ensure proper timing
       this.setupHandlers();
     });
-  }
-
-  /**
-   * Request the list of roots from the client
-   * This is called after the client sends the notifications/initialized notification
-   * @returns Promise that resolves when roots are updated
-   */
-  private async requestRootsFromClient(): Promise<void> {
-    if (!this.mcpServer?.server) {
-      logger.warn('Cannot request roots - MCP server not available');
-      return;
-    }
-
-    // roots/list is a client capability. Do not send a server-initiated
-    // request to clients that did not advertise roots support; older clients
-    // commonly complete initialization without that capability.
-    if (!this.mcpServer.server.getClientCapabilities?.()?.roots) {
-      logger.debug('Skipping roots/list request: client does not advertise roots capability');
-      return;
-    }
-
-    logger.info('Requesting roots from client via roots/list...');
-
-    try {
-      // Create a schema for the response using the Zod library
-      // This is needed because the request method requires a result schema
-      const RootsResponseSchema = z.object({
-        roots: z.array(z.object({
-          uri: z.string(),
-          name: z.string().optional()
-        }))
-      });
-
-      type RootsResponse = z.infer<typeof RootsResponseSchema>;
-
-      // Using the correct request format with schema
-      // Note: The MCP SDK request method expects a specific schema type, but we use our own Zod schema
-      const response = await this.mcpServer.server.request(
-        { method: 'roots/list' },
-        RootsResponseSchema
-      ) as RootsResponse;
-
-      const roots = response.roots;
-
-      if (Array.isArray(roots) && roots.length > 0) {
-        logger.info('Received roots from client', { rootCount: roots.length });
-
-        // Update roots with client-provided roots
-        await this.updateRoots(roots);
-      } else {
-        logger.warn('Client responded to roots/list but provided no roots');
-      }
-    } catch (error) {
-      logger.error('Error requesting roots from client',
-        CommandResultFactory.normalizeError(error)
-      );
-
-    }
   }
 
   /**
@@ -168,8 +107,6 @@ export class FluentMcpServer {
     });
 
     // Set up the resources/read handler
-    // The SDK's registerResource() doesn't automatically set up the read handler
-    // We need to explicitly handle resource read requests
     server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const { uri } = request.params;
 
@@ -206,99 +143,14 @@ export class FluentMcpServer {
     // Set up prompts handlers
     this.promptManager.setupHandlers();
 
-    // Set up handler for notifications/initialized
-    server.setNotificationHandler(InitializedNotificationSchema, async () => {
-      logger.info('Received notifications/initialized notification from client');
-
-      // Request the list of roots from the client now that initialization is complete
-      try {
-        await this.requestRootsFromClient();
-      } catch (error) {
-        logger.error('Failed to request roots after initialization notification',
-          CommandResultFactory.normalizeError(error)
-        );
-      }
-    });
-
     // Note: Tool calls are handled by the callbacks registered via mcpServer.registerTool() in ToolsManager.
     // We don't need a separate setRequestHandler for CallToolRequestSchema as that would conflict.
-  }
-
-  /**
-   * Update the list of roots and notify clients if changed
-   * @param roots The new list of roots
-   */
-  async updateRoots(roots: { uri: string; name?: string }[]): Promise<void> {
-    // Validate roots - ensure all URIs exist and are valid
-    const validatedRoots = roots.filter(root => {
-      if (!root.uri) {
-        logger.warn('Ignoring root with empty URI');
-        return false;
-      }
-      return true;
-    });
-
-    // Check if roots have changed
-    const hasChanged = this.roots.length !== validatedRoots.length ||
-      this.roots.some((root, index) =>
-        root.uri !== validatedRoots[index]?.uri ||
-        root.name !== validatedRoots[index]?.name
-      );
-
-    if (hasChanged) {
-      this.roots = [...validatedRoots];
-
-      // Only update tools manager with the roots if the server is running
-      // or if the status is INITIALIZING (for tests)
-      // This prevents unnecessary updates during initialization
-      if (this.status === ServerStatus.RUNNING || this.status === ServerStatus.INITIALIZING) {
-        // Update roots in tools manager
-        this.toolsManager.updateRoots(this.roots);
-        if (this.status === ServerStatus.RUNNING) {
-          loggingManager.logRootsChanged(this.roots);
-        }
-      }
-    }
-  }
-
-  /**
-   * Add a new root to the list of roots
-   * @param uri The URI of the root
-   * @param name Optional name for the root
-   */
-  async addRoot(uri: string, name?: string): Promise<void> {
-    // Validate root URI
-    if (!uri) {
-      logger.warn('Attempted to add root with empty URI, ignoring');
-      return;
-    }
-
-    // Check if root already exists
-    const existingIndex = this.roots.findIndex(root => root.uri === uri);
-
-    if (existingIndex >= 0) {
-      // Update existing root if name has changed
-      if (this.roots[existingIndex].name !== name) {
-        logger.debug(`Updating existing root: ${uri} from name '${this.roots[existingIndex].name}' to '${name}'`);
-        const updatedRoots = [...this.roots];
-        updatedRoots[existingIndex] = { uri, name };
-        await this.updateRoots(updatedRoots);
-      } else {
-        logger.debug(`Root already exists with same name, no update needed: ${uri} (${name})`);
-      }
-    } else {
-      // Add new root
-      logger.debug(`Adding new root: ${uri}${name ? ` (${name})` : ''}, server status: ${this.status}`);
-      await this.updateRoots([...this.roots, { uri, name }]);
-    }
-  }
-
-  /**
-   * Get the current list of roots
-   * @returns The list of roots
-   */
-  getRoots(): { uri: string; name?: string }[] {
-    return [...this.roots];
+    //
+    // There is deliberately no `notifications/initialized` handler: its only
+    // remaining job was to trigger the transitional `roots/list` fetch, and MCP
+    // 2026-07-28 both removed the handshake it belongs to and made
+    // server-initiated requests illegal. Auth validation is lazy and
+    // command-triggered (see ToolsManager.ensureAuthValidated).
   }
 
   /**
@@ -342,18 +194,12 @@ export class FluentMcpServer {
       // Connect the server to the stdio transport
       await this.mcpServer.connect(transport);
 
-      // Note: Resources are handled by manual handlers in setupHandlers() that use
+      // Note: resources are served by the handlers in setupHandlers(), which call
       // resourceManager.listResources() and resourceManager.readResource().
-      // We don't call resourceManager.registerAll() here because it would try to
-      // set up duplicate resources/list handlers via the SDK's registerResource().
+      // ResourceManager holds no MCP server reference and registers nothing itself.
 
-      // Set the server status to running before initializing roots
-      // This ensures that client notifications will be sent correctly
       this.status = ServerStatus.RUNNING;
       loggingManager.logServerStarted();
-
-      // The root list will be requested when the client sends the notifications/initialized notification
-      // This ensures proper timing according to the MCP protocol
     } catch (error) {
       this.status = ServerStatus.STOPPED;
       loggingManager.logServerStartFailed(error, this.status);

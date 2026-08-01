@@ -3,9 +3,9 @@
  */
 
 /**
- * Elicitation data for converting an existing app to Fluent
+ * Resolved request for converting an existing app to Fluent
  */
-export interface ConversionElicitationData {
+export interface ConversionInitData {
   from: string;
   workingDirectory: string;
   auth?: string;
@@ -13,9 +13,9 @@ export interface ConversionElicitationData {
 }
 
 /**
- * Elicitation data for creating a new Fluent app
+ * Resolved request for creating a new Fluent app
  */
-export interface CreationElicitationData {
+export interface CreationInitData {
   appName: string;
   packageName: string;
   scopeName: string;

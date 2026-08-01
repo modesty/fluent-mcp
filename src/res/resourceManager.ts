@@ -1,4 +1,3 @@
-import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ResourceLoader } from '../utils/resourceLoader.js';
 import { ResourceType, CommandResultFactory } from '../utils/types.js';
 import logger from '../utils/logger.js';
@@ -12,12 +11,8 @@ interface ResourceTypeConfig {
   resourceType: ResourceType;
   /** URI scheme, e.g. 'sn-spec' */
   scheme: string;
-  /** URI suffix after {type}. Empty for simple types, '/{snippetId}' for parameterized. */
-  uriSuffix: string;
   /** Function to build the title given a metadata type name */
   titleTemplate: (type: string) => string;
-  /** Function to build the description given a metadata type name */
-  descriptionTemplate: (type: string) => string;
   /** Label used in "not found" / error messages */
   label: string;
   /** Whether this type has dynamic sub-identifiers (like snippetId) */
@@ -32,46 +27,42 @@ const RESOURCE_TYPE_CONFIGS: ResourceTypeConfig[] = [
   {
     resourceType: ResourceType.SPEC,
     scheme: 'sn-spec',
-    uriSuffix: '',
     titleTemplate: (type) => `${type} API Specification for Fluent (ServiceNow SDK)`,
-    descriptionTemplate: (type) => `API specification for Fluent (ServiceNow SDK) ${type}`,
     label: 'API specification',
     hasSubId: false,
   },
   {
     resourceType: ResourceType.INSTRUCT,
     scheme: 'sn-instruct',
-    uriSuffix: '',
     titleTemplate: (type) => `${type} Instructions for Fluent (ServiceNow SDK)`,
-    descriptionTemplate: (type) => `Development instructions for Fluent (ServiceNow SDK) ${type}`,
     label: 'Instructions',
     hasSubId: false,
   },
   {
     resourceType: ResourceType.SNIPPET,
     scheme: 'sn-snippet',
-    uriSuffix: '/{snippetId}',
     titleTemplate: (type) => `${type} Code Snippets for Fluent (ServiceNow SDK)`,
-    descriptionTemplate: (type) => `Example code snippets for Fluent (ServiceNow SDK) ${type}`,
     label: 'Snippet',
     hasSubId: true,
   },
 ];
 
 /**
- * Manager for handling MCP resources registration and access
+ * Provides the content behind the `sn-spec://`, `sn-instruct://`, and
+ * `sn-snippet://` resource URIs.
+ *
+ * Deliberately holds no reference to the MCP server: the `resources/list` and
+ * `resources/read` handlers live in `FluentMcpServer.setupHandlers()` and call
+ * `listResources()` / `readResource()`. This class is a pure content provider.
  */
 export class ResourceManager {
-  private mcpServer: McpServer;
   private resourceLoader: ResourceLoader;
   private metadataTypes: string[] = [];
 
   /**
    * Create a new ResourceManager
-   * @param mcpServer The MCP server instance
    */
-  constructor(mcpServer: McpServer) {
-    this.mcpServer = mcpServer;
+  constructor() {
     this.resourceLoader = new ResourceLoader();
   }
 
@@ -86,99 +77,6 @@ export class ResourceManager {
     } catch (error) {
       logger.error('Error loading metadata types', CommandResultFactory.normalizeError(error));
       throw error;
-    }
-  }
-
-  /**
-   * Register all resource types
-   */
-  registerAll(): void {
-    for (const config of RESOURCE_TYPE_CONFIGS) {
-      this.registerResourcesForType(config);
-    }
-  }
-
-  /**
-   * Register resources for a single resource type config across all metadata types
-   */
-  private registerResourcesForType(config: ResourceTypeConfig): void {
-    for (const type of this.metadataTypes) {
-      const uriPattern = `${config.scheme}://${type}${config.uriSuffix}`;
-
-      // Build template options: snippet type gets a `complete` handler for autocomplete
-      const templateOptions: { list: undefined; complete?: Record<string, (value: string) => Promise<string[]>> } = {
-        list: undefined,
-      };
-
-      if (config.hasSubId) {
-        templateOptions.complete = {
-          snippetId: async (value: string): Promise<string[]> => {
-            try {
-              const snippets = await this.resourceLoader.listSnippets(type);
-              return snippets.filter(id => id.startsWith(value || ''));
-            } catch (error) {
-              logger.error(`Error completing snippet IDs for ${type}`,
-                CommandResultFactory.normalizeError(error)
-              );
-              return [];
-            }
-          }
-        };
-      }
-
-      const template = new ResourceTemplate(uriPattern, templateOptions);
-
-      this.mcpServer.registerResource(
-        `${config.scheme}-${type}`,
-        template,
-        {
-          title: config.titleTemplate(type),
-          description: config.descriptionTemplate(type),
-          mimeType: 'text/markdown',
-        },
-        async (uri: URL, extra?: { arguments?: { snippetId?: string } }) => {
-          try {
-            const metadataType = uri.host.toLowerCase();
-            const subId = config.hasSubId ? extra?.arguments?.snippetId : undefined;
-
-            const result = await this.resourceLoader.getResource(
-              config.resourceType,
-              metadataType,
-              subId
-            );
-
-            if (!result.found) {
-              throw new McpResourceNotFoundError(
-                uri.href,
-                `${config.label} not found for ${metadataType}`
-              );
-            }
-
-            return {
-              contents: [{
-                uri: uri.href,
-                text: result.content,
-              }],
-            };
-          } catch (error) {
-            if (error instanceof McpResourceNotFoundError) {
-              throw error;
-            }
-
-            logger.error(`Error reading ${config.label.toLowerCase()} resource for ${uri.href}`,
-              CommandResultFactory.normalizeError(error)
-            );
-            return {
-              contents: [{
-                uri: uri.href,
-                text: `Error retrieving ${config.label.toLowerCase()}: ${
-                  CommandResultFactory.normalizeError(error).message
-                }`,
-              }],
-            };
-          }
-        }
-      );
     }
   }
 

@@ -13,7 +13,6 @@ import {
   GetInstructCommand,
   CheckAuthStatusCommand
 } from './resources/resourceTools.js';
-import { setRoots as setRootContextRoots } from '../utils/rootContext.js';
 import { buildInputZodSchema } from './toolSchema.js';
 import { autoValidateAuthIfConfigured } from '../server/fluentInstanceAuth.js';
 import loggingManager from '../utils/loggingManager.js';
@@ -72,7 +71,6 @@ export class ToolsManager {
     const commands = CommandFactory.createCommands(
       cliExecutor,
       cliCmdWriter,
-      this.mcpServer,
       this.ensureAuthValidated
     );
 
@@ -258,25 +256,6 @@ export class ToolsManager {
    */
   getMCPTools(): Record<string, unknown>[] {
     return this.commandRegistry.toMCPTools();
-  }
-
-  /**
-   * Update the roots in CLI tools
-   * @param roots Array of root URIs and optional names
-   */
-  updateRoots(roots: { uri: string; name?: string }[]): void {
-    // Skip empty root updates
-    if (!roots || roots.length === 0) {
-      return;
-    }
-
-    logger.debug('Updating transitional MCP root context', {
-      rootCount: roots.length,
-      rootPaths: roots.map(r => r.uri)
-    });
-
-    setRootContextRoots(roots);
-    logger.info('Updated transitional MCP root context', { roots });
   }
 
   /**

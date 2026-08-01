@@ -7,7 +7,6 @@ import { DownloadCommand, CleanCommand, PackCommand, ExplainCommand } from '../.
 
 jest.mock('../../src/utils/logger.js', () => require('../mocks/index.js').createLoggerMock());
 jest.mock('../../src/config.js', () => require('../mocks/index.js').createConfigMock());
-jest.mock('../../src/utils/rootContext.js', () => require('../mocks/index.js').createRootContextMock());
 jest.mock('../../src/utils/sessionManager.js', () => require('../mocks/index.js').createSessionManagerMock());
 
 describe('New SDK Commands', () => {
@@ -75,7 +74,6 @@ describe('New SDK Commands', () => {
       expect(mockProcessor.process).toHaveBeenCalledWith(
         process.execPath,
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'download', 'my-app'],
-        false,
         '/mock/working/dir',
         undefined, // stdinInput
         180000,   // timeoutMs
@@ -97,7 +95,6 @@ describe('New SDK Commands', () => {
       expect(mockProcessor.process).toHaveBeenCalledWith(
         process.execPath,
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'download', 'my-app', '--source', './src', '--incremental', '--debug'],
-        false,
         '/mock/working/dir',
         undefined, // stdinInput
         180000,   // timeoutMs
@@ -141,7 +138,6 @@ describe('New SDK Commands', () => {
       expect(mockProcessor.process).toHaveBeenCalledWith(
         process.execPath,
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'clean'],
-        false,
         '/mock/working/dir',
         undefined, // stdinInput
         15000,    // timeoutMs
@@ -161,7 +157,6 @@ describe('New SDK Commands', () => {
       expect(mockProcessor.process).toHaveBeenCalledWith(
         process.execPath,
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'clean', '--source', 'src', '--debug'],
-        false,
         '/mock/working/dir',
         undefined, // stdinInput
         15000,    // timeoutMs
@@ -205,7 +200,6 @@ describe('New SDK Commands', () => {
       expect(mockProcessor.process).toHaveBeenCalledWith(
         process.execPath,
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'pack'],
-        false,
         '/mock/working/dir',
         undefined, // stdinInput
         30000,    // timeoutMs
@@ -225,7 +219,6 @@ describe('New SDK Commands', () => {
       expect(mockProcessor.process).toHaveBeenCalledWith(
         process.execPath,
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'pack', '--source', './build', '--debug'],
-        false,
         '/mock/working/dir',
         undefined, // stdinInput
         30000,    // timeoutMs
@@ -285,7 +278,6 @@ describe('New SDK Commands', () => {
       expect(mockProcessor.process).toHaveBeenCalledWith(
         process.execPath,
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', 'BusinessRule'],
-        false,
         '/mock/project/root',
         undefined,
         15000,
@@ -306,7 +298,6 @@ describe('New SDK Commands', () => {
       expect(mockProcessor.process).toHaveBeenCalledWith(
         process.execPath,
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', 'Acl', '--source', './src', '--debug'],
-        false,
         '/mock/project/root',
         undefined,
         15000,
@@ -323,7 +314,6 @@ describe('New SDK Commands', () => {
       expect(mockProcessor.process).toHaveBeenCalledWith(
         process.execPath,
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', '--list'],
-        false,
         '/mock/project/root',
         undefined,
         15000,
@@ -340,7 +330,6 @@ describe('New SDK Commands', () => {
       expect(mockProcessor.process).toHaveBeenCalledWith(
         process.execPath,
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', 'flow', '--list'],
-        false,
         '/mock/project/root',
         undefined,
         15000,
@@ -361,7 +350,6 @@ describe('New SDK Commands', () => {
       expect(mockProcessor.process).toHaveBeenCalledWith(
         process.execPath,
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', 'BusinessRule', '--format', 'raw', '--peek'],
-        false,
         '/mock/project/root',
         undefined,
         15000,
