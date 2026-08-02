@@ -3,7 +3,7 @@
 An [MCP server](https://modelcontextprotocol.io) that brings [ServiceNow Fluent SDK](https://www.servicenow.com/docs/bundle/yokohama-application-development/page/build/servicenow-sdk/concept/servicenow-fluent.html) capabilities to AI-assisted development environments. Enables natural language interaction with ServiceNow SDK commands, API specifications, code snippets, and development resources.
 
 Built for **`@servicenow/sdk` 4.9.0**.
-> **Note** : v0.5.1 is the last release that supports [MCP@v2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25). For future releases, [MCP@v2026-7-28](https://modelcontextprotocol.io/specification/2026-07-28) will be the baseline .
+> **Note** : Since v0.6.0 the server speaks **both** [MCP@2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28) and [MCP@2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25) from one handler set — the stdio entry inspects the opening message and serves whichever era the client opens with. v0.5.1 is the last release built on the v1 MCP SDK (2025-11-25 only).
 
 ## Key Features
 
@@ -11,7 +11,7 @@ Built for **`@servicenow/sdk` 4.9.0**.
 - **Rich Resources** - API specifications, instructions, and code snippets for **65 ServiceNow metadata types**
 - **API Documentation Lookup** - `explain_fluent_api` returns SDK docs for any Fluent API or guide — no project required
 - **Lazy Auto-Authentication** - Detects and caches an auth profile only when an auth-requiring command or `check_auth_status` needs it
-- **Explicit Project Context** - Resolves each project command from its `workingDirectory` argument, the initialized session, `FLUENT_MCP_WORKING_DIR`, or transitional MCP roots, then fails with actionable guidance instead of guessing
+- **Explicit Project Context** - Resolves each project command from its `workingDirectory` argument, the initialized session, or `FLUENT_MCP_WORKING_DIR`, then fails with actionable guidance instead of guessing
 - **Client-Friendly Schemas** - Optional inputs advertise their canonical value types while the enforced schema accepts `null` as an omitted-value compatibility form
 
 This MCP server implements the [Model Context Protocol](https://modelcontextprotocol.io) specification with the following capabilities:
@@ -23,25 +23,20 @@ This MCP server implements the [Model Context Protocol](https://modelcontextprot
 - **Prompts** - Development workflow templates for common ServiceNow tasks (`coding_in_fluent`, `create_custom_ui`)
 - **Logging & Progress** - Structured logs are written to stderr; progress notifications are sent for long-running commands (any command with a 30s or longer timeout — deploy, build, transform, download, dependencies, query, pack) when the client supplies a progress token
 
-### Client Capabilities (used by this server)
+### Project Context & Sessions
 
-The server leverages these MCP client capabilities when available:
-
-- **Roots (transitional)** - After initialization, requests the client's workspace roots when the client advertises roots support; the primary root is used only when no explicit, session, or configured project directory exists
-  - Never guesses from the server process cwd or installed package directory
-
-- **Elicitation** - Interactive parameter collection for complex workflows
-  - **`init_fluent_app`** - Prompts for missing project parameters (workingDirectory, template, appName, etc.)
-  - Supports both creation and conversion workflows with smart validation
-  - Handles user acceptance/rejection of elicited data
+The server requires **no client capabilities** and issues **no server→client requests**: Roots, Sampling, and Elicitation are not used (MCP 2026-07-28 removed server-initiated requests, and all input arrives with the `tools/call` arguments).
 
 - **Session Management** - Tracks the directory established by `init_fluent_app` for subsequent project commands
-- **Working Directory Resolution** - `workingDirectory` tool argument → initialized session → `FLUENT_MCP_WORKING_DIR` → transitional MCP root → actionable failure. Accepted paths are non-empty absolute paths other than the filesystem root.
+- **Working Directory Resolution** - `workingDirectory` tool argument → initialized session → `FLUENT_MCP_WORKING_DIR` → actionable failure. Accepted paths are non-empty absolute paths other than the filesystem root. The server never guesses from its process cwd or installed package directory.
+- **Non-interactive `init_fluent_app`** - Intent-specific arguments must be supplied with the call (creation: `appName`, `packageName`, `scopeName`, `template`; conversion: `from`); a missing argument fails with an error naming exactly what is absent
 - **Error Handling** - Comprehensive error messages with actionable guidance
 - **Type Safety** - Full TypeScript implementation with strict typing
 
 ### Protocol Behavior
 
+- Dual-era stdio: a 2026-07-28 opening (per-request `_meta` envelope, `server/discover`) and a 2025-11-25 `initialize` are both served from the same handler set; the SDK entry point pins one era per connection.
+- The six cacheable results of 2026-07-28 (`tools/list`, `prompts/list`, `resources/list`, `resources/templates/list`, `resources/read`, `server/discover`) advertise `ttlMs: 3600000` / `cacheScope: 'public'` — everything they return is static for the process lifetime.
 - The server advertises instructions during initialization; `tools/list` is a side-effect-free read that returns tools in deterministic name order.
 - Optional tool arguments advertise their canonical JSON types so clients render normal form fields. The enforced call schema additionally accepts `null` as an omitted value; `workingDirectory` also treats an empty string as omitted before applying the fallback chain.
 - Structured logs go to stderr, keeping stdout reserved for MCP protocol traffic. Runtime `logging/setLevel` and `notifications/message` are not used.
@@ -70,7 +65,7 @@ Create a new Fluent app in ~/projects/time-off-tracker to manage employee PTO re
 |------|-------------|----------------|
 | `sdk_info` | Get SDK version or help | `flag` (-v/-h), `command` (optional for -h) |
 | `explain_fluent_api` | Look up Fluent SDK documentation for any API or guide. No Fluent project required. | `topic` (optional API/guide name or tag keyword — required unless `list=true`), `list` (boolean — list topics), `peek` (boolean — brief summary), `format` (`pretty`\|`raw`), `source` (optional project path override), `debug` (optional) |
-| `init_fluent_app` | Initialize or convert a ServiceNow app. Creation and conversion may use elicitation for missing values. | `intent`, `from`, `appName`, `packageName`, `scopeName`, `template`, `auth`, `workingDirectory` (required), `debug` |
+| `init_fluent_app` | Initialize or convert a ServiceNow app. Non-interactive: missing intent-specific arguments fail with an error naming them. | `intent`, `from` (conversion), `appName`/`packageName`/`scopeName`/`template` (creation), `auth`, `workingDirectory` (required), `debug` |
 | `build_fluent_app` | Build the application | `workingDirectory`, `debug` (optional) |
 | `deploy_fluent_app` | Deploy to a ServiceNow instance. SDK flow activation can be skipped. | `workingDirectory`, `auth` (auto-injected), `skipFlowActivation`, `debug` |
 | `fluent_transform` | Convert XML or instance metadata to Fluent TypeScript. Local paths do not require auth; instance transforms do. | `workingDirectory`, `from`, `directory`, `auth` (auto-injected), `table`, `id`, `debug` |
@@ -225,7 +220,7 @@ Add to your MCP client configuration file:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `FLUENT_MCP_WORKING_DIR` | Absolute Fluent project path used after the per-call and initialized-session sources; transitional roots are checked after this value | - |
+| `FLUENT_MCP_WORKING_DIR` | Absolute Fluent project path used after the per-call and initialized-session sources; when it is also absent, project commands fail with actionable guidance | - |
 | `SN_INSTANCE_URL` | ServiceNow instance URL for auto-auth validation | - |
 | `SN_AUTH_TYPE` | Authentication method: `basic` or `oauth` | `oauth` |
 | `SN_USER_NAME` | Username for basic auth (informational) | - |
