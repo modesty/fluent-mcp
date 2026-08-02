@@ -2,7 +2,9 @@
 
 An [MCP server](https://modelcontextprotocol.io) that brings [ServiceNow Fluent SDK](https://www.servicenow.com/docs/bundle/yokohama-application-development/page/build/servicenow-sdk/concept/servicenow-fluent.html) capabilities to AI-assisted development environments. Enables natural language interaction with ServiceNow SDK commands, API specifications, code snippets, and development resources.
 
-Built for [@servicenow/sdk@v4.9.0](https://github.com/ServiceNow/sdk/releases#release-v4.9.0) and [MCP@v2026-7-28](https://modelcontextprotocol.io/specification/2026-07-28). Compatible with Node.js 20.18.0+ and npm 11.4.1+.
+Built for [@servicenow/sdk@v4.9.0](https://github.com/ServiceNow/sdk/releases#release-v4.9.0).
+
+> **Note** : Since v0.6.0 the server speaks **both** [MCP@2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28) and [MCP@2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25) from one handler set — the stdio entry inspects the opening message and serves whichever era the client opens with. [v0.5.1](https://github.com/modesty/fluent-mcp/releases#release-v0.5.1) is the last release built on the v1 MCP SDK (2025-11-25 only).
 
 ## Key Features
 
