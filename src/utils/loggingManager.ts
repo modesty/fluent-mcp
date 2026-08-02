@@ -145,22 +145,6 @@ export class LoggingManager {
     );
   }
 
-  /**
-   * Log when roots have changed
-   * @param roots The updated list of roots
-   */
-  logRootsChanged(roots: { uri: string; name?: string }[]): void {
-    // Log summary of roots for normal log levels
-    logger.info('Roots list changed', { roots });
-    
-    // Log detailed information at debug level
-    logger.debug('Roots list details', {
-      count: roots.length,
-      paths: roots.map(r => r.uri),
-      rootsWithNames: roots.filter(r => r.name).length,
-      timestamp: new Date().toISOString()
-    });
-  }
 }
 
 // Create and export a singleton instance

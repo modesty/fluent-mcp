@@ -81,7 +81,11 @@ export interface CommandProcessor {
   process(
     command: string,
     args: string[],
-    useMcpCwd?: boolean,
+    /**
+     * Absolute working directory, already resolved and validated by the command
+     * layer. There is no server-side fallback: the former `useMcpCwd` flag
+     * selected an MCP Roots lookup, which MCP 2026-07-28 removed.
+     */
     customWorkingDir?: string,
     stdinInput?: string,
     timeoutMs?: number,

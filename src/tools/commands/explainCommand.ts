@@ -89,7 +89,6 @@ export class ExplainCommand extends BaseCLICommand {
     return this.commandProcessor.process(
       command,
       sdkArgs,
-      false,
       getProjectRootPath(),
       undefined,
       this.timeoutMs,

@@ -8,7 +8,6 @@ import {
 } from '../../utils/types.js';
 import { BaseCLICommand } from './baseCommand.js';
 import { SessionManager } from '../../utils/sessionManager.js';
-import { resolveWorkingDirectory } from '../../utils/rootContext.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
 import logger from '../../utils/logger.js';
 import { getConfig } from '../../config.js';
@@ -18,12 +17,12 @@ export const WORKING_DIRECTORY_ARGUMENT: CommandArgument = {
   type: 'string',
   required: false,
   description:
-    'Absolute path to the Fluent project for this call. Overrides the initialized session, FLUENT_MCP_WORKING_DIR, and transitional MCP Roots.',
+    'Absolute path to the Fluent project for this call. Overrides the initialized session and FLUENT_MCP_WORKING_DIR.',
 };
 
 /**
- * Base class for commands that use the session working directory with root context fallback
- * Extends BaseCLICommand and adds working directory handling, auth resolution, and timeout support
+ * Base class for commands that operate inside a Fluent project directory.
+ * Extends BaseCLICommand and adds working directory handling, auth resolution, and timeout support.
  */
 export abstract class SessionAwareCLICommand extends BaseCLICommand {
   constructor(
@@ -36,8 +35,16 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
   /**
    * Resolve the Fluent project directory without guessing from process cwd or the
    * installed package location.
-  * @returns The working directory to use for the command
-  */
+   *
+   * Resolution order: explicit `workingDirectory` argument → initialized session
+   * → `FLUENT_MCP_WORKING_DIR` → undefined (the caller turns that into an
+   * actionable error). MCP Roots was formerly a fourth rung; MCP 2026-07-28
+   * deprecated Roots and removed the server-initiated `roots/list` request that
+   * populated it, so it is gone rather than migrated — the three remaining rungs
+   * are the spec's own sanctioned mechanisms (tool parameter, server
+   * configuration).
+   * @returns The working directory to use for the command
+   */
   protected getWorkingDirectory(explicitWorkingDirectory?: unknown): string | undefined {
     // MCP clients commonly serialize an omitted optional value as null. Empty
     // strings have the same meaning for this optional context argument. Treat
@@ -63,13 +70,6 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
     if (configuredDir !== undefined) {
       const resolved = this.validateWorkingDirectory(configuredDir, 'FLUENT_MCP_WORKING_DIR');
       logger.debug(`Using FLUENT_MCP_WORKING_DIR: ${resolved}`);
-      return resolved;
-    }
-
-    const rootDir = resolveWorkingDirectory();
-    if (rootDir) {
-      const resolved = this.validateWorkingDirectory(rootDir, 'transitional MCP Roots');
-      logger.debug(`Using transitional MCP root: ${resolved}`);
       return resolved;
     }
 
@@ -120,16 +120,15 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
    * Execute a command that requires a working directory from the session
    * @param command The command to execute
    * @param args The command arguments
-   * @param useMcpCwd Whether to use the MCP's current working directory
    * @param stdinInput Optional stdin input for interactive commands
    * @param timeoutMs Optional command-specific timeout (falls back to this.timeoutMs)
    * @param signal Optional abort signal from the MCP client (kills the child on cancel)
+   * @param explicitWorkingDirectory The per-call `workingDirectory` tool argument, if supplied
    * @returns The command result
    */
   protected async executeWithSessionWorkingDirectory(
     command: string,
     args: string[],
-    useMcpCwd: boolean = false,
     stdinInput?: string,
     timeoutMs?: number,
     signal?: AbortSignal,
@@ -144,7 +143,7 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
       }
 
       const effectiveTimeout = timeoutMs ?? this.timeoutMs;
-      return await this.commandProcessor.process(command, args, useMcpCwd, workingDirectory, stdinInput, effectiveTimeout, signal);
+      return await this.commandProcessor.process(command, args, workingDirectory, stdinInput, effectiveTimeout, signal);
     } catch (error) {
       return CommandResultFactory.fromError(error);
     }
@@ -217,7 +216,6 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
     return this.executeWithSessionWorkingDirectory(
       command,
       sdkArgs,
-      false,
       undefined,
       this.timeoutMs,
       signal,

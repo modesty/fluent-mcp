@@ -13,7 +13,6 @@ import { TransformCommand } from '../../src/tools/commands/transformCommand.js';
 
 jest.mock('../../src/utils/logger.js', () => require('../mocks/index.js').createLoggerMock());
 jest.mock('../../src/config.js', () => require('../mocks/index.js').createConfigMock());
-jest.mock('../../src/utils/rootContext.js', () => require('../mocks/index.js').createRootContextMock());
 jest.mock('../../src/utils/sessionManager.js', () => require('../mocks/index.js').createSessionManagerMock());
 
 describe('Shell-free arg handling for free-string paths (H1)', () => {

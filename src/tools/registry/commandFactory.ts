@@ -1,5 +1,4 @@
 import { CommandProcessor, CLICommand, EnsureAuthValidated } from '../../utils/types.js';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
   SdkInfoCommand,
   InitCommand,
@@ -22,17 +21,20 @@ export class CommandFactory {
    * Creates all CLI command instances with appropriate processors
    * @param executor The command processor to use for most commands that require execution
    * @param writer The command processor to use for commands that should return text (InitCommand)
-   * @param mcpServer Optional MCP server for commands that support elicitation
+   * @param ensureAuthValidated Single-flight lazy auth-validation trigger
    * @returns An array of command instances
    *
    * Note: AuthCommand is not exposed to MCP clients. Authentication is handled
    * lazily via environment variables (SN_INSTANCE_URL, SN_AUTH_TYPE) when first needed.
    * The auth alias is stored in the session and used by all SDK commands.
+   *
+   * No command receives the MCP server: nothing calls back to the client. The
+   * former `mcpServer` parameter existed only to reach `elicitInput`, which MCP
+   * 2026-07-28 removed (SEP-2322).
    */
   static createCommands(
     executor: CommandProcessor,
     writer?: CommandProcessor,
-    mcpServer?: McpServer,
     ensureAuthValidated: EnsureAuthValidated = async () => {}
   ): CLICommand[] {
     // If no writer is provided, use the executor for all commands
@@ -44,7 +46,7 @@ export class CommandFactory {
 
       // SDK Command Tools (actual SDK subcommands)
       // Note: AuthCommand removed - auth is handled lazily via env vars
-      new InitCommand(textProcessor, mcpServer, ensureAuthValidated), // Uses writer to generate text instead of executing
+      new InitCommand(textProcessor, ensureAuthValidated), // Uses writer to generate text instead of executing
       new BuildCommand(executor, ensureAuthValidated),
       new InstallCommand(executor, ensureAuthValidated),
       new TransformCommand(executor, ensureAuthValidated),

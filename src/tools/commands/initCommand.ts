@@ -8,26 +8,28 @@ import {
   CommandResultFactory,
   EnsureAuthValidated,
 } from '../../utils/types.js';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-
 import { BaseCLICommand } from './baseCommand.js';
 import { FluentAppValidator } from '../../utils/fluentAppValidator.js';
 import { SessionManager } from '../../utils/sessionManager.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
 import logger from '../../utils/logger.js';
 import {
-  InitElicitator,
+  InitArgsResolver,
   InitValidator,
-  ConversionElicitationData,
-  CreationElicitationData,
+  ConversionInitData,
+  CreationInitData,
 } from './init/index.js';
 
 /**
  * Command to initialize a new ServiceNow application
- * Implements the init command with MCP elicitation for structured data collection
+ *
+ * Every input arrives with the `tools/call` arguments — the tool never asks the
+ * client for more. MCP 2026-07-28 removed server-initiated requests (SEP-2322),
+ * so the former elicitation flow was deleted rather than ported to
+ * multi-round-trip; see `init/initArgsResolver.ts`.
  *
  * Uses composition to delegate responsibilities:
- * - InitElicitator: Handles MCP elicitation for user input
+ * - InitArgsResolver: Resolves the intent-specific request from the arguments
  * - InitValidator: Handles parameter validation
  */
 export class InitCommand extends BaseCLICommand {
@@ -38,7 +40,6 @@ export class InitCommand extends BaseCLICommand {
   // populated directory is refused), and open-world for the conversion path.
   annotations = { openWorldHint: true, idempotentHint: false };
 
-  private elicitator: InitElicitator;
   private readonly ensureAuthValidated: EnsureAuthValidated;
 
   arguments: CommandArgument[] = [
@@ -46,7 +47,7 @@ export class InitCommand extends BaseCLICommand {
       name: 'intent',
       type: 'string',
       required: false,
-      description: 'Specify your intent: "conversion" to convert an existing scoped app to Fluent, or "creation" to create a new scoped app. If not provided, you will be prompted to choose.',
+      description: 'Specify your intent: "conversion" to convert an existing scoped app to Fluent, or "creation" to create a new scoped app. If omitted it is inferred — "conversion" when from is set, "creation" when appName, packageName or scopeName is set. Supply it explicitly when none of those are present.',
     },
     {
       name: 'from',
@@ -100,19 +101,10 @@ export class InitCommand extends BaseCLICommand {
 
   constructor(
     commandProcessor: CommandProcessor,
-    mcpServer?: McpServer,
     ensureAuthValidated: EnsureAuthValidated = async () => {}
   ) {
     super(commandProcessor);
-    this.elicitator = new InitElicitator(mcpServer);
     this.ensureAuthValidated = ensureAuthValidated;
-  }
-
-  /**
-   * Set the MCP server for this command
-   */
-  setMcpServer(mcpServer: McpServer): void {
-    this.elicitator.setMcpServer(mcpServer);
   }
 
   /**
@@ -140,13 +132,13 @@ export class InitCommand extends BaseCLICommand {
    * Prepare and validate the working directory
    */
   private async prepareWorkingDirectory(
-    elicitedData: ConversionElicitationData | CreationElicitationData
+    initData: ConversionInitData | CreationInitData
   ): Promise<CommandResult | string> {
     const sessionManager = SessionManager.getInstance();
     let workingDirectory: string;
 
-    if (elicitedData.workingDirectory) {
-      workingDirectory = InitValidator.normalizePath(elicitedData.workingDirectory);
+    if (initData.workingDirectory) {
+      workingDirectory = InitValidator.normalizePath(initData.workingDirectory);
 
       if (!fs.existsSync(workingDirectory)) {
         try {
@@ -205,7 +197,7 @@ export class InitCommand extends BaseCLICommand {
   /**
    * Build SDK arguments for conversion
    */
-  private async buildConversionArgs(data: ConversionElicitationData, baseArgs: string[]): Promise<string[]> {
+  private async buildConversionArgs(data: ConversionInitData, baseArgs: string[]): Promise<string[]> {
     const sdkArgs = [...baseArgs, 'init'];
     sdkArgs.push('--from', data.from);
 
@@ -228,7 +220,7 @@ export class InitCommand extends BaseCLICommand {
   /**
    * Build SDK arguments for creation
    */
-  private buildCreationArgs(data: CreationElicitationData, baseArgs: string[]): string[] {
+  private buildCreationArgs(data: CreationInitData, baseArgs: string[]): string[] {
     const sdkArgs = [...baseArgs, 'init'];
 
     const appNameArg = typeof data.appName === 'string' && !/^".*"$/.test(data.appName)
@@ -248,36 +240,37 @@ export class InitCommand extends BaseCLICommand {
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
     try {
-      // Step 1: Determine user intent
-      let intent = this.elicitator.determineIntent(args);
-
+      // Step 1: Determine user intent from the supplied arguments. There is no
+      // fallback prompt — a bag that implies neither mode fails with a message
+      // naming both modes and their required arguments.
+      const intent = InitArgsResolver.determineIntent(args);
       if (!intent) {
-        intent = await this.elicitator.elicitIntent();
+        return CommandResultFactory.error(InitArgsResolver.missingIntentError());
       }
 
-      // Step 2: Elicit and validate data based on intent
-      let elicitedData: ConversionElicitationData | CreationElicitationData;
+      // Step 2: Resolve and validate data based on intent
+      let initData: ConversionInitData | CreationInitData;
 
       if (intent === 'conversion') {
-        elicitedData = await this.elicitator.elicitConversionData(args);
+        initData = InitArgsResolver.resolveConversionData(args);
 
         // Validate 'from' parameter
-        const validation = await InitValidator.validateFromParameter(elicitedData.from);
+        const validation = await InitValidator.validateFromParameter(initData.from);
         if (!validation.valid) {
           return CommandResultFactory.error(`Invalid 'from' parameter: ${validation.error}`);
         }
       } else {
-        elicitedData = await this.elicitator.elicitCreationData(args);
+        initData = InitArgsResolver.resolveCreationData(args);
 
         // Validate creation parameters
-        const validation = await InitValidator.validateCreationParameters(elicitedData as CreationElicitationData);
+        const validation = await InitValidator.validateCreationParameters(initData as CreationInitData);
         if (!validation.valid) {
           return CommandResultFactory.error(`Invalid parameters: ${validation.errors.join(', ')}`);
         }
       }
 
       // Step 3: Handle working directory
-      const workingDirResult = await this.prepareWorkingDirectory(elicitedData);
+      const workingDirResult = await this.prepareWorkingDirectory(initData);
 
       // If prepareWorkingDirectory returned a CommandResult, return it (app already exists or error)
       if (typeof workingDirResult !== 'string') {
@@ -289,10 +282,10 @@ export class InitCommand extends BaseCLICommand {
       // Step 4: Build and execute SDK command using the bundled CLI
       const { command, baseArgs } = resolveSdkCli();
       const sdkArgs = intent === 'conversion'
-        ? await this.buildConversionArgs(elicitedData as ConversionElicitationData, baseArgs)
-        : this.buildCreationArgs(elicitedData as CreationElicitationData, baseArgs);
+        ? await this.buildConversionArgs(initData as ConversionInitData, baseArgs)
+        : this.buildCreationArgs(initData as CreationInitData, baseArgs);
 
-      const result = await this.commandProcessor.process(command, sdkArgs, false, workingDirectory);
+      const result = await this.commandProcessor.process(command, sdkArgs, workingDirectory);
       logger.info(`Executed init command in directory: ${workingDirectory} - ${JSON.stringify(result)}`);
 
       if (result.success) {

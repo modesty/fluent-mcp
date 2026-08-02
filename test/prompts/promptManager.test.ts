@@ -8,7 +8,6 @@
  * Config is mocked to point resourcePaths at the real res/ directories so the
  * instruction summaries load from the shipped content.
  */
-import { GetPromptRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { PromptManager } from '../../src/prompts/promptManager.js';
 import { ServiceNowMetadataType } from '../../src/types.js';
 
@@ -34,19 +33,20 @@ type PromptHandler = (request: { params: { name: string; arguments?: Record<stri
 }>;
 
 async function renderCodingInFluent(metadataList: string[]): Promise<string> {
-  const handlers = new Map<unknown, PromptHandler>();
+  // v2 keys request handlers by method string rather than by Zod schema object.
+  const handlers = new Map<string, PromptHandler>();
   const mockServer = {
     server: {
-      setRequestHandler: (schema: unknown, handler: PromptHandler) => handlers.set(schema, handler),
+      setRequestHandler: (method: string, handler: PromptHandler) => handlers.set(method, handler),
     },
   };
 
-  const manager = new PromptManager(mockServer as never);
+  const manager = new PromptManager();
   await manager.initialize();
-  manager.setupHandlers();
+  manager.registerOn(mockServer as never);
 
-  const handler = handlers.get(GetPromptRequestSchema);
-  if (!handler) throw new Error('GetPromptRequest handler not registered');
+  const handler = handlers.get('prompts/get');
+  if (!handler) throw new Error('prompts/get handler not registered');
 
   const result = await handler({ params: { name: 'coding_in_fluent', arguments: { metadata_list: metadataList } } });
   return result.messages[0].content.text;

@@ -7,7 +7,6 @@ import { SessionManager } from '../../src/utils/sessionManager.js';
 import { CommandProcessor, CommandResult } from '../../src/utils/types.js';
 
 jest.mock('../../src/utils/sessionManager.js', () => require('../mocks/index.js').createSessionManagerMock());
-jest.mock('../../src/utils/rootContext.js', () => require('../mocks/index.js').createRootContextMock());
 
 class TestSessionAwareCommand extends SessionAwareCLICommand {
   name = 'test_command';
@@ -23,7 +22,6 @@ describe('SessionAwareCLICommand working-directory resolution', () => {
   let command: TestSessionAwareCommand;
   let processor: CommandProcessor;
   let session: ReturnType<typeof SessionManager.getInstance>;
-  let resolveRoot: jest.Mock;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -37,8 +35,6 @@ describe('SessionAwareCLICommand working-directory resolution', () => {
     command = new TestSessionAwareCommand(processor);
     session = SessionManager.getInstance();
     (session.getWorkingDirectory as jest.Mock).mockReturnValue('/session/project');
-    ({ resolveWorkingDirectory: resolveRoot } = require('../../src/utils/rootContext.js'));
-    resolveRoot.mockReturnValue('/root/project');
     (getConfig as jest.Mock).mockReturnValue({
       logLevel: 'info',
       resourcePaths: {},
@@ -53,7 +49,6 @@ describe('SessionAwareCLICommand working-directory resolution', () => {
     expect(processor.process).toHaveBeenCalledWith(
       process.execPath,
       ['/test/node_modules/@servicenow/sdk/bin/index.js', 'test'],
-      false,
       '/explicit/project',
       undefined,
       undefined,
@@ -68,7 +63,6 @@ describe('SessionAwareCLICommand working-directory resolution', () => {
     expect(processor.process).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(Array),
-      false,
       '/session/project',
       undefined,
       undefined,
@@ -87,25 +81,7 @@ describe('SessionAwareCLICommand working-directory resolution', () => {
     expect(processor.process).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(Array),
-      false,
       '/configured/project',
-      undefined,
-      undefined,
-      undefined
-    );
-    expect(resolveRoot).not.toHaveBeenCalled();
-  });
-
-  it('uses transitional MCP Roots only after explicit, session, and config are absent', async () => {
-    (session.getWorkingDirectory as jest.Mock).mockReturnValue(undefined);
-
-    await command.execute({});
-
-    expect(processor.process).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.any(Array),
-      false,
-      '/root/project',
       undefined,
       undefined,
       undefined
@@ -118,23 +94,26 @@ describe('SessionAwareCLICommand working-directory resolution', () => {
     ['whitespace-only string', '   '],
   ])('treats an explicit %s workingDirectory as absent and continues fallback resolution', async (_label, value) => {
     (session.getWorkingDirectory as jest.Mock).mockReturnValue(undefined);
+    (getConfig as jest.Mock).mockReturnValue({ workingDirectory: '/configured/project' });
 
     await command.execute({ workingDirectory: value });
 
     expect(processor.process).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(Array),
-      false,
-      '/root/project',
+      '/configured/project',
       undefined,
       undefined,
       undefined
     );
   });
 
+  // MCP 2026-07-28 deprecated Roots and removed the server-initiated roots/list
+  // request that populated it, so the chain is exactly three rungs and then a
+  // refusal. There is deliberately no process.cwd() or installed-package guess:
+  // a command that refuses beats one that runs against the wrong tree.
   it('fails closed with actionable configuration when no source resolves', async () => {
     (session.getWorkingDirectory as jest.Mock).mockReturnValue(undefined);
-    resolveRoot.mockReturnValue(undefined);
 
     const result = await command.execute({});
 
@@ -142,6 +121,18 @@ describe('SessionAwareCLICommand working-directory resolution', () => {
     expect(result.error?.message).toContain("'workingDirectory' tool argument");
     expect(result.error?.message).toContain('FLUENT_MCP_WORKING_DIR');
     expect(processor.process).not.toHaveBeenCalled();
+  });
+
+  it('never falls back to MCP Roots, process.cwd(), or the package directory', async () => {
+    (session.getWorkingDirectory as jest.Mock).mockReturnValue(undefined);
+
+    const result = await command.execute({});
+
+    // The only outcome with no explicit/session/configured directory is refusal.
+    expect(result.success).toBe(false);
+    expect(processor.process).not.toHaveBeenCalled();
+    // In particular it must not silently adopt the server's own cwd.
+    expect(result.error?.message).not.toContain(process.cwd());
   });
 
   it.each([
@@ -156,7 +147,6 @@ describe('SessionAwareCLICommand working-directory resolution', () => {
 
     expect(result.success).toBe(false);
     expect(result.error?.message).toMatch(/absolute path|filesystem root/);
-    expect(resolveRoot).not.toHaveBeenCalled();
     expect(processor.process).not.toHaveBeenCalled();
   });
 

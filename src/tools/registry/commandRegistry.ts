@@ -1,4 +1,4 @@
-import { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { Tool } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { CLICommand } from '../../utils/types.js';
 import { buildInputJsonSchema } from '../toolSchema.js';

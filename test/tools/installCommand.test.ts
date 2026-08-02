@@ -5,7 +5,6 @@ import { InstallCommand } from '../../src/tools/commands/installCommand.js';
 
 jest.mock('../../src/utils/logger.js', () => require('../mocks/index.js').createLoggerMock());
 jest.mock('../../src/config.js', () => require('../mocks/index.js').createConfigMock());
-jest.mock('../../src/utils/rootContext.js', () => require('../mocks/index.js').createRootContextMock());
 jest.mock('../../src/utils/sessionManager.js', () => require('../mocks/index.js').createSessionManagerMock());
 
 describe('InstallCommand', () => {
@@ -59,7 +58,6 @@ describe('InstallCommand', () => {
       expect(mockProcessor.process).toHaveBeenCalledWith(
         process.execPath,
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'install'],
-        false,
         '/mock/working/dir',
         undefined, // stdinInput
         300000,   // timeoutMs
@@ -75,7 +73,6 @@ describe('InstallCommand', () => {
       expect(mockProcessor.process).toHaveBeenCalledWith(
         process.execPath,
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'install', '--skip-flow-activation'],
-        false,
         '/mock/working/dir',
         undefined, // stdinInput
         300000,   // timeoutMs
@@ -104,7 +101,6 @@ describe('InstallCommand', () => {
       expect(mockProcessor.process).toHaveBeenCalledWith(
         process.execPath,
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'install', '--auth', 'my-alias', '--skip-flow-activation', '--debug'],
-        false,
         '/mock/working/dir',
         undefined, // stdinInput
         300000,   // timeoutMs

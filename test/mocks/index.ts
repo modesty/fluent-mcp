@@ -75,18 +75,6 @@ export function createSessionManagerMock(overrides?: Record<string, unknown>) {
 }
 
 /**
- * Creates a rootContext mock with standard resolution functions
- */
-export function createRootContextMock(overrides?: Record<string, unknown>) {
-  return {
-    getPrimaryRootPath: jest.fn().mockReturnValue('/mock/root'),
-    resolveWorkingDirectory: jest.fn().mockReturnValue('/mock/root'),
-    setRoots: jest.fn(),
-    ...overrides,
-  };
-}
-
-/**
  * Creates a config mock with standard test values
  */
 export function createConfigMock(overrides?: Record<string, unknown>) {

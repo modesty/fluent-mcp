@@ -17,26 +17,24 @@ export class CLIExecutor extends BaseCommandProcessor {
   async process(
     command: string,
     args: string[],
-    useMcpCwd: boolean = false,
     customWorkingDir?: string,
     stdinInput?: string,
     timeoutMs?: number,
     signal?: AbortSignal
   ): Promise<CommandResult> {
-    return this.execute(command, args, useMcpCwd, customWorkingDir, stdinInput, timeoutMs, signal);
+    return this.execute(command, args, customWorkingDir, stdinInput, timeoutMs, signal);
   }
 
   async execute(
     command: string,
     args: string[],
-    useMcpCwd: boolean = false,
     customWorkingDir?: string,
     stdinInput?: string,
     timeoutMs?: number,
     signal?: AbortSignal
   ): Promise<CommandResult> {
     try {
-      const cwd = this.resolveCommandWorkingDirectory(useMcpCwd, customWorkingDir);
+      const cwd = this.resolveCommandWorkingDirectory(customWorkingDir);
 
       // Command invocation detail is verbose; outcomes surface via CommandResult.
       logger.debug(`Executing command: ${command} ${args.join(' ')}`, { cwd });

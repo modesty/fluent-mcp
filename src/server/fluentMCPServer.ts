@@ -1,13 +1,5 @@
-import { z } from 'zod';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  ListToolsRequestSchema,
-  ListResourcesRequestSchema,
-  ReadResourceRequestSchema,
-  InitializedNotificationSchema,
-} from '@modelcontextprotocol/sdk/types.js';
-
+import { serveStdio, StdioServerHandle } from '@modelcontextprotocol/server/stdio';
+import { McpServer, Transport } from '@modelcontextprotocol/server';
 import { getConfig, findMissingResourcePaths } from '../config.js';
 import { ServerStatus } from '../types.js';
 import { CommandResultFactory } from '../utils/types.js';
@@ -25,21 +17,56 @@ const SERVER_INSTRUCTIONS = [
   'Instance authentication is validated lazily, cached in the session, and injected when a command needs it.',
 ].join(' ');
 
+/** One hour, in ms. */
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
 /**
- * Implementation of the Model Context Protocol server for Fluent (ServiceNow SDK) 
+ * Cache hints for the cacheable results of protocol revision 2026-07-28
+ * (`ttlMs` / `cacheScope`, SEP-2549).
+ *
+ * Everything this server returns on these six methods is immutable for the
+ * lifetime of the process: a fixed tool set derived from the command registry,
+ * a fixed prompt set, and static markdown bundled in `res/`. None of it can
+ * change without a new release, so a long TTL is safe and saves every client
+ * re-fetching the same content each turn.
+ *
+ * `cacheScope: 'public'` is correct because the payloads are identical for
+ * every caller — they contain no session, instance, or credential state. (The
+ * SDK migration guide's example shows `cacheScope: 'global'`; the installed
+ * package types define `CacheScope = 'public' | 'private'` and throw a
+ * `RangeError` on anything else, so the package wins.)
+ *
+ * Without these, v2 emits the conservative defaults `ttlMs: 0` /
+ * `cacheScope: 'private'`. 2025-era responses are never affected either way.
+ */
+const CACHE_HINTS = {
+  'tools/list': { ttlMs: ONE_HOUR_MS, cacheScope: 'public' },
+  'prompts/list': { ttlMs: ONE_HOUR_MS, cacheScope: 'public' },
+  'resources/list': { ttlMs: ONE_HOUR_MS, cacheScope: 'public' },
+  'resources/templates/list': { ttlMs: ONE_HOUR_MS, cacheScope: 'public' },
+  'resources/read': { ttlMs: ONE_HOUR_MS, cacheScope: 'public' },
+  'server/discover': { ttlMs: ONE_HOUR_MS, cacheScope: 'public' },
+} as const;
+
+/**
+ * Implementation of the Model Context Protocol server for Fluent (ServiceNow SDK)
  *
  * This server provides Fluent (ServiceNow SDK) functionality to AI assistants and developers
  * through the standardized Model Context Protocol interface.
+ *
+ * Speaks **both** protocol eras from one handler set. `serveStdio` owns the era
+ * decision: it inspects the opening message and pins one instance from
+ * `buildServer()` for the connection's lifetime — a 2025-era `initialize` is
+ * served exactly as before, a modern opening as 2026-07-28.
  */
 export class FluentMcpServer {
-  private mcpServer: McpServer;
   private toolsManager: ToolsManager;
   private resourceManager: ResourceManager;
   private promptManager: PromptManager;
   private config: ReturnType<typeof getConfig>;
   private status: ServerStatus = ServerStatus.STOPPED;
-  private roots: { uri: string; name?: string }[] = [];
   private initializationPromise: Promise<void>;
+  private handle?: StdioServerHandle;
 
   /**
    * Create a new MCP server instance
@@ -48,8 +75,35 @@ export class FluentMcpServer {
     // Initialize server with configuration
     this.config = getConfig();
 
-    // Create MCP server instance with server info from package.json
-    this.mcpServer = new McpServer(
+    // Managers are built once and shared across every McpServer instance the
+    // factory produces: they hold the command registry and the loaded resource
+    // and prompt content, none of which is per-connection state.
+    this.toolsManager = new ToolsManager();
+    this.resourceManager = new ResourceManager();
+    this.promptManager = new PromptManager();
+
+    // Load resource and prompt content once. start() awaits this before
+    // accepting connections so the factory can register synchronously.
+    this.initializationPromise = Promise.all([
+      this.resourceManager.initialize(),
+      this.promptManager.initialize()
+    ]).then(() => { /* content loaded; registration happens per instance */ });
+  }
+
+  /**
+   * Build a fully-registered MCP server instance.
+   *
+   * MUST return a fresh instance on every call. `serveStdio` may invoke its
+   * factory twice for one connection: a `server/discover` opening builds an
+   * optimistic "probe" instance, and if the next message is instead a 2025-era
+   * `initialize`, the entry closes that probe and asks the factory again.
+   * Returning a shared instance would hand back an already-closed server.
+   *
+   * All content loading happens in the constructor, so this method is
+   * synchronous and cheap enough to repeat.
+   */
+  private buildServer(): McpServer {
+    const mcpServer = new McpServer(
       {
         name: this.config.name,
         version: this.config.version,
@@ -57,107 +111,50 @@ export class FluentMcpServer {
       },
       {
         capabilities: {
-          tools: {},
-          resources: {}, // Enable resources capability
-          // Note: 'elicitation' and 'roots' are ClientCapabilities, not ServerCapabilities
-          // in MCP SDK v1.25+. Servers don't declare these - clients do.
-          // The server can still USE these features by making requests to the client.
-          prompts: {},
+          // Every listChanged is explicitly false. v2 defaults each of them to
+          // `true` when it installs the corresponding handler set, which would
+          // advertise three notifications this server never sends — the same
+          // defect W6 fixed for prompts.listChanged, and 2026-07-28 routes
+          // list-change signalling through subscriptions/listen anyway.
+          tools: { listChanged: false },
+          resources: { listChanged: false },
+          // Note: 'elicitation', 'roots' and 'sampling' are ClientCapabilities,
+          // never ServerCapabilities. This server neither declares nor uses
+          // them — 2026-07-28 forbids server-initiated requests entirely.
+          prompts: { listChanged: false },
         },
         instructions: SERVER_INSTRUCTIONS,
+        cacheHints: CACHE_HINTS,
       }
     );
 
-    // Initialize managers for tools, resources, and prompts
-    this.toolsManager = new ToolsManager(this.mcpServer);
-    this.resourceManager = new ResourceManager(this.mcpServer);
-    this.promptManager = new PromptManager(this.mcpServer);
+    // Declaring a capability makes v2's McpServer install its own default
+    // handlers for that capability's methods. Ours are registered afterwards
+    // and replace them by method name; `resources/templates/list` is left to
+    // the SDK's default (an empty template list), which is what keeps the
+    // declared `resources` capability answerable rather than -32601.
+    this.toolsManager.registerOn(mcpServer);
+    this.promptManager.registerOn(mcpServer);
+    this.setupHandlers(mcpServer);
 
-    // Initialize resources and prompts, then set up handlers
-    // Store the promise so start() can await it before accepting connections
-    this.initializationPromise = Promise.all([
-      this.resourceManager.initialize(),
-      this.promptManager.initialize()
-    ]).then(() => {
-      // Set up the handlers after initialization
-      // Resources will be registered during start() to ensure proper timing
-      this.setupHandlers();
-    });
+    return mcpServer;
   }
 
   /**
-   * Request the list of roots from the client
-   * This is called after the client sends the notifications/initialized notification
-   * @returns Promise that resolves when roots are updated
+   * Set up MCP protocol handlers for tools and resources on one server instance.
    */
-  private async requestRootsFromClient(): Promise<void> {
-    if (!this.mcpServer?.server) {
-      logger.warn('Cannot request roots - MCP server not available');
-      return;
-    }
+  private setupHandlers(mcpServer: McpServer): void {
+    const server = mcpServer.server;
 
-    // roots/list is a client capability. Do not send a server-initiated
-    // request to clients that did not advertise roots support; older clients
-    // commonly complete initialization without that capability.
-    if (!this.mcpServer.server.getClientCapabilities?.()?.roots) {
-      logger.debug('Skipping roots/list request: client does not advertise roots capability');
-      return;
-    }
-
-    logger.info('Requesting roots from client via roots/list...');
-
-    try {
-      // Create a schema for the response using the Zod library
-      // This is needed because the request method requires a result schema
-      const RootsResponseSchema = z.object({
-        roots: z.array(z.object({
-          uri: z.string(),
-          name: z.string().optional()
-        }))
-      });
-
-      type RootsResponse = z.infer<typeof RootsResponseSchema>;
-
-      // Using the correct request format with schema
-      // Note: The MCP SDK request method expects a specific schema type, but we use our own Zod schema
-      const response = await this.mcpServer.server.request(
-        { method: 'roots/list' },
-        RootsResponseSchema
-      ) as RootsResponse;
-
-      const roots = response.roots;
-
-      if (Array.isArray(roots) && roots.length > 0) {
-        logger.info('Received roots from client', { rootCount: roots.length });
-
-        // Update roots with client-provided roots
-        await this.updateRoots(roots);
-      } else {
-        logger.warn('Client responded to roots/list but provided no roots');
-      }
-    } catch (error) {
-      logger.error('Error requesting roots from client',
-        CommandResultFactory.normalizeError(error)
-      );
-
-    }
-  }
-
-  /**
-   * Set up MCP protocol handlers for tools, resources, and prompts.
-   */
-  private setupHandlers(): void {
-    const server = this.mcpServer?.server;
-    if (!server) return;
-
-    // Set up the tools/list handler
-    server.setRequestHandler(ListToolsRequestSchema, async () => {
-      const tools = this.toolsManager.getMCPTools();
-      return { tools };
-    });
+    // tools/list is served from the CommandRegistry rather than from what
+    // registerTool() inferred, because the registry is the single source of
+    // truth for advertised annotations, _meta and outputSchema.
+    server.setRequestHandler('tools/list', async () => ({
+      tools: this.toolsManager.getMCPTools(),
+    }));
 
     // Set up the resources/list handler
-    server.setRequestHandler(ListResourcesRequestSchema, async () => {
+    server.setRequestHandler('resources/list', async () => {
       try {
         const resources = await this.resourceManager.listResources();
         return { resources };
@@ -168,9 +165,7 @@ export class FluentMcpServer {
     });
 
     // Set up the resources/read handler
-    // The SDK's registerResource() doesn't automatically set up the read handler
-    // We need to explicitly handle resource read requests
-    server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+    server.setRequestHandler('resources/read', async (request) => {
       const { uri } = request.params;
 
       try {
@@ -203,108 +198,26 @@ export class FluentMcpServer {
       }
     });
 
-    // Set up prompts handlers
-    this.promptManager.setupHandlers();
-
-    // Set up handler for notifications/initialized
-    server.setNotificationHandler(InitializedNotificationSchema, async () => {
-      logger.info('Received notifications/initialized notification from client');
-
-      // Request the list of roots from the client now that initialization is complete
-      try {
-        await this.requestRootsFromClient();
-      } catch (error) {
-        logger.error('Failed to request roots after initialization notification',
-          CommandResultFactory.normalizeError(error)
-        );
-      }
-    });
-
-    // Note: Tool calls are handled by the callbacks registered via mcpServer.registerTool() in ToolsManager.
-    // We don't need a separate setRequestHandler for CallToolRequestSchema as that would conflict.
-  }
-
-  /**
-   * Update the list of roots and notify clients if changed
-   * @param roots The new list of roots
-   */
-  async updateRoots(roots: { uri: string; name?: string }[]): Promise<void> {
-    // Validate roots - ensure all URIs exist and are valid
-    const validatedRoots = roots.filter(root => {
-      if (!root.uri) {
-        logger.warn('Ignoring root with empty URI');
-        return false;
-      }
-      return true;
-    });
-
-    // Check if roots have changed
-    const hasChanged = this.roots.length !== validatedRoots.length ||
-      this.roots.some((root, index) =>
-        root.uri !== validatedRoots[index]?.uri ||
-        root.name !== validatedRoots[index]?.name
-      );
-
-    if (hasChanged) {
-      this.roots = [...validatedRoots];
-
-      // Only update tools manager with the roots if the server is running
-      // or if the status is INITIALIZING (for tests)
-      // This prevents unnecessary updates during initialization
-      if (this.status === ServerStatus.RUNNING || this.status === ServerStatus.INITIALIZING) {
-        // Update roots in tools manager
-        this.toolsManager.updateRoots(this.roots);
-        if (this.status === ServerStatus.RUNNING) {
-          loggingManager.logRootsChanged(this.roots);
-        }
-      }
-    }
-  }
-
-  /**
-   * Add a new root to the list of roots
-   * @param uri The URI of the root
-   * @param name Optional name for the root
-   */
-  async addRoot(uri: string, name?: string): Promise<void> {
-    // Validate root URI
-    if (!uri) {
-      logger.warn('Attempted to add root with empty URI, ignoring');
-      return;
-    }
-
-    // Check if root already exists
-    const existingIndex = this.roots.findIndex(root => root.uri === uri);
-
-    if (existingIndex >= 0) {
-      // Update existing root if name has changed
-      if (this.roots[existingIndex].name !== name) {
-        logger.debug(`Updating existing root: ${uri} from name '${this.roots[existingIndex].name}' to '${name}'`);
-        const updatedRoots = [...this.roots];
-        updatedRoots[existingIndex] = { uri, name };
-        await this.updateRoots(updatedRoots);
-      } else {
-        logger.debug(`Root already exists with same name, no update needed: ${uri} (${name})`);
-      }
-    } else {
-      // Add new root
-      logger.debug(`Adding new root: ${uri}${name ? ` (${name})` : ''}, server status: ${this.status}`);
-      await this.updateRoots([...this.roots, { uri, name }]);
-    }
-  }
-
-  /**
-   * Get the current list of roots
-   * @returns The list of roots
-   */
-  getRoots(): { uri: string; name?: string }[] {
-    return [...this.roots];
+    // Note: tools/call is dispatched by the callbacks registered via
+    // registerTool() in ToolsManager, so it is deliberately not handled here.
+    //
+    // There is also deliberately no `notifications/initialized` handler: its only
+    // remaining job was to trigger the transitional `roots/list` fetch, and MCP
+    // 2026-07-28 both removed the handshake it belongs to and made
+    // server-initiated requests illegal. Auth validation is lazy and
+    // command-triggered (see ToolsManager.ensureAuthValidated).
+    //
+    // `server/discover` is installed by the SDK itself for modern connections.
   }
 
   /**
    * Start the MCP server
+   * @param transport Optional transport to serve over instead of the process's
+   *   stdio. `ServeStdioOptions.transport` exists for exactly this ("bring your
+   *   own transport"); tests use an `InMemoryTransport` pair so both protocol
+   *   eras can be exercised over the real entry point rather than through mocks.
    */
-  async start(): Promise<void> {
+  async start(transport?: Transport): Promise<void> {
     if (this.status === ServerStatus.RUNNING) {
       loggingManager.logServerAlreadyRunning();
       return;
@@ -327,33 +240,23 @@ export class FluentMcpServer {
         );
       }
 
-      if (!this.mcpServer) {
-        throw new Error('MCP server not properly initialized');
-      }
-
-      // Wait for handlers to be set up before accepting connections
-      // This ensures notification handlers (like notifications/initialized) are registered
-      // before the client can send them, preventing race conditions in auth validation
+      // Load resource and prompt content before accepting connections so the
+      // server factory below can register everything synchronously.
       await this.initializationPromise;
 
-      // Create stdio transport for communication
-      const transport = new StdioServerTransport();
+      // serveStdio owns the transport and the era decision. legacy: 'serve'
+      // (the default, explicit here) means a 2025-era opening is served from
+      // the same factory rather than rejected.
+      this.handle = serveStdio(() => this.buildServer(), {
+        legacy: 'serve',
+        onerror: (error) => {
+          logger.error('MCP stdio transport error', CommandResultFactory.normalizeError(error));
+        },
+        ...(transport && { transport }),
+      });
 
-      // Connect the server to the stdio transport
-      await this.mcpServer.connect(transport);
-
-      // Note: Resources are handled by manual handlers in setupHandlers() that use
-      // resourceManager.listResources() and resourceManager.readResource().
-      // We don't call resourceManager.registerAll() here because it would try to
-      // set up duplicate resources/list handlers via the SDK's registerResource().
-
-      // Set the server status to running before initializing roots
-      // This ensures that client notifications will be sent correctly
       this.status = ServerStatus.RUNNING;
       loggingManager.logServerStarted();
-
-      // The root list will be requested when the client sends the notifications/initialized notification
-      // This ensures proper timing according to the MCP protocol
     } catch (error) {
       this.status = ServerStatus.STOPPED;
       loggingManager.logServerStartFailed(error, this.status);
@@ -374,9 +277,9 @@ export class FluentMcpServer {
       this.status = ServerStatus.STOPPING;
       loggingManager.logServerStopping();
 
-      if (this.mcpServer) {
-        await this.mcpServer.close();
-      }
+      // Closes the pinned instance (if any) and the underlying transport.
+      await this.handle?.close();
+      this.handle = undefined;
 
       this.status = ServerStatus.STOPPED;
       loggingManager.logServerStopped();

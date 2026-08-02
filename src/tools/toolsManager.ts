@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer, ServerContext, Tool } from '@modelcontextprotocol/server';
 import { CommandFactory } from './registry/commandFactory.js';
 import { CommandRegistry } from './registry/commandRegistry.js';
 import { NodeProcessRunner } from './processors/processRunner.js';
@@ -13,17 +13,23 @@ import {
   GetInstructCommand,
   CheckAuthStatusCommand
 } from './resources/resourceTools.js';
-import { setRoots as setRootContextRoots } from '../utils/rootContext.js';
 import { buildInputZodSchema } from './toolSchema.js';
 import { autoValidateAuthIfConfigured } from '../server/fluentInstanceAuth.js';
 import loggingManager from '../utils/loggingManager.js';
 
 /**
- * Manager for handling MCP tools registration and execution
+ * Owns the command registry and registers it onto MCP server instances.
+ *
+ * Construction and registration are deliberately separate: `serveStdio` may
+ * call its server factory more than once per connection (it builds an
+ * optimistic `server/discover` probe instance and discards it if the client
+ * then opens with a 2025-era `initialize`), so each call needs a *fresh*
+ * `McpServer`. Building the registry once and calling `registerOn()` per
+ * instance keeps the expensive work — and the single-flight auth memo below —
+ * shared, while per-instance registration stays cheap and repeatable.
  */
 export class ToolsManager {
   private commandRegistry: CommandRegistry;
-  private mcpServer: McpServer;
   private cliExecutor!: CLIExecutor;
   private authValidationPromise?: Promise<void>;
   private readonly ensureAuthValidated: EnsureAuthValidated = () => {
@@ -42,11 +48,9 @@ export class ToolsManager {
   };
 
   /**
-   * Create a new ToolsManager
-   * @param mcpServer The MCP server instance
+   * Create a new ToolsManager and build its command registry.
    */
-  constructor(mcpServer: McpServer) {
-    this.mcpServer = mcpServer;
+  constructor() {
     this.commandRegistry = new CommandRegistry();
 
     // Initialize the tools
@@ -54,7 +58,18 @@ export class ToolsManager {
   }
 
   /**
-   * Initialize all tools
+   * Register every command in the registry as a tool on the given MCP server.
+   * Safe to call for each instance the server factory produces.
+   * @param server The MCP server instance to register onto
+   */
+  registerOn(server: McpServer): void {
+    for (const command of this.commandRegistry.getAllCommands()) {
+      this.registerToolFromCommand(server, command);
+    }
+  }
+
+  /**
+   * Build the command registry
    */
   private initializeTools(): void {
     // Register CLI commands
@@ -72,14 +87,11 @@ export class ToolsManager {
     const commands = CommandFactory.createCommands(
       cliExecutor,
       cliCmdWriter,
-      this.mcpServer,
       this.ensureAuthValidated
     );
 
     commands.forEach((command) => {
       this.commandRegistry.register(command);
-      // Register each CLI command as an MCP tool
-      this.registerToolFromCommand(command);
     });
 
     // Register resource tools
@@ -91,25 +103,10 @@ export class ToolsManager {
    */
   private registerResourceTools(): void {
     try {
-      // Register API specification tool
-      const getApiSpecCommand = new GetApiSpecCommand();
-      this.commandRegistry.register(getApiSpecCommand);
-      this.registerToolFromCommand(getApiSpecCommand);
-
-      // Register code snippet tool
-      const getSnippetCommand = new GetSnippetCommand();
-      this.commandRegistry.register(getSnippetCommand);
-      this.registerToolFromCommand(getSnippetCommand);
-
-      // Register instruction tool
-      const getInstructCommand = new GetInstructCommand();
-      this.commandRegistry.register(getInstructCommand);
-      this.registerToolFromCommand(getInstructCommand);
-
-      // Register auth status check tool
-      const checkAuthStatusCommand = new CheckAuthStatusCommand(this.ensureAuthValidated);
-      this.commandRegistry.register(checkAuthStatusCommand);
-      this.registerToolFromCommand(checkAuthStatusCommand);
+      this.commandRegistry.register(new GetApiSpecCommand());
+      this.commandRegistry.register(new GetSnippetCommand());
+      this.commandRegistry.register(new GetInstructCommand());
+      this.commandRegistry.register(new CheckAuthStatusCommand(this.ensureAuthValidated));
 
       logger.debug('Resource tools registered successfully');
     } catch (error) {
@@ -121,22 +118,24 @@ export class ToolsManager {
   }
 
   /**
-   * Registers a command as an MCP tool
+   * Registers a command as an MCP tool on the given server
+   * @param server The MCP server instance to register onto
    * @param command The command to register
    */
-  private registerToolFromCommand(command: CLICommand): void {
-    if (!this.mcpServer) return;
-
+  private registerToolFromCommand(server: McpServer, command: CLICommand): void {
     // Build the enforced input schema from the single source of truth shared with
     // the advertised tools/list schema (commandRegistry.toMCPTools), so canonical
     // types and required fields cannot drift. See src/tools/toolSchema.ts.
+    // This is already a concrete ZodObject (z.strictObject), i.e. a Standard
+    // Schema object, not a v1 raw shape — the codemod could not prove that
+    // statically and flagged it; verified by hand instead.
     const inputSchema = buildInputZodSchema(command.arguments);
 
     // Register with MCP server.
     // Wrap the output shape in z.object() so the schema survives bundling — the
-    // SDK's raw-shape detection (isZodRawShapeCompat) can misfire on a minified
-    // bundle, dropping the advertised outputSchema; a concrete ZodObject is robust.
-    this.mcpServer.registerTool(
+    // SDK's raw-shape detection can misfire on a minified bundle, dropping the
+    // advertised outputSchema; a concrete ZodObject is robust.
+    server.registerTool(
       command.name,
       {
         title: command.name,
@@ -145,13 +144,13 @@ export class ToolsManager {
         ...(command.outputSchema && { outputSchema: z.object(command.outputSchema) }),
         ...(command.annotations && { annotations: command.annotations }),
       },
-      async (args: { [x: string]: any }, _extra: unknown) => {
+      async (args: { [x: string]: any }, ctx: ServerContext) => {
         // Emit progress notifications for long-running commands when the client
         // supplied a progressToken. Best-effort: never let progress break the tool.
-        const endProgress = this.startProgress(command, _extra);
+        const endProgress = this.startProgress(command, ctx);
         // Propagate MCP client cancellation: aborting `tools/call` fires this
         // signal, which threads down to the spawned child so it is killed (P0.3).
-        const signal = (_extra as { signal?: AbortSignal })?.signal;
+        const signal = ctx.mcpReq.signal;
         try {
           const result = await command.execute(args, signal);
 
@@ -196,21 +195,25 @@ export class ToolsManager {
    * total, until the returned cleanup function is called (which sends a final
    * progress). No-ops unless the client supplied a `progressToken` and the
    * command is long-running. Never throws.
+   *
+   * Request-scoped `notifications/progress` still flows on the originating
+   * request's stream on 2026-07-28, so this behaviour is unchanged by the v2
+   * swap; only the accessors moved (`ctx.mcpReq.notify` replaces the v1
+   * `extra.sendNotification`).
    * @returns A cleanup function to call when the command completes.
    */
-  private startProgress(command: CLICommand, extra: unknown): () => void {
-    const progressToken = (extra as { _meta?: { progressToken?: string | number } })?._meta?.progressToken;
-    const sendNotification = (extra as { sendNotification?: (n: unknown) => Promise<unknown> })?.sendNotification;
+  private startProgress(command: CLICommand, ctx: ServerContext): () => void {
+    const progressToken = ctx.mcpReq._meta?.progressToken;
     const isLongRunning = (command.timeoutMs ?? 0) >= ToolsManager.LONG_RUNNING_THRESHOLD_MS;
 
-    if (progressToken === undefined || typeof sendNotification !== 'function' || !isLongRunning) {
+    if (progressToken === undefined || !isLongRunning) {
       return () => { /* no-op */ };
     }
 
     let progress = 0;
     const emit = (message: string) => {
       // Indeterminate progress: increment a counter, omit total so clients render a spinner.
-      sendNotification({
+      ctx.mcpReq.notify({
         method: 'notifications/progress',
         params: { progressToken, progress: ++progress, message },
       }).catch((err) => logger.debug(`Progress notification failed for '${command.name}': ${err}`));
@@ -256,27 +259,8 @@ export class ToolsManager {
    * Get all commands as MCP tools
    * @returns List of MCP tools
    */
-  getMCPTools(): Record<string, unknown>[] {
+  getMCPTools(): Tool[] {
     return this.commandRegistry.toMCPTools();
-  }
-
-  /**
-   * Update the roots in CLI tools
-   * @param roots Array of root URIs and optional names
-   */
-  updateRoots(roots: { uri: string; name?: string }[]): void {
-    // Skip empty root updates
-    if (!roots || roots.length === 0) {
-      return;
-    }
-
-    logger.debug('Updating transitional MCP root context', {
-      rootCount: roots.length,
-      rootPaths: roots.map(r => r.uri)
-    });
-
-    setRootContextRoots(roots);
-    logger.info('Updated transitional MCP root context', { roots });
   }
 
   /**

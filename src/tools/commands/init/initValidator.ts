@@ -11,7 +11,7 @@ import { FluentAppValidator } from '../../../utils/fluentAppValidator.js';
 import { CommandResultFactory } from '../../../utils/types.js';
 import logger from '../../../utils/logger.js';
 import {
-  CreationElicitationData,
+  CreationInitData,
   MultiValidationResult,
   ValidationResult,
   VALID_TEMPLATES,
@@ -131,7 +131,7 @@ export class InitValidator {
    * Validate creation parameters
    */
   static async validateCreationParameters(
-    data: CreationElicitationData
+    data: CreationInitData
   ): Promise<MultiValidationResult> {
     const errors: string[] = [];
 
