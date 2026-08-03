@@ -32,6 +32,7 @@ yarn-error.log*
 
 # Misc
 *.tgz
+*.mcpb
 *.log
 
 # TypeScript
@@ -49,5 +50,4 @@ build/
 # OS generated files
 Thumbs.db
 Desktop.ini
-
 

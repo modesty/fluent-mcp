@@ -13,6 +13,7 @@ Built for [@servicenow/sdk@v4.9.0](https://github.com/ServiceNow/sdk/releases#re
 - **API Documentation Lookup** - `explain_fluent_api` returns SDK docs for any Fluent API or guide — no project required
 - **Lazy Auto-Authentication** - Detects and caches an auth profile only when an auth-requiring command or `check_auth_status` needs it
 - **Explicit Project Context** - Resolves each project command from its `workingDirectory` argument, the initialized session, or `FLUENT_MCP_WORKING_DIR`, then fails with actionable guidance instead of guessing
+- **MCPB Bundle** - Builds a self-contained `.mcpb` distribution with the server, resources, and production dependencies
 - **Client-Friendly Schemas** - Optional inputs advertise their canonical value types while the enforced schema accepts `null` as an omitted-value compatibility form
 
 This MCP server implements the [Model Context Protocol](https://modelcontextprotocol.io) specification with the following capabilities:
@@ -26,11 +27,11 @@ This MCP server implements the [Model Context Protocol](https://modelcontextprot
 
 ### Project Context & Sessions
 
-The server requires **no client capabilities** and issues **no server→client requests**: Roots, Sampling, and Elicitation are not used (MCP 2026-07-28 removed server-initiated requests, and all input arrives with the `tools/call` arguments).
+The server requires **no client capabilities** and issues **no server→client requests**: Roots, Sampling, and Elicitation are not used (MCP 2026-07-28 removed server-initiated requests, and all input arrives with the `tools/call` arguments). Automatic workspace detection through Roots is gone for every client, including MCPB hosts.
 
 - **Session Management** - Tracks the directory established by `init_fluent_app` for subsequent project commands
-- **Working Directory Resolution** - `workingDirectory` tool argument → initialized session → `FLUENT_MCP_WORKING_DIR` → actionable failure. Accepted paths are non-empty absolute paths other than the filesystem root. The server never guesses from its process cwd or installed package directory.
-- **Non-interactive `init_fluent_app`** - Intent-specific arguments must be supplied with the call (creation: `appName`, `packageName`, `scopeName`, `template`; conversion: `from`); a missing argument fails with an error naming exactly what is absent
+- **Working Directory Resolution** - `workingDirectory` tool argument → initialized session → `FLUENT_MCP_WORKING_DIR` → actionable failure. Accepted paths are non-empty absolute paths other than the filesystem root. The server never guesses from its process cwd or installed package directory. Clients must pass `workingDirectory` or configure `FLUENT_MCP_WORKING_DIR` when no session directory exists.
+- **Non-interactive `init_fluent_app`** - Intent-specific arguments must be supplied with the call (creation: `appName`, `packageName`, `scopeName`, `template`; conversion: `from`); a missing argument fails with an error naming exactly what is absent. The tool does not prompt or elicit missing values.
 - **Error Handling** - Comprehensive error messages with actionable guidance
 - **Type Safety** - Full TypeScript implementation with strict typing
 
@@ -49,8 +50,21 @@ The server requires **no client capabilities** and issues **no server→client r
 # Test with MCP Inspector
 npx @modelcontextprotocol/inspector npx @modesty/fluent-mcp
 
+# Build the optional self-contained MCPB distribution
+npm run bundle
+
 # Or use in your MCP client (see Configuration below)
 ```
+
+### MCPB Distribution
+
+The optional `npm run bundle` command produces `fluent-mcp-<version>.mcpb`. The bundle contains `dist/`, `res/`, and production dependencies, and its `manifest.json` declares all 15 tools. MCPB hosts expose these user-configurable values to the server:
+
+- `FLUENT_MCP_WORKING_DIR` — optional default project directory; otherwise pass `workingDirectory` on project-aware tool calls
+- `SN_INSTANCE_URL` — optional instance URL for lazy authentication validation
+- `SN_AUTH_TYPE` — authentication type (`basic` or `oauth`, default `oauth`)
+
+The npm package remains the primary distribution channel. MCPB does not restore Roots-based workspace detection or interactive `init_fluent_app` prompting.
 
 **Example prompt:**
 

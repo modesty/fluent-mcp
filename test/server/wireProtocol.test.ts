@@ -12,8 +12,17 @@
  * `ServeStdioOptions.transport` is the SDK's own "bring your own transport"
  * affordance, so nothing here is a test-only code path in the server.
  */
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { InMemoryTransport } from '@modelcontextprotocol/server';
 import { FluentMcpServer } from '../../src/server/fluentMCPServer.js';
+import { resolveSdkCli } from '../../src/utils/sdkCli.js';
+
+jest.mock('../../src/utils/sdkCli.js', () => ({
+  resolveSdkCli: jest.fn(),
+  resetSdkCliCache: jest.fn(),
+}));
 
 jest.mock('../../src/utils/logger.js', () => require('../mocks/index.js').createLoggerMock());
 
@@ -46,8 +55,10 @@ const LEGACY_VERSION = '2025-11-25';
 const PROTOCOL_VERSION_KEY = 'io.modelcontextprotocol/protocolVersion';
 const CLIENT_CAPABILITIES_KEY = 'io.modelcontextprotocol/clientCapabilities';
 const CLIENT_INFO_KEY = 'io.modelcontextprotocol/clientInfo';
+const HANGING_SDK_CLI = path.resolve(process.cwd(), 'test/fixtures/hanging-sdk-cli.js');
 
 type Frame = Record<string, any>;
+type PendingRequest = { requestId: number; response: Promise<Frame> };
 
 /** Drives one end of a linked transport pair with raw JSON-RPC. */
 class WireClient {
@@ -70,17 +81,24 @@ class WireClient {
   async modern(method: string, params: Record<string, unknown> = {}): Promise<Frame> {
     return this.request(method, {
       ...params,
-      _meta: {
-        [PROTOCOL_VERSION_KEY]: MODERN_VERSION,
-        [CLIENT_CAPABILITIES_KEY]: {},
-        [CLIENT_INFO_KEY]: { name: 'wire-test', version: '1.0.0' },
-      },
+      _meta: this.modernMeta(),
     });
+  }
+
+  async modernPending(method: string, params: Record<string, unknown> = {}, timeoutMs = 10_000): Promise<PendingRequest> {
+    return this.requestPending(method, {
+      ...params,
+      _meta: this.modernMeta(),
+    }, timeoutMs);
   }
 
   /** Sends a plain 2025-era request (no envelope). */
   async legacy(method: string, params: Record<string, unknown> = {}): Promise<Frame> {
     return this.request(method, params);
+  }
+
+  async legacyPending(method: string, params: Record<string, unknown> = {}, timeoutMs = 10_000): Promise<PendingRequest> {
+    return this.requestPending(method, params, timeoutMs);
   }
 
   async legacyInitialize(): Promise<Frame> {
@@ -95,10 +113,28 @@ class WireClient {
     await this.client.send({ jsonrpc: '2.0', method, ...(params && { params }) } as never);
   }
 
+  async modernNotify(method: string, params: Record<string, unknown> = {}): Promise<void> {
+    await this.notify(method, { ...params, _meta: this.modernMeta() });
+  }
+
   private async request(method: string, params: Record<string, unknown>): Promise<Frame> {
+    const pending = await this.requestPending(method, params);
+    return pending.response;
+  }
+
+  private async requestPending(method: string, params: Record<string, unknown>, timeoutMs = 10_000): Promise<PendingRequest> {
     const id = this.nextId++;
+    const response = this.await(id, timeoutMs);
     await this.client.send({ jsonrpc: '2.0', id, method, params } as never);
-    return await this.await(id);
+    return { requestId: id, response };
+  }
+
+  private modernMeta(): Record<string, unknown> {
+    return {
+      [PROTOCOL_VERSION_KEY]: MODERN_VERSION,
+      [CLIENT_CAPABILITIES_KEY]: {},
+      [CLIENT_INFO_KEY]: { name: 'wire-test', version: '1.0.0' },
+    };
   }
 
   private async await(id: number, timeoutMs = 10_000): Promise<Frame> {
@@ -119,6 +155,42 @@ class WireClient {
   async close(): Promise<void> {
     await this.server.stop();
   }
+}
+
+async function waitForPidFile(pidPath: string, timeoutMs = 5_000): Promise<number> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    try {
+      const pid = Number.parseInt((await readFile(pidPath, 'utf8')).trim(), 10);
+      if (Number.isInteger(pid) && pid > 0) {
+        return pid;
+      }
+    } catch {
+      // The fixture has not started yet.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+
+  throw new Error(`Timed out waiting for hanging SDK CLI pid file: ${pidPath}`);
+}
+
+async function waitForProcessExit(pid: number, timeoutMs = 5_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    try {
+      process.kill(pid, 0);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
+        return;
+      }
+      throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+
+  throw new Error(`Timed out waiting for hanging SDK CLI process ${pid} to exit`);
 }
 
 describe('dual-era wire protocol', () => {
@@ -371,4 +443,75 @@ describe('dual-era wire protocol', () => {
       expect(wire.serverInitiatedRequests()).toEqual([]);
     });
   });
+});
+
+describe('wire-level cancellation at the process boundary (W13)', () => {
+  let wire: WireClient;
+
+  beforeEach(async () => {
+    wire = await WireClient.connect();
+  });
+
+  afterEach(async () => {
+    await wire?.close();
+  });
+
+  it.each([
+    ['2026-07-28', true],
+    ['2025-11-25', false],
+  ])('cancels a live tools/call through the child process for the %s era', async (_era, modern) => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'fluent-mcp-cancel-'));
+    const pidPath = path.join(tempDir, 'child.pid');
+    let childPid: number | undefined;
+
+    const sdkCliMock = resolveSdkCli as jest.MockedFunction<typeof resolveSdkCli>;
+    sdkCliMock.mockReturnValue({ command: process.execPath, baseArgs: [HANGING_SDK_CLI, pidPath] });
+
+    try {
+      if (!modern) {
+        await wire.legacyInitialize();
+        await wire.notify('notifications/initialized');
+      }
+
+      const pending = modern
+        ? await wire.modernPending('tools/call', {
+          name: 'sdk_info',
+          arguments: { flag: '-v' },
+        }, 1_000)
+        : await wire.legacyPending('tools/call', {
+          name: 'sdk_info',
+          arguments: { flag: '-v' },
+        }, 1_000);
+      const cancelledResponse = pending.response.catch(() => undefined);
+
+      childPid = await waitForPidFile(pidPath);
+
+      if (modern) {
+        await wire.modernNotify('notifications/cancelled', { requestId: pending.requestId });
+      } else {
+        await wire.notify('notifications/cancelled', { requestId: pending.requestId });
+      }
+
+      await waitForProcessExit(childPid);
+
+      // sdk@2.0.0 aborts a cancelled request and intentionally suppresses its
+      // response. The existing process-runner robustness test proves the
+      // underlying result is exit 130 with the cancellation/SIGKILL text;
+      // this wire test proves the cancellation reaches that process boundary.
+      expect(await cancelledResponse).toBeUndefined();
+      expect(wire.received.some((message) => message.id === pending.requestId)).toBe(false);
+    } finally {
+      if (childPid !== undefined) {
+        try {
+          process.kill(childPid, 'SIGKILL');
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'ESRCH') {
+            throw error;
+          }
+        }
+      }
+      sdkCliMock.mockReset();
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  }, 20_000);
 });
