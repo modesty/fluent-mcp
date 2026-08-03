@@ -37,9 +37,10 @@
     "lint": "eslint 'src/**/*.ts' --config eslint.config.js",
     "lint:fix": "eslint 'src/**/*.ts' --config eslint.config.js --fix",
     "test": "jest",
-    "validate:snippets": "bash .mosey/scripts/validate-snippets.sh",
-    "validate:specs": "node .mosey/scripts/validate-specs.mjs",
-    "validate:instructs": "node .mosey/scripts/validate-instructs.mjs",
+    "validate:snippets": "bash scripts/validate-snippets.sh",
+    "validate:specs": "node scripts/validate-specs.mjs",
+    "validate:instructs": "node scripts/validate-instructs.mjs",
+    "bundle": "npm run build && node scripts/bundle.mjs",
     "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
     "inspect:dev": "npx @modelcontextprotocol/inspector ts-node src/index.ts",
     "inspect:published": "npx @modelcontextprotocol/inspector npx @modesty/fluent-mcp"
@@ -61,6 +62,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@anthropic-ai/mcpb": "2.1.2",
     "@eslint/js": "^10.0.1",
     "@rollup/plugin-commonjs": "^29.0.3",
     "@rollup/plugin-json": "^6.1.0",

@@ -1,0 +1,72 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/mcpb/main/schemas/mcpb-manifest-v0.4.schema.json",
+  "manifest_version": "0.4",
+  "name": "fluent-mcp",
+  "display_name": "Fluent MCP",
+  "version": "0.6.0",
+  "description": "MCP server for ServiceNow Fluent SDK commands and development resources.",
+  "long_description": "Fluent MCP provides ServiceNow Fluent SDK command tools, API specifications, authoring instructions, code snippets, and development prompts over MCP.",
+  "author": {
+    "name": "Modesty Zhang",
+    "email": "modestyz@hotmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/modesty/fluent-mcp"
+  },
+  "homepage": "https://github.com/modesty/fluent-mcp",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/dist/index.js"
+      ],
+      "env": {
+        "FLUENT_MCP_WORKING_DIR": "${user_config.FLUENT_MCP_WORKING_DIR}",
+        "SN_INSTANCE_URL": "${user_config.SN_INSTANCE_URL}",
+        "SN_AUTH_TYPE": "${user_config.SN_AUTH_TYPE}"
+      }
+    }
+  },
+  "tools": [
+    { "name": "build_fluent_app", "description": "Build a Fluent application." },
+    { "name": "check_auth_status", "description": "Check configured ServiceNow authentication." },
+    { "name": "clean_fluent_app", "description": "Clean Fluent application output." },
+    { "name": "deploy_fluent_app", "description": "Deploy a Fluent application to ServiceNow." },
+    { "name": "download_fluent_app", "description": "Download application metadata from ServiceNow." },
+    { "name": "download_fluent_dependencies", "description": "Download Fluent application dependencies." },
+    { "name": "explain_fluent_api", "description": "Look up Fluent SDK API and guide documentation." },
+    { "name": "fluent_transform", "description": "Transform metadata into Fluent source code." },
+    { "name": "get-api-spec", "description": "Read a Fluent metadata API specification." },
+    { "name": "get-instruct", "description": "Read Fluent metadata authoring guidance." },
+    { "name": "get-snippet", "description": "Read a Fluent metadata code snippet." },
+    { "name": "init_fluent_app", "description": "Initialize or convert a Fluent application." },
+    { "name": "pack_fluent_app", "description": "Package a built Fluent application." },
+    { "name": "query_fluent_records", "description": "Run a read-only ServiceNow Table REST query." },
+    { "name": "sdk_info", "description": "Read ServiceNow Fluent SDK version or help." }
+  ],
+  "keywords": ["mcp", "servicenow", "fluent", "sdk"],
+  "license": "MIT",
+  "user_config": {
+    "FLUENT_MCP_WORKING_DIR": {
+      "type": "directory",
+      "title": "Fluent project directory",
+      "description": "Absolute Fluent project path used when a tool call does not provide workingDirectory.",
+      "default": ""
+    },
+    "SN_INSTANCE_URL": {
+      "type": "string",
+      "title": "ServiceNow instance URL",
+      "description": "Optional instance URL used for lazy authentication validation.",
+      "default": ""
+    },
+    "SN_AUTH_TYPE": {
+      "type": "string",
+      "title": "ServiceNow authentication type",
+      "description": "Authentication method for lazy validation: basic or oauth.",
+      "default": "oauth"
+    }
+  }
+}
