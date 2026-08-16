@@ -55,26 +55,28 @@ npm run inspect:published
 **Expected Output:**
 ```
 ✅ Output:
-@servicenow/sdk version: 4.0.2
+@servicenow/sdk version: 4.10.1
 ```
 
-### Example 2: Test manage_fluent_auth Tool
+### Example 2: Test check_auth_status Tool
 
-**Purpose:** Verify authentication management command generation
+**Purpose:** Verify lazy authentication validation and its structured status output
 
 **Steps:**
 1. Navigate to the **Tools** tab
-2. Find `manage_fluent_auth` in the tools list
-3. Set parameters:
-   - `list`: `true`
+2. Find `check_auth_status` in the tools list
+3. Take no parameters — the tool accepts none
 4. Click **Execute**
-5. Verify you get a command string (not actual execution, since it's interactive)
+5. Verify the response reports whether a credential alias was resolved for `SN_INSTANCE_URL`
 
-**Expected Output:**
-```
-✅ Output:
-now-cli auth --list (in directory: /path/to/project)
-```
+**Expected Output:** a `structuredContent` payload describing the configured instance and
+whether a matching auth profile was found. With no `SN_INSTANCE_URL` set, the tool reports
+that no instance is configured and names the remedy rather than failing.
+
+**Notes:**
+- Authentication is validated lazily, on first need; `tools/list` never triggers it.
+- There is no `manage_fluent_auth` tool. `AuthCommand` is used internally for lazy
+  auto-auth validation but is deliberately not exposed over MCP.
 
 ### Example 3: Test build_fluent_app Tool
 
@@ -302,17 +304,27 @@ SN_INSTANCE_URL=https://company.service-now.com SN_AUTH_TYPE=oauth npm run inspe
    npm run inspect
    ```
 
-2. **Check Tools (should see 10 tools):**
-   - sdk_info
-   - manage_fluent_auth
-   - init_fluent_app
+2. **Check Tools (should see 17 tools, in alphabetical order):**
    - build_fluent_app
-   - deploy_fluent_app
-   - fluent_transform
-   - download_fluent_dependencies
-   - download_fluent_app
+   - check_auth_status
+   - cicd_fluent_app
+   - cicd_fluent_test
    - clean_fluent_app
+   - deploy_fluent_app
+   - download_fluent_app
+   - download_fluent_dependencies
+   - explain_fluent_api
+   - fluent_transform
+   - get-api-spec
+   - get-instruct
+   - get-snippet
+   - init_fluent_app
    - pack_fluent_app
+   - query_fluent_records
+   - sdk_info
+
+   Note: authentication is handled lazily from environment variables and is surfaced
+   through `check_auth_status`; there is no `manage_fluent_auth` tool.
 
 3. **Check Resources:**
    - Verify all metadata types have specs
@@ -415,7 +427,7 @@ echo "Starting Inspector..."
 npm run inspect
 
 echo "Inspector should now be running. Test the following:"
-echo "1. Verify all 10 tools are present"
+echo "1. Verify all 17 tools are present"
 echo "2. Execute sdk_info -v"
 echo "3. Check resources load"
 echo "4. Review notifications for errors"

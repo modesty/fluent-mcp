@@ -63,7 +63,7 @@ export const x_snc_example_to_do = Table({
             },
         }),
     },
-    actions: ['create', 'read'], // Allowed actions for the table
+    actions: { create: true, read: true, update: false, delete: false }, // Allowed actions for the table (object form; each key is written to metadata as set)
     display: 'deadline', // Field used as the display value
     accessibleFrom: 'package_private', // Scope restrictions for access
     allowClientScripts: true, // Enables client-side scripts

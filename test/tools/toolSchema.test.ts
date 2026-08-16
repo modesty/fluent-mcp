@@ -55,6 +55,7 @@ describe('Tool input schema — advertised (tools/list) and enforced (tools/call
   it('advertises explicit workingDirectory only on Fluent project commands', () => {
     const projectCommands = new Set([
       'build_fluent_app',
+      'cicd_fluent_app',
       'clean_fluent_app',
       'deploy_fluent_app',
       'download_fluent_app',

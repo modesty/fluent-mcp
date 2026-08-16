@@ -13,7 +13,7 @@ GenericColumn({
  functionDefinition: `glidefunction:${""}`, // string, definition of a function that the field performs, such as a mathematical operation, field length computation, or day of the week calculation
  label: '', // string or array of Documentation object
  mandatory: false, // boolean
- maxLength: 0, // number
+ maxLength: 0, // number | string - NO SDK-applied default (the pre-4.10.1 docs claimed 40; that claim was removed). Omit it and nothing is written, leaving the instance's install-time default for the internal type in place
  readOnly: false // boolean
 }): GenericColumn // returns a GenericColumn object
 

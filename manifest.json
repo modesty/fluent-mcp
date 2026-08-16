@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "fluent-mcp",
   "display_name": "Fluent MCP",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "MCP server for ServiceNow Fluent SDK commands and development resources.",
   "long_description": "Fluent MCP provides ServiceNow Fluent SDK command tools, API specifications, authoring instructions, code snippets, and development prompts over MCP.",
   "author": {
@@ -33,6 +33,8 @@
   "tools": [
     { "name": "build_fluent_app", "description": "Build a Fluent application." },
     { "name": "check_auth_status", "description": "Check configured ServiceNow authentication." },
+    { "name": "cicd_fluent_app", "description": "Install, publish, or rollback an app via the ServiceNow CI/CD API." },
+    { "name": "cicd_fluent_test", "description": "Run or inspect ServiceNow ATF tests via the CI/CD API." },
     { "name": "clean_fluent_app", "description": "Clean Fluent application output." },
     { "name": "deploy_fluent_app", "description": "Deploy a Fluent application to ServiceNow." },
     { "name": "download_fluent_app", "description": "Download application metadata from ServiceNow." },

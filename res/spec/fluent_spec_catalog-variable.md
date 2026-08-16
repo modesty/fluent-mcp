@@ -50,9 +50,20 @@ const _sharedBaseProperties = {
     removeFromConversationalInterfaces: false, // boolean, optional
     mapToField: false,      // boolean, optional — map variable value to a record field
     field: '',              // string, optional — record field to map to (requires mapToField: true)
-    useDynamicDefault: false, // boolean, optional — use dynamic default value
-    dotWalkPath: '',        // string, optional — dot-walk path for dynamic default
-    dependentQuestion: '',  // string, optional — variable this depends on for dynamic default
+    // Dynamic default value — these three properties always work together.
+    // This auto-populates THIS variable's value by dot-walking from another variable's
+    // referenced record. It is NOT a visibility or choice-filtering mechanism:
+    // use `CatalogUiPolicy` to show/hide variables and a reference qualifier
+    // (`referenceQualCondition` / `dynamicRefQual` / `referenceQual`) to filter options.
+    useDynamicDefault: false, // boolean, optional — must be true to enable the dynamic default
+    dependentQuestion: 'requestedFor', // optional — the source variable whose selected record is dot-walked
+    // type: string | ReturnType<typeof ReferenceVariable> | ReturnType<typeof RequestedForVariable> (union widened SDK v4.10.1+; declared once on BaseVariableConfig, so every variable type accepts it)
+    // The source must be a `RequestedForVariable` or a `ReferenceVariable` — it needs a referenced record to dot-walk from.
+    // The source must also be declared BEFORE this variable in the `variables` object.
+    // PREFER the source variable's key name as a string, e.g. 'requestedFor'.
+    // The only supported object form is a VariableSet dot-walk, e.g. `employeeSet.variables.requestedFor`.
+    // A direct reference to a variable's own const (e.g. `dependentQuestion: requestedForVar`) is NOT supported, even though the widened union type-checks it.
+    dotWalkPath: 'manager', // string, optional — field path from the source variable's referenced record, e.g. 'manager' or 'department.name'
     unique: false,          // boolean, optional — enforce unique values
     postInsertScript: '',   // string, optional — script run after record insert
     readScript: '',         // string, optional — script run when reading the value

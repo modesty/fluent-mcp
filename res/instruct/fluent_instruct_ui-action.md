@@ -18,15 +18,17 @@ Always reference the UI Action API specifications for more details.
 
 ## Form Display Properties
 
-1. **form object**: Use the `form` object to control form-level display: `{ showButton, showLink, showContextMenu, style }`.
+1. **form object**: Use the `form` object to control form-level display: `{ showButton, showLink, showContextMenu, style, iconName, showIconOnly }`.
 1. **showButton**: Set `form.showButton: true` to display as form button.
 1. **showLink**: Set `form.showLink: true` to display as related link on form.
 1. **showContextMenu**: Set `form.showContextMenu: true` to display in form context menu (right-click).
 1. **style**: Use `form.style` to set button styling: `'primary'`, `'destructive'`, or `'unstyled'`.
+1. **iconName** (SDK v4.10.1+): Set `form.iconName` (and/or `list.iconName`) to the name of a retina icon to show on the button. Browse `/styles/retina_icons/retina_icons.html` on your instance for the available names.
+1. **showIconOnly** (SDK v4.10.1+): `form.showIconOnly: true` / `list.showIconOnly: true` hides the `name` text and renders only `iconName`. Because the label is gone, **always pair it with a `hint`** on the UI Action so hovering still identifies the button — an icon-only action with no tooltip is unidentifiable and inaccessible to screen readers.
 
 ## List Display Properties
 
-1. **list object**: Use the `list` object to control list-level display: `{ showButton, showLink, showContextMenu, style, showListChoice, showBannerButton, showSaveWithFormButton }`.
+1. **list object**: Use the `list` object to control list-level display: `{ showButton, showLink, showContextMenu, style, showListChoice, showBannerButton, showSaveWithFormButton, iconName, showIconOnly }`.
 1. **showButton**: Set `list.showButton: true` to display as list button.
 1. **showListChoice**: Set `list.showListChoice: true` to display in list choice menu.
 1. **showBannerButton**: Set `list.showBannerButton: true` to display as banner button.
