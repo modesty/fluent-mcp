@@ -2,14 +2,14 @@
 
 An [MCP server](https://modelcontextprotocol.io) that brings [ServiceNow Fluent SDK](https://www.servicenow.com/docs/bundle/yokohama-application-development/page/build/servicenow-sdk/concept/servicenow-fluent.html) capabilities to AI-assisted development environments. Enables natural language interaction with ServiceNow SDK commands, API specifications, code snippets, and development resources.
 
-Built for [@servicenow/sdk@v4.9.0](https://github.com/ServiceNow/sdk/releases#release-v4.9.0).
+Built for [@servicenow/sdk@v4.10.1](https://github.com/ServiceNow/sdk/releases#release-v4.10.0).
 
 > **Note** : Since v0.6.0 the server speaks **both** [MCP@2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28) and [MCP@2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25) from one handler set — the stdio entry inspects the opening message and serves whichever era the client opens with. [v0.5.1](https://github.com/modesty/fluent-mcp/releases#release-v0.5.1) is the last release built on the v1 MCP SDK (2025-11-25 only).
 
 ## Key Features
 
-- **SDK Command Tools** - `sdk_info` plus ServiceNow SDK command tools for `init`, `build`, `install`, `dependencies`, `transform`, `download`, `clean`, `pack`, `explain`, and `query`
-- **Rich Resources** - API specifications, instructions, and code snippets for **65 ServiceNow metadata types**
+- **SDK Command Tools** - `sdk_info` plus ServiceNow SDK command tools for `init`, `build`, `install`, `dependencies`, `transform`, `download`, `clean`, `pack`, `explain`, `query`, and `cicd`
+- **Rich Resources** - API specifications, instructions, and code snippets for **67 ServiceNow metadata types**
 - **API Documentation Lookup** - `explain_fluent_api` returns SDK docs for any Fluent API or guide — no project required
 - **Lazy Auto-Authentication** - Detects and caches an auth profile only when an auth-requiring command or `check_auth_status` needs it
 - **Explicit Project Context** - Resolves each project command from its `workingDirectory` argument, the initialized session, or `FLUENT_MCP_WORKING_DIR`, then fails with actionable guidance instead of guessing
@@ -20,10 +20,10 @@ This MCP server implements the [Model Context Protocol](https://modelcontextprot
 
 ### Core
 
-- **Resources** - 300+ resources across 65 ServiceNow metadata types (API specs, instructions, snippets, prompts)
-- **Tools** - 11 ServiceNow SDK command tools plus 4 resource/auth tools (15 total), with full parameter validation. Read tools (`get-api-spec`, `get-snippet`, `get-instruct`, `check_auth_status`) declare an `outputSchema` and return `structuredContent` for programmatic consumers
+- **Resources** - 300+ resources across 67 ServiceNow metadata types (API specs, instructions, snippets, prompts)
+- **Tools** - 13 ServiceNow SDK command tools plus 4 resource/auth tools (17 total), with full parameter validation. Read tools (`get-api-spec`, `get-snippet`, `get-instruct`, `check_auth_status`) declare an `outputSchema` and return `structuredContent` for programmatic consumers
 - **Prompts** - Development workflow templates for common ServiceNow tasks (`coding_in_fluent`, `create_custom_ui`)
-- **Logging & Progress** - Structured logs are written to stderr; progress notifications are sent for long-running commands (any command with a 30s or longer timeout — deploy, build, transform, download, dependencies, query, pack) when the client supplies a progress token
+- **Logging & Progress** - Structured logs are written to stderr; progress notifications are sent for long-running commands (any command with a 30s or longer timeout — deploy, build, transform, download, dependencies, query, pack, cicd) when the client supplies a progress token
 
 ### Project Context & Sessions
 
@@ -58,7 +58,7 @@ npm run bundle
 
 ### MCPB Distribution
 
-The optional `npm run bundle` command produces `fluent-mcp-<version>.mcpb`. The bundle contains `dist/`, `res/`, and production dependencies, and its `manifest.json` declares all 15 tools. MCPB hosts expose these user-configurable values to the server:
+The optional `npm run bundle` command produces `fluent-mcp-<version>.mcpb`. The bundle contains `dist/`, `res/`, and production dependencies, and its `manifest.json` declares all 17 tools. MCPB hosts expose these user-configurable values to the server:
 
 - `FLUENT_MCP_WORKING_DIR` — optional default project directory; otherwise pass `workingDirectory` on project-aware tool calls
 - `SN_INSTANCE_URL` — optional instance URL for lazy authentication validation
@@ -74,7 +74,7 @@ Create a new Fluent app in ~/projects/time-off-tracker to manage employee PTO re
 
 ## Available Tools
 
-### SDK Command Tools (11)
+### SDK Command Tools (13)
 
 | Tool | Description | Key Parameters |
 |------|-------------|----------------|
@@ -88,7 +88,9 @@ Create a new Fluent app in ~/projects/time-off-tracker to manage employee PTO re
 | `download_fluent_app` | Download metadata from an instance | `workingDirectory`, `directory` (required), `source`, `auth` (auto-injected), `incremental`, `debug` |
 | `clean_fluent_app` | Clean output directory | `workingDirectory`, `source` (optional), `debug` |
 | `pack_fluent_app` | Create an installable artifact | `workingDirectory`, `source` (optional), `debug` |
-| `query_fluent_records` | Read-only Table REST query against an instance; returns a JSON envelope | `workingDirectory`, `table` (required), `query` (required encoded query), `fields`, `limit`, `offset`, `displayValue`, `view`, `queryCategory`, `excludeReferenceLink`, `noCount`, `queryNoDomain`, `timeout`, `auth` (auto-injected), `debug` |
+| `query_fluent_records` | Read-only Table REST query against an instance; returns a JSON envelope | `workingDirectory`, `table` (required), `query` (required encoded query), `fields`, `limit`, `offset`, `displayValue`, `view`, `queryCategory`, `excludeReferenceLink`, `noCount`, `queryNoDomain`, `timeout`, `select`, `auth` (auto-injected), `debug` |
+| `cicd_fluent_app` | Install, publish, or rollback an app via the ServiceNow CI/CD API (`sn_cicd`). **Changes instance state.** | `workingDirectory`, `action` (required: `install`\|`publish`\|`rollback`), `scope`\|`appSysId`, `appVersion` (required for rollback, and for install/publish outside a Fluent project), `baseAppVersion`, `autoUpgradeBaseApp`, `devNotes`, `wait`, `pollTimeout`, `auth` (auto-injected), `output` (`json`\|`raw`), `select`, `debug` |
+| `cicd_fluent_test` | Run, watch, or fetch results for ATF test suites and tests via the CI/CD API. `run` executes real ATF steps on the instance. No Fluent project required (and none accepted). | `target` (required: `testsuite`\|`test`), `action` (required: `run`\|`watch`\|`result`), `testSuiteSysId`\|`testSuiteName`, `testSysId`\|`testName`, `progressId` (watch), `resultId` (result), `browserName`, `browserVersion`, `osName`, `osVersion`, `runInCloud`, `isPerformanceRun`, `captureNodeLogs`, `wait`, `pollTimeout`, `auth` (auto-injected), `output` (`json`\|`raw`), `select`, `debug` |
 
 ### Resource and Authentication Tools (4)
 
@@ -128,9 +130,9 @@ Standardized URI patterns following MCP specification:
 
 ### Supported Metadata Types
 
-65 metadata types across the following categories:
+67 metadata types across the following categories:
 
-**Core Types:** `acl`, `application-menu`, `business-rule`, `client-script`, `cross-scope-privilege`, `data-policy`, `form`, `import-set`, `instance-scan`, `list`, `property`, `role`, `scheduled-script`, `script-action`, `script-include`, `scripted-rest`, `sla`, `table`, `ui-action`, `ui-page`, `ui-policy`, `user-preference`
+**Core Types:** `acl`, `application-menu`, `business-rule`, `client-script`, `cross-scope-privilege`, `data-policy`, `form`, `import-set`, `instance-scan`, `list`, `property`, `role`, `scheduled-script`, `script-action`, `script-include`, `scripted-rest`, `sla`, `state-model`, `table`, `ui-action`, `ui-page`, `ui-policy`, `user-preference`
 
 **Table Types:** `column`, `column-generic`
 
@@ -148,9 +150,28 @@ Standardized URI patterns following MCP specification:
 
 **Workspace & Analytics:** `workspace`, `dashboard`
 
-**ATF (Automated Test Framework):** `atf-appnav`, `atf-catalog-action`, `atf-catalog-validation`, `atf-catalog-variable`, `atf-email`, `atf-form`, `atf-form-action`, `atf-form-declarative-action`, `atf-form-field`, `atf-form-sp`, `atf-reporting`, `atf-rest-api`, `atf-rest-assert-payload`, `atf-server`, `atf-server-catalog-item`, `atf-server-record`, `atf-ui-test-script`
+**ATF (Automated Test Framework):** `atf-appnav`, `atf-catalog-action`, `atf-catalog-validation`, `atf-catalog-variable`, `atf-email`, `atf-form`, `atf-form-action`, `atf-form-declarative-action`, `atf-form-field`, `atf-form-sp`, `atf-list`, `atf-reporting`, `atf-rest-api`, `atf-rest-assert-payload`, `atf-server`, `atf-server-catalog-item`, `atf-server-record`, `atf-ui-test-script`
 
-### What's new in 4.9.0
+### What's new in 4.10.1
+
+This release of the MCP server tracks `@servicenow/sdk` 4.10.1, covering the authoring-surface additions shipped across 4.10.0 and 4.10.1:
+
+- **New metadata type**: `state-model` — the `StateModel` API defines a table's **state machine** (states, transitions, and the conditions that gate them) in a single call, writing `sttrm_model`/`sttrm_state`/`sttrm_state_transition`/`sttrm_transition_condition` records, or the `chg_model`/`prb_model`/`prb_task_model` subclass auto-selected from `table`. It can also edit out-of-box models in place by referencing their real sys_ids.
+- **New metadata type**: `atf-list` — the `atf.list.*` ATF steps (`relatedListVisibility`, `applyFilterToList`, `recordPresentInList`, `openRecordInList`, `listUIActionVisibility`, `clickListUIAction`) exercise list and related-list UI behavior.
+- **New tools**: `cicd_fluent_app` (install/publish/rollback an app through the `sn_cicd` API — changes instance state) and `cicd_fluent_test` (run, watch, or fetch results for ATF suites and tests), wrapping the new `now-sdk cicd` command. `query_fluent_records` gains `select` for the new `--select` path extractor.
+- **`$meta.useEsLatest`** — new cross-cutting flag that runs a record's script field(s) at the latest ECMAScript version the platform supports. It reaches the APIs whose type carries `$meta` (`BusinessRule`, `Acl`, `ScriptInclude`, `ScriptAction`, `ScheduledScript`, `UiPage`, `RestApi` routes, `SPWidget`, `SPMenu`, and others) — **not every API with a server-side script field**: `StateModel` transition conditions are server-side scripts whose type accepts no `$meta` at all (see the source-of-truth note below).
+- **Table `actions` object form** — `actions` now accepts the exported `TableActionAccess` shape `{ read?, update?, delete?, create? }`, where each action is three-state. **The array form is deprecated**: it is a complete enumeration, so `actions: ['read']` also writes the other three as `false`. The SDK also no longer derives defaults for `actions`, `allowClientScripts`, `allowNewFields`, `allowUiActions`, `allowWebServiceAccess`, or `maxLength`.
+- **Reference column `mtom`** — creates a many-to-many relationship. Note the semantic split: `referenceKey` no longer means many-to-many, and now stores a field from the referenced table in place of `sys_id`.
+- **UI Action icons** — `UiAction`'s `form` and `list` objects both accept `iconName` and `showIconOnly`.
+- **`Form` `$meta`** — `Form` now honors `$meta.installMethod` to route its output folder (previously accepted but inert).
+- **Playbook `timerSchedule`** — `startWithDelay` can evaluate its delay against a `cmn_schedule` record instead of elapsed clock time, on all three variants.
+- **Catalog dynamic default values** — a variable's `dependentQuestion` widened to accept a `ReferenceVariable`/`RequestedForVariable` in addition to a name string; `CatalogUiPolicy` actions accept `variable`, and `CatalogClientScript` accepts `order`.
+- **`$override` on `sys_*` fields** — `$override` can set `sys_domain` and most other `sys_*` columns on any table; `sys_id`, `sys_scope`, `sys_update_name`, and `sys_domainpath` remain framework-managed and error if overridden.
+- **Service Portal** — widget/page/instance CSS fields accept SCSS or CSS, `widgetParameters` now correctly serializes a plain object, `SPInstance`'s placeholder properties are functional rather than ignored, and `urlSuffix` accepts hyphens. The `service-portal` spec also gained the previously undocumented `ServicePortal()` (`sp_portal`) API.
+
+> Source-of-truth note: several release-note claims are not corroborated by the installed package and were treated as corrections — "dependent questions" are a **dynamic default value**, not visibility or option control (and the property is not new, only its type widened); `runServerSideScript` "surface support" already shipped in 4.9.0; and the `add_message` inference change is an internal transform fix with no authoring-surface change. The overview guide also lists `StateModel`, `AliasTemplate`, `InboundEmailAction`, `CatalogItem`, `CatalogItemRecordProducer`, and the instance-scan checks as accepting `$meta.useEsLatest`, but their declarations carry no `$meta`. See `.mosey/upgrade-sdk-4.10.1.md`.
+
+### Previously (4.9.x)
 
 This release of the MCP server tracks `@servicenow/sdk` 4.9.0 — a maintenance and bug-fix release (Flow, ClientScript, ImportSet, SLA transform/build reliability) with select authoring-surface additions:
 
@@ -197,7 +218,7 @@ Added `custom-action`, `inbound-email-action`, `sp-header-footer`, and `sp-page-
 
 ## Configuration
 
-**Requirements:** Node.js 20.18.0+, npm 11.4.1+, `@servicenow/sdk` 4.9.0
+**Requirements:** Node.js 20.18.0+, npm 11.4.1+, `@servicenow/sdk` 4.10.1
 
 ### MCP Client Setup
 
@@ -305,7 +326,7 @@ npm run inspect:dev
 
 ### What to verify
 
-- The Tools tab shows all 15 tools in deterministic name order.
+- The Tools tab shows all 17 tools in deterministic name order.
 - Optional parameters render with their normal types rather than as nullable union forms.
 - Structured server logs appear on the server process stderr/terminal output; stdout remains reserved for MCP protocol traffic.
 
@@ -342,7 +363,7 @@ npm run inspect:dev
 3. **Test Version:**
    - Set `flag` parameter to `-v`
    - Click **Execute**
-   - Verify response shows the SDK version (e.g., `4.9.0`)
+   - Verify response shows the SDK version (e.g., `4.10.1`)
 4. **Test Help:**
    - Set `flag` parameter to `-h`
    - Set `command` parameter to `build`

@@ -71,10 +71,13 @@ PlaybookDefinition(
  }
 ) // returns a PlaybookDefinition
 
-// startWithDelay (on LaneConfig/ActivityConfig) is discriminated by `type`:
-//   { type: 'explicit', duration: {days?,hours?,minutes?,seconds?} }
-//   { type: 'relative', duration, relativeDatetime: 'yyyy-MM-dd HH:mm:ss', relativeOperator: 'before'|'after' }
-//   { type: 'percentage', percentage: number, percentageDatetime: 'yyyy-MM-dd HH:mm:ss' }
+// startWithDelay (on LaneConfig/ActivityConfig) maps to a sys_pd_timer_attributes record and is discriminated by `type`:
+//   { type: 'explicit', duration: {days?,hours?,minutes?,seconds?}, timerSchedule? }
+//   { type: 'relative', duration, relativeDatetime: 'yyyy-MM-dd HH:mm:ss', relativeOperator: 'before'|'after', timerSchedule? }
+//   { type: 'percentage', percentage: number, percentageDatetime: 'yyyy-MM-dd HH:mm:ss', timerSchedule? }
+//   timerSchedule?: string | Record<'cmn_schedule'> — optional on ALL THREE variants (SDK v4.10.1+). Evaluates the
+//   delay against a schedule (business hours / calendar) instead of elapsed clock time, so e.g. an 8-hour explicit
+//   delay started Friday afternoon on a 9-5 weekday schedule expires Monday morning rather than Friday night.
 // Decision activity (ActivityDefinitions.Core.Decision): inputs = { type: 'match_first'|'match_all', branches: [{id,label,condition?}, ...] }.
 //   The 'else' branch must be LAST with id:'else', label:'Else', and no condition. Branch deps: wfa.playbook.run.After(decision.branches.<id>).
 // wfa.playbook.run.After(...deps) takes VARARGS (not an array); deps are ActivityInstance/lane/branch references.

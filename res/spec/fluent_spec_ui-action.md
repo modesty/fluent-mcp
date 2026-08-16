@@ -17,6 +17,8 @@ UiAction({
         showLink: false, // boolean, optional - Display as form link
         showContextMenu: false, // boolean, optional - Display in form context menu
         style: '', // string, optional - 'primary' | 'destructive' | 'unstyled'
+        iconName: '', // string, optional (SDK v4.10.1+) - Name of the icon to display on the button. For the list of available icons, go to `/styles/retina_icons/retina_icons.html` on your instance
+        showIconOnly: false, // boolean, optional (SDK v4.10.1+) - When true, the button displays only the icon, ignoring the 'Name' field. Remember to add a separate tooltip (`hint`) to the UI Action itself to describe its function to users
     },
     
     // UI action on list view and related properties
@@ -28,6 +30,8 @@ UiAction({
         showListChoice: false, // boolean, optional - Display in list choice menu
         showBannerButton: false, // boolean, optional - Display as banner button on list
         showSaveWithFormButton: false, // boolean, optional - Display as save with form button
+        iconName: '', // string, optional (SDK v4.10.1+) - Name of the icon to display on the button. For the list of available icons, go to `/styles/retina_icons/retina_icons.html` on your instance
+        showIconOnly: false, // boolean, optional (SDK v4.10.1+) - When true, the button displays only the icon, ignoring the 'Name' field. Remember to add a separate tooltip (`hint`) to the UI Action itself to describe its function to users
     },
     
     // Client side script and related properties

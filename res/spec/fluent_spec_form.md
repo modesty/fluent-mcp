@@ -127,6 +127,16 @@ Form({
             ],
         },
     ],
+    $meta: {                     // object, optional — FUNCTIONAL AS OF SDK v4.10.1. `Form` gained the metadata
+                                 // mixin in 4.10.1; on earlier releases writing `$meta` compiled but did nothing.
+        installMethod: 'demo',   // 'first install' | 'demo' | 'once', optional — maps the generated form records to an
+                                 // output folder that loads only in specific circumstances:
+                                 //   'first install' → 'unload'      (loaded only when the plugin is first registered)
+                                 //   'demo'          → 'unload.demo' (loaded only when demo data is loaded)
+                                 //   'once'          → 'apply_once'  (applied only once)
+        // `useEsLatest` is also part of the shared $meta shape, but it only affects server-side script fields.
+        // A Form has no script field, so it is not meaningful here — set `installMethod` only.
+    },
 }): Form
 ```
 

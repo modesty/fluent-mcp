@@ -135,12 +135,16 @@ export class PromptManager {
    * replaces the previous generic "Use the appropriate Fluent API methods" stubs
    * and the stale hardcoded type list (plan P0.1).
    * @param baseContent The prompt body (without frontmatter).
-   * @param rawList The `metadata_list` argument (string or array of strings).
+   * @param rawList The `metadata_list` argument. MCP prompt arguments are
+   *   string-valued on the wire, so the documented comma-separated form
+   *   ("table,business-rule") is what a conforming client sends; an array is
+   *   also accepted, and every element is split on commas either way.
    * @returns The rendered prompt content.
    */
   private async renderCodingInFluent(baseContent: string, rawList: unknown): Promise<string> {
     const requested = (Array.isArray(rawList) ? rawList : [rawList])
-      .map(value => String(value).trim().toLowerCase())
+      .flatMap(value => String(value).split(','))
+      .map(value => value.trim().toLowerCase())
       .filter(value => value.length > 0);
 
     const sections = await Promise.all(requested.map(type => this.renderTypeSection(type)));

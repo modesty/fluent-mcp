@@ -13,3 +13,5 @@ export * from './cleanCommand.js';
 export * from './packCommand.js';
 export * from './explainCommand.js';
 export * from './queryCommand.js';
+export * from './cicdAppCommand.js';
+export * from './cicdTestCommand.js';

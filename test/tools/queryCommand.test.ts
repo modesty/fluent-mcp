@@ -181,4 +181,33 @@ describe('QueryCommand', () => {
     await expect(command.execute({ table: 'incident;ls', query: 'active=true' }))
       .rejects.toThrow();
   });
+
+  // The SDK's --select extractor accepts numeric subscripts (sdk-cli
+  // util/json-select.ts), and this tool documents `records[0].sys_id` — the base
+  // shell sanitizer rejects brackets, so the select path needs its own grammar.
+  test.each([
+    'records[0].sys_id',
+    'result.records[10].opened_by.display_value',
+    'ok',
+  ])('should pass a documented select path through to --select: %s', async (select) => {
+    const command = new QueryCommand(mockProcessor as never);
+    const result = await command.execute({ table: 'incident', query: 'active=true', select });
+
+    expect(result.success).toBe(true);
+    const argv = mockProcessor.process.mock.calls[0][1] as string[];
+    expect(argv[argv.indexOf('--select') + 1]).toBe(select);
+  });
+
+  test.each([
+    'records[0]; rm -rf /',
+    'records[*].sys_id',
+    'records["0"].sys_id',
+    'records[0].sys id',
+    '',
+  ])('should reject a select path outside the SDK grammar: %s', async (select) => {
+    const command = new QueryCommand(mockProcessor as never);
+    await expect(command.execute({ table: 'incident', query: 'active=true', select }))
+      .rejects.toThrow(/Argument 'select' must be a dot\/bracket path/);
+    expect(mockProcessor.process).not.toHaveBeenCalled();
+  });
 });

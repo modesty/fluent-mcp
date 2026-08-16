@@ -12,11 +12,14 @@ Table({
     liveFeed: false, // boolean
     accessibleFrom: 'package_private', // 'public' | 'package_private' (defaults to 'public' as of SDK 4.8.0; 'package_private' restricts cross-scope read access but hides the table from some platform features such as Business Rules)
     callerAccess: 'none', // 'none' | 'tracking' | 'restricted'
-    actions: [], // array of 'read' | 'update' | 'delete' | 'create'
-    allowWebServiceAccess: false, // boolean
-    allowNewFields: false, // boolean
-    allowUiActions: false, // boolean
-    allowClientScripts: false, // boolean
+    // ACCESS PROPERTIES — the SDK derives NO defaults for `actions`, `allowClientScripts`, `allowNewFields`,
+    // `allowUiActions` and `allowWebServiceAccess`. Each is written to the table's metadata ONLY if you set it
+    // in Fluent; anything you omit is left to the instance's own default at install time.
+    actions: { read: true, create: true, update: true, delete: false }, // TableActionAccess object (exported from '@servicenow/sdk/core'), all four keys optional: { read?, update?, delete?, create? }. Each action is THREE-STATE — `true` AND `false` are both written to metadata, an OMITTED action is not written at all. Prefer this object form; the array form (['read' | 'update' | 'delete' | 'create'][]) is DEPRECATED as of SDK v4.10.1 because it is a COMPLETE ENUMERATION: ['read'] writes read_access=true PLUS update_access=false, delete_access=false and create_access=false
+    allowWebServiceAccess: false, // boolean, no SDK-applied default
+    allowNewFields: false, // boolean, no SDK-applied default
+    allowUiActions: false, // boolean, no SDK-applied default
+    allowClientScripts: false, // boolean, no SDK-applied default
     audit: false, // boolean
     readOnly: false, // boolean
     textIndex: false, // boolean

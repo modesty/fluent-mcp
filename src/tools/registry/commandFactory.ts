@@ -11,6 +11,8 @@ import {
   PackCommand,
   ExplainCommand,
   QueryCommand,
+  CicdAppCommand,
+  CicdTestCommand,
 } from '../commands/index.js';
 
 /**
@@ -56,6 +58,8 @@ export class CommandFactory {
       new PackCommand(executor, ensureAuthValidated),
       new ExplainCommand(executor),
       new QueryCommand(executor, ensureAuthValidated),
+      new CicdAppCommand(executor, ensureAuthValidated),
+      new CicdTestCommand(executor, ensureAuthValidated),
     ];
   }
 }

@@ -44,7 +44,10 @@ CatalogUiPolicy({
     // ─── Actions ───
     actions: [              // CatalogUiPolicyAction[], optional — field-level changes when condition is met
         {
-            variableName: variableSetRef.variables.varName, // string | VariableReference, mandatory — variable to affect
+            variableName: variableSetRef.variables.varName, // string | VariableReference, mandatory — the variable this action affects; pass a typed variable reference or the variable's name
+            variable: '',       // string, optional (SDK v4.10.1+) — human-readable variable name from the same catalog item, its variable set, or a variable set added to the catalog item
+            // `variableName` is the required target of the action; `variable` is an optional plain-string
+            // variable name and never replaces `variableName`.
             visible: true,      // boolean, optional — set variable visibility
             mandatory: false,   // boolean, optional — set variable as mandatory
             readOnly: false,    // boolean, optional — set variable as read-only

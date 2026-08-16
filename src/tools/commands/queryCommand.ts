@@ -1,13 +1,6 @@
 import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
-
-/**
- * Control characters can obscure command boundaries in logs and are not valid
- * encoded-query content. Printable punctuation is allowed because the process
- * runner passes the query as one literal argv entry without a shell.
- */
-// eslint-disable-next-line no-control-regex -- control characters are intentionally rejected
-const UNSAFE_QUERY_PATTERN = /[\x00-\x1f\x7f]/;
+import { assertNoControlCharacters, screenSelectPathArg } from './argValidation.js';
 
 /**
  * Command to run a read-only Table REST API query against a ServiceNow instance
@@ -97,6 +90,12 @@ export class QueryCommand extends SessionAwareCLICommand {
       description: 'Per-request timeout in milliseconds for each page fetch. Default 30000.',
     },
     {
+      name: 'select',
+      type: 'string',
+      required: false,
+      description: 'Dot/bracket path to extract from the output (SDK v4.10.0+), e.g. "records[0].sys_id". Implies machine-readable output; an unresolved path yields null rather than an error.',
+    },
+    {
       name: 'auth',
       type: 'string',
       required: false,
@@ -117,9 +116,10 @@ export class QueryCommand extends SessionAwareCLICommand {
    *
    * The base check sanitizes every string arg against the shell-metacharacter
    * pattern, which would reject printable operators (`<`, `>`, `&`, and others)
-   * that are legitimate query data on the shell-free execution path. We hand the
-   * base a benign placeholder for `query` (preserving its required/type checks)
-   * and reject only control characters in the real value.
+   * that are legitimate query data on the shell-free execution path — and the
+   * brackets in a `select` path such as `records[0].sys_id`. We hand the base
+   * benign placeholders for both (preserving its required/type checks) and screen
+   * each real value by the rule that applies to it (see argValidation).
    */
   protected validateArgs(args: Record<string, unknown>): void {
     const query = args.query;
@@ -127,13 +127,9 @@ export class QueryCommand extends SessionAwareCLICommand {
       throw new Error("Missing required argument 'query'. It must be a non-empty encoded query string.");
     }
 
-    super.validateArgs({ ...args, query: 'placeholder' });
+    super.validateArgs(screenSelectPathArg({ ...args, query: 'placeholder' }));
 
-    if (UNSAFE_QUERY_PATTERN.test(query)) {
-      throw new Error(
-        "Invalid characters in argument 'query': control characters are not allowed."
-      );
-    }
+    assertNoControlCharacters(query, 'query');
 
     const displayValue = args.displayValue;
     if (displayValue !== undefined && !['true', 'false', 'all'].includes(String(displayValue))) {
@@ -190,6 +186,7 @@ export class QueryCommand extends SessionAwareCLICommand {
         queryCategory: '--query-category',
         timeout: '--timeout',
         output: '--output',
+        select: '--select',
         auth: '--auth',
         noCount: { flag: '--no-count', hasValue: false },
         queryNoDomain: { flag: '--query-no-domain', hasValue: false },

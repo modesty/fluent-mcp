@@ -30,6 +30,7 @@ CatalogClientScript({
     global: false,          // boolean, optional — apply globally
     isolateScript: false,   // boolean, optional — run script in isolated scope
     vaSupported: false,     // boolean, optional — run in Virtual Agent conversations
+    order: 100,             // number, optional (SDK v4.10.1+) — execution order of this client script; lower numbers execute first
 
     // ─── Where to apply ───
     appliesOnCatalogItemView: true,   // boolean, optional — apply on the catalog item request form

@@ -94,14 +94,15 @@ function setupScaffold() {
     'ClientScript', 'CrossScopePrivilege', 'DataLookup', 'DataPolicy', 'Documentation',
     'ImportSet', 'LicensingConfig', 'List', 'NowAssistSkillConfig', 'Property',
     'RestApi', 'RestMessage', 'RetryPolicy',
-    'Role', 'Test', 'UiPolicy', 'UserPreference', 'atf', 'Record',
+    'Role', 'StateModel', 'Test', 'UiPolicy', 'UserPreference', 'atf', 'Record',
     // Flow / automation surface (also exported from '@servicenow/sdk/automation')
     'Flow', 'FlowStage', 'Subflow', 'Table',
     'PlaybookDefinition', 'PlaybookTriggerTypes', 'ActivityDefinitions',
     // Instance Scan check types
     'LinterCheck', 'ScriptOnlyCheck', 'ColumnTypeCheck', 'TableCheck',
     // Service Portal types
-    'SPMenu', 'SPPage', 'SPTheme', 'SPWidget', 'SPWidgetDependency',
+    'ServicePortal', 'SPAngularProvider', 'SPMenu', 'SPPage', 'SPTheme',
+    'SPWidget', 'SPWidgetDependency',
     // Spec-doc placeholder variable names (used in specs to indicate "imagine
     // a reference variable here"). Real code would substitute real values.
     'catalogItemRef', 'variableSetRef', 'variableSetObject',
