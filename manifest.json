@@ -3,7 +3,7 @@
   "manifest_version": "0.4",
   "name": "fluent-mcp",
   "display_name": "Fluent MCP",
-  "version": "0.8.0",
+  "version": "0.7.1",
   "description": "MCP server for ServiceNow Fluent SDK commands and development resources.",
   "long_description": "Fluent MCP provides ServiceNow Fluent SDK command tools, API specifications, authoring instructions, code snippets, and development prompts over MCP.",
   "author": {
