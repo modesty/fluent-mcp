@@ -43,8 +43,11 @@ describe('SDK v4.10.1 Types - Integration Tests', () => {
       expect(ServiceNowMetadataType[key]).toBe(value);
     });
 
-    it('should total 67 metadata types (65 before v4.10.1 + state-model + atf-list)', () => {
-      expect(Object.values(ServiceNowMetadataType).length).toBe(67);
+    it('should have grown to at least 67 metadata types (65 before v4.10.1 + state-model + atf-list)', () => {
+      // Lower bound, not an equality: the exact total is a moving target owned by the
+      // newest version's integration test (see sdk4112-types.integration.test.ts).
+      // This assertion only guards that the two v4.10.1 additions were not lost.
+      expect(Object.values(ServiceNowMetadataType).length).toBeGreaterThanOrEqual(67);
     });
   });
 

@@ -3,7 +3,7 @@
  * per-type instruction summaries plus explicit tool/URI pointers — and the full,
  * enum-derived catalog of supported metadata types. It must contain zero generic
  * "Use the appropriate Fluent API methods" stubs, and the catalog must list all
- * 67 types (single source of truth: ServiceNowMetadataType in src/types.ts).
+ * 71 types (single source of truth: ServiceNowMetadataType in src/types.ts).
  *
  * Config is mocked to point resourcePaths at the real res/ directories so the
  * instruction summaries load from the shipped content.
@@ -78,11 +78,11 @@ describe('coding_in_fluent prompt rendering (P0.1)', () => {
     expect(text).not.toContain('Reference the specific instructions for');
   });
 
-  it('appends the full enum-derived catalog of all 67 metadata types', async () => {
+  it('appends the full enum-derived catalog of all 71 metadata types', async () => {
     const text = await renderCodingInFluent(['flow']);
     const total = Object.values(ServiceNowMetadataType).length;
 
-    expect(total).toBe(67); // guards against the pre-v4.10.1 count of 65
+    expect(total).toBe(71); // guards against the pre-v4.11.x count of 67 and the pre-`atf` count of 70
     expect(text).toContain(`All ${total} supported metadata types`);
 
     // Every supported type appears in the rendered catalog.

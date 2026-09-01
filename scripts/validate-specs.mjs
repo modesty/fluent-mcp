@@ -94,7 +94,8 @@ function setupScaffold() {
     'ClientScript', 'CrossScopePrivilege', 'DataLookup', 'DataPolicy', 'Documentation',
     'ImportSet', 'LicensingConfig', 'List', 'NowAssistSkillConfig', 'Property',
     'RestApi', 'RestMessage', 'RetryPolicy',
-    'Role', 'StateModel', 'Test', 'UiPolicy', 'UserPreference', 'atf', 'Record',
+    'Role', 'StateModel', 'Test', 'TestSuite', 'UiPolicy', 'UserPreference', 'atf', 'Record',
+    'GraphQLApi',
     // Flow / automation surface (also exported from '@servicenow/sdk/automation')
     'Flow', 'FlowStage', 'Subflow', 'Table',
     'PlaybookDefinition', 'PlaybookTriggerTypes', 'ActivityDefinitions',
@@ -108,6 +109,8 @@ function setupScaffold() {
     'catalogItemRef', 'variableSetRef', 'variableSetObject',
     'workspaceObject', 'applicabilityObject', 'listConfigObject', 'dataPill',
     'flowVarSchema',
+    'someTest', 'someOtherTest', 'parentSuite',
+    'resolveItems', 'resolveSearchResultType', 'schemaGateAcl',
     // Column types
     'ApprovalRulesColumn', 'BasicDateTimeColumn', 'BasicImageColumn',
     'BooleanColumn', 'CalendarDateTime', 'ChoiceColumn', 'ConditionsColumn',
@@ -295,6 +298,51 @@ function writeReport(specs, errorsByFile) {
   return totals;
 }
 
+/**
+ * Guard the ATF parent index against drift.
+ *
+ * `res/spec/fluent_spec_atf.md` fronts the whole atf-* family: it documents the
+ * `Test()` container once and routes to the 18 step sub-types. That index is
+ * hand-written, so it rots as soon as a new atf-* type lands (atf-ui-test-script
+ * arrived in SDK v4.9.0, atf-list in v4.10.0). Exactly that rot is how the family
+ * ended up with an orphan instruct file and no spec at all.
+ *
+ * Asserts, in both directions:
+ *   - every `atf-*` member of ServiceNowMetadataType has a row in the index
+ *   - every type the index points at is a real enum member with a spec file
+ */
+function checkAtfIndex() {
+  const PARENT = 'fluent_spec_atf.md';
+  const parentPath = path.join(SPEC_DIR, PARENT);
+  if (!fs.existsSync(parentPath)) {
+    return [`${PARENT} is missing — the atf-* family has no parent spec`];
+  }
+
+  const typesSrc = fs.readFileSync(path.join(PROJECT_ROOT, 'src', 'types.ts'), 'utf-8');
+  const enumBody = typesSrc.match(/export enum ServiceNowMetadataType \{([\s\S]*?)\n\}/);
+  if (!enumBody) return ['could not parse ServiceNowMetadataType from src/types.ts'];
+  const subTypes = [...enumBody[1].matchAll(/'(atf-[a-z0-9-]+)'/g)].map(m => m[1]);
+
+  const parent = fs.readFileSync(parentPath, 'utf-8');
+  // Index rows look like: | `atf-form` | `atf.form` | ... |
+  const indexed = [...parent.matchAll(/^\|\s*`(atf-[a-z0-9-]+)`\s*\|/gm)].map(m => m[1]);
+
+  const problems = [];
+  for (const t of subTypes) {
+    if (!indexed.includes(t)) {
+      problems.push(`${PARENT} index is missing sub-type '${t}' (add a row, or the type is unreachable from the family entry point)`);
+    }
+  }
+  for (const t of indexed) {
+    if (!subTypes.includes(t)) {
+      problems.push(`${PARENT} index points at '${t}', which is not a ServiceNowMetadataType member`);
+    } else if (!fs.existsSync(path.join(SPEC_DIR, `fluent_spec_${t}.md`))) {
+      problems.push(`${PARENT} index points at '${t}', which has no res/spec/fluent_spec_${t}.md`);
+    }
+  }
+  return problems;
+}
+
 function main() {
   console.log(`\nValidating res/spec/*.md against @servicenow/sdk (installed version) types…\n`);
 
@@ -327,12 +375,23 @@ function main() {
   }
 
   const totals = writeReport(specs, errors);
+
+  // ATF parent-index parity (skipped when validating a single unrelated type)
+  const atfProblems = (!FILTER || FILTER.startsWith('atf')) ? checkAtfIndex() : [];
+  if (atfProblems.length > 0) {
+    console.log('');
+    console.log('  [FAIL] ATF parent index (res/spec/fluent_spec_atf.md)');
+    for (const p of atfProblems) console.log(`         ${p}`);
+  } else if (!FILTER || FILTER.startsWith('atf')) {
+    console.log('  [OK]   ATF parent index covers every atf-* sub-type');
+  }
+
   console.log('');
   console.log(`Results: ${totals.passed} clean, ${totals.failed} with errors, ${totals.skipped} skipped, ${specs.length} total`);
   console.log(`Report:  coverage/spec-validation.md`);
   console.log('');
 
-  process.exit(totals.failed > 0 ? 1 : 0);
+  process.exit(totals.failed > 0 || atfProblems.length > 0 ? 1 : 0);
 }
 
 main();
