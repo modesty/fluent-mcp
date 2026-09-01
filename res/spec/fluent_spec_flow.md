@@ -148,6 +148,27 @@ wfa.flowLogic.exitLoop({ $id: Now.ID['exit_id'] })
 wfa.flowLogic.endFlow({ $id: Now.ID['end_id'] })
 wfa.flowLogic.skipIteration({ $id: Now.ID['skip_id'] })
 
+// ─── DO-WHILE RETRY LOOP — SDK v4.11.0+ (NEW construct, not a rename of anything) ───
+// Repeats the body until an exit condition is met, with DO-WHILE semantics: the body ALWAYS runs at
+// least once, and the condition is evaluated only AFTER each run — so it can reference outputs of
+// actions declared inside the same body.
+// NOTE the authored names are `doTheFollowing` + `until`. There is no `doTheFollowingUntil` function;
+// that string appears only as a doc tag keyword.
+wfa.flowLogic.doTheFollowing(
+    { $id: Now.ID['do_until_id'], label: '', annotation: '' }, // { $id, label?: string, annotation?: string }
+    () => {
+        // loop body actions...
+        // The condition MUST be the body's LAST statement, and must be CALLED, not returned:
+        // omitting it, or using `return wfa.flowLogic.until(...)`, fails build-time validation.
+        wfa.flowLogic.until('') // string condition; may embed wfa.dataPill(...) references
+    }
+)
+// `doTheFollowing` counts as a loop construct, so exitLoop / skipIteration work inside its body
+// exactly as inside forEach. endFlow inside the body still terminates the WHOLE flow, not the loop.
+// Guard against infinite loops: because the condition is checked after the body, include a bounded
+// signal (retry counter, timeout field, max-attempts flag). When polling, put a waitForADuration
+// inside the body to avoid tight polling.
+
 // ─── ERROR HANDLING & PARALLELISM — SDK v4.7.0+ ───
 // tryCatch: run a try block, run the catch block only if the try block errors. Blocks can be nested.
 wfa.flowLogic.tryCatch(

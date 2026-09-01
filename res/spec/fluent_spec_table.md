@@ -37,6 +37,8 @@ Table({
         numberOfDigits: 0, // number
     },
     scriptableTable: false, // boolean
+    sizeClass: 0, // number, optional (SDK v4.11.0+) - size classification of the table, indicating its
+        // expected size category. Free-form number; the SDK derives no default and validates no range
 }): Table; // returns a Table object
 
 // ─── TABLE AUGMENTS (SDK v4.7.0+) ───

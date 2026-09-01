@@ -13,5 +13,7 @@ List({
     ],
     parent: '', // string, optional - parent table for related lists
     relationship: '', // string, optional - custom relationship identifier for relationship-based lists
+    domain: 'global', // string, optional (SDK v4.11.0+) - the sys_domain applied to the list.
+        // Defaults to 'global' when omitted, so only set it for a domain-separated instance
 });
 ```
