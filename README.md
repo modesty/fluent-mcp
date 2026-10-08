@@ -2,14 +2,14 @@
 
 An [MCP server](https://modelcontextprotocol.io) that brings [ServiceNow Fluent SDK](https://www.servicenow.com/docs/bundle/yokohama-application-development/page/build/servicenow-sdk/concept/servicenow-fluent.html) capabilities to AI-assisted development environments. Enables natural language interaction with ServiceNow SDK commands, API specifications, code snippets, and development resources.
 
-Built for [@servicenow/sdk@v4.11.2](https://github.com/ServiceNow/sdk/releases#release-v4.11.0).
+Built for [@servicenow/sdk@v4.13.6](https://github.com/ServiceNow/sdk/releases#release-v4.13.0).
 
 > **Note** : Since v0.6.0 the server speaks **both** [MCP@2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28) and [MCP@2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25) from one handler set — the stdio entry inspects the opening message and serves whichever era the client opens with. [v0.5.1](https://github.com/modesty/fluent-mcp/releases#release-v0.5.1) is the last release built on the v1 MCP SDK (2025-11-25 only).
 
 ## Key Features
 
 - **SDK Command Tools** - `sdk_info` plus ServiceNow SDK command tools for `init`, `build`, `install`, `dependencies`, `transform`, `download`, `clean`, `pack`, `explain`, `query`, and `cicd`
-- **Rich Resources** - API specifications, instructions, and code snippets for **70 ServiceNow metadata types**
+- **Rich Resources** - API specifications, instructions, and code snippets for **75 ServiceNow metadata types**
 - **API Documentation Lookup** - `explain_fluent_api` returns SDK docs for any Fluent API or guide — no project required
 - **Lazy Auto-Authentication** - Detects and caches an auth profile only when an auth-requiring command or `check_auth_status` needs it
 - **Explicit Project Context** - Resolves each project command from its `workingDirectory` argument, the initialized session, or `FLUENT_MCP_WORKING_DIR`, then fails with actionable guidance instead of guessing
@@ -20,7 +20,7 @@ This MCP server implements the [Model Context Protocol](https://modelcontextprot
 
 ### Core
 
-- **Resources** - 300+ resources across 70 ServiceNow metadata types (API specs, instructions, snippets, prompts)
+- **Resources** - 300+ packaged resource documents across 75 ServiceNow metadata types (API specs, instructions, snippets, prompts)
 - **Tools** - 13 ServiceNow SDK command tools plus 4 resource/auth tools (17 total), with full parameter validation. Read tools (`get-api-spec`, `get-snippet`, `get-instruct`, `check_auth_status`) declare an `outputSchema` and return `structuredContent` for programmatic consumers
 - **Prompts** - Development workflow templates for common ServiceNow tasks (`coding_in_fluent`, `create_custom_ui`)
 - **Logging & Progress** - Structured logs are written to stderr; progress notifications are sent for long-running commands (any command with a 30s or longer timeout — deploy, build, transform, download, dependencies, query, pack, cicd) when the client supplies a progress token
@@ -48,7 +48,7 @@ The server requires **no client capabilities** and issues **no server→client r
 
 ```bash
 # Test with MCP Inspector
-npx @modelcontextprotocol/inspector npx @modesty/fluent-mcp
+npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector npx @modesty/fluent-mcp
 
 # Build the optional self-contained MCPB distribution
 npm run bundle
@@ -82,15 +82,15 @@ Create a new Fluent app in ~/projects/time-off-tracker to manage employee PTO re
 | `explain_fluent_api` | Look up Fluent SDK documentation for any API or guide. No Fluent project required. | `topic` (optional API/guide name or tag keyword — required unless `list=true`), `list` (boolean — list topics), `peek` (boolean — brief summary), `format` (`pretty`\|`raw`), `source` (optional project path override), `debug` (optional) |
 | `init_fluent_app` | Initialize or convert a ServiceNow app. Non-interactive: missing intent-specific arguments fail with an error naming them. | `intent`, `from` (conversion), `appName`/`packageName`/`scopeName`/`template` (creation), `auth`, `workingDirectory` (required), `debug` |
 | `build_fluent_app` | Build the application | `workingDirectory`, `debug` (optional) |
-| `deploy_fluent_app` | Deploy to a ServiceNow instance. SDK flow activation can be skipped. | `workingDirectory`, `auth` (auto-injected), `skipFlowActivation`, `debug` |
-| `fluent_transform` | Convert XML or instance metadata to Fluent TypeScript. Local paths do not require auth; instance transforms do. | `workingDirectory`, `from`, `directory`, `auth` (auto-injected), `table`, `id`, `debug` |
+| `deploy_fluent_app` | Deploy to a ServiceNow instance. SDK flow activation can be skipped. Installs run asynchronously by default since SDK v4.12.0. | `workingDirectory`, `auth` (auto-injected), `skipFlowActivation`, `async` (set `false` to force a synchronous install), `debug` |
+| `fluent_transform` | Convert local XML to Fluent TypeScript (`from`, offline — cannot be combined with `auth` or `id`), or pull instance changes back into `.now.ts` files: the whole app (no `from`), or one record and its related records (`table` + `id`). `table` without `id` only filters local XML to those tables — it never downloads. | `workingDirectory`, `from`, `directory`, `auth` (auto-injected; instance modes only), `table`, `id` (requires `table`), `force` (requires `table`), `format` (default true), `timeoutSeconds` (full-app instance transforms), `debug` |
 | `download_fluent_dependencies` | Download dependencies and type definitions | `workingDirectory`, `auth` (auto-injected), `debug` |
-| `download_fluent_app` | Download metadata from an instance | `workingDirectory`, `directory` (required), `source`, `auth` (auto-injected), `incremental`, `debug` |
+| `download_fluent_app` | Download metadata from an instance | `workingDirectory`, `directory` (required), `source`, `auth` (auto-injected), `incremental`, `timeoutSeconds`, `debug` |
 | `clean_fluent_app` | Clean output directory | `workingDirectory`, `source` (optional), `debug` |
 | `pack_fluent_app` | Create an installable artifact | `workingDirectory`, `source` (optional), `debug` |
 | `query_fluent_records` | Read-only Table REST query against an instance; returns a JSON envelope | `workingDirectory`, `table` (required), `query` (required encoded query), `fields`, `limit`, `offset`, `displayValue`, `view`, `queryCategory`, `excludeReferenceLink`, `noCount`, `queryNoDomain`, `timeout`, `select`, `auth` (auto-injected), `debug` |
 | `cicd_fluent_app` | Install, publish, or rollback an app via the ServiceNow CI/CD API (`sn_cicd`). **Changes instance state.** | `workingDirectory`, `action` (required: `install`\|`publish`\|`rollback`), `scope`\|`appSysId`, `appVersion` (required for rollback, and for install/publish outside a Fluent project), `baseAppVersion`, `autoUpgradeBaseApp`, `devNotes`, `wait`, `pollTimeout`, `auth` (auto-injected), `output` (`json`\|`raw`), `select`, `debug` |
-| `cicd_fluent_test` | Run, watch, or fetch results for ATF test suites and tests via the CI/CD API. `run` executes real ATF steps on the instance. No Fluent project required (and none accepted). | `target` (required: `testsuite`\|`test`), `action` (required: `run`\|`watch`\|`result`), `testSuiteSysId`\|`testSuiteName`, `testSysId`\|`testName`, `progressId` (watch), `resultId` (result), `browserName`, `browserVersion`, `osName`, `osVersion`, `runInCloud`, `isPerformanceRun`, `captureNodeLogs`, `wait`, `pollTimeout`, `auth` (auto-injected), `output` (`json`\|`raw`), `select`, `debug` |
+| `cicd_fluent_test` | Run, watch, or fetch results and logs for ATF test suites and tests via the CI/CD API. `run` executes real ATF steps on the instance. No Fluent project required (and none accepted). | `target` (required: `testsuite`\|`test`), `action` (required: `run`\|`watch`\|`result`\|`logs` — `logs` for `test` only), `testSuiteSysId`\|`testSuiteName`, `testSysId`\|`testName`, `progressId` (watch), `resultId` (result, logs), `pattern`, `limit` (logs), `browserName`, `browserVersion`, `osName`, `osVersion`, `runInCloud`, `isPerformanceRun`, `captureNodeLogs`, `wait`, `pollTimeout`, `auth` (auto-injected), `output` (`json`\|`raw`), `select`, `debug` |
 
 ### Resource and Authentication Tools (4)
 
@@ -130,11 +130,11 @@ Standardized URI patterns following MCP specification:
 
 ### Supported Metadata Types
 
-71 metadata types across the following categories:
+75 metadata types across the following categories:
 
-**Core Types:** `acl`, `application-menu`, `business-rule`, `client-script`, `cross-scope-privilege`, `data-policy`, `field-style`, `form`, `import-set`, `instance-scan`, `list`, `property`, `role`, `scheduled-script`, `script-action`, `script-include`, `scripted-rest`, `sla`, `state-model`, `table`, `ui-action`, `ui-page`, `ui-policy`, `user-preference`
+**Core Types:** `acl`, `application-menu`, `business-rule`, `client-script`, `cross-scope-privilege`, `data-policy`, `field-style`, `form`, `import-set`, `instance-scan`, `interceptor`, `list`, `property`, `role`, `scheduled-script`, `script-action`, `script-include`, `scripted-rest`, `sla`, `state-model`, `table`, `ui-action`, `ui-page`, `ui-policy`, `user-preference`
 
-**Table Types:** `column`, `column-generic`
+**Table Types:** `column`, `column-generic`, `database-view`
 
 **Service Catalog:** `catalog-item`, `catalog-item-record-producer`, `catalog-ui-policy`, `catalog-client-script`, `catalog-variable`, `variable-set`
 
@@ -150,11 +150,35 @@ Standardized URI patterns following MCP specification:
 
 **Workspace & Analytics:** `workspace`, `dashboard`
 
+**Assessments:** `assessment`, `risk-assessment`
+
 **ATF (Automated Test Framework):** `atf` (the `Test()` container and family entry point — start here, then route to a step sub-type), `atf-appnav`, `atf-catalog-action`, `atf-catalog-validation`, `atf-catalog-variable`, `atf-email`, `atf-form`, `atf-form-action`, `atf-form-declarative-action`, `atf-form-field`, `atf-form-sp`, `atf-list`, `atf-reporting`, `atf-rest-api`, `atf-rest-assert-payload`, `atf-server`, `atf-server-catalog-item`, `atf-server-record`, `atf-ui-test-script`, `test-suite`
 
-### What's new in 4.11.2
+### What's new in 4.13.6
 
-This release of the MCP server tracks `@servicenow/sdk` 4.11.2, covering the authoring-surface additions shipped across 4.11.0 and 4.11.2 (4.11.1 was never published to npm, and 4.11.2 shipped no release notes — its surface was established by diffing the installed package):
+This release of the MCP server tracks `@servicenow/sdk` 4.13.6, covering everything shipped across 4.12.0–4.13.6. Only 4.12.0 and 4.13.0 published release notes (4.13.1, 4.13.2, 4.13.4 and 4.13.5 were never published to npm), so the surface was established by diffing the installed package — types, build plugins, and CLI flag declarations — against 4.11.2:
+
+- **New metadata type**: `assessment` (SDK v4.12.0+) — the `Assessment` API defines an assessment or survey (`asmt_metric_type`) with its categories, metrics, and metric definitions. Metrics are a discriminated union over 19 `dataType` values. A scored assessment also writes its scoring business rules, and a scheduled one a `sys_trigger` job that ships **inactive**.
+- **New metadata type**: `risk-assessment` (SDK v4.12.0+) — the `RiskAssessment` API defines a change risk assessment (`change_risk_asmt`) with its categories, metrics, and risk thresholds. It requires the Change Risk Assessment plugin, which the build cannot check — query `sys_plugins` with `query_fluent_records` first.
+- **New metadata type**: `database-view` (SDK v4.13.0+) — the `DatabaseView` API joins existing tables into a read-only reportable view (`sys_db_view` + `sys_db_view_table` + `sys_db_view_table_field`). `name` is the identity (no top-level `$id`) and must carry the `u_` (global) or `<scope>_` (`x_` scope) prefix — both hard build errors.
+- **New metadata type**: `interceptor` (SDK v4.13.0+, absent from every release note) — the `Interceptor` API defines a guided-question wizard (`sys_wizard` + `sys_wizard_answer`) that routes a user to the right form or page; choices for multiple-choice answers go in the new `sys_wizard_choice` table via `Record()` + `Now.ref`.
+- **Playbook variants, Go Back, and more** (SDK v4.13.0+) — `wfa.playbook.variant()` with per-activity `variant` / `variantOverrides` (mutually exclusive) and `evaluateVariantChildrenAfter`; `ActivityDefinitions.Core.GoBack` (only as the last activity of a `match_first` branch, with a `RUN_ALWAYS` target); `isIdealPath` on decision branches; per-activity `actionOverrides` that **replace** the default buttons; `publicAccess` for unauthenticated execution from public pages; and `wfa.playbook.automationPlan()` pills in experience properties. **Potentially breaking:** `NewRecordForm` now requires `table` and `ChecklistTask` requires `checklist_items`, and `interface … extends BaseActivityConfig` now fails (TS2312).
+- **Flow hoisting** (SDK v4.13.0+) — `tryCatch` arms and `doInParallel` branches can return outputs, the `catch` arm receives `tryOutputs`, and `endFlow` is allowed inside either `tryCatch` arm. The old "datapills are not visible outside the block — use `setFlowVariables`" rule is retired. Give each exposed action an explicit string `uuid`.
+- **Table** — augment mode accepts `index` (SDK v4.13.0+), and new `allowConfiguration` / `dbObjectId` properties (SDK v4.13.3+). `UrlColumn` accepts relative URLs (SDK v4.12.0+), and column `hint` / `help` / `plural` now actually reach `sys_documentation` (SDK v4.12.1+).
+- **ACL** — three new AI-experience types (`aiux_page`, `aiux_widget`, `aiux_experience`, SDK v4.12.0+) that **require `name`**, and `roles` entries may carry a per-role `protectionPolicy` (SDK v4.13.6+).
+- **ATF** — the Service Portal `clickUIAction` step's `assert` and `searchForCatalogItem`'s `catalog` / `category` became optional (SDK v4.13.0+), and the `atf-server-catalog-item` resources now use the real snake_case input and output names (`catalog_item_id`, `request_item`, `request_id`); the old camelCase names never built.
+- **UI Action** — `form` / `list` accept `true` (programmatic-only, UI26) and `style` adds `'primary-ai'` / `'secondary-ai'` (SDK v4.12.0+).
+- **`$meta` on more APIs** (SDK v4.13.0+) — `EmailNotification`, `UiPolicy`, `ScriptOnlyCheck`, `TableCheck`, `CatalogClientScript`, `CatalogItemRecordProducer`, and catalog variables now accept `$meta`.
+- **Dashboard corrections** — the new SDK dashboard guides exposed long-standing errors in this server's `dashboard` resources: the grid is **48** columns wide (not 24), data is bound inline (`dataSources` + `metrics` + `groupBy` / `trendBy`) rather than by report sys_id, and filters are now documented.
+- **Tool changes** — `cicd_fluent_test` gains `action: "logs"` (a single test result's captured logs, filtered by a case-insensitive regex `pattern`, with `limit`); `deploy_fluent_app` gains `async` (installs are asynchronous by default since SDK v4.12.0) and a 15-minute budget, because the CLI's async install poll has no cap of its own; `download_fluent_app` and `fluent_transform` gain `timeoutSeconds` for the new CLI `--timeout` (an idle timeout in **seconds**, default 3600) and a 10-minute default budget. `fluent_transform` now also enforces the CLI's own combination rules before spawning — `from` cannot be combined with `auth` or `id`, and `id` and `force` each require `table` — so a call that used to fail inside yargs after spawn (an explicit `auth` with `from` was forwarded) is rejected with a message naming the conflict, and it exposes the CLI's long-standing `force` and `format` flags. The tool count is unchanged at 17.
+- **Prompts aligned with `now-sdk explain`** — `coding_in_fluent` is now **TypeScript-first**: server-side logic goes in TypeScript modules under `src/server/` that import Glide APIs from `@servicenow/glide`, and JavaScript (a `Now.include()` file) is only the fallback for string-only script fields such as `ScriptInclude` and `ClientScript`. Server scripts default to ES2021, not ES5. Its syntax rules now cite the compiler's real diagnostics (loops TS250, `if` TS245, `+` concatenation TS303) and warn that `.map()`-generated records build but are corrupt. It replaces `get_sys_id(...)`, which is not an SDK API and fails a real build, with `Now.ref`. Two dozen capability bullets were corrected where the 4.13.6 docs or package disagreed with them, among them `protectionPolicy`'s two value sets, State Model enforcement, Now Assist provider selection, and Store-app augment prefixes. `create_custom_ui` gets an endpoint that actually builds, the React 18.2.0 dependency set (the templates scaffold 19.x), the `clientDir` / `staticContent.paths` trap, the UI Page guides' required patterns, and their full limitations list. `coding_in_fluent` keeps `Now.include()` for scripts, CSS, and as-is HTML (Jelly pages, Service Portal templates) but exempts a bundled UI Page's `index.html`, which must be imported: `Now.include()` there builds successfully yet leaves `src="./main.tsx"` unrewritten in the deployed page.
+- **Not wrapped on purpose**: the new `now-sdk auth --print` prints a live bearer or session token with the user's full instance permissions. Exposing it as a tool would place that secret in model context and transcripts, where instance-sourced text could steer it into another tool, and the server already makes every instance call itself. Run it in your own terminal if you need a token.
+
+> Source-of-truth note: the installed package disagrees with the release notes and shipped docs in several places, each treated as a correction. Assessments have **no** "post-deployment steps" API (that phrase is a manual checklist in the risk guide), and the string form of `displayedWhen` / `correctAnswerChoice` is **silently written empty**. `RiskAssessment` has **no** `table` or `evaluationMethod` property. The 4.13.0 `DatabaseView` example does **not** compile, failing in six separate ways (it has a top-level `$id`, uses `where` instead of `whereClause`, and puts `fields` at the top level, among others). `publicAccess` is **not** a public API, and playbook "image attachments" are a transform round-trip, not an authoring feature. The package carries **no** `@since` tags, contrary to the "corrected `@since` versions" item. The CLI `--timeout` default is **3600** seconds, not 300. The developing-apps guide says `transform --table` scopes an instance pull, but without `--id` it only filters local XML (`--from`, or the project directory) and never downloads. The UI Page guide says a client `tsconfig.json` without `skipLibCheck` fails the build; that did not reproduce with `@servicenow/react-components` 0.1.8, so the prompt keeps the rule without the claim. Table augments need `<scope>_` in every `x_` scope — Store apps included — so this server's earlier advice to use `u_` for Store apps was wrong. The shipped flow-hoisting examples use shorthand returns that Fluent rejects. See `.mosey/upgrade-sdk-4.13.6.md`.
+
+### Previously (4.11.x)
+
+Authoring-surface additions shipped across `@servicenow/sdk` 4.11.0 and 4.11.2 (4.11.1 was never published to npm, and 4.11.2 shipped no release notes — its surface was established by diffing the installed package):
 
 - **New metadata type**: `test-suite` — the `TestSuite` API groups existing ATF `Test()` records into a named, orderable, optionally nested suite, writing `sys_atf_test_suite` plus one `sys_atf_test_suite_test` membership row per entry. Run order comes from **array position**, not an authored field. It is **authoring only**: it never triggers or schedules a run — use ATF's UI/scheduler or `cicd_fluent_test`.
 - **New metadata type**: `graphql-api` — the `GraphQLApi` API defines a scripted GraphQL API (`sys_graphql_schema`) with its resolvers, type resolvers, and two-tier security: schema-gate ACLs on the whole API plus standalone field-level `Acl({ type: 'graphql' })` path ACLs. Resolver `paths` use `Type:field`; ACL names use the slash-delimited runtime query path.
@@ -223,7 +247,7 @@ This release of the MCP server tracked `@servicenow/sdk` 4.7.x and added support
 - **New metadata type**: `data-policy` — the `DataPolicy` API (`sys_data_policy2`) for server-side mandatory/read-only field enforcement that cannot be bypassed via API, import, or web service.
 - **Flow error handling & parallelism** — `wfa.flowLogic.tryCatch`, `wfa.flowLogic.doInParallel`, and `wfa.flowLogic.appendToFlowVariables` (append to `Array.Object` flow variables).
 - **Flow stages** — declare `stages` with `FlowStage({ label, value, … })` and activate them in the body via `wfa.stage(...)` for progress tracking.
-- **Table augments** — add columns to an existing platform/cross-scope table via `Table({ augments: '<table>', schema })`; added columns must use the current app's ownership prefix: `<scope>_` in a named custom scope (for example, `x_acme_`), or `u_` in global and Store-app contexts.
+- **Table augments** — add columns to an existing platform/cross-scope table via `Table({ augments: '<table>', schema })`; added columns must use the current app's ownership prefix: `<scope>_` in an `x_` scope (for example, `x_acme_`), or `u_` in global — the build rejects anything else, so a Store app (always an `x_` scope) uses its scope prefix.
 - **AI Agent** — new `agentDescriptor`; `dataAccess` accepts `roleMap` (role names) or `roleList` (role sys_ids).
 - **NASK** — `securityControls` accepts `roleMap` (role names) alongside `roleRestrictions` (role sys_ids).
 - **Universal field override (`$override`)** — escape hatch on Fluent constructors to set unmodeled columns by DB column name.
@@ -237,7 +261,7 @@ Added `custom-action`, `inbound-email-action`, `sp-header-footer`, and `sp-page-
 
 ## Configuration
 
-**Requirements:** Node.js 20.18.0+, npm 11.4.1+, `@servicenow/sdk` 4.11.2
+**Requirements:** Node.js 20.18.0+, npm 11.4.1+, `@servicenow/sdk` 4.13.6
 
 ### MCP Client Setup
 
@@ -302,6 +326,16 @@ For headless pipelines, the ServiceNow SDK CLI reads credentials directly from `
 
 OAuth uses the `client_credentials` grant against `/oauth_token.do`. See the SDK's `ci-integration` guide (via `explain_fluent_api`) for instance setup details.
 
+Note that these `SN_SDK_*` credentials take precedence over a stored alias, so the `auth` alias the server injects is ignored while they are set.
+
+#### MFA-enforced basic auth — SDK v4.13.0+
+
+The SDK CLI now answers an instance's `mfa_code_required` challenge by prompting for a TOTP code — but only in an interactive terminal. The server spawns the CLI without a TTY, so for an MFA-enforced basic-auth user every instance-touching tool fails fast with *"MFA code required but no interactive terminal is available"* (it does not hang). Use an OAuth profile instead, or pre-authenticate in your own terminal with `now-sdk auth --print --format env` and export the resulting `SN_SDK_INSTANCE_URL` + `SN_SDK_SESSION_*` variables into the server's environment; spawned commands inherit them.
+
+#### SDK telemetry
+
+The ServiceNow SDK CLI sends usage telemetry by default. As of SDK 4.13.6 it goes to a ServiceNow-hosted PostHog endpoint (4.11.2 used AppSee), and it includes a hashed user/host id, the instance hostname, and a coding-agent tag. Nearly every command the server spawns emits it (including the lazy `auth --list` check and missed `explain` topics). The server does not override the SDK default. Set `NO_TELEMETRY=1` in the server's environment to opt out, or `FLUENT_TELEMETRY_FILE=<path>` to write the events to a local file instead; spawned commands inherit both. Neither variable is documented by the SDK itself; both were read from `@servicenow/sdk-build-core`'s telemetry factory.
+
 ## Usage Examples
 
 ### Typical Workflow
@@ -334,7 +368,7 @@ The [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) provid
 
 ```bash
 # Test published package
-npx @modelcontextprotocol/inspector npx @modesty/fluent-mcp
+npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector npx @modesty/fluent-mcp
 
 # Or for local development (built server)
 npm run build && npm run inspect
@@ -382,7 +416,7 @@ npm run inspect:dev
 3. **Test Version:**
    - Set `flag` parameter to `-v`
    - Click **Execute**
-   - Verify response shows the SDK version (e.g., `4.11.2`)
+   - Verify response shows the SDK version (e.g., `4.13.6`)
 4. **Test Help:**
    - Set `flag` parameter to `-h`
    - Set `command` parameter to `build`

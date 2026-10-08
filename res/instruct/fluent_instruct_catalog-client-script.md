@@ -11,3 +11,4 @@ Always reference the CatalogClientScript API specification for more details.
 6. For `onSubmit` validation scripts, return `true` to allow submission and `false` to block it. Always `alert()` the reason for blocking so the user knows what to fix.
 7. Set `appliesOnCatalogItemView: true` (the most common setting) to run the script on the catalog request form. Additional flags (`appliesOnRequestedItems`, `appliesOnCatalogTasks`, `appliesOnTargetRecord`) extend where the script runs.
 8. Set `vaSupported: true` only if the script logic is compatible with Virtual Agent catalog flows. Many DOM-based operations do not work in VA context.
+9. **SDK v4.13.0** — `CatalogClientScript` accepts `$meta` with `installMethod` (`'demo'`, `'once'` or 'first install') to control when the record loads. `useEsLatest` targets server-side scripts, so it does nothing for this client-side script — leave it unset.

@@ -5,20 +5,27 @@
 const specAcl = Acl({
     $id: '', // string | guid, mandatory
     active: true, // boolean, optional
-    name: '', // string — mandatory for the named object types (`rest_endpoint`, `ui_page`, `processor`, `graphql`, `client_callable_flow_object`, `client_callable_script_include`); optional for `ux_page`/`ux_route`; not applicable when `type` is `record` or `pd_action` (use `table`/`field` instead)
-    type: 'record', // mandatory — the object type being secured, see "ACL object types" below: `record`, `rest_endpoint`, `ui_page`, `processor`, `graphql`, `pd_action`, `ux_data_broker`, `ux_page`, `ux_route`, `client_callable_flow_object`, `client_callable_script_include`. Type is `keyof typeof AclTypes | (string & {})`, so those 11 are autocomplete suggestions, NOT a compile-time constraint — any string compiles. `type` also selects which variant properties apply (`table`/`field` vs `name` vs `dataBroker`) and CANNOT be changed after the ACL is created.
+    name: '', // string — mandatory for the named object types (`rest_endpoint`, `ui_page`, `processor`, `graphql`, `client_callable_flow_object`, `client_callable_script_include`, and — SDK v4.12.0+ — `aiux_page`, `aiux_widget`, `aiux_experience`); optional for `ux_page`/`ux_route`; not applicable when `type` is `record` or `pd_action` (use `table`/`field` instead)
+    type: 'record', // mandatory — the object type being secured, see "ACL object types" below: `record`, `rest_endpoint`, `ui_page`, `processor`, `graphql`, `pd_action`, `ux_data_broker`, `ux_page`, `ux_route`, `client_callable_flow_object`, `client_callable_script_include`, plus (SDK v4.12.0+) `aiux_page`, `aiux_widget`, `aiux_experience`. Type is `keyof typeof AclTypes | (string & {})`, so those 14 are autocomplete suggestions, NOT a compile-time constraint — any string compiles. `type` also selects which variant properties apply (`table`/`field` vs `name` vs `dataBroker`) and CANNOT be changed after the ACL is created.
     operation: 'read', // mandatory — the operation this rule secures: `execute`, `create`, `read`, `write`, `delete`, `conditional_table_query_range`, `data_fabric`, `query_match`, `query_range`, `edit_task_relations`, `edit_ci_relations`, `save_as_template`, `add_to_list`, `report_on`, `list_edit`, `report_view`, `personalize_choices`. Type is `keyof typeof AclOperations | (string & {})` — those 17 are autocomplete suggestions, NOT a compile-time constraint. One ACL secures exactly one operation.
     table: '', // mandatory if `type` is `record` or `pd_action`; optional for `ux_data_broker`, `ux_page` and `ux_route`
     field: '*', // for field-level `record` ACLs: a schema field name, a system column, or the wildcard `*` (type: keyof FullSchema<T> | SystemColumns | '*', SDK 4.8.0+ accepts custom column names)
     appliesTo: '', // ServiceNow encoded query, applicable when `type` is `record` or `pd_action` (also accepted for `ux_page`/`ux_route`); not available for the named types or `ux_data_broker`
-    roles: [get_sys_id('sys_user_role', '')], // array of Record<'sys_user_role'>, either sys_id for existing roles or Role object for new roles
+    roles: [ // (string | Role | { role: string | Role, protectionPolicy?: '' | 'read' | 'protected' })[]
+        get_sys_id('sys_user_role', ''), // a sys_id (GUID string) of an existing role
+        'itil',                          // a non-GUID string is resolved as a role NAME at build time
+        // Per-role protection override (SDK v4.13.6+). Plain entries inherit the ACL's own `protectionPolicy`
+        // (the build writes it onto every `sys_security_acl_role`); use the object form only when one role must differ.
+        // `''` explicitly marks that role as NOT protected even though the ACL is (only valid here, not at ACL level).
+        { role: 'admin', protectionPolicy: 'read' },
+    ],
     decisionType: 'allow', // typed string, `allow`|`deny`
     condition: '', // ServiceNow encoded query
     script: '', // ServiceNow script to fullfil the functional request in scripting,
     adminOverrides: true, // boolean, default is true
     securityAttribute: 'LoggedIn', // typed string, `LoggedIn`|`Group`|`GroupExplicit`|`HasAdminRole`|`Impersonating`|`InteractiveSession`|`NetworkCriteria`|`Role`|`RoleExplicit`, additional security attributes may be available based on installed plugins, ex. com.glide.client_session_security_attributes
     localOrExisting: 'Local', // typed string, 'Local'|'Existing': if `Local`: A security attribute based on the `condition` property that is saved only for the ACL it is created in; if `Existing`: An existing security attribute to reference in the `security_attribute` property
-    protectionPolicy: 'read', // typed string (added SDK 4.4.0): 'read' | 'protected' — controls edit/view access for other developers
+    protectionPolicy: 'read', // typed string (added SDK 4.4.0): 'read' | 'protected' — controls edit/view access for other developers; also inherited by each plain `roles` entry
     dataBroker: '', // string | Record<'sys_ux_data_broker'>, optional — reference to UX data broker, applicable when `type` is `ux_data_broker`
     $meta: { installMethod: 'once' }, // optional (SDK 4.8.0+): { installMethod: 'first install' | 'demo' | 'once' } — load the record only in specific circumstances
 }): Acl; // returns an Acl object
@@ -41,10 +48,15 @@ const specAcl = Acl({
 | `ux_data_broker` | UX data broker scripts | `dataBroker`, `table`, `field` (all optional) |
 | `ux_page` | UX pages | `name`, `table`, `field`, `appliesTo` (all optional) |
 | `ux_route` | UX routes — use this for workspace ACLs | `name`, `table`, `field`, `appliesTo` (all optional) |
+| `aiux_page` | AIUX pages (SDK v4.12.0+) | `name` (required) |
+| `aiux_widget` | AIUX widgets (SDK v4.12.0+) | `name` (required) |
+| `aiux_experience` | AIUX experiences (SDK v4.12.0+) | `name` (required) |
 
 **WARNING — the object type is immutable.** After creating an ACL rule you cannot change its object type; delete the ACL and create a new one with the correct type.
 
-Note: these 11 values are what the SDK documents and autocompletes, but the declared type is `keyof typeof AclTypes | (string & {})`, so TypeScript will not reject an unknown `type` string.
+**WARNING — `aiux_*` types require `name`.** They are named types like `ui_page`, not catch-all strings: `Acl({ type: 'aiux_page', operation: 'read', roles: ['itil'] })` without `name` is a TS2345 compile error (only `ux_page`/`ux_route` keep `name` optional).
+
+Note: these 14 values are what the SDK documents and autocompletes, but the declared type is `keyof typeof AclTypes | (string & {})`, so TypeScript will not reject an unknown `type` string.
 
 ## Query ACLs (`operation: 'query_match'` / `'query_range'`)
 

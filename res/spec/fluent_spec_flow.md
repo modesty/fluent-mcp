@@ -145,7 +145,8 @@ wfa.flowLogic.waitForADuration({
     duration: Duration({ minutes: 30 }),
 })
 wfa.flowLogic.exitLoop({ $id: Now.ID['exit_id'] })
-wfa.flowLogic.endFlow({ $id: Now.ID['end_id'] })
+wfa.flowLogic.endFlow({ $id: Now.ID['end_id'] }) // must sit inside an if/elseIf/else, forEach, doTheFollowing, doInParallel or (SDK v4.13.0+) tryCatch block —
+    // a top-level endFlow is a build error (TS213 "End Flow must be used within a Do In Parallel, Do The Following, For Each, Try/Catch, or If block")
 wfa.flowLogic.skipIteration({ $id: Now.ID['skip_id'] })
 
 // ─── DO-WHILE RETRY LOOP — SDK v4.11.0+ (NEW construct, not a rename of anything) ───
@@ -169,8 +170,9 @@ wfa.flowLogic.doTheFollowing(
 // signal (retry counter, timeout field, max-attempts flag). When polling, put a waitForADuration
 // inside the body to avoid tight polling.
 
-// ─── ERROR HANDLING & PARALLELISM — SDK v4.7.0+ ───
+// ─── ERROR HANDLING & PARALLELISM — SDK v4.7.0+ (output hoisting SDK v4.13.0+) ───
 // tryCatch: run a try block, run the catch block only if the try block errors. Blocks can be nested.
+// Side-effect-only arms (no return, zero-arg catch) remain valid exactly as before.
 wfa.flowLogic.tryCatch(
     { $id: Now.ID['tc_id'], annotation: '' }, // { $id: string, annotation?: string }
     {
@@ -179,12 +181,67 @@ wfa.flowLogic.tryCatch(
     }
 )
 // doInParallel: run two or more blocks in parallel. Cannot be nested inside another doInParallel.
-// Datapills captured inside a block are not visible outside — persist via setFlowVariables to read them later.
 wfa.flowLogic.doInParallel(
     { $id: Now.ID['parallel_id'], annotation: '' }, // { $id: string, annotation?: string }
     () => { /* block 1 */ },
-    () => { /* block 2 */ } // ...one or more () => void blocks
+    () => { /* block 2 */ } // ...one or more blocks; each may return void or an object of outputs
 )
+
+// ─── OUTPUT HOISTING out of tryCatch / doInParallel — SDK v4.13.0+ ───
+// WARNING — CHANGED GUIDANCE: before SDK v4.13.0, action outputs inside a tryCatch/doInParallel block were NOT
+// reachable outside it (the workaround was setFlowVariables). That limitation is RETIRED: a block can now RETURN
+// the actions it wants to expose, and code after the block dot-walks them from the call's return value.
+//   - doInParallel returns { output_0, output_1, … } — branch N's returned object, by POSITION (side-effect branch → {}).
+//   - tryCatch returns the MERGED outputs of both arms directly (no output_N). The catch arm receives the try arm's
+//     outputs as its single parameter (`tryOutputs`); never reference the outer const from inside an arm.
+//   - Hoisting exists ONLY for these two: an action nested in if/elseIf/else/forEach/doTheFollowing is not exposed,
+//     and only actions declared DIRECTLY in an arm/branch body can be returned.
+// Build-verified rules (the SDK docs/JSDoc examples break the first two):
+//   1. Write explicit property assignments: return { lookup: lookup }. The doc shorthand "return { lookup }" is a
+//      build error (TS304 — shorthand properties are not allowed in Fluent files).
+//   2. Give each exposed action an explicit string-literal `uuid` in its instance config. Without it, a catch-arm
+//      reference (tryOutputs.lookup.X) fails with TS211 "Invalid pill reference", and outer references build but
+//      emit a pill on the tryCatch/doInParallel CONTAINER instead of on the action.
+//   3. An unused catch parameter fails the build (TS6133): omit it, or name it `_tryOutputs`.
+//   4. endFlow may be used inside EITHER tryCatch arm (SDK v4.13.0+); see the endFlow note above.
+const guarded = wfa.flowLogic.tryCatch(
+    { $id: Now.ID['tc_hoist'] },
+    {
+        try: () => {
+            const lookup = wfa.action(
+                action.core.lookUpRecord,
+                { $id: Now.ID['tc_hoist_lookup'], uuid: '00000000-0000-4000-8000-000000000001' }, // literal uuid: required to hoist
+                { table: 'sys_user', conditions: 'active=true' }
+            )
+            return { lookup: lookup } // NOT the shorthand { lookup }
+        },
+        catch: (tryOutputs) => {
+            wfa.action(action.core.log, { $id: Now.ID['tc_hoist_log'] }, {
+                log_level: 'error',
+                log_message: `${wfa.dataPill(tryOutputs.lookup.__action_status__.message, 'string')}`,
+            })
+            wfa.flowLogic.endFlow({ $id: Now.ID['tc_hoist_end'] }) // allowed inside a tryCatch arm
+        },
+    }
+)
+const parallel = wfa.flowLogic.doInParallel(
+    { $id: Now.ID['dip_hoist'] },
+    () => {
+        const groupLookup = wfa.action(
+            action.core.lookUpRecord,
+            { $id: Now.ID['dip_hoist_lookup'], uuid: '00000000-0000-4000-8000-000000000002' },
+            { table: 'sys_user_group', conditions: 'active=true' }
+        )
+        return { groupLookup: groupLookup } // branch 0 → parallel.output_0.groupLookup
+    },
+    () => { /* side-effect-only branch: exposes nothing */ }
+)
+// After the blocks: guarded.lookup.Record, guarded.lookup.__action_status__.message, parallel.output_0.groupLookup.Record
+wfa.action(action.core.log, { $id: Now.ID['hoist_consumer'] }, {
+    log_level: 'info',
+    log_message: `${wfa.dataPill(guarded.lookup.Record, 'reference')} ${wfa.dataPill(parallel.output_0.groupLookup.Record, 'reference')}`,
+})
+// (Use real random UUIDs per action, e.g. from `uuidgen`; the zero-padded values above are placeholders.)
 // appendToFlowVariables: append element(s) to an Array.Object flow variable
 // (declared via FlowArray({ elementType: FlowObject(...) })). Pass params.flowVariables as the schema.
 wfa.flowLogic.appendToFlowVariables(

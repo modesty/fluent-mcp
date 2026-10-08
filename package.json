@@ -1,6 +1,6 @@
 {
   "name": "@modesty/fluent-mcp",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "MCP server for Fluent (ServiceNow SDK)",
   "keywords": [
     "Servicenow SDK",
@@ -41,9 +41,9 @@
     "validate:specs": "node scripts/validate-specs.mjs",
     "validate:instructs": "node scripts/validate-instructs.mjs",
     "bundle": "npm run build && node scripts/bundle.mjs",
-    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
-    "inspect:dev": "npx @modelcontextprotocol/inspector ts-node src/index.ts",
-    "inspect:published": "npx @modelcontextprotocol/inspector npx @modesty/fluent-mcp"
+    "inspect": "npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector node dist/index.js",
+    "inspect:dev": "npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector ts-node src/index.ts",
+    "inspect:published": "npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector npx @modesty/fluent-mcp"
   },
   "type": "module",
   "engines": {
@@ -58,7 +58,7 @@
   "dependencies": {
     "@modelcontextprotocol/core": "2.0.0",
     "@modelcontextprotocol/server": "2.0.0",
-    "@servicenow/sdk": "4.11.2",
+    "@servicenow/sdk": "4.13.6",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -12,21 +12,24 @@ UiAction({
     active: true, // boolean, optional - If true, the UI Action is enabled
     
     // UI action on form view and related properties
-    form: { // object, optional - UI action on form view and related properties
+    form: { // object | true, optional - UI action on form view and related properties. SDK v4.12.0+: `form: true` makes the action
+        // executable in a form via programmatic calls WITHOUT appearing in the UI (only applicable in UI26) — the build writes
+        // form_action=true with every display flag false. Use the object form to display it. `false` is not accepted; omit instead.
         showButton: false, // boolean, optional - Display as form button
         showLink: false, // boolean, optional - Display as form link
         showContextMenu: false, // boolean, optional - Display in form context menu
-        style: '', // string, optional - 'primary' | 'destructive' | 'unstyled'
+        style: '', // string, optional - 'primary' | 'destructive' | 'unstyled' | (SDK v4.12.0+) 'primary-ai' | 'secondary-ai'
         iconName: '', // string, optional (SDK v4.10.1+) - Name of the icon to display on the button. For the list of available icons, go to `/styles/retina_icons/retina_icons.html` on your instance
         showIconOnly: false, // boolean, optional (SDK v4.10.1+) - When true, the button displays only the icon, ignoring the 'Name' field. Remember to add a separate tooltip (`hint`) to the UI Action itself to describe its function to users
     },
     
     // UI action on list view and related properties
-    list: { // object, optional - UI action on list view and related properties
+    list: { // object | true, optional - UI action on list view and related properties. SDK v4.12.0+: `list: true` makes the action
+        // executable in a list via programmatic calls WITHOUT appearing in the UI (only applicable in UI26).
         showButton: false, // boolean, optional - Display as list button
         showLink: false, // boolean, optional - Display as list link
         showContextMenu: false, // boolean, optional - Display in list context menu
-        style: '', // string, optional - 'primary' | 'destructive' | 'unstyled'
+        style: '', // string, optional - 'primary' | 'destructive' | 'unstyled' | (SDK v4.12.0+) 'primary-ai' | 'secondary-ai'
         showListChoice: false, // boolean, optional - Display in list choice menu
         showBannerButton: false, // boolean, optional - Display as banner button on list
         showSaveWithFormButton: false, // boolean, optional - Display as save with form button
@@ -73,4 +76,15 @@ UiAction({
     includeInViews: [], // string[], optional - Specifies views in which UI action to be included
     excludeFromViews: [], // string[], optional - Specifies views from which UI action to be excluded
 }): UiAction; // returns a UiAction object
+
+// Hidden, programmatic-only action (SDK v4.12.0+, UI26): `true` instead of a display object
+UiAction({
+    $id: Now.ID['hidden_resolve'],
+    table: 'incident',
+    name: 'Resolve',
+    actionName: 'resolve_incident',
+    showUpdate: true,
+    form: true, // executable from a form via programmatic calls; no button, link or context-menu entry is shown
+    script: 'current.state = 6; current.update();',
+})
 ```

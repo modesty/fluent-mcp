@@ -8,3 +8,4 @@ Always reference the UiPolicy API specifications for more details.
 6. Set `onLoad: true` to execute the UI Policy when the form first loads. When `false`, the policy only runs when field values change. Use `onLoad: true` for policies that need to set initial field states.
 7. The `uiType` property controls which user interface the policy targets: `'desktop'` for standard UI, `'mobile-or-service-portal'` for mobile and portal, or `'all'` for both.
 8. Use `fieldMessage` and `fieldMessageType` in actions to display inline messages on fields. Valid message types are `'error'`, `'info'`, `'warning'`, and `'none'` (to clear a message).
+9. **SDK v4.13.0** — `UiPolicy` accepts `$meta` with `installMethod` (`'demo'`, `'once'` or 'first install') to control when the policy record loads. Omit it for a policy that should always install.

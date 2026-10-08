@@ -81,5 +81,10 @@ EmailNotification({
         from: '',              // string, optional — digest sender address
         replyTo: '',           // string, optional — digest reply-to address
     },
+
+    // ─── Install-time loading (SDK v4.13.0+) ───
+    $meta: { installMethod: 'demo' }, // optional: { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean }
+        // installMethod: 'first install' → unload, 'demo' → unload.demo (demo data only), 'once' → apply_once.
+        // useEsLatest: run this record's server-side script fields (e.g. advancedCondition) on the latest ECMAScript version.
 }): EmailNotification<TableName> // returns an EmailNotification object
 ```

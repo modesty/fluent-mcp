@@ -6,6 +6,13 @@
 // was removed). If you omit `maxLength`, nothing is written and the column falls back to the instance's
 // own install-time default for that internal type. Set it explicitly whenever the length matters.
 
+// ─── `hint`, `help`, `plural` — column-level documentation, applies to EVERY column type below ───
+// Optional strings on every Column config (hint: verbose description, help: help text, plural: plural label).
+// They are written to the column's `sys_documentation` record(s). Before SDK v4.12.1 the build silently DROPPED the
+// column-level values; from v4.12.1 they land, as the default for every language entry. A `label: Documentation[]`
+// entry that sets its own hint/help/plural overrides the column-level value for that language.
+//   e.g. StringColumn({ label: 'Key', hint: 'Correlation key from the source system', help: 'Set by the integration', plural: 'Keys' })
+
 // Creates a new Column (`sys_dictionary`)
 StringColumn({
  active: false, // boolean
@@ -354,7 +361,7 @@ DomainIdColumn({
  active: false, // boolean
  attributes: {}, // object, snake_case name value pairs, see attribute list
  audit: false, // boolean
- default: '', // string
+ default: '', // string — value type is Record<'domain'> | 'global' | string (the plain-string escape hatch is SDK v4.13.0+)
  functionDefinition: `glidefunction:${""}`, // string, definition of a function that the field performs, such as a mathematical operation, field length computation, or day of the week calculation
  label: '', // string or array of Documentation object
  mandatory: false, // boolean
@@ -470,7 +477,7 @@ UrlColumn({
  attributes: {}, // object, snake_case name value pairs, see attribute list
  audit: false, // boolean
  choices: {}, // object, snake_case name value pairs, for example { choice_1: { label: 'Choice1' }, choice_2: { label: 'Choice2' } }
- default: '', // string, should start with http:// or https://
+ default: '', // string — http:// or https:// is autocompleted, but any string is accepted (SDK v4.12.0+), including relative values such as 'sn_appstore_store.do'
  dropdown: 'none', // 'none' | 'dropdown_with_none' | 'suggestion' | 'dropdown_without_none'
  dynamicValueDefinitions: {}, // object, see dynamic_value_definition examples
  functionDefinition: `glidefunction:${""}`, // string, definition of a function that the field performs, such as a mathematical operation, field length computation, or day of the week calculation

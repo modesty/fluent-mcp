@@ -152,7 +152,11 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
   /**
    * Execute an SDK command with argument mapping to CLI flags.
    * Automatically resolves auth from session when 'auth' is in flagMapping but not provided in args.
-   * Uses the command's timeoutMs for process execution.
+   * Uses resolveTimeoutMs(args) for process execution.
+   *
+   * A boolean flag config marked `negatable` emits the yargs negation
+   * (`--no-<flag>`) when the value is `false` — the only way to turn off a CLI
+   * flag that defaults to true. Without it, `false` emits nothing.
    * @param sdkCommand The SDK command name (e.g., 'build', 'install')
    * @param args The command arguments object
    * @param flagMapping Optional mapping of arg names to CLI flags
@@ -163,7 +167,7 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
   protected async executeSdkCommand(
     sdkCommand: string,
     args: Record<string, unknown>,
-    flagMapping: Record<string, string | { flag: string; hasValue: boolean }> = {},
+    flagMapping: Record<string, string | { flag: string; hasValue: boolean; negatable?: boolean }> = {},
     positionalArgs: string[] = [],
     signal?: AbortSignal
   ): Promise<CommandResult> {
@@ -205,6 +209,9 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
           } else if (value) {
             // Boolean flag without value
             sdkArgs.push(flagConfig.flag);
+          } else if (flagConfig.negatable) {
+            // Explicit false on a default-true CLI flag: emit the yargs negation
+            sdkArgs.push(flagConfig.flag.replace(/^--/, '--no-'));
           }
         }
       }
@@ -217,9 +224,21 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
       command,
       sdkArgs,
       undefined,
-      this.timeoutMs,
+      this.resolveTimeoutMs(args),
       signal,
       args.workingDirectory
     );
+  }
+
+  /**
+   * The runner timeout for one invocation. Defaults to the command's static
+   * timeoutMs; commands whose CLI accepts its own caller-tunable timeout override
+   * this so the runner never kills the child before the CLI can report it.
+   * `FLUENT_MCP_COMMAND_TIMEOUT_MS` still wins over the value returned here.
+   * @param _args The (validated) command arguments
+   * @returns The timeout in milliseconds, or undefined for the runner default
+   */
+  protected resolveTimeoutMs(_args: Record<string, unknown>): number | undefined {
+    return this.timeoutMs;
   }
 }

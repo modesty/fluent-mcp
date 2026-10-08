@@ -72,6 +72,9 @@ GraphQLApi({
   protectionPolicy: 'read', // 'read' | 'protected', optional - post-install developer access
   // $override: { ... } // optional - escape hatch for sys_* / sys_domain columns
   // NOTE: GraphQLApi does NOT accept `$meta` — no installMethod, no useEsLatest
+  // WARNING (SDK v4.13.0+): a resolvers[] / typeResolvers[] ENTRY now type-checks with `$meta`, but the build
+  // IGNORES it — `installMethod` does not move the record and `useEsLatest` writes no sys_es_latest_script.
+  // Do not set `$meta` on resolver or type-resolver entries.
 })
 
 // ── FIELD-LEVEL PATH ACLs are STANDALONE Acl() records, never set inside GraphQLApi ──

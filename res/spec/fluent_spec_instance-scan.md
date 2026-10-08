@@ -14,6 +14,7 @@ LinterCheck({
   category: '', // ScanCategory, mandatory - category: 'upgradability' | 'performance' | 'security' | 'manageability' | 'user_experience'
   script: '', // string, optional - server-side script for custom linting logic using Instance Scan API
   protectionPolicy: '', // 'read' | 'protected', optional - protection level for this check
+  // NOTE: no `$meta` on this check type — only ScriptOnlyCheck and TableCheck accept it (SDK v4.13.0+)
   priority: '1', // ScanPriority, mandatory - '1' (Critical) | '2' (High) | '3' (Moderate) | '4' (Low)
   shortDescription: '', // string, mandatory - brief description of the check
   resolutionDetails: '', // string, optional - guidance for resolving findings
@@ -43,6 +44,7 @@ ScriptOnlyCheck({
   script: '', // string, mandatory - server-side script that runs the check logic
     // The script should use the Instance Scan API to report findings
   protectionPolicy: '', // 'read' | 'protected', optional - protection level for this check
+  $meta: { installMethod: 'demo', useEsLatest: true }, // optional (SDK v4.13.0+): { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean } — installMethod picks when the check loads ('demo' → demo data only); useEsLatest runs its server-side script on the latest ECMAScript version
   priority: '1', // ScanPriority, mandatory - '1' (Critical) | '2' (High) | '3' (Moderate) | '4' (Low)
   shortDescription: '', // string, mandatory - brief description of the check
   resolutionDetails: '', // string, optional - guidance for resolving findings
@@ -71,6 +73,7 @@ ColumnTypeCheck({
   category: '', // ScanCategory, mandatory - category: 'upgradability' | 'performance' | 'security' | 'manageability' | 'user_experience'
   columnType: '', // ColumnType, mandatory - the column type to validate: 'script' | 'xml' | 'html'
   protectionPolicy: '', // 'read' | 'protected', optional - protection level for this check
+  // NOTE: no `$meta` on this check type — only ScriptOnlyCheck and TableCheck accept it (SDK v4.13.0+)
   priority: '1', // ScanPriority, mandatory - '1' (Critical) | '2' (High) | '3' (Moderate) | '4' (Low)
   shortDescription: '', // string, mandatory - brief description of the check
   resolutionDetails: '', // string, optional - guidance for resolving findings
@@ -100,6 +103,7 @@ TableCheck({
   table: '', // string, mandatory - target table for the check
   conditions: '', // string, optional - encoded query condition to match tables
   protectionPolicy: '', // 'read' | 'protected', optional - protection level for this check
+  $meta: { installMethod: 'demo', useEsLatest: true }, // optional (SDK v4.13.0+): { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean } — installMethod picks when the check loads ('demo' → demo data only); useEsLatest runs its server-side script on the latest ECMAScript version
   priority: '1', // ScanPriority, mandatory - '1' (Critical) | '2' (High) | '3' (Moderate) | '4' (Low)
   shortDescription: '', // string, mandatory - brief description of the check
   resolutionDetails: '', // string, optional - guidance for resolving findings

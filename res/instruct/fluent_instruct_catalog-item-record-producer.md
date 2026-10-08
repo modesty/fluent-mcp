@@ -9,3 +9,4 @@ Always reference the CatalogItemRecordProducer API specification for more detail
 7. Record producers do NOT use `flow`, `executionPlan`, or `workflow` for fulfillment — the record creation IS the fulfillment. These fields are not applicable to record producers.
 8. All other `CatalogItem` properties (categories, availableFor, variableSets, etc.) apply equally — see the catalog-item instruct for those guidelines.
 9. Export the record producer as a named constant so it can be referenced by `CatalogClientScript` and `CatalogUiPolicy` that apply specifically to record producers.
+10. **SDK v4.13.0** — `CatalogItemRecordProducer` accepts `$meta`: `installMethod` (`'demo'`, `'once'` or 'first install') controls when the producer loads, and `useEsLatest` runs its server-side `script` on the latest ECMAScript version. `CatalogItem` itself still has no `$meta`.
