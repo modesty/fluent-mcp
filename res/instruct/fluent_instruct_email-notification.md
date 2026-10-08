@@ -10,3 +10,4 @@ Always reference the EmailNotification API specification for more details.
 8. Set `mandatory: true` only for critical notifications that users should not be able to unsubscribe from (e.g., security alerts). Most notifications should leave this as `false`.
 9. `enableDynamicTranslation: true` translates the notification content based on the recipient's language preferences.
 10. To enable digest batching, set `digest.allow: true` and optionally `digest.default: true` to make digest the default for subscribers.
+11. **SDK v4.13.0** — `EmailNotification` accepts `$meta`: `installMethod` (`'demo'` loads the notification only with demo data, `'once'` applies it once, or 'first install') and `useEsLatest` (runs its server-side script fields, such as `advancedCondition`, on the latest ECMAScript version). Omit `$meta` for an ordinary notification.

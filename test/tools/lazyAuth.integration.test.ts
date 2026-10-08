@@ -100,21 +100,21 @@ describe('lazy auto-auth', () => {
     expect((commandProcessor.process as jest.Mock).mock.calls[0][1]).not.toContain('--auth');
   });
 
-  it('honors an explicit auth alias for a local transform without lazy validation', async () => {
+  it('rejects an explicit auth alias on a local transform without validating or spawning', async () => {
+    // The CLI declares `.conflicts('from', ['mode', 'auth'])`, so forwarding the
+    // alias would only trade this message for a yargs failure after spawn.
     const ensureAuth = jest.fn().mockResolvedValue(undefined);
     const commandProcessor = processor();
     const transform = new TransformCommand(commandProcessor, ensureAuth);
 
-    await transform.execute({
+    await expect(transform.execute({
       from: '/tmp/local-update-set.xml',
       auth: 'explicit-local-alias',
       workingDirectory: '/project',
-    });
+    })).rejects.toThrow("Arguments 'from' and 'auth' cannot be combined");
 
     expect(ensureAuth).not.toHaveBeenCalled();
-    expect((commandProcessor.process as jest.Mock).mock.calls[0][1]).toEqual(
-      expect.arrayContaining(['--auth', 'explicit-local-alias'])
-    );
+    expect(commandProcessor.process).not.toHaveBeenCalled();
   });
 
   it('memoizes a failed validation instead of racing or retrying', async () => {

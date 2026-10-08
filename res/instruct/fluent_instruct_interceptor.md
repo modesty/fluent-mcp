@@ -1,0 +1,36 @@
+# Instructions for Fluent Interceptor API
+
+Always reference the Interceptor API specifications for more details.
+
+1. Import `Interceptor` from `@servicenow/sdk/core` (SDK v4.13.0+). The API first shipped in 4.13.0 but appears in no release note. One call writes `sys_wizard` plus one `sys_wizard_answer` per `answers` entry — never author `sys_wizard_answer` separately with `Record()`.
+2. Use an Interceptor to replace a table's default "New" form with a "What type of X would you like to create?" decision panel, to offer a fixed list of destinations (URLs, catalog items, record producers), to branch across several questions, or to show some options only to certain roles.
+3. Do **not** use an Interceptor to validate or control fields on the destination form — use `DataPolicy` or `UiPolicy`. Interceptors run before a record exists and never see or set its field values. To let users pick actual table *records*, use a `CatalogItemRecordProducer` with a reference variable, not `'externalChoice'`.
+4. **`name` is the identity — a top-level `$id` is not accepted, and neither is `$meta`.** Both are rejected at compile time (TS2353). The JSDoc claims the API accepts `protectionPolicy` "via `Now.Internal.WithIdAndMetadata`", but the type is `Now.Internal.WithMetadata`, which carries no `$id`. `protectionPolicy` and `$override` are accepted.
+5. `sys_wizard` coalesces on `name` across the instance. **Before authoring, verify the name is unique** by querying `sys_wizard` filtered by `name` (this server's query_fluent_records tool). An accidental match silently coalesces into, and overwrites, the existing — possibly out-of-box — wizard. There is no scope-prefix rule, so choose a distinctive name. Renaming creates a new record and **orphans** the old one; the API doc's claim that the old record is deleted is wrong.
+6. Give **every** answer its own `$id` (`Now.ID[...]`). `sys_wizard_answer` has no safe natural key — `order` defaults to `100` everywhere and `name` is not reliably unique. A missing `$id` fails to compile (TS2322) and the build cannot create the record.
+7. **`type` selects which fields matter** (default `'answer'`):
+    - `'answer'` uses `targetUrl`.
+    - `'leadingQuestion'` uses `nextQuestion`.
+    - `'externalChoice'` uses `table`, `element` and optionally `dependentValue`.
+    - `'button'` uses `buttonLabel`.
+    - `'yesNo'` and `'freeformText'` use only `payloadName`.
+    - `'multipleChoice'` reads `sys_wizard_choice` rows (instruction 15).
+
+    `name`, `answer`, `script`, `roles`, `order`, and `active` are valid on every type. `type` is an open union: an unknown string is stored verbatim as the type code with no diagnostic, so use only those seven names.
+8. For `'answer'`, the `targetUrl` destination (e.g. a `<table>.do?sys_id=-1` new-record form or a catalog item) must have an active form/view on the instance. Any field pre-filled through `sysparm_query` must be on that form, or its value is silently dropped. Write a multi-word value with a literal space — never '+' or '%20'. None of this is checked at build time.
+9. `backPanel`, `nextPanel`, and `nextQuestion` reference other `sys_wizard` records and accept a raw sys_id, a `Record<'sys_wizard'>`, or an `Interceptor(...)` return value. For a question in the same project, declare it first and pass its return value — it resolves to the generated sys_id. Use a raw sys_id only for a question that already exists on the instance. `nextPanel` is the default next panel; an answer's `nextQuestion` overrides it for that answer.
+10. `intercepts` is a single `*.do` path string (e.g. `'incident.do'`). Setting it creates no answers — always author at least one.
+11. **Default to `'externalChoice'` over `'multipleChoice'`** whenever the options already exist as a `sys_choice` dropdown on a table (e.g. `state`, `priority`, `category`). Set `table` and `element` together: the platform ignores an incomplete pair, and `element` without `table` emits a build warning. The answer reads the dropdown values of that column; it never lists records of the table. Supply `dependentValue` only when `element` is itself a dependent choice list (e.g. `subcategory` under `category`). Neither name is validated at build time, so confirm the column and its choices with a `sys_dictionary` or `sys_choice` query first. In a scoped app the type's JSDoc requires a same-scope table, but the build does not enforce it.
+12. Generate `'yesNo'` or `'freeformText'` answers only when the request implies a yes/no question or a free-text input, and always set `payloadName` — it is the only field with runtime effect. Correction: the API doc says both types "require" `payloadName`, but the type marks it optional and a missing one is only a hint that `now-sdk build` never prints.
+13. For `'button'`, `buttonLabel` is the visible text. Never set `answer` on a button — it is stored but not displayed, and the build warns. `script` runs on any answer type when it is selected. Use a short string literal or `Now.include('./script.js')`; an inline arrow or function expression is a hard build error. `roles` is a runtime visibility filter only, not a build-time or access-control check.
+14. Give sibling answers explicit, distinct `order` values — siblings that resolve to the same value emit a build warning, and the display order becomes unpredictable. `protectionPolicy` is written to `sys_wizard` only and is **not** propagated to the `sys_wizard_answer` rows (unlike `DatabaseView`, which copies it to every child). `$override` also reaches only the `sys_wizard` row.
+15. **`'multipleChoice'` sub-choices live in `sys_wizard_choice`, which `Interceptor()` never writes.** The type's JSDoc and the build support a separate `Record()` call on the `sys_wizard_choice` table. Its `data` takes `answer`, `text`, `value`, and `order`, and `answer` must be a `Now.ref` to the parent answer by its `Now.ID` key: Now.ref('sys_wizard_answer', '<answer key>').
+    - **Never pass `Now.ID[...]` as the `answer` value** — the build writes the literal key string, a broken reference.
+    - The `interceptor-guide` topic says instead to add these choices by hand on the instance after deploying, and never via `Record()`.
+    - The `Record()` path builds and resolves to the answer's real sys_id, but its install-time behaviour has not been verified against an instance.
+    - `sys_wizard_choice` has no coalesce key, so choices edited on the instance drift from source. Reconcile a drifted choice with a new `Record()` plus `Now.del()` of the duplicate.
+    - The API doc's multiple-choice example imports `Record` but never creates a choice.
+16. **Build diagnostics.**
+    - Hard errors: a top-level `$id` or `$meta`, a missing answer `$id`, an inline-function `script`.
+    - Printed warnings: `answer` set on a `'button'`; `element` without `table`; `dependentValue` without both `table` and `element`; sibling answers sharing an `order`.
+    - Silent hints, which `now-sdk build` never prints, so check these yourself: `'answer'` without `targetUrl`, `'leadingQuestion'` without `nextQuestion`, `'button'` without `buttonLabel`, `'externalChoice'` without `table` and `element`, `'yesNo'`/`'freeformText'` without `payloadName`, and every `'multipleChoice'` answer.

@@ -5,35 +5,43 @@ import { getProjectRootPath } from '../../config.js';
 import {
   CLI_OUTPUT_FORMATS,
   assertOneOf,
+  assertPositiveInteger,
   screenFreeTextArgs,
   screenSelectPathArg,
 } from './argValidation.js';
 
 /** Strict allowlists — a caller-supplied token never reaches argv unvalidated. */
 const TEST_TARGETS = ['testsuite', 'test'] as const;
-const TEST_ACTIONS = ['run', 'watch', 'result'] as const;
+const TEST_ACTIONS = ['run', 'watch', 'result', 'logs'] as const;
 type TestTarget = (typeof TEST_TARGETS)[number];
 type TestAction = (typeof TEST_ACTIONS)[number];
 
 /** Browser choices accepted by `now-sdk cicd testsuite run --browser-name`. */
 const BROWSER_NAMES = ['any', 'chrome', 'firefox', 'edge', 'ie', 'safari'] as const;
 
+/** Actions that start or follow a polled operation and so accept `wait`/`pollTimeout`. */
+const POLLED_ACTIONS: readonly TestAction[] = ['run', 'watch'];
+/** Actions that read a finished result by `resultId`. */
+const RESULT_ACTIONS: readonly TestAction[] = ['result', 'logs'];
+
 /**
  * ATF suite and test names are author-chosen labels that routinely contain
- * printable punctuation — e.g. "Incident (Regression) & Cleanup". Those are
- * harmless on the shell-free execution path, so they bypass the base
- * shell-metacharacter check and are screened for control characters instead.
+ * printable punctuation — e.g. "Incident (Regression) & Cleanup" — and a logs
+ * `pattern` is a regular expression (e.g. "error|fail"). Those are harmless on
+ * the shell-free execution path, so they bypass the base shell-metacharacter
+ * check and are screened for control characters instead.
  */
-const FREE_TEXT_ARGS = ['testSuiteName', 'testName'] as const;
+const FREE_TEXT_ARGS = ['testSuiteName', 'testName', 'pattern'] as const;
 
 /**
  * Command to drive ATF test execution through the ServiceNow CI/CD API
- * (SDK v4.10.0+ `now-sdk cicd`). Covers the six ATF leaves of the `cicd` tree:
- * `testsuite run|watch|result` and `test run|watch|result`.
+ * (SDK v4.10.0+ `now-sdk cicd`). Covers the seven ATF leaves of the `cicd` tree:
+ * `testsuite run|watch|result` and `test run|watch|result|logs` (`logs` is
+ * SDK v4.12.0+ and exists for single tests only).
  *
  * The tool is annotated destructive because `run` executes real ATF steps
  * against the instance, which create, update, and delete records under the
- * runner's impersonation. `watch` and `result` are reads, but annotations are
+ * runner's impersonation. `watch`, `result`, and `logs` are reads, but annotations are
  * per-tool, so the annotation follows the widest blast radius the tool can reach
  * — a client gating on it may only ever over-prompt, never under-prompt.
  *
@@ -44,7 +52,7 @@ const FREE_TEXT_ARGS = ['testSuiteName', 'testName'] as const;
  */
 export class CicdTestCommand extends SessionAwareCLICommand {
   name = 'cicd_fluent_test';
-  description = 'Run or inspect ServiceNow ATF tests through the sn_cicd API (SDK v4.10.0+). Set target to "testsuite" or "test" and action to "run" (start it), "watch" (follow a progressId from a previous run), or "result" (fetch a resultId). Identify a suite by testSuiteSysId or testSuiteName, a test by testSysId or testName. action="run" executes real ATF steps on the instance and the records those steps touch change; "watch" and "result" only read. No Fluent project required. Requires instance authentication (auto-injected from session, or pass auth explicitly).';
+  description = 'Run or inspect ServiceNow ATF tests through the sn_cicd API (SDK v4.10.0+). Set target to "testsuite" or "test" and action to "run" (start it), "watch" (follow a progressId from a previous run), "result" (fetch a resultId), or "logs" (fetch the captured logs of a single test result, optionally filtered by a regex pattern; target="test" only, SDK v4.12.0+). Identify a suite by testSuiteSysId or testSuiteName, a test by testSysId or testName. action="run" executes real ATF steps on the instance and the records those steps touch change; "watch", "result", and "logs" only read. No Fluent project required. Requires instance authentication (auto-injected from session, or pass auth explicitly).';
   annotations = { destructiveHint: true, idempotentHint: false, openWorldHint: true };
   timeoutMs = 930_000;
   arguments: CommandArgument[] = [
@@ -58,7 +66,7 @@ export class CicdTestCommand extends SessionAwareCLICommand {
       name: 'action',
       type: 'string',
       required: true,
-      description: 'Operation: "run" to start, "watch" to follow a progressId from a previous run, or "result" to fetch a resultId.',
+      description: 'Operation: "run" to start, "watch" to follow a progressId from a previous run, "result" to fetch a resultId, or "logs" to fetch the captured logs of a single test result (target="test" only).',
     },
     {
       name: 'testSuiteSysId',
@@ -94,7 +102,19 @@ export class CicdTestCommand extends SessionAwareCLICommand {
       name: 'resultId',
       type: 'string',
       required: false,
-      description: 'Result sys_id to fetch. REQUIRED when action="result". For a suite this is the links.results.id from run; for a test it is the resultId from watch.',
+      description: 'Result sys_id to fetch. REQUIRED when action="result" or action="logs". For a suite this is the links.results.id from run; for a test it is the resultId from watch. action="logs" needs a single-test result (sys_atf_test_result), never a suite result.',
+    },
+    {
+      name: 'pattern',
+      type: 'string',
+      required: false,
+      description: 'Regular expression to filter the captured log lines (always matched case-insensitively), e.g. "error|fail". Only with action="logs". Omit to return every line.',
+    },
+    {
+      name: 'limit',
+      type: 'number',
+      required: false,
+      description: 'Maximum number of log lines to return (positive integer, CLI default 100). Only with action="logs".',
     },
     {
       name: 'browserName',
@@ -142,13 +162,13 @@ export class CicdTestCommand extends SessionAwareCLICommand {
       name: 'wait',
       type: 'boolean',
       required: false,
-      description: 'Wait for completion, polling progress (CLI default true). Set false to return immediately with the progress id, then follow up with action="watch". Not accepted when action="result".',
+      description: 'Wait for completion, polling progress (CLI default true). Set false to return immediately with the progress id, then follow up with action="watch". Only with action="run" or action="watch".',
     },
     {
       name: 'pollTimeout',
       type: 'number',
       required: false,
-      description: 'Milliseconds to poll for completion before giving up. CLI default 900000 (15 minutes). Not accepted when action="result". Values above ~15 minutes also require raising FLUENT_MCP_COMMAND_TIMEOUT_MS.',
+      description: 'Milliseconds to poll for completion before giving up. CLI default 900000 (15 minutes). Only with action="run" or action="watch". Values above ~15 minutes also require raising FLUENT_MCP_COMMAND_TIMEOUT_MS.',
     },
     {
       name: 'auth',
@@ -181,7 +201,7 @@ export class CicdTestCommand extends SessionAwareCLICommand {
    * enforces, so an unusable combination is named precisely instead of failing
    * opaquely in the CLI.
    *
-   * The two name arguments are free text (see FREE_TEXT_ARGS) and `select` is a
+   * The two name arguments and `pattern` are free text (see FREE_TEXT_ARGS) and `select` is a
    * bracket path: the base is handed benign placeholders so its required/type
    * checks still run, while each real value is screened by the rule that applies
    * to it (see argValidation).
@@ -202,11 +222,24 @@ export class CicdTestCommand extends SessionAwareCLICommand {
     if (action === 'watch' && !args.progressId) {
       throw new Error("Argument 'progressId' is required when action=\"watch\". Use the progress id returned by a previous run.");
     }
-    if (action === 'result' && !args.resultId) {
-      throw new Error("Argument 'resultId' is required when action=\"result\".");
+    if (RESULT_ACTIONS.includes(action) && !args.resultId) {
+      throw new Error(`Argument 'resultId' is required when action="${action}".`);
     }
-    if (action === 'result' && (args.wait !== undefined || args.pollTimeout !== undefined)) {
-      throw new Error("Arguments 'wait' and 'pollTimeout' are not accepted when action=\"result\" — fetching a result is a single read, not a polled operation.");
+    if (!POLLED_ACTIONS.includes(action) && (args.wait !== undefined || args.pollTimeout !== undefined)) {
+      throw new Error(`Arguments 'wait' and 'pollTimeout' are not accepted when action="${action}" — it is a single read, not a polled operation.`);
+    }
+    if (action === 'logs' && target !== 'test') {
+      throw new Error('action="logs" is only available with target="test" — the CLI has no test-suite logs operation. Fetch logs per test result instead.');
+    }
+    if (action !== 'logs') {
+      for (const name of ['pattern', 'limit']) {
+        if (args[name] !== undefined) {
+          throw new Error(`Argument '${name}' is only valid with action="logs", not action="${action}".`);
+        }
+      }
+    }
+    if (args.limit !== undefined) {
+      assertPositiveInteger(args.limit, 'limit');
     }
 
     if (action === 'run') {
@@ -255,8 +288,8 @@ export class CicdTestCommand extends SessionAwareCLICommand {
     if (action !== 'watch' && args.progressId !== undefined) {
       throw new Error(`Argument 'progressId' is only valid with action="watch", not action="${action}".`);
     }
-    if (action !== 'result' && args.resultId !== undefined) {
-      throw new Error(`Argument 'resultId' is only valid with action="result", not action="${action}".`);
+    if (!RESULT_ACTIONS.includes(action) && args.resultId !== undefined) {
+      throw new Error(`Argument 'resultId' is only valid with action="result" or action="logs", not action="${action}".`);
     }
   }
 
@@ -300,9 +333,12 @@ export class CicdTestCommand extends SessionAwareCLICommand {
     if (args.isPerformanceRun) sdkArgs.push('--is-performance-run');
     if (args.captureNodeLogs) sdkArgs.push('--capture-node-logs');
 
+    if (args.pattern) sdkArgs.push('--pattern', String(args.pattern));
+    if (args.limit !== undefined) sdkArgs.push('--limit', String(args.limit));
+
     // `--wait` defaults to true in the CLI, so only the negation is meaningful.
-    // `result` is a plain read and accepts neither polling flag.
-    if (action !== 'result') {
+    // `result` and `logs` are plain reads and accept neither polling flag.
+    if (POLLED_ACTIONS.includes(action)) {
       if (args.wait === false) sdkArgs.push('--no-wait');
       if (args.pollTimeout !== undefined) sdkArgs.push('--poll-timeout', String(args.pollTimeout));
     }

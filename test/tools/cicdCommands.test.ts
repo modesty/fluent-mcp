@@ -442,4 +442,116 @@ describe('CicdTestCommand', () => {
     expect(bad.output).toContain("Argument 'select' must be a dot/bracket path");
     expect(mockProcessor.process).not.toHaveBeenCalled();
   });
+
+  // SDK v4.12.0 `cicd test logs`: a single GET with --result-id (required),
+  // --pattern (sysparm_regex) and --limit (CLI default 100). It has no `poll`,
+  // so the CLI declares no --wait/--poll-timeout on it, and it exists under
+  // `test` only — there is no `testsuite logs`.
+  describe('logs action (SDK v4.12.0+)', () => {
+    test('should build test logs argv with pattern and limit and no polling flags', async () => {
+      const command = new CicdTestCommand(mockProcessor as never);
+
+      const result = await command.execute({
+        target: 'test', action: 'logs', resultId: 'res-1', pattern: 'error|fail', limit: 50,
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockProcessor.process.mock.calls[0][1]).toEqual([
+        SDK_BIN, 'cicd', 'test', 'logs',
+        '--result-id', 'res-1',
+        '--pattern', 'error|fail',
+        '--limit', '50',
+        '--auth', 'session-alias',
+        '--output', 'json',
+      ]);
+    });
+
+    test('should let the CLI default the limit and send no pattern when both are omitted', async () => {
+      const command = new CicdTestCommand(mockProcessor as never);
+
+      await command.execute({ target: 'test', action: 'logs', resultId: 'res-1' });
+
+      const argv = mockProcessor.process.mock.calls[0][1] as string[];
+      expect(argv).not.toContain('--pattern');
+      expect(argv).not.toContain('--limit');
+    });
+
+    test('should accept regex metacharacters in pattern but reject control characters', async () => {
+      const command = new CicdTestCommand(mockProcessor as never);
+
+      const ok = await command.execute({
+        target: 'test', action: 'logs', resultId: 'res-1', pattern: '^(Step|Assert)\\s+[0-9]+ failed$',
+      });
+      expect(ok.success).toBe(true);
+
+      mockProcessor.process.mockClear();
+      const bad = await command.execute({ target: 'test', action: 'logs', resultId: 'res-1', pattern: 'error\nfail' });
+      expect(bad.success).toBe(false);
+      expect(bad.output).toContain("Invalid characters in argument 'pattern'");
+      expect(mockProcessor.process).not.toHaveBeenCalled();
+    });
+
+    test('should reject logs on a test suite, which the CLI does not offer', async () => {
+      const command = new CicdTestCommand(mockProcessor as never);
+
+      const result = await command.execute({ target: 'testsuite', action: 'logs', resultId: 'res-1' });
+
+      expect(result.success).toBe(false);
+      expect(result.output).toContain('action="logs" is only available with target="test"');
+      expect(mockProcessor.process).not.toHaveBeenCalled();
+    });
+
+    test('should require resultId for logs', async () => {
+      const command = new CicdTestCommand(mockProcessor as never);
+
+      const result = await command.execute({ target: 'test', action: 'logs' });
+
+      expect(result.success).toBe(false);
+      expect(result.output).toContain("Argument 'resultId' is required when action=\"logs\"");
+    });
+
+    test.each([
+      [{ wait: false }],
+      [{ pollTimeout: 60000 }],
+    ])('should reject polling arguments on logs (%p)', async (extra) => {
+      const command = new CicdTestCommand(mockProcessor as never);
+
+      const result = await command.execute({ target: 'test', action: 'logs', resultId: 'res-1', ...extra });
+
+      expect(result.success).toBe(false);
+      expect(result.output).toContain('not accepted when action="logs"');
+      expect(mockProcessor.process).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      ['pattern', 'error'],
+      ['limit', 10],
+    ])('should reject %s outside the logs action', async (name, value) => {
+      const command = new CicdTestCommand(mockProcessor as never);
+
+      const result = await command.execute({ target: 'test', action: 'result', resultId: 'res-1', [name]: value });
+
+      expect(result.success).toBe(false);
+      expect(result.output).toContain(`Argument '${name}' is only valid with action="logs"`);
+    });
+
+    test.each([0, -1, 2.5])('should reject a non-positive-integer limit (%p)', async (limit) => {
+      const command = new CicdTestCommand(mockProcessor as never);
+
+      const result = await command.execute({ target: 'test', action: 'logs', resultId: 'res-1', limit });
+
+      expect(result.success).toBe(false);
+      expect(result.output).toContain("Argument 'limit' must be a positive integer");
+    });
+
+    test('should still send polling flags for run and watch only', async () => {
+      const command = new CicdTestCommand(mockProcessor as never);
+
+      await command.execute({ target: 'test', action: 'watch', progressId: 'p-1', wait: false, pollTimeout: 1000 });
+
+      const argv = mockProcessor.process.mock.calls[0][1] as string[];
+      expect(argv).toContain('--no-wait');
+      expect(argv).toContain('--poll-timeout');
+    });
+  });
 });

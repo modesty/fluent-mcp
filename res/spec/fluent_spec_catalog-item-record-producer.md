@@ -52,5 +52,6 @@ CatalogItemRecordProducer({
     canCancel: false,       // boolean, optional — allow user to cancel the submission, default: false
     redirectUrl: 'generatedRecord', // 'generatedRecord' | 'catalogHomePage', optional — where to redirect after submit, default: 'generatedRecord'
     saveOptions: '',        // string, optional — advanced save configuration
+    $meta: { installMethod: 'demo', useEsLatest: true }, // optional (SDK v4.13.0+): { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean } — installMethod picks when the record loads; useEsLatest runs the producer's server-side script on the latest ECMAScript version
 }): CatalogItemRecordProducer // returns a CatalogItemRecordProducer object
 ```

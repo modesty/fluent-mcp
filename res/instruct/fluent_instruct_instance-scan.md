@@ -14,3 +14,4 @@ Always reference the Instance Scan API specifications for more details.
 12. Use `documentationUrl` to link to detailed documentation about the check and its findings.
 13. Use the scoring fields (`scoreMin`, `scoreMax`, `scoreScale`) to assign severity scores to findings for prioritization.
 14. Use `runCondition` to control when the check executes, and `findingType` to classify the type of findings produced.
+15. **SDK v4.13.0** — `ScriptOnlyCheck` and `TableCheck` accept `$meta` (`installMethod`, and `useEsLatest` to run the check's server-side script on the latest ECMAScript version). `LinterCheck` and `ColumnTypeCheck` still do NOT accept `$meta` — setting it there is a compile error.

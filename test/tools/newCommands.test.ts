@@ -35,6 +35,7 @@ describe('New SDK Commands', () => {
         'directory',
         'source',
         'incremental',
+        'timeoutSeconds',
         'debug',
       ]);
 
@@ -76,7 +77,7 @@ describe('New SDK Commands', () => {
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'download', 'my-app'],
         '/mock/working/dir',
         undefined, // stdinInput
-        180000,   // timeoutMs
+        600000,   // timeoutMs
         undefined  // signal
       );
     });
@@ -97,7 +98,7 @@ describe('New SDK Commands', () => {
         ['/test/node_modules/@servicenow/sdk/bin/index.js', 'download', 'my-app', '--source', './src', '--incremental', '--debug'],
         '/mock/working/dir',
         undefined, // stdinInput
-        180000,   // timeoutMs
+        600000,   // timeoutMs
         undefined  // signal
       );
     });

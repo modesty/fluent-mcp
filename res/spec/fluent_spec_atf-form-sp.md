@@ -56,14 +56,15 @@ atf.form_SP.addAttachmentsToForm({ // all props are mandatory
 atf.form_SP.submitForm({ // all props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
   assert: '', // '' | 'form_submitted_to_server' | 'form_submission_canceled_in_browser'
-}): { table: string; recordId: string };
+}): { table: string; record_id: string }; // output keys are snake_case
 
 // Clicks a UI action button on the current Service Portal form.
-atf.form_SP.clickUIAction({ // all props are mandatory
+atf.form_SP.clickUIAction({
   $id: Now.ID[''], // string | guid, mandatory
-  table: '', // table name
-  uiAction: get_sys_id('sys_ui_action', ''), // sys_id | Record<'sys_ui_action'>
-  assert: 'form_submitted_to_server', // 'form_submitted_to_server' | 'form_submission_canceled_in_browser' | 'page_reloaded_or_redirected'
-}): { recordId: string; table: string };
+  table: '', // table name, mandatory
+  uiAction: get_sys_id('sys_ui_action', ''), // sys_id | Record<'sys_ui_action'>, mandatory
+  assert: 'form_submitted_to_server', // optional as of SDK v4.13.0 (was mandatory; no SDK default — omitted is written empty): 'form_submitted_to_server' | 'form_submission_canceled_in_browser' (only these two values)
+}): { table: string; record_id: string }; // output keys are snake_case
+// NOTE: only the Service Portal step relaxed `assert`; the standard-UI atf.form.clickUIAction still REQUIRES it.
 
 ```

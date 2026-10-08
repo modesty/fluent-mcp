@@ -50,6 +50,8 @@ const _sharedBaseProperties = {
     removeFromConversationalInterfaces: false, // boolean, optional
     mapToField: false,      // boolean, optional — map variable value to a record field
     field: '',              // string, optional — record field to map to (requires mapToField: true)
+    $meta: { installMethod: 'demo' }, // optional (SDK v4.13.0+), every variable type: { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean }
+                            // — e.g. 'demo' writes this variable (item_option_new) only with demo data; variables have no server script, so useEsLatest is moot
     // Dynamic default value — these three properties always work together.
     // This auto-populates THIS variable's value by dot-walking from another variable's
     // referenced record. It is NOT a visibility or choice-filtering mechanism:

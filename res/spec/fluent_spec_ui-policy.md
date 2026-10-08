@@ -39,5 +39,6 @@ UiPolicy({
    // Each set value: { field: '', value: '' }
  modelId: '', // string, optional - model ID for scoped UI policies
  modelTable: '', // string, optional - model table for scoped UI policies
+ $meta: { installMethod: 'demo' }, // optional (SDK v4.13.0+): { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean } — 'demo' loads the policy only with demo data, 'once' applies it once, 'first install' only on first install
 }): UiPolicy // returns a UiPolicy object
 ```

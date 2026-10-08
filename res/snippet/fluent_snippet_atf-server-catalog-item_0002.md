@@ -9,6 +9,8 @@ Test({
   active: true,
   failOnServerError: true
 }, (atf) => {
+  // checkoutShoppingCart outputs `request_id` (an sc_request); replayRequestItem needs an sc_req_item,
+  // so the two are not chained — replay a known request item instead.
   const checkoutResult = atf.server.checkoutShoppingCart({
     $id: 'step_1_d4e5f6',
     assert: 'empty_cart',
@@ -18,11 +20,11 @@ Test({
   })
   atf.server.replayRequestItem({
     $id: 'step_2_g7h8i9',
-    requestItem: checkoutResult.requestId,
+    request_item: "aeed229047801200e0ef563dbb9a71c2", // snake_case INPUT; sys_id of an existing sc_req_item
   })
   atf.server.log({
     $id: 'step_3_j0k1l2',
-    log: 'empty cart is checked out and replayed'
+    log: `empty cart checked out (request: ${checkoutResult.request_id}); request item replayed`
   })
 })
 ```

@@ -50,11 +50,13 @@ describe('SDK v4.11.2 Types - Integration Tests', () => {
       expect(ServiceNowMetadataType[key]).toBe(value);
     });
 
-    it('should total 71 metadata types (67 before v4.11.x + field-style + graphql-api + test-suite + atf)', () => {
+    it('should total at least 71 metadata types (67 before v4.11.x + field-style + graphql-api + test-suite + atf)', () => {
       // `atf` is not an SDK addition — it is the ATF `Test()` container type that
       // fronts the 18 atf-* step sub-types. It had an instruct file but no spec,
       // so get-api-spec('atf') failed while get-instruct('atf') succeeded.
-      expect(Object.values(ServiceNowMetadataType).length).toBe(71);
+      // Lower bound only: the exact total is owned by the newest version's test
+      // (sdk4136-types), so this file keeps guarding its own additions.
+      expect(Object.values(ServiceNowMetadataType).length).toBeGreaterThanOrEqual(71);
     });
 
     it('registers the ATF Test() container type that fronts the atf-* step sub-types', () => {

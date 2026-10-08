@@ -12,21 +12,24 @@ Table({
     liveFeed: false, // boolean
     accessibleFrom: 'package_private', // 'public' | 'package_private' (defaults to 'public' as of SDK 4.8.0; 'package_private' restricts cross-scope read access but hides the table from some platform features such as Business Rules)
     callerAccess: 'none', // 'none' | 'tracking' | 'restricted'
-    // ACCESS PROPERTIES — the SDK derives NO defaults for `actions`, `allowClientScripts`, `allowNewFields`,
-    // `allowUiActions` and `allowWebServiceAccess`. Each is written to the table's metadata ONLY if you set it
-    // in Fluent; anything you omit is left to the instance's own default at install time.
-    actions: { read: true, create: true, update: true, delete: false }, // TableActionAccess object (exported from '@servicenow/sdk/core'), all four keys optional: { read?, update?, delete?, create? }. Each action is THREE-STATE — `true` AND `false` are both written to metadata, an OMITTED action is not written at all. Prefer this object form; the array form (['read' | 'update' | 'delete' | 'create'][]) is DEPRECATED as of SDK v4.10.1 because it is a COMPLETE ENUMERATION: ['read'] writes read_access=true PLUS update_access=false, delete_access=false and create_access=false
+    // ACCESS PROPERTIES — the SDK derives NO defaults for `actions`, `allowClientScripts`, `allowConfiguration`,
+    // `allowNewFields`, `allowUiActions` and `allowWebServiceAccess`. Each is written to the table's metadata ONLY
+    // if you set it in Fluent; anything you omit is left to the instance's own default at install time.
+    actions: { read: true, create: true, update: true, delete: false }, // TableActionAccess object (exported from '@servicenow/sdk/core'), all four keys optional: { read?, update?, delete?, create? }. Each action is THREE-STATE — `true` AND `false` are both written to metadata, an OMITTED action is not written at all. Prefer this object form; the array form (['read' | 'update' | 'delete' | 'create'][]) is DEPRECATED as of SDK v4.10.1 because it is a COMPLETE ENUMERATION: ['read'] writes read_access=true PLUS update_access=false, delete_access=false and create_access=false. (The SDK 4.13 table-api doc shows only `TableActionAccess`, but the installed type still accepts the deprecated array and it still writes those `false` values.)
     allowWebServiceAccess: false, // boolean, no SDK-applied default
     allowNewFields: false, // boolean, no SDK-applied default
     allowUiActions: false, // boolean, no SDK-applied default
     allowClientScripts: false, // boolean, no SDK-applied default
+    allowConfiguration: false, // boolean, optional (SDK v4.13.3+) — allow design-time configuration of the table itself from other
+        // application scopes ("Allow configuration" on the Application Access form); written as the `configuration_access`
+        // attribute. No SDK-applied default: omitted means the platform inherits the value from the parent table
     audit: false, // boolean
     readOnly: false, // boolean
     textIndex: false, // boolean
     attributes: {}, // object, snake_case name value pairs of any supported dictionary attributes in ServiceNow [sys_schema_attribute], ex. { update_sync_custom: false, update_synch: true }
     index: [ // Array of index definitions
         {
-            name: '', // string, mandatory
+            name: '', // string, optional (an unnamed index is generated without a name attribute)
             unique: false, // boolean, mandatory
             element: '', // string | string[], mandatory - column name(s) making up the index; accepts custom columns and platform default columns (e.g. 'sys_created_on', 'sys_updated_on') as of SDK v4.9.0
         }
@@ -39,22 +42,33 @@ Table({
     scriptableTable: false, // boolean
     sizeClass: 0, // number, optional (SDK v4.11.0+) - size classification of the table, indicating its
         // expected size category. Free-form number; the SDK derives no default and validates no range
+    dbObjectId: false, // boolean, optional (SDK v4.13.3+), default: false - when true, writes the table's sys_id to the
+        // `db_object_id` attribute of the bootstrap dictionary XML, pinning the platform-created `sys_db_object` record
+        // to that sys_id (use when other metadata references the `sys_db_object` record directly). Not allowed with `augments`
 }): Table; // returns a Table object
 
 // ─── TABLE AUGMENTS (SDK v4.7.0+) ───
 // Add columns to an EXISTING platform or cross-scope table (owned by another scope) without creating a new table.
-// Set `augments` to the target table name; when set, ONLY `schema` is allowed — all other table-level properties
-// (name, extends, label, display, audit, etc.) are rejected by the TypeScript compiler. The build produces
-// `sys_dictionary` records for each column but does NOT create a `sys_db_object` (the table already exists).
+// Set `augments` to the target table name; when set, only `schema` and — SDK v4.13.0+ — `index` are allowed. All
+// other table-level properties (name, extends, label, display, audit, access flags, allowConfiguration, dbObjectId,
+// etc.) are rejected by the TypeScript compiler. The build produces `sys_dictionary` records for each column but does
+// NOT create a `sys_db_object` (the table already exists). As of SDK v4.13.0 the augment's dictionary XML carries only
+// the table name and type, so augmenting no longer overwrites platform-set table attributes such as access flags.
 // Added column names MUST begin with the current app's ownership prefix to avoid collisions with platform fields:
-// `<scope>_` in a named custom scope (e.g. `x_acme_`), or `u_` in global and Store-app contexts.
+// `<scope>_` in an `x_` scope (e.g. `x_acme_`), or `u_` in global — the build rejects anything else, so a
+// Store app (always an `x_` scope) uses its scope prefix, never `u_`.
 // The exported variable name should match the augmented table name.
 export const incident = Table({
     augments: 'incident',          // string, mandatory in augment mode — the full name of the existing table to extend
-    schema: {                       // only `schema` is configurable alongside `augments`
+    schema: {                       // the columns to add
         x_acme_escalation_reason: StringColumn({ label: 'Escalation Reason', maxLength: 500 }),
         x_acme_reviewed: BooleanColumn({ label: 'Reviewed' }),
     },
+    index: [                        // optional (SDK v4.13.0+) — same shape as on a named table; `element` may reference
+        // columns you add (keys of `schema`) or pre-existing columns of the target table
+        { name: 'idx_acme_escalation_reason', unique: false, element: 'x_acme_escalation_reason' },
+        { unique: false, element: ['x_acme_reviewed', 'sys_created_on'] },
+    ],
 })
 
 // ─── DICTIONARY OVERRIDES (SDK v4.6.0+) ───

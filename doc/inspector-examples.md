@@ -55,7 +55,7 @@ npm run inspect:published
 **Expected Output:**
 ```
 ✅ Output:
-@servicenow/sdk version: 4.11.2
+@servicenow/sdk version: 4.13.6
 ```
 
 ### Example 2: Test check_auth_status Tool

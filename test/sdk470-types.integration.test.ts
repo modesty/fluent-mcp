@@ -98,13 +98,18 @@ describe('SDK v4.7.0 Types - Integration Tests', () => {
       read(SNIPPET_DIR, 'fluent_snippet_table_0005.md'),
     ];
 
-    it('documents ownership prefixes for named, global, and Store-app contexts everywhere', () => {
+    it('documents ownership prefixes for x_ scopes and global everywhere', () => {
+      // table-plugin.js: scopePrefix = scope === 'global' ? 'u_' : `${scope}_`,
+      // enforced unless isSNScope(scope). A Store app is an x_ scope, so the
+      // former "u_ in global and Store-app contexts" wording was wrong — an x_
+      // scope rejects a u_ column ("must be prefixed with 'x_<scope>_'").
       for (const content of tableAugmentResources) {
         expect(content).toContain('ownership prefix');
         expect(content).toMatch(/<scope>_/);
         expect(content).toContain('x_acme_');
-        expect(content).toContain('`u_`');
-        expect(content).toContain('global and Store-app contexts');
+        expect(content).toMatch(/`u_`\s+(\/\/\s+)?in global/);
+        expect(content).toContain('the build rejects anything else');
+        expect(content).not.toContain('Store-app contexts');
       }
     });
 

@@ -49,6 +49,23 @@ export function assertNoControlCharacters(value: unknown, argName: string): stri
 }
 
 /**
+ * Assert that a numeric argument is a positive integer. The base validator only
+ * proves the value is a number; counts and durations the CLI forwards to an
+ * HTTP client (a page limit, a seconds-based idle timeout) must also be whole and
+ * greater than zero — undici treats `0` as "no timeout at all".
+ * @param value The value to check
+ * @param argName The argument name (for error messages)
+ * @returns The value, narrowed to number
+ * @throws Error if the value is not a positive integer
+ */
+export function assertPositiveInteger(value: unknown, argName: string): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
+    throw new Error(`Argument '${argName}' must be a positive integer. Received: ${String(value)}.`);
+  }
+  return value;
+}
+
+/**
  * Assert that a caller-supplied token is one of the values the CLI declares, so
  * an unknown token is named precisely instead of reaching argv and failing
  * opaquely in yargs.
