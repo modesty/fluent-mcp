@@ -48,7 +48,7 @@ The server requires **no client capabilities** and issues **no server→client r
 
 ```bash
 # Test with MCP Inspector
-npx @modelcontextprotocol/inspector npx @modesty/fluent-mcp
+npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector npx @modesty/fluent-mcp
 
 # Build the optional self-contained MCPB distribution
 npm run bundle
@@ -368,7 +368,7 @@ The [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) provid
 
 ```bash
 # Test published package
-npx @modelcontextprotocol/inspector npx @modesty/fluent-mcp
+npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector npx @modesty/fluent-mcp
 
 # Or for local development (built server)
 npm run build && npm run inspect

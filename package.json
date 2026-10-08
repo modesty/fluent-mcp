@@ -41,9 +41,9 @@
     "validate:specs": "node scripts/validate-specs.mjs",
     "validate:instructs": "node scripts/validate-instructs.mjs",
     "bundle": "npm run build && node scripts/bundle.mjs",
-    "inspect": "npx @modelcontextprotocol/inspector node dist/index.js",
-    "inspect:dev": "npx @modelcontextprotocol/inspector ts-node src/index.ts",
-    "inspect:published": "npx @modelcontextprotocol/inspector npx @modesty/fluent-mcp"
+    "inspect": "npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector node dist/index.js",
+    "inspect:dev": "npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector ts-node src/index.ts",
+    "inspect:published": "npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector npx @modesty/fluent-mcp"
   },
   "type": "module",
   "engines": {
