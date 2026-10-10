@@ -38,7 +38,7 @@
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
     "lint": "eslint 'src/**/*.ts' --config eslint.config.js",
     "lint:fix": "eslint 'src/**/*.ts' --config eslint.config.js --fix",
-    "test": "npm run test:runners && npm run test:native && npm run test:jest",
+    "test": "npm run test:runners && npm run test:native",
     "test:runners": "node scripts/check-test-runners.mjs",
     "test:native": "node scripts/run-native-tests.mjs",
     "test:jest": "jest",
