@@ -41,6 +41,8 @@
     "test": "npm run test:runners && npm run test:native",
     "test:runners": "node scripts/check-test-runners.mjs",
     "test:native": "node scripts/run-native-tests.mjs",
+    "test:coverage": "node scripts/run-native-tests.mjs --coverage",
+    "test:watch": "node scripts/run-native-tests.mjs --watch",
     "test:jest": "jest",
     "validate:snippets": "bash scripts/validate-snippets.sh",
     "validate:specs": "node scripts/validate-specs.mjs",

@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const buildRoot = path.join(projectRoot, '.test-build');
-const tscBin = path.join(projectRoot, 'node_modules', 'typescript', 'bin', 'tsc');
+export const tscBin = path.join(projectRoot, 'node_modules', 'typescript', 'bin', 'tsc');
 
 /**
  * Compile the given test files into .test-build/<stage>/ and stage package
