@@ -47,6 +47,7 @@ jest-coverage/
 
 # Build output
 build/
+.test-build/
 
 # OS generated files
 Thumbs.db

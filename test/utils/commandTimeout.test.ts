@@ -5,23 +5,27 @@
  * process runner applies that override ahead of any per-call timeout
  * (see processRunner.robustness.test.ts).
  */
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { parseCommandTimeoutOverride } from '../../src/utils/commandTimeout.js';
 
 describe('parseCommandTimeoutOverride', () => {
   it('returns undefined when the env var is unset', () => {
-    expect(parseCommandTimeoutOverride(undefined)).toBeUndefined();
+    assert.equal(parseCommandTimeoutOverride(undefined), undefined);
   });
 
   it('parses a positive integer to milliseconds', () => {
-    expect(parseCommandTimeoutOverride('450000')).toBe(450000);
-    expect(parseCommandTimeoutOverride('1')).toBe(1);
+    assert.equal(parseCommandTimeoutOverride('450000'), 450000);
+    assert.equal(parseCommandTimeoutOverride('1'), 1);
   });
 
   it('accepts a value with trailing non-digits (parseInt semantics)', () => {
-    expect(parseCommandTimeoutOverride('300000ms')).toBe(300000);
+    assert.equal(parseCommandTimeoutOverride('300000ms'), 300000);
   });
 
-  it.each(['0', '-5', 'abc', '', '   '])('rejects non-positive / non-numeric %p', (bad) => {
-    expect(parseCommandTimeoutOverride(bad)).toBeUndefined();
-  });
+  for (const bad of ['0', '-5', 'abc', '', '   ']) {
+    it(`rejects non-positive / non-numeric ${JSON.stringify(bad)}`, () => {
+      assert.equal(parseCommandTimeoutOverride(bad), undefined);
+    });
+  }
 });

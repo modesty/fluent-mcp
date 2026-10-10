@@ -1,0 +1,6 @@
+{
+  "native": [
+    "test/config.test.ts",
+    "test/utils/commandTimeout.test.ts"
+  ]
+}
