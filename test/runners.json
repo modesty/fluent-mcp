@@ -1,6 +1,8 @@
 {
   "native": [
     "test/config.test.ts",
-    "test/utils/commandTimeout.test.ts"
+    "test/utils/commandTimeout.test.ts",
+    "test/utils/resourceLoader.test.ts",
+    "test/server/fluentMCPServer.test.ts"
   ]
 }

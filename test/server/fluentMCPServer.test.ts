@@ -5,218 +5,195 @@
  * wireProtocol.test.ts. This file covers what a wire test cannot easily force:
  * the lifecycle contract `serveStdio` imposes on the factory, and the absence of
  * protocol surface that must never come back.
+ *
+ * Native runner: module mocks are registered before the server is imported.
+ * Constructor mocks use `function` implementations, because a native mock.fn can
+ * only be called with `new` when its implementation is constructible.
  */
-import { FluentMcpServer } from "../../src/server/fluentMCPServer.js";
-import { ToolsManager } from "../../src/tools/toolsManager.js";
-import { ResourceManager } from "../../src/res/resourceManager.js";
-import { ServerStatus } from "../../src/types.js";
+import { beforeEach, describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { assertCalledTimes, assertNotCalled } from '../support/mockAssertions.js';
+import { configFixture, loggerFixture } from '../support/fixtures.js';
 
 type ServerFactory = () => unknown;
 
-// Mock the MCP server so each construction is observable.
-jest.mock("@modelcontextprotocol/server", () => {
-  const mockRegisterTool = jest.fn();
-  const mockSetRequestHandler = jest.fn();
-  const mockSetNotificationHandler = jest.fn();
-  const mockRequest = jest.fn();
-  const mockGetClientCapabilities = jest.fn().mockReturnValue({ roots: {} });
-  const mockClose = jest.fn();
+// --- MCP SDK ----------------------------------------------------------------
 
+const mockRegisterTool = mock.fn();
+const mockSetRequestHandler = mock.fn();
+const mockSetNotificationHandler = mock.fn();
+const mockRequest = mock.fn();
+const mockGetClientCapabilities = mock.fn((): Record<string, unknown> => ({ roots: {} }));
+const mockClose = mock.fn();
+
+type ServerOptions = { capabilities: Record<string, Record<string, unknown> | undefined> };
+
+const McpServer = mock.fn(function (_info?: unknown, _options?: ServerOptions) {
   return {
-    __esModule: true,
-    mockSetRequestHandler,
-    mockSetNotificationHandler,
-    mockRequest,
-    mockGetClientCapabilities,
-    McpServer: jest.fn().mockImplementation(() => ({
-      registerTool: mockRegisterTool,
-      connect: jest.fn(),
-      close: mockClose,
-      server: {
-        setRequestHandler: mockSetRequestHandler,
-        setNotificationHandler: mockSetNotificationHandler,
-        request: mockRequest,
-        getClientCapabilities: mockGetClientCapabilities,
-      },
-    })),
+    registerTool: mockRegisterTool,
+    connect: mock.fn(),
+    close: mockClose,
+    server: {
+      setRequestHandler: mockSetRequestHandler,
+      setNotificationHandler: mockSetNotificationHandler,
+      request: mockRequest,
+      getClientCapabilities: mockGetClientCapabilities,
+    },
   };
 });
+mock.module('@modelcontextprotocol/server', { namedExports: { McpServer } });
 
 // Capture the factory serveStdio is given, plus the handle it returns.
-jest.mock("@modelcontextprotocol/server/stdio", () => {
-  const mockHandleClose = jest.fn().mockResolvedValue(undefined);
-  const serveStdio = jest.fn().mockImplementation(() => ({ close: mockHandleClose }));
-  return { __esModule: true, serveStdio, mockHandleClose };
-});
-
-// Mock the config
-jest.mock('../../src/config.js', () => ({
-  getConfig: jest.fn().mockReturnValue({
-    name: "test-mcp-server",
-    version: "1.0.0",
-    description: "Test MCP Server",
-    resourcePaths: {
-      spec: "/mock/path/to/spec",
-      snippet: "/mock/path/to/snippet",
-      instruct: "/mock/path/to/instruct",
-    }
-  }),
-  getProjectRootPath: jest.fn().mockReturnValue("/mock/project/root"),
-  findMissingResourcePaths: jest.fn().mockReturnValue([])
+const mockHandleClose = mock.fn(async () => undefined);
+const serveStdio = mock.fn((_factory: ServerFactory, _options?: { legacy?: string }) => ({
+  close: mockHandleClose,
 }));
+mock.module('@modelcontextprotocol/server/stdio', { namedExports: { serveStdio } });
 
-// Mock the ToolsManager
-jest.mock("../../src/tools/toolsManager.js", () => {
+// --- Application collaborators ----------------------------------------------
+
+const config = configFixture({
+  name: 'test-mcp-server',
+  version: '1.0.0',
+  description: 'Test MCP Server',
+  resourcePaths: {
+    spec: '/mock/path/to/spec',
+    snippet: '/mock/path/to/snippet',
+    instruct: '/mock/path/to/instruct',
+  },
+});
+mock.module('../../src/config.js', config.mockOptions);
+const { findMissingResourcePaths } = config;
+
+const ToolsManager = mock.fn(function () {
   return {
-    ToolsManager: jest.fn().mockImplementation(() => ({
-      getMCPTools: jest.fn().mockReturnValue([
-        { name: "mock-tool", description: "A mock tool", inputSchema: { type: "object" } }
-      ]),
-      registerOn: jest.fn()
-    }))
+    getMCPTools: mock.fn(() => [
+      { name: 'mock-tool', description: 'A mock tool', inputSchema: { type: 'object' } },
+    ]),
+    registerOn: mock.fn(),
   };
 });
+mock.module('../../src/tools/toolsManager.js', { namedExports: { ToolsManager } });
 
-// Mock the ResourceManager
-jest.mock("../../src/res/resourceManager.js", () => {
+const ResourceManager = mock.fn(function () {
   return {
-    ResourceManager: jest.fn().mockImplementation(() => ({
-      initialize: jest.fn().mockResolvedValue(undefined),
-      listResources: jest.fn().mockResolvedValue([]),
-      readResource: jest.fn().mockResolvedValue({ contents: [] })
-    }))
+    initialize: mock.fn(async () => undefined),
+    listResources: mock.fn(async () => []),
+    readResource: mock.fn(async () => ({ contents: [] })),
   };
 });
+mock.module('../../src/res/resourceManager.js', { namedExports: { ResourceManager } });
 
-// Mock logger with LogLevel enum
-jest.mock("../../src/utils/logger.js", () => {
-  const LogLevel = {
-    DEBUG: 'debug',
-    INFO: 'info',
-    NOTICE: 'notice',
-    WARNING: 'warning',
-    WARN: 'warning',
-    ERROR: 'error',
-    CRITICAL: 'critical',
-    ALERT: 'alert',
-    EMERGENCY: 'emergency',
-  };
+mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 
-  return {
-    LogLevel,
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    __esModule: true,
-    default: {
-      debug: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-    }
-  };
-});
+const { FluentMcpServer } = await import('../../src/server/fluentMCPServer.js');
+const { ServerStatus } = await import('../../src/types.js');
+
+const allMocks: Array<{ mock: { resetCalls(): void } }> = [
+  mockRegisterTool,
+  mockSetRequestHandler,
+  mockSetNotificationHandler,
+  mockRequest,
+  mockGetClientCapabilities,
+  mockClose,
+  McpServer,
+  mockHandleClose,
+  serveStdio,
+  findMissingResourcePaths,
+  ToolsManager,
+  ResourceManager,
+];
 
 /** The factory serveStdio was handed on the most recent start(). */
 function capturedFactory(): ServerFactory {
-  const { serveStdio } = require("@modelcontextprotocol/server/stdio");
-  const call = (serveStdio as jest.Mock).mock.calls.at(-1);
+  const call = serveStdio.mock.calls.at(-1);
   if (!call) throw new Error('serveStdio was never called');
-  return call[0] as ServerFactory;
+  return call.arguments[0];
 }
 
-describe("FluentMcpServer with Modular Design", () => {
-  let server: FluentMcpServer;
+describe('FluentMcpServer with Modular Design', () => {
+  let server: InstanceType<typeof FluentMcpServer>;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    for (const fn of allMocks) fn.mock.resetCalls();
     server = new FluentMcpServer();
   });
 
-  test("should initialize correctly", () => {
-    expect(server).toBeDefined();
-    expect(ToolsManager).toHaveBeenCalled();
-    expect(ResourceManager).toHaveBeenCalled();
+  it('should initialize correctly', () => {
+    assert.ok(server);
+    assert.ok(ToolsManager.mock.callCount() > 0);
+    assert.ok(ResourceManager.mock.callCount() > 0);
   });
 
-  test("should fail fast when required resource directories are missing", async () => {
-    const { findMissingResourcePaths } = require("../../src/config.js");
+  it('should fail fast when required resource directories are missing', async () => {
     // Simulate a broken install: a configured resource directory cannot be resolved.
-    findMissingResourcePaths.mockReturnValueOnce(["/mock/path/to/spec"]);
+    findMissingResourcePaths.mock.mockImplementationOnce(() => ['/mock/path/to/spec']);
 
-    await expect(server.start()).rejects.toThrow(/Missing required resource directories/);
-    expect(server.getStatus()).toBe(ServerStatus.STOPPED);
+    await assert.rejects(server.start(), /Missing required resource directories/);
+    assert.equal(server.getStatus(), ServerStatus.STOPPED);
   });
 
   // serveStdio owns the transport and the era decision; the server's only job is
   // to hand it a factory that satisfies its lifecycle contract.
-  describe("server factory contract", () => {
-    test("serves both eras from one factory", async () => {
-      const { serveStdio } = require("@modelcontextprotocol/server/stdio");
-
+  describe('server factory contract', () => {
+    it('serves both eras from one factory', async () => {
       await server.start();
 
-      expect(serveStdio).toHaveBeenCalledTimes(1);
-      const [factory, options] = (serveStdio as jest.Mock).mock.calls[0];
-      expect(typeof factory).toBe('function');
+      assertCalledTimes(serveStdio, 1);
+      const [factory, options] = serveStdio.mock.calls[0].arguments;
+      assert.equal(typeof factory, 'function');
       // 'serve' (not 'reject') is what makes a 2025-era opening work.
-      expect(options.legacy).toBe('serve');
+      assert.equal(options?.legacy, 'serve');
     });
 
-    test("builds no MCP server until the factory is invoked", async () => {
-      const { McpServer } = require("@modelcontextprotocol/server");
-
+    it('builds no MCP server until the factory is invoked', async () => {
       await server.start();
 
       // Construction is deferred to the factory, so nothing is built up-front.
-      expect(McpServer).not.toHaveBeenCalled();
+      assertNotCalled(McpServer);
     });
 
-    test("returns a FRESH server instance on every factory call", async () => {
+    it('returns a FRESH server instance on every factory call', async () => {
       // Load-bearing: serveStdio builds an optimistic instance to answer a
       // `server/discover` opening, then closes it and calls the factory AGAIN if
       // the client instead opens with a 2025-era `initialize`. A shared instance
       // would be handed back already closed.
-      const { McpServer } = require("@modelcontextprotocol/server");
       await server.start();
       const factory = capturedFactory();
 
       const first = factory();
       const second = factory();
 
-      expect(McpServer).toHaveBeenCalledTimes(2);
-      expect(first).not.toBe(second);
+      assertCalledTimes(McpServer, 2);
+      assert.notEqual(first, second);
     });
 
-    test("fully registers tools, prompts and resource handlers on each instance", async () => {
-      const { mockSetRequestHandler } = require("@modelcontextprotocol/server");
+    it('fully registers tools, prompts and resource handlers on each instance', async () => {
       await server.start();
 
       capturedFactory()();
-      const methods = mockSetRequestHandler.mock.calls.map(([method]: [string]) => method);
+      const methods = mockSetRequestHandler.mock.calls.map((call) => call.arguments[0]);
 
-      expect(methods).toContain('tools/list');
-      expect(methods).toContain('resources/list');
-      expect(methods).toContain('resources/read');
+      assert.ok(methods.includes('tools/list'));
+      assert.ok(methods.includes('resources/list'));
+      assert.ok(methods.includes('resources/read'));
       // prompts/* come from PromptManager.registerOn, which is not mocked here.
-      expect(methods).toContain('prompts/list');
-      expect(methods).toContain('prompts/get');
+      assert.ok(methods.includes('prompts/list'));
+      assert.ok(methods.includes('prompts/get'));
       // tools/call is dispatched by registerTool, never hand-registered.
-      expect(methods).not.toContain('tools/call');
+      assert.ok(!methods.includes('tools/call'));
       // resources/templates/list is deliberately left to the SDK's default so
       // the declared `resources` capability stays answerable rather than -32601.
-      expect(methods).not.toContain('resources/templates/list');
+      assert.ok(!methods.includes('resources/templates/list'));
     });
 
-    test("stop() closes the transport handle", async () => {
-      const { mockHandleClose } = require("@modelcontextprotocol/server/stdio");
+    it('stop() closes the transport handle', async () => {
       await server.start();
 
       await server.stop();
 
-      expect(mockHandleClose).toHaveBeenCalled();
-      expect(server.getStatus()).toBe(ServerStatus.STOPPED);
+      assert.ok(mockHandleClose.mock.callCount() > 0);
+      assert.equal(server.getStatus(), ServerStatus.STOPPED);
     });
   });
 
@@ -225,56 +202,52 @@ describe("FluentMcpServer with Modular Design", () => {
   // surface, not merely which handlers exist — the gap that let a server-side
   // `roots/list` handler and an outbound `roots/list_changed` notification ship
   // unnoticed, because nothing exercised them.
-  describe("no server-initiated protocol traffic", () => {
-    test("issues no server→client request while building an instance", async () => {
-      const { mockRequest, mockGetClientCapabilities } = require('@modelcontextprotocol/server');
+  describe('no server-initiated protocol traffic', () => {
+    it('issues no server→client request while building an instance', async () => {
       // Even a client that advertises roots must not be asked for them.
-      mockGetClientCapabilities.mockReturnValue({ roots: {}, elicitation: {} });
+      mockGetClientCapabilities.mock.mockImplementation(() => ({ roots: {}, elicitation: {} }));
 
       await server.start();
       capturedFactory()();
 
-      expect(mockRequest).not.toHaveBeenCalled();
+      assertNotCalled(mockRequest);
     });
 
-    test("registers no notification handler", async () => {
+    it('registers no notification handler', async () => {
       // The only notification handler this server ever had was
       // notifications/initialized, whose sole remaining job was triggering the
       // transitional roots fetch. 2026-07-28 removed that handshake entirely.
-      const { mockSetNotificationHandler } = require('@modelcontextprotocol/server');
-
       await server.start();
       capturedFactory()();
 
-      expect(mockSetNotificationHandler).not.toHaveBeenCalled();
+      assertNotCalled(mockSetNotificationHandler);
     });
 
-    test("exposes no roots API surface", () => {
+    it('exposes no roots API surface', () => {
       // Guards against reintroduction: the working directory now comes only from
       // the explicit tool argument, the initialized session, or
       // FLUENT_MCP_WORKING_DIR.
       const surface = server as unknown as Record<string, unknown>;
-      expect(surface.getRoots).toBeUndefined();
-      expect(surface.addRoot).toBeUndefined();
-      expect(surface.updateRoots).toBeUndefined();
-      expect(surface.requestRootsFromClient).toBeUndefined();
+      assert.equal(surface.getRoots, undefined);
+      assert.equal(surface.addRoot, undefined);
+      assert.equal(surface.updateRoots, undefined);
+      assert.equal(surface.requestRootsFromClient, undefined);
     });
 
-    test("declares no client-side capability and no unsent listChanged", async () => {
-      const { McpServer } = require('@modelcontextprotocol/server');
+    it('declares no client-side capability and no unsent listChanged', async () => {
       await server.start();
       capturedFactory()();
 
-      const options = (McpServer as jest.Mock).mock.calls[0][1];
-      expect(options.capabilities).not.toHaveProperty('roots');
-      expect(options.capabilities).not.toHaveProperty('elicitation');
-      expect(options.capabilities).not.toHaveProperty('sampling');
-      expect(options.capabilities).not.toHaveProperty('logging');
+      const capabilities = McpServer.mock.calls[0].arguments[1]?.capabilities ?? {};
+      assert.ok(!('roots' in capabilities));
+      assert.ok(!('elicitation' in capabilities));
+      assert.ok(!('sampling' in capabilities));
+      assert.ok(!('logging' in capabilities));
       // v2 defaults each listChanged to true once it installs a handler set, so
       // these must be explicitly false — nothing here ever sends them.
-      expect(options.capabilities.tools.listChanged).toBe(false);
-      expect(options.capabilities.resources.listChanged).toBe(false);
-      expect(options.capabilities.prompts.listChanged).toBe(false);
+      assert.equal(capabilities.tools?.listChanged, false);
+      assert.equal(capabilities.resources?.listChanged, false);
+      assert.equal(capabilities.prompts?.listChanged, false);
     });
   });
 });
