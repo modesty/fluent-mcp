@@ -30,6 +30,9 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Type check tests
+        run: npm run typecheck:test
+
       - name: Validate API specs
         run: npm run validate:specs
 
