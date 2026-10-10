@@ -3,7 +3,6 @@ import { builtinModules } from 'node:module';
 import nodeResolve from '@rollup/plugin-node-resolve';
 import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
-import commonjs from '@rollup/plugin-commonjs';
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 
@@ -40,7 +39,6 @@ export default [
         preferBuiltins: true,
         exportConditions: ['node'],
       }),
-      commonjs(),
       ...(isDevelopment
         ? []
         : [
