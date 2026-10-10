@@ -1,109 +1,107 @@
-import { FluentAppValidator } from "../../src/utils/fluentAppValidator.js";
-import fs from "node:fs";
-import path from "node:path";
+/**
+ * Unit tests for FluentAppValidator
+ *
+ * Native runner: node:fs and node:path are shared builtin objects, so method stubs
+ * installed with the test context's mock tracker replace the methods for the
+ * validator too and are restored automatically when each test ends.
+ */
+import { beforeEach, describe, it, mock } from 'node:test';
+import type { TestContext } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { loggerFixture } from '../support/fixtures.js';
 
-// Mock the fs and path modules
-jest.mock("node:fs", () => ({
-  existsSync: jest.fn(),
-  readFileSync: jest.fn(),
-}));
+// The Jest setup silenced the logger for every suite; the fixture does the same here.
+mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 
-jest.mock("node:path", () => ({
-  join: jest.fn((dir, file) => `${dir}/${file}`),
-}));
+const { FluentAppValidator } = await import('../../src/utils/fluentAppValidator.js');
 
-// Mock the logger
-jest.mock("../../src/utils/logger.js", () => require('../mocks/index.js').createLoggerMock());
-
-describe("FluentAppValidator", () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+describe('FluentAppValidator', () => {
+  beforeEach((hook) => {
+    // A beforeEach hook runs with the current test's context, so this stub is
+    // restored when the test ends. Joining with '/' keeps the expected paths
+    // identical on every platform.
+    (hook as TestContext).mock.method(path, 'join', (dir: string, file: string) => `${dir}/${file}`);
   });
 
-  test("should detect Fluent app from now.config.json", async () => {
+  it('should detect Fluent app from now.config.json', async (t) => {
     // Mock file existence
-    jest.spyOn(fs, "existsSync").mockImplementation((filePath) => {
-      return String(filePath) === "/test-dir/now.config.json";
+    t.mock.method(fs, 'existsSync', (filePath: unknown) => {
+      return String(filePath) === '/test-dir/now.config.json';
     });
 
     // Mock file content
-    jest.spyOn(fs, "readFileSync").mockImplementation((filePath, encoding) => {
-      if (String(filePath) === "/test-dir/now.config.json") {
+    t.mock.method(fs, 'readFileSync', (filePath: unknown) => {
+      if (String(filePath) === '/test-dir/now.config.json') {
         return JSON.stringify({
-          scope: "x_test_scope",
-          name: "test-app",
+          scope: 'x_test_scope',
+          name: 'test-app',
         });
       }
-      throw new Error("File not found");
+      throw new Error('File not found');
     });
 
-    // Mock path.join
-    jest.spyOn(path, "join").mockImplementation((dir, file) => {
-      return `${dir}/${file}`;
-    });
-
-    const result = await FluentAppValidator.checkFluentAppExists("/test-dir");
-    expect(result.hasApp).toBe(true);
-    expect(result.scopeName).toBe("x_test_scope");
-    expect(result.packageName).toBe("test-app");
+    const result = await FluentAppValidator.checkFluentAppExists('/test-dir');
+    assert.equal(result.hasApp, true);
+    assert.equal(result.scopeName, 'x_test_scope');
+    assert.equal(result.packageName, 'test-app');
   });
 
-  test("should detect Fluent app from package.json with ServiceNow SDK dependency", async () => {
+  it('should detect Fluent app from package.json with ServiceNow SDK dependency', async (t) => {
     // Mock file existence
-    jest.spyOn(fs, "existsSync").mockImplementation((filePath) => {
-      if (String(filePath) === "/test-dir/now.config.json") {
+    t.mock.method(fs, 'existsSync', (filePath: unknown) => {
+      if (String(filePath) === '/test-dir/now.config.json') {
         return false;
       }
-      if (String(filePath) === "/test-dir/package.json") {
+      if (String(filePath) === '/test-dir/package.json') {
         return true;
       }
       return false;
     });
 
     // Mock file content
-    jest.spyOn(fs, "readFileSync").mockImplementation((filePath, encoding) => {
-      if (String(filePath) === "/test-dir/package.json") {
+    t.mock.method(fs, 'readFileSync', (filePath: unknown) => {
+      if (String(filePath) === '/test-dir/package.json') {
         return JSON.stringify({
-          name: "test-app",
+          name: 'test-app',
           dependencies: {
-            "@servicenow/sdk": "3.0.3",
+            '@servicenow/sdk': '3.0.3',
           },
         });
       }
-      throw new Error("File not found");
+      throw new Error('File not found');
     });
 
-    const result = await FluentAppValidator.checkFluentAppExists("/test-dir");
-    expect(result.hasApp).toBe(true);
-    expect(result.packageName).toBe("test-app");
+    const result = await FluentAppValidator.checkFluentAppExists('/test-dir');
+    assert.equal(result.hasApp, true);
+    assert.equal(result.packageName, 'test-app');
   });
 
-  test("should return hasApp=false when no Fluent app is detected", async () => {
+  it('should return hasApp=false when no Fluent app is detected', async (t) => {
     // Mock file existence - no config files
-    jest.spyOn(fs, "existsSync").mockImplementation((filePath) => {
-      return false;
-    });
+    t.mock.method(fs, 'existsSync', () => false);
 
-    const result = await FluentAppValidator.checkFluentAppExists("/empty-dir");
-    expect(result.hasApp).toBe(false);
-    expect(result.scopeName).toBeUndefined();
-    expect(result.packageName).toBeUndefined();
+    const result = await FluentAppValidator.checkFluentAppExists('/empty-dir');
+    assert.equal(result.hasApp, false);
+    assert.equal(result.scopeName, undefined);
+    assert.equal(result.packageName, undefined);
   });
 
-  test("should handle errors when reading file", async () => {
+  it('should handle errors when reading file', async (t) => {
     // Mock file existence
-    jest.spyOn(fs, "existsSync").mockImplementation((filePath) => {
-      return String(filePath) === "/test-dir/now.config.json";
+    t.mock.method(fs, 'existsSync', (filePath: unknown) => {
+      return String(filePath) === '/test-dir/now.config.json';
     });
 
     // Mock readFileSync to throw error
-    jest.spyOn(fs, "readFileSync").mockImplementation(() => {
-      throw new Error("Test error reading file");
+    t.mock.method(fs, 'readFileSync', () => {
+      throw new Error('Test error reading file');
     });
 
-    const result = await FluentAppValidator.checkFluentAppExists("/test-dir");
-    expect(result.hasApp).toBe(true); // We know the file exists, so it's considered an app
-    expect(result.scopeName).toBe("unknown");
-    expect(result.packageName).toBe("unknown");
+    const result = await FluentAppValidator.checkFluentAppExists('/test-dir');
+    assert.equal(result.hasApp, true); // We know the file exists, so it's considered an app
+    assert.equal(result.scopeName, 'unknown');
+    assert.equal(result.packageName, 'unknown');
   });
 });

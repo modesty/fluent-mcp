@@ -3,39 +3,52 @@
  * add can complete non-interactively (basic auth with credentials). OAuth and
  * credential-less basic skip the add and emit a single not_authenticated NOTICE.
  */
-import { autoValidateAuthIfConfigured } from '../../src/server/fluentInstanceAuth.js';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { assertCalledWith } from '../support/mockAssertions.js';
+import { loggerFixture, withEnvironment } from '../support/fixtures.js';
+import type { ToolsManager } from '../../src/tools/toolsManager.js';
+
+// The Jest setup silenced the logger for every suite; the fixture does the same here.
+mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
+
+const { autoValidateAuthIfConfigured } = await import('../../src/server/fluentInstanceAuth.js');
 
 function makeToolsManager(listOutput = '') {
-  const runAuth = jest.fn(async (args: Record<string, unknown>) => {
+  const runAuth = mock.fn(async (args: Record<string, unknown>) => {
     if (args.list) {
       return { success: true, output: listOutput, exitCode: 0 };
     }
     // add / use
     return { success: true, output: '', exitCode: 0 };
   });
-  return { runAuth } as any;
+  return { runAuth, toolsManager: { runAuth } as unknown as ToolsManager };
 }
 
 describe('autoValidateAuthIfConfigured', () => {
-  const ORIGINAL_ENV = { ...process.env };
+  let restoreEnvironment: () => void;
 
   beforeEach(() => {
-    delete process.env.SN_INSTANCE_URL;
-    delete process.env.SN_AUTH_TYPE;
-    delete process.env.SN_USER_NAME;
-    delete process.env.SN_USERNAME;
-    delete process.env.SN_PASSWORD;
+    // Start every test with no auth environment; the previous values come back
+    // after the test, including anything the test itself sets.
+    restoreEnvironment = withEnvironment({
+      SN_INSTANCE_URL: undefined,
+      SN_AUTH_TYPE: undefined,
+      SN_USER_NAME: undefined,
+      SN_USERNAME: undefined,
+      SN_PASSWORD: undefined,
+    });
   });
 
-  afterAll(() => {
-    process.env = { ...ORIGINAL_ENV };
+  afterEach(() => {
+    restoreEnvironment();
   });
 
   it('skips entirely when SN_INSTANCE_URL is not set', async () => {
     const tm = makeToolsManager();
-    const result = await autoValidateAuthIfConfigured(tm);
-    expect(result.status).toBe('skipped');
-    expect(tm.runAuth).not.toHaveBeenCalled();
+    const result = await autoValidateAuthIfConfigured(tm.toolsManager);
+    assert.equal(result.status, 'skipped');
+    assert.equal(tm.runAuth.mock.callCount(), 0);
   });
 
   it('does NOT auto-add for oauth when no matching profile exists', async () => {
@@ -43,13 +56,13 @@ describe('autoValidateAuthIfConfigured', () => {
     process.env.SN_AUTH_TYPE = 'oauth';
 
     const tm = makeToolsManager('');
-    const result = await autoValidateAuthIfConfigured(tm);
+    const result = await autoValidateAuthIfConfigured(tm.toolsManager);
 
-    expect(result.status).toBe('not_authenticated');
-    expect(result.actionRequired).toContain('auth --add');
+    assert.equal(result.status, 'not_authenticated');
+    assert.ok(result.actionRequired?.includes('auth --add'));
     // Only the list call — never an add.
-    expect(tm.runAuth).toHaveBeenCalledTimes(1);
-    expect(tm.runAuth).toHaveBeenCalledWith({ list: true });
+    assert.equal(tm.runAuth.mock.callCount(), 1);
+    assertCalledWith(tm.runAuth, { list: true });
   });
 
   it('does NOT auto-add for basic when credentials are absent', async () => {
@@ -57,10 +70,10 @@ describe('autoValidateAuthIfConfigured', () => {
     process.env.SN_AUTH_TYPE = 'basic';
 
     const tm = makeToolsManager('');
-    const result = await autoValidateAuthIfConfigured(tm);
+    const result = await autoValidateAuthIfConfigured(tm.toolsManager);
 
-    expect(result.status).toBe('not_authenticated');
-    expect(tm.runAuth).toHaveBeenCalledTimes(1);
+    assert.equal(result.status, 'not_authenticated');
+    assert.equal(tm.runAuth.mock.callCount(), 1);
   });
 
   it('auto-adds for basic when credentials are present', async () => {
@@ -70,13 +83,16 @@ describe('autoValidateAuthIfConfigured', () => {
     process.env.SN_PASSWORD = 'secret';
 
     const tm = makeToolsManager('');
-    const result = await autoValidateAuthIfConfigured(tm);
+    const result = await autoValidateAuthIfConfigured(tm.toolsManager);
 
-    expect(result.status).toBe('authenticated');
+    assert.equal(result.status, 'authenticated');
     // list + add
-    expect(tm.runAuth).toHaveBeenCalledTimes(2);
-    expect(tm.runAuth).toHaveBeenCalledWith(
-      expect.objectContaining({ add: 'https://dev12345.service-now.com', type: 'basic' })
+    assert.equal(tm.runAuth.mock.callCount(), 2);
+    assert.ok(
+      tm.runAuth.mock.calls.some((call) => {
+        const args = call.arguments[0];
+        return args.add === 'https://dev12345.service-now.com' && args.type === 'basic';
+      })
     );
   });
 
@@ -92,10 +108,10 @@ describe('autoValidateAuthIfConfigured', () => {
     ].join('\n');
 
     const tm = makeToolsManager(listOutput);
-    const result = await autoValidateAuthIfConfigured(tm);
+    const result = await autoValidateAuthIfConfigured(tm.toolsManager);
 
-    expect(result.status).toBe('authenticated');
-    expect(result.isDefault).toBe(true);
-    expect(tm.runAuth).toHaveBeenCalledTimes(1); // list only
+    assert.equal(result.status, 'authenticated');
+    assert.equal(result.isDefault, true);
+    assert.equal(tm.runAuth.mock.callCount(), 1); // list only
   });
 });

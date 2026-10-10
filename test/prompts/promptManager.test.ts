@@ -5,28 +5,20 @@
  * "Use the appropriate Fluent API methods" stubs, and the catalog must list all
  * 75 types (single source of truth: ServiceNowMetadataType in src/types.ts).
  *
- * Config is mocked to point resourcePaths at the real res/ directories so the
- * instruction summaries load from the shipped content.
+ * Native runner: configuration is NOT mocked. The real getProjectRootPath() and
+ * resourcePaths resolve to the staged copy of the shipped res/ tree
+ * (.test-build/<stage>/res), so the instruction summaries load from the shipped
+ * content, which is what the Jest config mock pointed at. Only the logger is
+ * replaced, to keep the run quiet.
  */
-import { PromptManager } from '../../src/prompts/promptManager.js';
-import { ServiceNowMetadataType } from '../../src/types.js';
+import { describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { loggerFixture } from '../support/fixtures.js';
 
-jest.mock('../../src/utils/logger.js', () => require('../mocks/index.js').createLoggerMock());
-jest.mock('../../src/config.js', () => {
-  const path = require('node:path');
-  const root = process.cwd();
-  return {
-    getProjectRootPath: jest.fn(() => root),
-    getConfig: jest.fn(() => ({
-      resourcePaths: {
-        spec: path.join(root, 'res', 'spec'),
-        snippet: path.join(root, 'res', 'snippet'),
-        instruct: path.join(root, 'res', 'instruct'),
-      },
-    })),
-    findMissingResourcePaths: jest.fn(() => []),
-  };
-});
+mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
+
+const { PromptManager } = await import('../../src/prompts/promptManager.js');
+const { ServiceNowMetadataType } = await import('../../src/types.js');
 
 type PromptHandler = (request: { params: { name: string; arguments?: Record<string, unknown> } }) => Promise<{
   messages: { content: { type: string; text: string } }[];
@@ -57,40 +49,40 @@ describe('coding_in_fluent prompt rendering (P0.1)', () => {
     const text = await renderCodingInFluent(['business-rule', 'table']);
 
     // Real content pulled from the shipped instruction resources.
-    expect(text).toContain('### business-rule');
-    expect(text).toContain('`when` field'); // first substantive rule in fluent_instruct_business-rule.md
-    expect(text).toContain('### table');
+    assert.ok(text.includes('### business-rule'));
+    assert.ok(text.includes('`when` field')); // first substantive rule in fluent_instruct_business-rule.md
+    assert.ok(text.includes('### table'));
 
     // Explicit tool pointers.
-    expect(text).toContain('get-api-spec');
-    expect(text).toContain('get-instruct');
-    expect(text).toContain('get-snippet');
+    assert.ok(text.includes('get-api-spec'));
+    assert.ok(text.includes('get-instruct'));
+    assert.ok(text.includes('get-snippet'));
 
     // Explicit resource-URI pointers.
-    expect(text).toContain('sn-spec://business-rule');
-    expect(text).toContain('sn-instruct://business-rule');
-    expect(text).toContain('sn-snippet://table/0001');
+    assert.ok(text.includes('sn-spec://business-rule'));
+    assert.ok(text.includes('sn-instruct://business-rule'));
+    assert.ok(text.includes('sn-snippet://table/0001'));
   });
 
   it('emits zero generic boilerplate stubs', async () => {
     const text = await renderCodingInFluent(['business-rule', 'client-script', 'acl']);
-    expect(text).not.toContain('Use the appropriate Fluent API methods');
-    expect(text).not.toContain('Reference the specific instructions for');
+    assert.ok(!text.includes('Use the appropriate Fluent API methods'));
+    assert.ok(!text.includes('Reference the specific instructions for'));
   });
 
   it('appends the full enum-derived catalog of all 75 metadata types', async () => {
     const text = await renderCodingInFluent(['flow']);
     const total = Object.values(ServiceNowMetadataType).length;
 
-    expect(total).toBe(75); // guards against the pre-v4.12.x count of 71 (+ assessment, risk-assessment, database-view, interceptor)
-    expect(text).toContain(`All ${total} supported metadata types`);
+    assert.equal(total, 75); // guards against the pre-v4.12.x count of 71 (+ assessment, risk-assessment, database-view, interceptor)
+    assert.ok(text.includes(`All ${total} supported metadata types`));
 
     // Every supported type appears in the rendered catalog.
     for (const type of Object.values(ServiceNowMetadataType)) {
-      expect(text).toContain(type);
+      assert.ok(text.includes(type));
     }
     // Including the v4.9.0 addition.
-    expect(text).toContain('atf-ui-test-script');
+    assert.ok(text.includes('atf-ui-test-script'));
   });
 
   /**
@@ -101,22 +93,22 @@ describe('coding_in_fluent prompt rendering (P0.1)', () => {
   it('splits the documented comma-separated metadata_list string', async () => {
     const text = await renderCodingInFluent('state-model,atf-list');
 
-    expect(text).toContain('### state-model');
-    expect(text).toContain('### atf-list');
-    expect(text).not.toContain('not a recognized Fluent metadata type');
+    assert.ok(text.includes('### state-model'));
+    assert.ok(text.includes('### atf-list'));
+    assert.ok(!text.includes('not a recognized Fluent metadata type'));
   });
 
   it('tolerates whitespace and casing around comma-separated entries', async () => {
     const text = await renderCodingInFluent(' Table , business-rule ,, ');
 
-    expect(text).toContain('### table');
-    expect(text).toContain('### business-rule');
-    expect(text).not.toContain('not a recognized Fluent metadata type');
+    assert.ok(text.includes('### table'));
+    assert.ok(text.includes('### business-rule'));
+    assert.ok(!text.includes('not a recognized Fluent metadata type'));
   });
 
   it('handles an unknown metadata type with an actionable correction, not a stub', async () => {
     const text = await renderCodingInFluent(['not-a-real-type']);
-    expect(text).toContain('not a recognized Fluent metadata type');
-    expect(text).not.toContain('Use the appropriate Fluent API methods');
+    assert.ok(text.includes('not a recognized Fluent metadata type'));
+    assert.ok(!text.includes('Use the appropriate Fluent API methods'));
   });
 });

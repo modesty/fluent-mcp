@@ -38,6 +38,14 @@
     "test/tools/transformCommand.test.ts",
     "test/tools/structuredContent.test.ts",
     "test/tools/shellInjection.test.ts",
-    "test/tools/lazyAuth.integration.test.ts"
+    "test/tools/lazyAuth.integration.test.ts",
+    "test/utils/fluentAppValidator.test.ts",
+    "test/tools/resourceTools.test.ts",
+    "test/tools/initCommand.test.ts",
+    "test/tools/toolsManager.test.ts",
+    "test/server/fluentInstanceAuth.test.ts",
+    "test/res/resourceManager.test.ts",
+    "test/prompts/promptManager.test.ts",
+    "test/sdk440-types.unit.test.ts"
   ]
 }

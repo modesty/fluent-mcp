@@ -1,10 +1,26 @@
-import { CommandProcessor, CommandResult } from "../../src/utils/types.js";
-import { InitCommand } from "../../src/tools/commands/initCommand.js";
-import { FluentAppValidator } from "../../src/utils/fluentAppValidator.js";
-import { SessionManager } from "../../src/utils/sessionManager.js";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
+/**
+ * Unit tests for InitCommand
+ *
+ * Native runner:
+ * - SessionManager is replaced by a module mock registered before InitCommand is
+ *   imported, so setWorkingDirectory calls can be asserted on a shared handle.
+ * - The logger and SDK CLI resolution use the shared fixtures (the Jest setup
+ *   supplied both for every suite); resolveSdkCli() yields process.execPath plus
+ *   the fixed SDK entry point the argv assertions expect.
+ * - The filesystem, os.homedir and FluentAppValidator are spied on the shared
+ *   builtin / class objects with the running test's mock tracker, so they are
+ *   restored when each test ends (no restoreAllMocks hook is needed).
+ */
+import { beforeEach, describe, it, mock } from 'node:test';
+import type { TestContext } from 'node:test';
+import assert from 'node:assert/strict';
+import { inspect } from 'node:util';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import type { CommandResult } from '../../src/utils/types.js';
+import { assertCalledTimes, assertCalledWith, assertNotCalled } from '../support/mockAssertions.js';
+import { loggerFixture, sdkCliFixture } from '../support/fixtures.js';
 
 // Create a virtual filesystem helper
 interface FluentAppInfo {
@@ -68,171 +84,206 @@ class VirtualFileSystem {
 
 const mockFs = new VirtualFileSystem();
 
-jest.mock("../../src/utils/sessionManager.js", () => require('../mocks/index.js').createSessionManagerMock());
+// SessionManager mock: getInstance() always returns the same instance, so the
+// assertions read setWorkingDirectory straight from it.
+const sessionInstance = {
+  getWorkingDirectory: mock.fn(() => '/mock/working/dir'),
+  setWorkingDirectory: mock.fn((_directory: string): void => undefined),
+  getAuthAlias: mock.fn((): string | undefined => undefined),
+  setAuthAlias: mock.fn(),
+  getAuthValidationResult: mock.fn(() => undefined),
+  setAuthValidationResult: mock.fn(),
+};
+const SessionManager = {
+  getInstance: mock.fn(() => sessionInstance),
+};
+mock.module('../../src/utils/sessionManager.js', { namedExports: { SessionManager } });
 
-describe("InitCommand", () => {
-  let initCommand: InitCommand;
-  let mockExecutor: CommandProcessor;
+mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
+mock.module('../../src/utils/sdkCli.js', sdkCliFixture().mockOptions);
 
-  afterEach(() => {
-    jest.restoreAllMocks();
-  });
+const { InitCommand } = await import('../../src/tools/commands/initCommand.js');
+const { FluentAppValidator } = await import('../../src/utils/fluentAppValidator.js');
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    
+describe('InitCommand', () => {
+  let initCommand: InstanceType<typeof InitCommand>;
+  let processMock: ReturnType<typeof createProcessMock>;
+  let mockExecutor: { process: typeof processMock };
+  let mkdirSyncSpy: { mock: { calls: ReadonlyArray<{ arguments: unknown[] }> } };
+  // What the readdirSync spy answers; a test reassigns it to change the directory listing.
+  let readdirResult: (path: string) => string[];
+
+  /** A command processor whose process() succeeds with a canned init result. */
+  function createProcessMock() {
+    return mock.fn(
+      async (_command: string, _args: string[], _workingDir?: string): Promise<CommandResult> => ({
+        success: true,
+        output: 'Mock init command executed successfully',
+        exitCode: 0,
+      })
+    );
+  }
+
+  /**
+   * Asserts that some process() call ran process.execPath in `workingDirectory`
+   * with exactly three arguments, the middle one (the SDK argv) accepted by `accepts`.
+   */
+  function assertProcessCalledWithSdkArgs(
+    accepts: (sdkArgs: string[]) => boolean,
+    workingDirectory: string,
+    expectation: string
+  ): void {
+    const calls = processMock.mock.calls.map((call) => call.arguments as unknown[]);
+    assert.ok(
+      calls.some(
+        (args) =>
+          args.length === 3 &&
+          args[0] === process.execPath &&
+          Array.isArray(args[1]) &&
+          accepts(args[1] as string[]) &&
+          args[2] === workingDirectory
+      ),
+      `expected a process() call with ${expectation}; received ${inspect(calls)}`
+    );
+  }
+
+  /** Jest's expect.arrayContaining: every expected value is present, in any order. */
+  const containsAll = (expected: string[]) => (sdkArgs: string[]) =>
+    expected.every((value) => sdkArgs.includes(value));
+
+  beforeEach((hook) => {
+    // A beforeEach hook runs with the current test's context, so every spy
+    // installed below is restored when the test ends.
+    const t = hook as TestContext;
+
+    // Reset the shared SessionManager mock (Jest: clearAllMocks)
+    SessionManager.getInstance.mock.resetCalls();
+    for (const fn of Object.values(sessionInstance)) fn.mock.resetCalls();
+
     // Reset the virtual filesystem
     mockFs.reset();
     // Setup initial filesystem state
     mockFs.addExistingDirectory('/valid-dir');
     mockFs.markAsFluentApp('/existing-app-dir', 'x_test_scope', 'test-package');
-    
-    // Mock filesystem functions used by validation
-    jest.spyOn(fs, 'existsSync').mockImplementation((path: any) => {
-      const pathStr = path.toString();
-      return mockFs.exists(pathStr);
+
+    // Create a mock processor
+    processMock = createProcessMock();
+    mockExecutor = { process: processMock };
+
+    // Mock file system - must be done BEFORE creating the command
+    t.mock.method(fs, 'existsSync', (path: unknown) => {
+      return mockFs.directoryExists(String(path));
     });
-    
-    jest.spyOn(fs, 'statSync').mockImplementation((path: any) => {
-      const pathStr = path.toString();
+
+    t.mock.method(fs, 'statSync', (path: unknown) => {
+      const pathStr = String(path);
       if (!mockFs.exists(pathStr)) {
         throw new Error(`ENOENT: no such file or directory, stat '${pathStr}'`);
       }
       return {
         isDirectory: () => mockFs.isDirectory(pathStr),
-        isFile: () => !mockFs.isDirectory(pathStr)
-      } as any;
+        isFile: () => !mockFs.isDirectory(pathStr),
+      };
     });
-    
-    jest.spyOn(fs, 'readdirSync').mockImplementation((path: any) => {
-      const pathStr = path.toString();
-      return mockFs.readdir(pathStr) as any;
-    });
-    
-    jest.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined as any);
-    
-    // Create a mock processor
-    mockExecutor = {
-      process: jest.fn().mockImplementation((command, args, useMcpCwd, workingDir) => {
-        // Default mock implementation for successful execution
-        return Promise.resolve({
-          success: true,
-          output: "Mock init command executed successfully",
-          exitCode: 0,
-        } as CommandResult);
-      }),
-      execute: jest.fn().mockImplementation((command, args, useMcpCwd, workingDir) => {
-        // Default mock implementation for successful execution
-        return Promise.resolve({
-          success: true,
-          output: "Mock init command executed successfully",
-          exitCode: 0,
-        } as CommandResult);
-      }),
-    } as CommandProcessor;
 
-    // Mock file system - must be done BEFORE creating the command
-    jest.spyOn(fs, 'existsSync').mockImplementation((path) => {
-      return mockFs.directoryExists(String(path));
-    });
-    
-    jest.spyOn(fs, 'mkdirSync').mockImplementation((path) => {
+    readdirResult = (path) => mockFs.readdir(path);
+    t.mock.method(fs, 'readdirSync', (path: unknown) => readdirResult(String(path)));
+
+    mkdirSyncSpy = t.mock.method(fs, 'mkdirSync', (path: unknown) => {
       mockFs.createDirectory(String(path));
       return undefined;
     });
-    
+
     // Mock os.homedir
-    jest.spyOn(os, 'homedir').mockReturnValue('/mock-home');
-    
+    t.mock.method(os, 'homedir', () => '/mock-home');
+
     // Mock FluentAppValidator
-    jest.spyOn(FluentAppValidator, 'checkFluentAppExists').mockImplementation(async (directory) => {
+    t.mock.method(FluentAppValidator, 'checkFluentAppExists', async (directory: string) => {
       const info = mockFs.getFluentAppInfo(directory);
       if (info.hasApp) {
-        return { 
-          hasApp: true, 
-          scopeName: info.scopeName, 
-          packageName: info.packageName 
+        return {
+          hasApp: true,
+          scopeName: info.scopeName,
+          packageName: info.packageName,
         };
       }
       return { hasApp: false };
     });
-    
+
     initCommand = new InitCommand(mockExecutor);
   });
 
-  test("should have correct properties", () => {
-    expect(initCommand.name).toBe("init_fluent_app");
-    expect(initCommand.description).toContain(
-      "Initialize a new Fluent"
-    );
-    expect(initCommand.description).toContain("convert");
-    expect(initCommand.arguments.length).toBeGreaterThan(0);
-    
-    const intentArg = initCommand.arguments.find(arg => arg.name === "intent");
-    expect(intentArg?.required).toBe(false);
-    expect(intentArg?.description).toContain("conversion");
-    expect(intentArg?.description).toContain("creation");
+  it('should have correct properties', () => {
+    assert.equal(initCommand.name, 'init_fluent_app');
+    assert.ok(initCommand.description.includes('Initialize a new Fluent'));
+    assert.ok(initCommand.description.includes('convert'));
+    assert.ok(initCommand.arguments.length > 0);
 
-    const workingDirArg = initCommand.arguments.find(arg => arg.name === "workingDirectory");
-    expect(workingDirArg?.required).toBe(true);
+    const intentArg = initCommand.arguments.find((arg) => arg.name === 'intent');
+    assert.equal(intentArg?.required, false);
+    assert.ok(intentArg?.description.includes('conversion'));
+    assert.ok(intentArg?.description.includes('creation'));
 
-    const templateArg = initCommand.arguments.find(arg => arg.name === "template");
-    expect(templateArg?.required).toBe(false); // Only required for creation intent, not globally
-    expect(templateArg?.description).toContain("For creation only");
+    const workingDirArg = initCommand.arguments.find((arg) => arg.name === 'workingDirectory');
+    assert.equal(workingDirArg?.required, true);
 
-    const appNameArg = initCommand.arguments.find(arg => arg.name === "appName");
-    expect(appNameArg?.required).toBe(false);
-    expect(appNameArg?.description).toContain("For creation");
+    const templateArg = initCommand.arguments.find((arg) => arg.name === 'template');
+    assert.equal(templateArg?.required, false); // Only required for creation intent, not globally
+    assert.ok(templateArg?.description.includes('For creation only'));
 
-    const scopeNameArg = initCommand.arguments.find(arg => arg.name === "scopeName");
-    expect(scopeNameArg?.required).toBe(false);
-    expect(scopeNameArg?.description).toContain("x_");
+    const appNameArg = initCommand.arguments.find((arg) => arg.name === 'appName');
+    assert.equal(appNameArg?.required, false);
+    assert.ok(appNameArg?.description.includes('For creation'));
 
-    const fromArg = initCommand.arguments.find(arg => arg.name === "from");
-    expect(fromArg?.required).toBe(false);
-    expect(fromArg?.description).toContain("For conversion");
+    const scopeNameArg = initCommand.arguments.find((arg) => arg.name === 'scopeName');
+    assert.equal(scopeNameArg?.required, false);
+    assert.ok(scopeNameArg?.description.includes('x_'));
+
+    const fromArg = initCommand.arguments.find((arg) => arg.name === 'from');
+    assert.equal(fromArg?.required, false);
+    assert.ok(fromArg?.description.includes('For conversion'));
   });
 
   // MCP 2026-07-28 (SEP-2322) removed server-initiated requests, so the tool no
   // longer asks the client for missing values. Every argument must arrive with
   // the tools/call, and an incomplete bag must fail with an actionable message
   // rather than hang on a round trip that is no longer legal.
-  test('should fail with an actionable error when no intent can be determined', async () => {
+  it('should fail with an actionable error when no intent can be determined', async () => {
     const result = await initCommand.execute({});
 
-    expect(result.success).toBe(false);
-    expect(result.error?.message).toContain('Cannot determine intent for init_fluent_app');
+    assert.equal(result.success, false);
+    assert.ok(result.error?.message.includes('Cannot determine intent for init_fluent_app'));
     // Names both modes and their required arguments
-    expect(result.error?.message).toContain("intent to 'creation'");
-    expect(result.error?.message).toContain("intent to 'conversion'");
-    expect(result.error?.message).toContain('appName');
-    expect(result.error?.message).toContain('from');
+    assert.ok(result.error?.message.includes("intent to 'creation'"));
+    assert.ok(result.error?.message.includes("intent to 'conversion'"));
+    assert.ok(result.error?.message.includes('appName'));
+    assert.ok(result.error?.message.includes('from'));
     // Never reaches the SDK
-    expect(mockExecutor.process).not.toHaveBeenCalled();
+    assertNotCalled(mockExecutor.process);
   });
 
-  test('should never issue a server-initiated request for missing input', async () => {
+  it('should never issue a server-initiated request for missing input', async () => {
     // Guards the regression the 2026-07-28 migration removed: no code path may
     // reach back to the client. A bare intent with no data must fail locally.
     const result = await initCommand.execute({ intent: 'creation' });
 
-    expect(result.success).toBe(false);
-    expect(result.error?.message).toContain('Required parameters for creation are missing');
-    expect(mockExecutor.process).not.toHaveBeenCalled();
+    assert.equal(result.success, false);
+    assert.ok(result.error?.message.includes('Required parameters for creation are missing'));
+    assertNotCalled(mockExecutor.process);
   });
 
-  test('should fail with an actionable error when conversion is missing from', async () => {
+  it('should fail with an actionable error when conversion is missing from', async () => {
     const result = await initCommand.execute({
       intent: 'conversion',
       workingDirectory: '/valid-dir',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error?.message).toContain('Required parameters for conversion are missing: from');
-    expect(mockExecutor.process).not.toHaveBeenCalled();
+    assert.equal(result.success, false);
+    assert.ok(result.error?.message.includes('Required parameters for conversion are missing: from'));
+    assertNotCalled(mockExecutor.process);
   });
 
-  test('should treat null and blank arguments as absent when reporting missing input', async () => {
+  it('should treat null and blank arguments as absent when reporting missing input', async () => {
     // MCP clients commonly serialize an omitted optional value as null.
     const result = await initCommand.execute({
       intent: 'creation',
@@ -243,21 +294,21 @@ describe("InitCommand", () => {
       template: 'javascript.react',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error?.message).toContain('Required parameters for creation are missing');
-    expect(result.error?.message).toContain('packageName');
-    expect(result.error?.message).toContain('scopeName');
-    expect(result.error?.message).not.toContain('appName');
+    assert.equal(result.success, false);
+    assert.ok(result.error?.message.includes('Required parameters for creation are missing'));
+    assert.ok(result.error?.message.includes('packageName'));
+    assert.ok(result.error?.message.includes('scopeName'));
+    assert.ok(!result.error?.message.includes('appName'));
   });
 
-  test('should list the valid templates when creation input is incomplete', async () => {
+  it('should list the valid templates when creation input is incomplete', async () => {
     const result = await initCommand.execute({ intent: 'creation', appName: 'Test App' });
 
-    expect(result.success).toBe(false);
-    expect(result.error?.message).toContain('typescript.vue');
+    assert.equal(result.success, false);
+    assert.ok(result.error?.message.includes('typescript.vue'));
   });
 
-  test('should create directory if it does not exist', async () => {
+  it('should create directory if it does not exist', async () => {
     const args = {
       workingDirectory: '/non-existent-dir',
       appName: 'Test App',
@@ -266,13 +317,13 @@ describe("InitCommand", () => {
       template: 'javascript.react'
     };
     await initCommand.execute(args);
-    
-    expect(fs.mkdirSync).toHaveBeenCalledWith('/non-existent-dir', { recursive: true });
-    expect(SessionManager.getInstance().setWorkingDirectory).toHaveBeenCalledWith('/non-existent-dir');
-    expect(mockExecutor.process).toHaveBeenCalled();
+
+    assertCalledWith(mkdirSyncSpy, '/non-existent-dir', { recursive: true });
+    assertCalledWith(sessionInstance.setWorkingDirectory, '/non-existent-dir');
+    assert.ok(mockExecutor.process.mock.callCount() > 0);
   });
 
-  test('should handle existing directory with no Fluent app', async () => {
+  it('should handle existing directory with no Fluent app', async () => {
     mockFs.addExistingDirectory('/valid-dir');
     const args = {
       workingDirectory: '/valid-dir',
@@ -282,16 +333,16 @@ describe("InitCommand", () => {
       template: 'javascript.react'
     };
     await initCommand.execute(args);
-    
+
     // Should not create directory
-    expect(fs.mkdirSync).not.toHaveBeenCalled();
+    assertNotCalled(mkdirSyncSpy);
     // Should save working directory
-    expect(SessionManager.getInstance().setWorkingDirectory).toHaveBeenCalledWith('/valid-dir');
+    assertCalledWith(sessionInstance.setWorkingDirectory, '/valid-dir');
     // Should execute command
-    expect(mockExecutor.process).toHaveBeenCalled();
+    assert.ok(mockExecutor.process.mock.callCount() > 0);
   });
-  
-  test('should handle existing directory with Fluent app', async () => {
+
+  it('should handle existing directory with Fluent app', async () => {
     mockFs.markAsFluentApp('/existing-app-dir', 'x_test_scope', 'test-package');
     const args = {
       workingDirectory: '/existing-app-dir',
@@ -301,17 +352,17 @@ describe("InitCommand", () => {
       template: 'javascript.react'
     };
     const result = await initCommand.execute(args);
-    
-    expect(result.success).toBe(true);
-    expect(result.output).toContain('already contains');
-    expect(result.output).toContain('x_test_scope');
+
+    assert.equal(result.success, true);
+    assert.ok(result.output.includes('already contains'));
+    assert.ok(result.output.includes('x_test_scope'));
     // Should save working directory
-    expect(SessionManager.getInstance().setWorkingDirectory).toHaveBeenCalledWith('/existing-app-dir');
+    assertCalledWith(sessionInstance.setWorkingDirectory, '/existing-app-dir');
     // Should not execute command
-    expect(mockExecutor.process).not.toHaveBeenCalled();
+    assertNotCalled(mockExecutor.process);
   });
 
-  test('should fail when working directory not provided', async () => {
+  it('should fail when working directory not provided', async () => {
     const args = {
       appName: 'Test App',
       packageName: 'test-app',
@@ -321,11 +372,11 @@ describe("InitCommand", () => {
 
     const result = await initCommand.execute(args);
 
-    expect(result.success).toBe(false);
-    expect(result.error?.message).toContain('Required parameters for creation are missing: workingDirectory');
+    assert.equal(result.success, false);
+    assert.ok(result.error?.message.includes('Required parameters for creation are missing: workingDirectory'));
   });
 
-  test('should execute conversion with from parameter', async () => {
+  it('should execute conversion with from parameter', async () => {
     const args = {
       workingDirectory: '/valid-dir',
       from: 'a1b2c3d4e5f6789012345678901234ab', // Valid sys_id
@@ -333,22 +384,23 @@ describe("InitCommand", () => {
     };
 
     await initCommand.execute(args);
-    
-    expect(mockExecutor.process).toHaveBeenCalledWith(
+
+    assertCalledWith(
+      mockExecutor.process,
       process.execPath,
       [
         '/test/node_modules/@servicenow/sdk/bin/index.js',
-        'init', 
+        'init',
         '--from', 'a1b2c3d4e5f6789012345678901234ab',
         '--auth', 'test-auth'
       ],
       '/valid-dir'
     );
-    
-    expect(SessionManager.getInstance().setWorkingDirectory).toHaveBeenCalledWith('/valid-dir');
+
+    assertCalledWith(sessionInstance.setWorkingDirectory, '/valid-dir');
   });
 
-  test('should execute creation with all required parameters', async () => {
+  it('should execute creation with all required parameters', async () => {
     const args = {
       workingDirectory: '/valid-dir',
       appName: 'Test App',
@@ -359,9 +411,10 @@ describe("InitCommand", () => {
     };
 
     await initCommand.execute(args);
-    
+
     // SDK v4.5.0: init no longer injects --auth for creation (only for conversion)
-    expect(mockExecutor.process).toHaveBeenCalledWith(
+    assertCalledWith(
+      mockExecutor.process,
       process.execPath,
       [
         '/test/node_modules/@servicenow/sdk/bin/index.js',
@@ -373,11 +426,11 @@ describe("InitCommand", () => {
       ],
       '/valid-dir'
     );
-    
-    expect(SessionManager.getInstance().setWorkingDirectory).toHaveBeenCalledWith('/valid-dir');
+
+    assertCalledWith(sessionInstance.setWorkingDirectory, '/valid-dir');
   });
 
-  test('should succeed for an explicit conversion intent with complete arguments', async () => {
+  it('should succeed for an explicit conversion intent with complete arguments', async () => {
     const result = await initCommand.execute({
       intent: 'conversion',
       from: 'a1b2c3d4e5f6789012345678901234ab',
@@ -385,11 +438,11 @@ describe("InitCommand", () => {
       auth: 'test-auth',
     });
 
-    expect(result.success).toBe(true);
-    expect(mockExecutor.process).toHaveBeenCalled();
+    assert.equal(result.success, true);
+    assert.ok(mockExecutor.process.mock.callCount() > 0);
   });
 
-  test('should succeed for an explicit creation intent with complete arguments', async () => {
+  it('should succeed for an explicit creation intent with complete arguments', async () => {
     const result = await initCommand.execute({
       intent: 'creation',
       appName: 'Test App',
@@ -399,25 +452,25 @@ describe("InitCommand", () => {
       template: 'javascript.react',
     });
 
-    expect(result.success).toBe(true);
-    expect(mockExecutor.process).toHaveBeenCalled();
+    assert.equal(result.success, true);
+    assert.ok(mockExecutor.process.mock.callCount() > 0);
   });
 
 
-  test('should validate sys_id format for conversion', async () => {
+  it('should validate sys_id format for conversion', async () => {
     const args = {
       workingDirectory: '/valid-dir',
       from: 'invalid-sys-id'
     };
 
     const result = await initCommand.execute(args);
-    expect(result.success).toBe(false);
-    expect(result.error?.message).toContain('sys_id must be a 32-character hexadecimal string');
+    assert.equal(result.success, false);
+    assert.ok(result.error?.message.includes('sys_id must be a 32-character hexadecimal string'));
   });
 
-  test('should validate scopeName format for creation', async () => {
+  it('should validate scopeName format for creation', async () => {
     mockFs.addExistingDirectory('/valid-dir');
-    
+
     const args = {
       workingDirectory: '/valid-dir',
       appName: 'Test App',
@@ -427,13 +480,13 @@ describe("InitCommand", () => {
     };
 
     const result = await initCommand.execute(args);
-    expect(result.success).toBe(false);
-    expect(result.error?.message).toContain('scopeName must start with "x_" prefix');
+    assert.equal(result.success, false);
+    assert.ok(result.error?.message.includes('scopeName must start with "x_" prefix'));
   });
 
-  test('should validate local path for conversion', async () => {
+  it('should validate local path for conversion', async () => {
     mockFs.markAsFluentApp('/existing-path', 'x_existing_scope', 'existing-package');
-    const ensureAuthValidated = jest.fn().mockResolvedValue(undefined);
+    const ensureAuthValidated = mock.fn(async () => undefined);
     const localConversionCommand = new InitCommand(mockExecutor, ensureAuthValidated);
     const args = {
       workingDirectory: '/valid-dir',
@@ -441,18 +494,18 @@ describe("InitCommand", () => {
     };
 
     await localConversionCommand.execute(args);
-    expect(mockExecutor.process).toHaveBeenCalled();
-    expect(ensureAuthValidated).not.toHaveBeenCalled();
-    expect(mockExecutor.process).toHaveBeenCalledWith(
-      process.execPath,
-      expect.not.arrayContaining(['--auth']),
-      '/valid-dir'
+    assert.ok(mockExecutor.process.mock.callCount() > 0);
+    assertNotCalled(ensureAuthValidated);
+    assertProcessCalledWithSdkArgs(
+      (sdkArgs) => !sdkArgs.includes('--auth'),
+      '/valid-dir',
+      "no '--auth' argument"
     );
   });
 
-  test('should recognize a bare relative local path without triggering auth validation', async () => {
+  it('should recognize a bare relative local path without triggering auth validation', async () => {
     mockFs.markAsFluentApp(path.resolve('existing-path'), 'x_existing_scope', 'existing-package');
-    const ensureAuthValidated = jest.fn().mockResolvedValue(undefined);
+    const ensureAuthValidated = mock.fn(async () => undefined);
     const localConversionCommand = new InitCommand(mockExecutor, ensureAuthValidated);
 
     await localConversionCommand.execute({
@@ -460,17 +513,17 @@ describe("InitCommand", () => {
       from: 'existing-path',
     });
 
-    expect(ensureAuthValidated).not.toHaveBeenCalled();
-    expect(mockExecutor.process).toHaveBeenCalledWith(
-      process.execPath,
-      expect.not.arrayContaining(['--auth']),
-      '/valid-dir'
+    assertNotCalled(ensureAuthValidated);
+    assertProcessCalledWithSdkArgs(
+      (sdkArgs) => !sdkArgs.includes('--auth'),
+      '/valid-dir',
+      "no '--auth' argument"
     );
   });
 
-  test('should honor an explicit auth alias for a local conversion without lazy validation', async () => {
+  it('should honor an explicit auth alias for a local conversion without lazy validation', async () => {
     mockFs.markAsFluentApp('/existing-path', 'x_existing_scope', 'existing-package');
-    const ensureAuthValidated = jest.fn().mockResolvedValue(undefined);
+    const ensureAuthValidated = mock.fn(async () => undefined);
     const localConversionCommand = new InitCommand(mockExecutor, ensureAuthValidated);
 
     await localConversionCommand.execute({
@@ -479,16 +532,16 @@ describe("InitCommand", () => {
       auth: 'explicit-local-auth',
     });
 
-    expect(ensureAuthValidated).not.toHaveBeenCalled();
-    expect(mockExecutor.process).toHaveBeenCalledWith(
-      process.execPath,
-      expect.arrayContaining(['--auth', 'explicit-local-auth']),
-      '/valid-dir'
+    assertNotCalled(ensureAuthValidated);
+    assertProcessCalledWithSdkArgs(
+      containsAll(['--auth', 'explicit-local-auth']),
+      '/valid-dir',
+      "'--auth explicit-local-auth'"
     );
   });
 
-  test('should lazily validate auth for sys_id conversion without an alias', async () => {
-    const ensureAuthValidated = jest.fn().mockResolvedValue(undefined);
+  it('should lazily validate auth for sys_id conversion without an alias', async () => {
+    const ensureAuthValidated = mock.fn(async () => undefined);
     const instanceConversionCommand = new InitCommand(mockExecutor, ensureAuthValidated);
 
     await instanceConversionCommand.execute({
@@ -496,21 +549,21 @@ describe("InitCommand", () => {
       from: 'a1b2c3d4e5f6789012345678901234ab'
     });
 
-    expect(ensureAuthValidated).toHaveBeenCalledTimes(1);
+    assertCalledTimes(ensureAuthValidated, 1);
   });
 
-  test('should fail validation for non-existent local path', async () => {
+  it('should fail validation for non-existent local path', async () => {
     const args = {
       workingDirectory: '/valid-dir',
       from: '/non-existent-path'
     };
 
     const result = await initCommand.execute(args);
-    expect(result.success).toBe(false);
-    expect(result.error?.message).toContain('Local path does not exist');
+    assert.equal(result.success, false);
+    assert.ok(result.error?.message.includes('Local path does not exist'));
   });
 
-  test('should create working directory if it does not exist', async () => {
+  it('should create working directory if it does not exist', async () => {
     const args = {
       workingDirectory: '/non-existent-working-dir',
       appName: 'Test App',
@@ -520,19 +573,20 @@ describe("InitCommand", () => {
     };
 
     const result = await initCommand.execute(args);
-    
-    expect(result.success).toBe(true);
-    expect(fs.mkdirSync).toHaveBeenCalledWith('/non-existent-working-dir', { recursive: true });
+
+    assert.equal(result.success, true);
+    assertCalledWith(mkdirSyncSpy, '/non-existent-working-dir', { recursive: true });
   });
 
-  test('should validate working directory is empty (no package.json)', async () => {
-    // Mock fs.readdirSync to return package.json
-    const mockReaddirSync = jest.spyOn(fs, 'readdirSync').mockImplementation((path: any) => {
+  it('should validate working directory is empty (no package.json)', async () => {
+    // Make readdirSync report a package.json for this directory. The spy is
+    // restored with the test, so no explicit mockRestore is needed.
+    readdirResult = (path) => {
       if (path === '/dir-with-package') {
-        return ['package.json'] as any;
+        return ['package.json'];
       }
-      return [] as any;
-    });
+      return [];
+    };
 
     mockFs.addExistingDirectory('/dir-with-package');
 
@@ -545,22 +599,19 @@ describe("InitCommand", () => {
     };
 
     const result = await initCommand.execute(args);
-    
-    // Restore original function
-    mockReaddirSync.mockRestore();
-    
-    expect(result.success).toBe(false);
-    expect(result.error?.message).toContain('Working directory must not contain package.json');
+
+    assert.equal(result.success, false);
+    assert.ok(result.error?.message.includes('Working directory must not contain package.json'));
   });
 
-  test('should validate working directory is empty (no now.config.json)', async () => {
-    // Mock fs.readdirSync to return now.config.json
-    const mockReaddirSync = jest.spyOn(fs, 'readdirSync').mockImplementation((path: any) => {
+  it('should validate working directory is empty (no now.config.json)', async () => {
+    // Make readdirSync report a now.config.json for this directory
+    readdirResult = (path) => {
       if (path === '/dir-with-config') {
-        return ['now.config.json'] as any;
+        return ['now.config.json'];
       }
-      return [] as any;
-    });
+      return [];
+    };
 
     mockFs.addExistingDirectory('/dir-with-config');
 
@@ -573,17 +624,14 @@ describe("InitCommand", () => {
     };
 
     const result = await initCommand.execute(args);
-    
-    // Restore original function
-    mockReaddirSync.mockRestore();
-    
-    expect(result.success).toBe(false);
-    expect(result.error?.message).toContain('Working directory must not contain now.config.json');
+
+    assert.equal(result.success, false);
+    assert.ok(result.error?.message.includes('Working directory must not contain now.config.json'));
   });
 
-  test('should validate template parameter', async () => {
+  it('should validate template parameter', async () => {
     mockFs.addExistingDirectory('/valid-dir');
-    
+
     const args = {
       workingDirectory: '/valid-dir',
       appName: 'Test App',
@@ -593,28 +641,28 @@ describe("InitCommand", () => {
     };
 
     const result = await initCommand.execute(args);
-    
-    expect(result.success).toBe(false);
-    expect(result.error?.message).toContain('template must be one of:');
+
+    assert.equal(result.success, false);
+    assert.ok(result.error?.message.includes('template must be one of:'));
   });
 
-  test('should determine intent from from parameter', async () => {
+  it('should determine intent from from parameter', async () => {
     const args = {
       workingDirectory: '/valid-dir',
       from: 'a1b2c3d4e5f6789012345678901234ab'
     };
 
     await initCommand.execute(args);
-    
+
     // Should execute conversion flow
-    expect(mockExecutor.process).toHaveBeenCalledWith(
-      process.execPath,
-      expect.arrayContaining(['--from', 'a1b2c3d4e5f6789012345678901234ab']),
-      '/valid-dir'
+    assertProcessCalledWithSdkArgs(
+      containsAll(['--from', 'a1b2c3d4e5f6789012345678901234ab']),
+      '/valid-dir',
+      "'--from <sys_id>'"
     );
   });
 
-  test('should determine intent from creation parameters', async () => {
+  it('should determine intent from creation parameters', async () => {
     const args = {
       workingDirectory: '/valid-dir',
       appName: 'Test App',
@@ -624,12 +672,12 @@ describe("InitCommand", () => {
     };
 
     await initCommand.execute(args);
-    
+
     // Should execute creation flow
-    expect(mockExecutor.process).toHaveBeenCalledWith(
-      process.execPath,
-      expect.arrayContaining(['--appName', '"Test App"']),
-      '/valid-dir'
+    assertProcessCalledWithSdkArgs(
+      containsAll(['--appName', '"Test App"']),
+      '/valid-dir',
+      "'--appName \"Test App\"'"
     );
   });
 });
