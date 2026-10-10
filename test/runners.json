@@ -22,6 +22,10 @@
     "test/sdk490-types.integration.test.ts",
     "test/sdk4101-types.integration.test.ts",
     "test/sdk4112-types.integration.test.ts",
-    "test/sdk4136-types.integration.test.ts"
+    "test/sdk4136-types.integration.test.ts",
+    "test/server/wireProtocol.test.ts",
+    "test/tools/processRunner.test.ts",
+    "test/tools/processRunner.robustness.test.ts",
+    "test/tools/responseTimeout.test.ts"
   ]
 }

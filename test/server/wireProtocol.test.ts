@@ -12,43 +12,49 @@
  * `ServeStdioOptions.transport` is the SDK's own "bring your own transport"
  * affordance, so nothing here is a test-only code path in the server.
  */
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { InMemoryTransport } from '@modelcontextprotocol/server';
-import { FluentMcpServer } from '../../src/server/fluentMCPServer.js';
-import { resolveSdkCli } from '../../src/utils/sdkCli.js';
+import { configFixture, loggerFixture } from '../support/fixtures.js';
 
-jest.mock('../../src/utils/sdkCli.js', () => ({
-  resolveSdkCli: jest.fn(),
-  resetSdkCliCache: jest.fn(),
-}));
+/**
+ * Native runner: the server, transports and child processes are all real. Only
+ * three collaborators are replaced, each registered before the server is
+ * imported (native module mocks apply to later imports only):
+ *  - SDK CLI resolution, so the cancellation tests can point `sdk_info` at the
+ *    hanging fixture; every other test never reaches it.
+ *  - the logger, to keep stderr quiet.
+ *  - config, which reads the real shipped res/ content (the project root is the
+ *    runner's cwd) so resources/read and tools/call exercise the bundled
+ *    resources, exactly as the Jest suite's own config override did.
+ */
+type SdkCliInvocation = { command: string; baseArgs: string[] };
 
-jest.mock('../../src/utils/logger.js', () => require('../mocks/index.js').createLoggerMock());
+const resolveSdkCli = mock.fn((): SdkCliInvocation => undefined as unknown as SdkCliInvocation);
+const resetSdkCliCache = mock.fn();
+mock.module('../../src/utils/sdkCli.js', { namedExports: { resolveSdkCli, resetSdkCliCache } });
 
-// Override test/setup.js's global config mock, whose resourcePaths point at a
-// nonexistent /test/res/*. These tests read the real shipped res/ content so
-// that resources/read and tools/call exercise the actual bundled resources.
-jest.mock('../../src/config.js', () => {
-  const path = require('node:path');
-  const root = process.cwd();
-  return {
-    getProjectRootPath: jest.fn(() => root),
-    getConfig: jest.fn(() => ({
-      name: 'wire-test-server',
-      version: '0.0.0-test',
-      description: 'Wire test server',
-      logLevel: 'error',
-      resourcePaths: {
-        spec: path.join(root, 'res', 'spec'),
-        snippet: path.join(root, 'res', 'snippet'),
-        instruct: path.join(root, 'res', 'instruct'),
-      },
-      servicenowSdk: { cliPath: 'snc', commandTimeoutMs: 30000 },
-    })),
-    findMissingResourcePaths: jest.fn(() => []),
-  };
+mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
+
+const projectRoot = process.cwd();
+const config = configFixture({
+  name: 'wire-test-server',
+  version: '0.0.0-test',
+  description: 'Wire test server',
+  logLevel: 'error',
+  resourcePaths: {
+    spec: path.join(projectRoot, 'res', 'spec'),
+    snippet: path.join(projectRoot, 'res', 'snippet'),
+    instruct: path.join(projectRoot, 'res', 'instruct'),
+  },
 });
+config.getProjectRootPath.mock.mockImplementation(() => projectRoot);
+mock.module('../../src/config.js', config.mockOptions);
+
+const { FluentMcpServer } = await import('../../src/server/fluentMCPServer.js');
 
 const MODERN_VERSION = '2026-07-28';
 const LEGACY_VERSION = '2025-11-25';
@@ -57,6 +63,7 @@ const CLIENT_CAPABILITIES_KEY = 'io.modelcontextprotocol/clientCapabilities';
 const CLIENT_INFO_KEY = 'io.modelcontextprotocol/clientInfo';
 const HANGING_SDK_CLI = path.resolve(process.cwd(), 'test/fixtures/hanging-sdk-cli.js');
 
+type FluentMcpServerInstance = InstanceType<typeof FluentMcpServer>;
 type Frame = Record<string, any>;
 type PendingRequest = { requestId: number; response: Promise<Frame> };
 
@@ -65,7 +72,7 @@ class WireClient {
   readonly received: Frame[] = [];
   private nextId = 1;
 
-  private constructor(private readonly client: InMemoryTransport, readonly server: FluentMcpServer) {
+  private constructor(private readonly client: InMemoryTransport, readonly server: FluentMcpServerInstance) {
     this.client.onmessage = (message) => { this.received.push(message as Frame); };
   }
 
@@ -193,6 +200,16 @@ async function waitForProcessExit(pid: number, timeoutMs = 5_000): Promise<void>
   throw new Error(`Timed out waiting for hanging SDK CLI process ${pid} to exit`);
 }
 
+/** Best-effort read of a pid file that may not exist yet; never throws. */
+async function readPidIfPresent(pidPath: string): Promise<number | undefined> {
+  try {
+    const pid = Number.parseInt((await readFile(pidPath, 'utf8')).trim(), 10);
+    return Number.isInteger(pid) && pid > 0 ? pid : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 describe('dual-era wire protocol', () => {
   let wire: WireClient;
 
@@ -208,52 +225,52 @@ describe('dual-era wire protocol', () => {
     it('answers server/discover, which the revision makes mandatory', async () => {
       const res = await wire.modern('server/discover');
 
-      expect(res.error).toBeUndefined();
+      assert.equal(res.error, undefined);
       // The SDK installs this handler itself for modern connections.
-      expect(res.result.supportedVersions).toContain(MODERN_VERSION);
-      expect(res.result.instructions).toContain('explain_fluent_api');
+      assert.ok(res.result.supportedVersions.includes(MODERN_VERSION));
+      assert.ok(res.result.instructions.includes('explain_fluent_api'));
       // Servers SHOULD identify themselves on every response; the 2026 codec
       // stamps this into result _meta (and never on a 2025-era response).
-      expect(res.result._meta?.['io.modelcontextprotocol/serverInfo']?.name).toBeDefined();
+      assert.notEqual(res.result._meta?.['io.modelcontextprotocol/serverInfo']?.name, undefined);
     });
 
     it('advertises no listChanged on server/discover either', async () => {
       const res = await wire.modern('server/discover');
 
       const caps = res.result.capabilities;
-      expect(caps.tools?.listChanged).toBe(false);
-      expect(caps.resources?.listChanged).toBe(false);
-      expect(caps.prompts?.listChanged).toBe(false);
+      assert.equal(caps.tools?.listChanged, false);
+      assert.equal(caps.resources?.listChanged, false);
+      assert.equal(caps.prompts?.listChanged, false);
     });
 
     it('serves tools/list with the full tool set in deterministic name order', async () => {
       const res = await wire.modern('tools/list');
 
       const names = res.result.tools.map((t: Frame) => t.name);
-      expect(names.length).toBeGreaterThan(10);
-      expect(names).toEqual([...names].sort());
-      expect(names).toContain('init_fluent_app');
-      expect(names).toContain('get-api-spec');
+      assert.ok(names.length > 10);
+      assert.deepStrictEqual(names, [...names].sort());
+      assert.ok(names.includes('init_fluent_app'));
+      assert.ok(names.includes('get-api-spec'));
     });
 
     it('stamps the required resultType on results', async () => {
       // resultType is SDK-populated and required on every 2026-era result.
       const res = await wire.modern('tools/list');
-      expect(res.result.resultType).toBe('complete');
+      assert.equal(res.result.resultType, 'complete');
     });
 
     it('serves resources/list and resources/read', async () => {
       const list = await wire.modern('resources/list');
-      expect(list.result.resources.length).toBeGreaterThan(100);
+      assert.ok(list.result.resources.length > 100);
 
       const read = await wire.modern('resources/read', { uri: 'sn-spec://business-rule' });
-      expect(read.result.contents[0].text.length).toBeGreaterThan(100);
-      expect(read.result.contents[0].mimeType).toBe('text/markdown');
+      assert.ok(read.result.contents[0].text.length > 100);
+      assert.equal(read.result.contents[0].mimeType, 'text/markdown');
     });
 
     it('reports a missing resource as -32602, not -32002', async () => {
       const res = await wire.modern('resources/read', { uri: 'sn-spec://no-such-type' });
-      expect(res.error.code).toBe(-32602);
+      assert.equal(res.error.code, -32602);
     });
 
     it('answers resources/templates/list rather than Method not found', async () => {
@@ -262,17 +279,17 @@ describe('dual-era wire protocol', () => {
       // -32601 because nothing registered the handler.
       const res = await wire.modern('resources/templates/list');
 
-      expect(res.error).toBeUndefined();
-      expect(Array.isArray(res.result.resourceTemplates)).toBe(true);
+      assert.equal(res.error, undefined);
+      assert.equal(Array.isArray(res.result.resourceTemplates), true);
     });
 
     it('serves prompts/list and prompts/get', async () => {
       const list = await wire.modern('prompts/list');
-      expect(list.result.prompts.length).toBeGreaterThan(0);
+      assert.ok(list.result.prompts.length > 0);
 
       const name = list.result.prompts[0].name;
       const got = await wire.modern('prompts/get', { name });
-      expect(got.result.messages[0].content.text.length).toBeGreaterThan(0);
+      assert.ok(got.result.messages[0].content.text.length > 0);
     });
 
     it('executes a tool call and returns its content', async () => {
@@ -281,8 +298,8 @@ describe('dual-era wire protocol', () => {
         arguments: { metadataType: 'business-rule' },
       });
 
-      expect(res.result.isError).toBeFalsy();
-      expect(res.result.content[0].text.length).toBeGreaterThan(100);
+      assert.ok(!res.result.isError);
+      assert.ok(res.result.content[0].text.length > 100);
     });
 
     it('rejects an unknown tool argument via the enforced input schema', async () => {
@@ -293,27 +310,30 @@ describe('dual-era wire protocol', () => {
 
       // Enforced by the strict Zod object shared with the advertised schema.
       const text = JSON.stringify(res);
-      expect(text).toMatch(/bogus|unrecognized|strict/i);
+      assert.match(text, /bogus|unrecognized|strict/i);
     });
 
     // ttlMs + cacheScope are required on the cacheable results (SEP-2549).
     // Everything this server returns on them is immutable for the process
     // lifetime, so a long public TTL is safe. Without hints, v2 emits the
     // conservative ttlMs: 0 / cacheScope: 'private'.
-    it.each([
+    const cacheableMethods: Array<[string, Record<string, unknown>]> = [
       ['server/discover', {}],
       ['tools/list', {}],
       ['prompts/list', {}],
       ['resources/list', {}],
       ['resources/templates/list', {}],
       ['resources/read', { uri: 'sn-spec://business-rule' }],
-    ])('emits a non-zero public cache hint on %s', async (method, params) => {
-      const res = await wire.modern(method, params);
+    ];
+    for (const [method, params] of cacheableMethods) {
+      it(`emits a non-zero public cache hint on ${method}`, async () => {
+        const res = await wire.modern(method, params);
 
-      expect(res.error).toBeUndefined();
-      expect(res.result.ttlMs).toBeGreaterThan(0);
-      expect(res.result.cacheScope).toBe('public');
-    });
+        assert.equal(res.error, undefined);
+        assert.ok(res.result.ttlMs > 0);
+        assert.equal(res.result.cacheScope, 'public');
+      });
+    }
 
     it('does not cache-hint a non-cacheable result', async () => {
       // The cacheable list is closed; tools/call must never carry cache fields.
@@ -322,8 +342,8 @@ describe('dual-era wire protocol', () => {
         arguments: { metadataType: 'business-rule' },
       });
 
-      expect(res.result.ttlMs).toBeUndefined();
-      expect(res.result.cacheScope).toBeUndefined();
+      assert.equal(res.result.ttlMs, undefined);
+      assert.equal(res.result.cacheScope, undefined);
     });
 
     it('never issues a server-initiated request', async () => {
@@ -331,7 +351,7 @@ describe('dual-era wire protocol', () => {
       await wire.modern('resources/list');
       await wire.modern('prompts/list');
 
-      expect(wire.serverInitiatedRequests()).toEqual([]);
+      assert.deepStrictEqual(wire.serverInitiatedRequests(), []);
     });
 
     it('emits nothing on the wire for a request without a logLevel', async () => {
@@ -342,7 +362,7 @@ describe('dual-era wire protocol', () => {
       await wire.modern('resources/list');
 
       const logNotifications = wire.received.filter((m) => m.method === 'notifications/message');
-      expect(logNotifications).toEqual([]);
+      assert.deepStrictEqual(logNotifications, []);
     });
   });
 
@@ -354,32 +374,32 @@ describe('dual-era wire protocol', () => {
     it('completes the legacy initialize handshake', async () => {
       const res = await wire.legacyInitialize();
 
-      expect(res.error).toBeUndefined();
-      expect(res.result.protocolVersion).toBe(LEGACY_VERSION);
-      expect(res.result.serverInfo.name).toBeDefined();
-      expect(res.result.instructions).toContain('explain_fluent_api');
+      assert.equal(res.error, undefined);
+      assert.equal(res.result.protocolVersion, LEGACY_VERSION);
+      assert.notEqual(res.result.serverInfo.name, undefined);
+      assert.ok(res.result.instructions.includes('explain_fluent_api'));
     });
 
     it('does not declare roots, sampling, elicitation or logging as server capabilities', async () => {
       const res = await wire.legacyInitialize();
 
       const caps = res.result.capabilities;
-      expect(caps.tools).toBeDefined();
-      expect(caps.resources).toBeDefined();
-      expect(caps.prompts).toBeDefined();
-      expect(caps.roots).toBeUndefined();
-      expect(caps.sampling).toBeUndefined();
-      expect(caps.elicitation).toBeUndefined();
-      expect(caps.logging).toBeUndefined();
+      assert.notEqual(caps.tools, undefined);
+      assert.notEqual(caps.resources, undefined);
+      assert.notEqual(caps.prompts, undefined);
+      assert.equal(caps.roots, undefined);
+      assert.equal(caps.sampling, undefined);
+      assert.equal(caps.elicitation, undefined);
+      assert.equal(caps.logging, undefined);
     });
 
     it('does not advertise listChanged for notifications it never sends', async () => {
       const res = await wire.legacyInitialize();
 
       const caps = res.result.capabilities;
-      expect(caps.tools?.listChanged).toBeFalsy();
-      expect(caps.prompts?.listChanged).toBeFalsy();
-      expect(caps.resources?.listChanged).toBeFalsy();
+      assert.ok(!caps.tools?.listChanged);
+      assert.ok(!caps.prompts?.listChanged);
+      assert.ok(!caps.resources?.listChanged);
     });
 
     it('emits no cache fields on 2025-era results', async () => {
@@ -389,8 +409,8 @@ describe('dual-era wire protocol', () => {
       await wire.notify('notifications/initialized');
 
       const res = await wire.legacy('tools/list');
-      expect(res.result.ttlMs).toBeUndefined();
-      expect(res.result.cacheScope).toBeUndefined();
+      assert.equal(res.result.ttlMs, undefined);
+      assert.equal(res.result.cacheScope, undefined);
     });
 
     it('serves the same tool set as the modern era', async () => {
@@ -399,8 +419,8 @@ describe('dual-era wire protocol', () => {
 
       const res = await wire.legacy('tools/list');
       const names = res.result.tools.map((t: Frame) => t.name);
-      expect(names).toContain('init_fluent_app');
-      expect(names).toEqual([...names].sort());
+      assert.ok(names.includes('init_fluent_app'));
+      assert.deepStrictEqual(names, [...names].sort());
     });
 
     it('serves resources and prompts, and still reports a miss as -32602', async () => {
@@ -408,13 +428,13 @@ describe('dual-era wire protocol', () => {
       await wire.notify('notifications/initialized');
 
       const list = await wire.legacy('resources/list');
-      expect(list.result.resources.length).toBeGreaterThan(100);
+      assert.ok(list.result.resources.length > 100);
 
       const miss = await wire.legacy('resources/read', { uri: 'sn-spec://no-such-type' });
-      expect(miss.error.code).toBe(-32602);
+      assert.equal(miss.error.code, -32602);
 
       const prompts = await wire.legacy('prompts/list');
-      expect(prompts.result.prompts.length).toBeGreaterThan(0);
+      assert.ok(prompts.result.prompts.length > 0);
     });
 
     it('issues no server-initiated request even when the client advertises roots and elicitation', async () => {
@@ -425,7 +445,7 @@ describe('dual-era wire protocol', () => {
       await wire.notify('notifications/initialized');
       await wire.legacy('tools/list');
 
-      expect(wire.serverInitiatedRequests()).toEqual([]);
+      assert.deepStrictEqual(wire.serverInitiatedRequests(), []);
     });
 
     it('runs init_fluent_app without prompting for missing input', async () => {
@@ -438,9 +458,9 @@ describe('dual-era wire protocol', () => {
       });
 
       // Fails locally with an actionable message rather than eliciting.
-      expect(res.result.isError).toBe(true);
-      expect(res.result.content[0].text).toContain('Cannot determine intent');
-      expect(wire.serverInitiatedRequests()).toEqual([]);
+      assert.equal(res.result.isError, true);
+      assert.ok(res.result.content[0].text.includes('Cannot determine intent'));
+      assert.deepStrictEqual(wire.serverInitiatedRequests(), []);
     });
   });
 });
@@ -456,62 +476,68 @@ describe('wire-level cancellation at the process boundary (W13)', () => {
     await wire?.close();
   });
 
-  it.each([
+  const eras: Array<[string, boolean]> = [
     ['2026-07-28', true],
     ['2025-11-25', false],
-  ])('cancels a live tools/call through the child process for the %s era', async (_era, modern) => {
-    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'fluent-mcp-cancel-'));
-    const pidPath = path.join(tempDir, 'child.pid');
-    let childPid: number | undefined;
+  ];
+  for (const [_era, modern] of eras) {
+    it(`cancels a live tools/call through the child process for the ${_era} era`, { timeout: 20_000 }, async () => {
+      const tempDir = await mkdtemp(path.join(os.tmpdir(), 'fluent-mcp-cancel-'));
+      const pidPath = path.join(tempDir, 'child.pid');
+      let childPid: number | undefined;
 
-    const sdkCliMock = resolveSdkCli as jest.MockedFunction<typeof resolveSdkCli>;
-    sdkCliMock.mockReturnValue({ command: process.execPath, baseArgs: [HANGING_SDK_CLI, pidPath] });
+      resolveSdkCli.mock.mockImplementation(() => ({ command: process.execPath, baseArgs: [HANGING_SDK_CLI, pidPath] }));
 
-    try {
-      if (!modern) {
-        await wire.legacyInitialize();
-        await wire.notify('notifications/initialized');
-      }
+      try {
+        if (!modern) {
+          await wire.legacyInitialize();
+          await wire.notify('notifications/initialized');
+        }
 
-      const pending = modern
-        ? await wire.modernPending('tools/call', {
-          name: 'sdk_info',
-          arguments: { flag: '-v' },
-        }, 1_000)
-        : await wire.legacyPending('tools/call', {
-          name: 'sdk_info',
-          arguments: { flag: '-v' },
-        }, 1_000);
-      const cancelledResponse = pending.response.catch(() => undefined);
+        const pending = modern
+          ? await wire.modernPending('tools/call', {
+            name: 'sdk_info',
+            arguments: { flag: '-v' },
+          }, 1_000)
+          : await wire.legacyPending('tools/call', {
+            name: 'sdk_info',
+            arguments: { flag: '-v' },
+          }, 1_000);
+        const cancelledResponse = pending.response.catch(() => undefined);
 
-      childPid = await waitForPidFile(pidPath);
+        childPid = await waitForPidFile(pidPath);
 
-      if (modern) {
-        await wire.modernNotify('notifications/cancelled', { requestId: pending.requestId });
-      } else {
-        await wire.notify('notifications/cancelled', { requestId: pending.requestId });
-      }
+        if (modern) {
+          await wire.modernNotify('notifications/cancelled', { requestId: pending.requestId });
+        } else {
+          await wire.notify('notifications/cancelled', { requestId: pending.requestId });
+        }
 
-      await waitForProcessExit(childPid);
+        await waitForProcessExit(childPid);
 
-      // sdk@2.0.0 aborts a cancelled request and intentionally suppresses its
-      // response. The existing process-runner robustness test proves the
-      // underlying result is exit 130 with the cancellation/SIGKILL text;
-      // this wire test proves the cancellation reaches that process boundary.
-      expect(await cancelledResponse).toBeUndefined();
-      expect(wire.received.some((message) => message.id === pending.requestId)).toBe(false);
-    } finally {
-      if (childPid !== undefined) {
-        try {
-          process.kill(childPid, 'SIGKILL');
-        } catch (error) {
-          if ((error as NodeJS.ErrnoException).code !== 'ESRCH') {
-            throw error;
+        // sdk@2.0.0 aborts a cancelled request and intentionally suppresses its
+        // response. The existing process-runner robustness test proves the
+        // underlying result is exit 130 with the cancellation/SIGKILL text;
+        // this wire test proves the cancellation reaches that process boundary.
+        assert.equal(await cancelledResponse, undefined);
+        assert.equal(wire.received.some((message) => message.id === pending.requestId), false);
+      } finally {
+        // The child may have started without the test having observed its pid
+        // (an early failure): recover it from the pid file so it cannot leak.
+        childPid ??= await readPidIfPresent(pidPath);
+        if (childPid !== undefined) {
+          try {
+            process.kill(childPid, 'SIGKILL');
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== 'ESRCH') {
+              throw error;
+            }
           }
         }
+        resolveSdkCli.mock.restore();
+        resolveSdkCli.mock.resetCalls();
+        await rm(tempDir, { recursive: true, force: true });
       }
-      sdkCliMock.mockReset();
-      await rm(tempDir, { recursive: true, force: true });
-    }
-  }, 20_000);
+    });
+  }
 });
