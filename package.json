@@ -63,7 +63,6 @@
     }
   },
   "dependencies": {
-    "@modelcontextprotocol/core": "2.0.0",
     "@modelcontextprotocol/server": "2.0.0",
     "@servicenow/sdk": "4.13.6",
     "zod": "^4.4.3"
