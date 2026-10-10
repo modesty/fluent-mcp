@@ -11,33 +11,39 @@
  * caller landing on the parent can route to the right sub-type without fetching
  * all 18. These tests read the real res/ tree — no fs mocking.
  */
+import { describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
 import path from 'node:path';
 import fs from 'node:fs';
-import {
-  GetApiSpecCommand,
-  GetSnippetCommand,
-  GetInstructCommand,
-} from '../../src/tools/resources/resourceTools.js';
-import { ServiceNowMetadataType } from '../../src/types.js';
+import { configFixture, loggerFixture } from '../support/fixtures.js';
 
-jest.mock('../../src/utils/logger.js', () => require('../mocks/index.js').createLoggerMock());
-jest.mock('../../src/config.js', () => {
-  const nodePath = require('node:path');
-  const root = process.cwd();
-  return {
-    getProjectRootPath: jest.fn(() => root),
-    getConfig: jest.fn(() => ({
-      resourcePaths: {
-        spec: nodePath.join(root, 'res', 'spec'),
-        snippet: nodePath.join(root, 'res', 'snippet'),
-        instruct: nodePath.join(root, 'res', 'instruct'),
-      },
-    })),
-    findMissingResourcePaths: jest.fn(() => []),
-  };
-});
+// Native runner: there is no implicit global mock. The logger is silenced, and the
+// config points the resource loader at the repository's real res/ tree (the same
+// tree this file reads directly below), keeping the suite independent of the
+// .test-build staging copy. Mocks are registered before the modules under test are
+// imported, so those are loaded with dynamic import().
+mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
+mock.module(
+  '../../src/config.js',
+  configFixture({
+    resourcePaths: {
+      spec: path.join(process.cwd(), 'res', 'spec'),
+      snippet: path.join(process.cwd(), 'res', 'snippet'),
+      instruct: path.join(process.cwd(), 'res', 'instruct'),
+    },
+  }).mockOptions
+);
+
+const { GetApiSpecCommand, GetSnippetCommand, GetInstructCommand } = await import(
+  '../../src/tools/resources/resourceTools.js'
+);
+const { ServiceNowMetadataType } = await import('../../src/types.js');
 
 const RES = path.join(process.cwd(), 'res');
+
+// Substring check that names the missing text on failure.
+const assertIncludes = (text: string, expected: string): void =>
+  assert.ok(text.includes(expected), `expected document to contain: ${expected}`);
 
 /** The 18 atf-* step sub-types, derived from the enum rather than hardcoded. */
 const SUB_TYPES = (Object.values(ServiceNowMetadataType) as string[])
@@ -46,31 +52,37 @@ const SUB_TYPES = (Object.values(ServiceNowMetadataType) as string[])
 
 describe('`atf` parent metadata type', () => {
   it('is a registered metadata type', () => {
-    expect(ServiceNowMetadataType.ATF).toBe('atf');
-    expect(SUB_TYPES).toHaveLength(18);
+    assert.equal(ServiceNowMetadataType.ATF, 'atf');
+    assert.equal(SUB_TYPES.length, 18);
   });
 
   describe('the original bug: all three tools now resolve `atf`', () => {
-    it.each([
+    const tools = [
       ['get-api-spec', () => new GetApiSpecCommand()],
       ['get-snippet', () => new GetSnippetCommand()],
       ['get-instruct', () => new GetInstructCommand()],
-    ])('%s resolves metadataType "atf"', async (_name, make) => {
-      const result = await make().execute({ metadataType: 'atf' });
-      expect(result.success).toBe(true);
-      expect(result.exitCode).toBe(0);
-      expect(result.output.length).toBeGreaterThan(0);
-    });
+    ] as const;
+    for (const [name, make] of tools) {
+      it(`${name} resolves metadataType "atf"`, async () => {
+        const result = await make().execute({ metadataType: 'atf' });
+        assert.equal(result.success, true);
+        assert.equal(result.exitCode, 0);
+        assert.ok(result.output.length > 0);
+      });
+    }
 
-    it.each(['ATF', 'Atf', 'aTf'])('get-api-spec normalizes the casing of %s', async (variant) => {
-      const result = await new GetApiSpecCommand().execute({ metadataType: variant });
-      expect(result.success).toBe(true);
-      expect(result.structuredContent?.metadataType).toBe('atf');
-    });
+    for (const variant of ['ATF', 'Atf', 'aTf']) {
+      it(`get-api-spec normalizes the casing of ${variant}`, async () => {
+        const result = await new GetApiSpecCommand().execute({ metadataType: variant });
+        assert.equal(result.success, true);
+        assert.equal(result.structuredContent?.metadataType, 'atf');
+      });
+    }
 
     it('lists `atf` among the available types', async () => {
       const result = await new GetApiSpecCommand().execute({});
-      expect(result.structuredContent?.availableTypes).toContain('atf');
+      const availableTypes = result.structuredContent?.availableTypes as string[] | undefined;
+      assert.ok(Array.isArray(availableTypes) && availableTypes.includes('atf'));
     });
   });
 
@@ -79,49 +91,57 @@ describe('`atf` parent metadata type', () => {
     const parentInstruct = fs.readFileSync(path.join(RES, 'instruct', 'fluent_instruct_atf.md'), 'utf-8');
     const parentSnippet = fs.readFileSync(path.join(RES, 'snippet', 'fluent_snippet_atf_0001.md'), 'utf-8');
 
-    it.each(SUB_TYPES)('parent spec points at %s', (t) => {
-      expect(parentSpec).toContain(t);
-    });
+    for (const t of SUB_TYPES) {
+      it(`parent spec points at ${t}`, () => {
+        assertIncludes(parentSpec, t);
+      });
+    }
 
-    it.each(SUB_TYPES)('parent instruct points at %s', (t) => {
-      expect(parentInstruct).toContain(t);
-    });
+    for (const t of SUB_TYPES) {
+      it(`parent instruct points at ${t}`, () => {
+        assertIncludes(parentInstruct, t);
+      });
+    }
 
-    it.each(SUB_TYPES)('parent snippet points at %s', (t) => {
-      expect(parentSnippet).toContain(t);
-    });
+    for (const t of SUB_TYPES) {
+      it(`parent snippet points at ${t}`, () => {
+        assertIncludes(parentSnippet, t);
+      });
+    }
 
     it('routes on to `test-suite` for grouping tests into a suite', () => {
       for (const doc of [parentSpec, parentInstruct, parentSnippet]) {
-        expect(doc).toContain('test-suite');
+        assertIncludes(doc, 'test-suite');
       }
     });
   });
 
   describe('the pointers are not dangling', () => {
-    it.each(SUB_TYPES)('%s has both a spec and an instruct file', (t) => {
-      expect(fs.existsSync(path.join(RES, 'spec', `fluent_spec_${t}.md`))).toBe(true);
-      expect(fs.existsSync(path.join(RES, 'instruct', `fluent_instruct_${t}.md`))).toBe(true);
-    });
+    for (const t of SUB_TYPES) {
+      it(`${t} has both a spec and an instruct file`, () => {
+        assert.equal(fs.existsSync(path.join(RES, 'spec', `fluent_spec_${t}.md`)), true);
+        assert.equal(fs.existsSync(path.join(RES, 'instruct', `fluent_instruct_${t}.md`)), true);
+      });
+    }
   });
 
   describe('the parent is the authority on shared step mechanics', () => {
     const parentSpec = fs.readFileSync(path.join(RES, 'spec', 'fluent_spec_atf.md'), 'utf-8');
 
     it('documents the snake_case output / camelCase input rule', () => {
-      expect(parentSpec).toContain('record_id');
-      expect(parentSpec).toMatch(/camelCase/);
-      expect(parentSpec).toMatch(/snake_case/);
+      assertIncludes(parentSpec, 'record_id');
+      assert.match(parentSpec, /camelCase/);
+      assert.match(parentSpec, /snake_case/);
     });
 
     it('documents the five StandardStepValues shared by every step', () => {
       for (const prop of ['active', 'description', 'notes', 'timeout', 'warning']) {
-        expect(parentSpec).toContain(prop);
+        assertIncludes(parentSpec, prop);
       }
     });
 
     it('states that only $id and name are mandatory on Test()', () => {
-      expect(parentSpec).toMatch(/Only `\$id` and `name` are mandatory/);
+      assert.match(parentSpec, /Only `\$id` and `name` are mandatory/);
     });
   });
 });

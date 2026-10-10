@@ -3,6 +3,11 @@
     "test/config.test.ts",
     "test/utils/commandTimeout.test.ts",
     "test/utils/resourceLoader.test.ts",
-    "test/server/fluentMCPServer.test.ts"
+    "test/server/fluentMCPServer.test.ts",
+    "test/resourceUri.test.ts",
+    "test/utils/mcpErrors.test.ts",
+    "test/promptGuidance.integration.test.ts",
+    "test/promptExplainAlignment.integration.test.ts",
+    "test/res/atfParentType.test.ts"
   ]
 }
