@@ -20,7 +20,7 @@
   "homepage": "https://github.com/modesty/fluent-mcp",
   "repository": {
     "type": "git",
-    "url": "git://github.com/modesty/fluent-mcp.git"
+    "url": "git+https://github.com/modesty/fluent-mcp.git"
   },
   "main": "./dist/index.js",
   "exports": {
@@ -34,6 +34,7 @@
     "build:dev": "rollup -c rollup.config.mjs --environment NODE_ENV:development",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint 'src/**/*.ts' --config eslint.config.js",
     "lint:fix": "eslint 'src/**/*.ts' --config eslint.config.js --fix",
     "test": "jest",
@@ -43,16 +44,19 @@
     "bundle": "npm run build && node scripts/bundle.mjs",
     "inspect": "npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector node dist/index.js",
     "inspect:dev": "npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector ts-node src/index.ts",
-    "inspect:published": "npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector npx @modesty/fluent-mcp"
+    "inspect:published": "npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector npx @modesty/fluent-mcp",
+    "prepublishOnly": "npm run build && npm test"
   },
   "type": "module",
+  "packageManager": "npm@12.2.0",
   "engines": {
-    "node": ">=20.18.0"
+    "node": ">=22.23.2",
+    "npm": ">=10.9.8"
   },
   "devEngines": {
     "packageManager": {
       "name": "npm",
-      "version": ">=11.4.1"
+      "version": ">=10.9.8"
     }
   },
   "dependencies": {

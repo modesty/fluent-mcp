@@ -261,7 +261,7 @@ Added `custom-action`, `inbound-email-action`, `sp-header-footer`, and `sp-page-
 
 ## Configuration
 
-**Requirements:** Node.js 20.18.0+, npm 11.4.1+, `@servicenow/sdk` 4.13.6
+**Requirements:** Node.js 22.23.2+, npm 10.9.8+, `@servicenow/sdk` 4.13.6
 
 ### MCP Client Setup
 

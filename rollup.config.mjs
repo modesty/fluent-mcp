@@ -1,24 +1,26 @@
 // rollup.config.mjs - Using .mjs extension to force ES modules mode
+import { builtinModules } from 'node:module';
 import json from '@rollup/plugin-json';
 import nodeResolve from '@rollup/plugin-node-resolve';
 import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
 import commonjs from '@rollup/plugin-commonjs';
 
-const external = [
-  'process',
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+const nodeBuiltins = [
+  ...builtinModules,
+  ...builtinModules.map((m) => `node:${m}`),
   'console',
-  'fs',
-  'util',
-  'fs/promises',
-  'events',
-  'path',
-  'url',
-  'buffer',
-  'stream',
+  'process',
+];
+
+const external = [
+  ...nodeBuiltins,
+  /^node:/,
   /^@modelcontextprotocol\/(?:core|server)(?:\/|$)/,
   '@servicenow/sdk',
-  'zod'
+  'zod',
 ];
 
 export default [
@@ -29,7 +31,7 @@ export default [
       {
         file: './dist/index.js',
         format: 'es',
-        sourcemap: true
+        sourcemap: true,
       },
     ],
     treeshake: false,
@@ -41,11 +43,15 @@ export default [
         exportConditions: ['node'],
       }),
       commonjs(),
-      terser({
-        format: {
-          comments: false
-        },
-      }),
-    ]
-  }
+      ...(isDevelopment
+        ? []
+        : [
+            terser({
+              format: {
+                comments: false,
+              },
+            }),
+          ]),
+    ],
+  },
 ];

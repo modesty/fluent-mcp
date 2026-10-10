@@ -9,8 +9,6 @@
 		"declarationDir": "./dist",
 		"declarationMap": true,
 		"moduleResolution": "node",
-		"emitDecoratorMetadata": true,
-		"experimentalDecorators": true,
 		"allowSyntheticDefaultImports": true,
 		"importHelpers": true,
 		"strict": true,

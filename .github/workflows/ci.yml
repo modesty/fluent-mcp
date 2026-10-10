@@ -1,6 +1,8 @@
 name: Node.js CI/CD
 
 on:
+  push:
+    branches: [ master, main ]
   pull_request:
     branches: [ "*" ]
   workflow_dispatch: # Allow manual triggering
@@ -11,21 +13,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Setup Node.js 20.18.0
-        uses: actions/setup-node@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 20.18.0
-          
-      - name: Clean install dependencies
-        run: rm -rf node_modules package-lock.json && npm i
+          node-version-file: '.nvmrc'
+          cache: 'npm'
 
-      # - name: Install dependencies
-      #   run: npm ci
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Validate API specs
+        run: npm run validate:specs
+
+      - name: Validate authoring instructions
+        run: npm run validate:instructs
 
       - name: Build project
         run: npm run build
 
       - name: Run tests
-        run: npm run test        
+        run: npm test
