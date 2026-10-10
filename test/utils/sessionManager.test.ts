@@ -2,7 +2,7 @@ import { beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { loggerFixture } from '../support/fixtures.js';
 
-// SessionManager only logs through the shared logger; keep the run quiet as Jest did.
+// SessionManager only logs through the shared logger; keep the run quiet.
 const { logger, mockOptions: loggerOptions } = loggerFixture();
 mock.module('../../src/utils/logger.js', loggerOptions);
 

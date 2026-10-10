@@ -1,8 +1,7 @@
 /**
  * Tests for the real stderr-only logger pipeline.
  *
- * The logger under test is the real module. Only configuration is pinned (the
- * Jest setup supplied logLevel 'info'), so the minimum-level assertion does not
+ * The logger under test is the real module. Only configuration is pinned (logLevel 'info'), so the minimum-level assertion does not
  * depend on FLUENT_MCP_LOG_LEVEL in the environment.
  */
 import { describe, it, mock } from 'node:test';

@@ -9,9 +9,9 @@
  * These spawn real short-lived Node child processes (config and logger are
  * replaced with the shared fixtures, providing servicenowSdk.commandTimeoutMs).
  *
- * Native runner: node:test has no default per-test timeout, whereas Jest failed
- * a test after 5 s. A child that is never killed would hang the run, so each
- * test carries an explicit timeout to keep that failure mode a failure.
+ * node:test has no default per-test timeout. A child that is never killed would
+ * hang the run, so each test carries an explicit timeout to keep that failure
+ * mode a failure.
  */
 import { describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,7 +22,7 @@ mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 
 const { NodeProcessRunner } = await import('../../src/tools/processors/processRunner.js');
 
-/** Replaces Jest's implicit 5 s default (with slack for a loaded machine). */
+/** Explicit per-test timeout (with slack for a loaded machine). */
 const TEST_TIMEOUT_MS = 10_000;
 
 /** A child that writes `text` to stdout immediately, then hangs indefinitely. */

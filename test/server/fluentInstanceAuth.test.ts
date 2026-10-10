@@ -9,7 +9,7 @@ import { assertCalledWith } from '../support/mockAssertions.js';
 import { loggerFixture, withEnvironment } from '../support/fixtures.js';
 import type { ToolsManager } from '../../src/tools/toolsManager.js';
 
-// The Jest setup silenced the logger for every suite; the fixture does the same here.
+// The logger fixture keeps the run quiet.
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 
 const { autoValidateAuthIfConfigured } = await import('../../src/server/fluentInstanceAuth.js');

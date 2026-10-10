@@ -12,7 +12,7 @@ mock.module('../../src/server/fluentInstanceAuth.js', {
   namedExports: { autoValidateAuthIfConfigured: autoValidate },
 });
 
-// The Jest setup silenced logging and pinned SDK CLI resolution for every suite.
+// Logging is silenced and SDK CLI resolution is pinned for this suite.
 mock.module('../../src/config.js', configFixture().mockOptions);
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 mock.module('../../src/utils/sdkCli.js', sdkCliFixture().mockOptions);

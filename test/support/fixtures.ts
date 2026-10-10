@@ -1,8 +1,7 @@
 /**
  * Shared native-runner fixtures.
  *
- * Nothing here is global. The Jest setup silently mocked config, logger, and SDK
- * CLI resolution for every suite; native suites opt in explicitly so each file
+ * Nothing here is global: every suite opts in explicitly, so each file
  * shows its real/mock boundary.
  *
  * Every fixture returns its mock handles plus `mockOptions`, the descriptor for
@@ -29,7 +28,7 @@ export const LOG_LEVEL = {
   EMERGENCY: 'emergency',
 } as const;
 
-/** Defaults matching the configuration the Jest setup used. */
+/** Default configuration values used by configFixture(). */
 export const TEST_CONFIG = {
   name: 'test',
   version: '0.0.0',
@@ -71,7 +70,7 @@ export function loggerFixture() {
 }
 
 /**
- * Config replacement with the same defaults the Jest setup used.
+ * Config replacement with the TEST_CONFIG defaults.
  * @param overrides top-level TEST_CONFIG fields to replace
  */
 export function configFixture(overrides: Partial<typeof TEST_CONFIG> = {}) {

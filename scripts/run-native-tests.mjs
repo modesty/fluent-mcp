@@ -3,13 +3,13 @@
  * Runs test files with the native Node test runner.
  *
  * Usage:
- *   node scripts/run-native-tests.mjs                          # every test in test/runners.json
- *   node scripts/run-native-tests.mjs test/config.test.ts      # focused run (any test/**\/*.test.ts)
+ *   node scripts/run-native-tests.mjs                          # every test/**\/*.test.ts
+ *   node scripts/run-native-tests.mjs test/config.test.ts      # focused run of one file
  *   node scripts/run-native-tests.mjs --coverage               # coverage report -> coverage/lcov.info
  *   node scripts/run-native-tests.mjs --watch [test files...]  # re-stage and re-run on change
  *
- * Test-file ownership is declared in test/runners.json. Explicit file arguments
- * run directly, so a file can be checked before it joins the manifest. Set
+ * Discovery is by file name: every *.test.ts under test/. Helpers, fixtures, and
+ * support modules do not match and are never executed as tests. Set
  * NATIVE_TEST_STAGE to keep concurrent runs in separate directories under
  * .test-build/.
  *
@@ -17,14 +17,13 @@
  * test process. Coverage uses source maps, so results map back to src/*.ts.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { stageTests, tscBin } from './stage-tests.mjs';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const manifest = JSON.parse(readFileSync(path.join(projectRoot, 'test', 'runners.json'), 'utf8'));
 
 const args = process.argv.slice(2);
 const coverage = args.includes('--coverage');
@@ -32,10 +31,10 @@ const watch = args.includes('--watch');
 const requested = args
   .filter((arg) => !arg.startsWith('--'))
   .map((file) => path.posix.normalize(file.replaceAll('\\', '/')));
-const selected = requested.length > 0 ? requested : manifest.native;
+const selected = requested.length > 0 ? requested : discoverTests();
 
 if (selected.length === 0) {
-  console.log('No tests are assigned to the native runner.');
+  console.log('No test files found under test/.');
   process.exit(0);
 }
 
@@ -77,6 +76,15 @@ if (watch) {
     process.exit(1);
   }
   process.exit(result.status ?? 1);
+}
+
+/** @returns {string[]} repo-relative paths of every *.test.ts under test/, sorted */
+function discoverTests() {
+  return readdirSync(path.join(projectRoot, 'test'), { recursive: true })
+    .map((entry) => entry.split(path.sep).join('/'))
+    .filter((entry) => entry.endsWith('.test.ts'))
+    .map((entry) => `test/${entry}`)
+    .sort();
 }
 
 /** @returns {string} absolute path of coverage/lcov.info, creating its directory */

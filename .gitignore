@@ -42,9 +42,6 @@ yarn-error.log*
 # Rollup
 .rollup.cache/
 
-# Jest
-jest-coverage/
-
 # Build output
 build/
 .test-build/

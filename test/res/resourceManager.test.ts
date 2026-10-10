@@ -47,7 +47,7 @@ mock.module('../../src/utils/resourceLoader.js', {
   },
 });
 
-// The Jest setup silenced the logger for every suite; the fixture does the same here.
+// The logger fixture keeps the run quiet.
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 
 const { ResourceManager } = await import('../../src/res/resourceManager.js');

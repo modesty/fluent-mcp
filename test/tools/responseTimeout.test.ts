@@ -15,7 +15,7 @@ mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 mock.module('../../src/config.js', configFixture().mockOptions);
 mock.module('../../src/utils/sdkCli.js', sdkCliFixture().mockOptions);
 
-// Mirrors the Jest session-manager mock: a fixed working directory and no auth
+// Session manager stub: a fixed working directory and no auth
 // alias (the cases here pass `auth` explicitly).
 const sessionInstance = {
   getWorkingDirectory: mock.fn(() => '/mock/working/dir'),

@@ -7,7 +7,7 @@
     "declarationDir": null,
     "declarationMap": false,
     "checkJs": false,
-    "types": ["node", "jest"],
+    "types": ["node"],
     "allowJs": true
   },
   "include": ["src/**/*.ts", "test/**/*.ts", "test/**/*.js"],

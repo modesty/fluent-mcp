@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { loggerFixture } from '../support/fixtures.js';
 
-// The Jest setup silenced the logger for every suite; the fixture does the same here.
+// The logger fixture keeps the run quiet.
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 
 const { FluentAppValidator } = await import('../../src/utils/fluentAppValidator.js');

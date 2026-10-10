@@ -16,7 +16,7 @@ import { z } from 'zod';
 import { assertCalledWith } from '../support/mockAssertions.js';
 import { loggerFixture } from '../support/fixtures.js';
 
-// The Jest setup silenced the logger for every suite; the fixture does the same here.
+// The logger fixture keeps the run quiet.
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 
 // Mock command tools (split into individual modules)

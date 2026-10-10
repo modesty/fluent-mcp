@@ -4,8 +4,8 @@
  * Native runner:
  * - SessionManager is replaced by a module mock registered before InitCommand is
  *   imported, so setWorkingDirectory calls can be asserted on a shared handle.
- * - The logger and SDK CLI resolution use the shared fixtures (the Jest setup
- *   supplied both for every suite); resolveSdkCli() yields process.execPath plus
+ * - The logger and SDK CLI resolution use the shared fixtures ; resolveSdkCli()
+ *   yields process.execPath plus
  *   the fixed SDK entry point the argv assertions expect.
  * - The filesystem, os.homedir and FluentAppValidator are spied on the shared
  *   builtin / class objects with the running test's mock tracker, so they are
@@ -147,7 +147,7 @@ describe('InitCommand', () => {
     );
   }
 
-  /** Jest's expect.arrayContaining: every expected value is present, in any order. */
+  /** Every expected value is present, in any order. */
   const containsAll = (expected: string[]) => (sdkArgs: string[]) =>
     expected.every((value) => sdkArgs.includes(value));
 
@@ -156,7 +156,7 @@ describe('InitCommand', () => {
     // installed below is restored when the test ends.
     const t = hook as TestContext;
 
-    // Reset the shared SessionManager mock (Jest: clearAllMocks)
+    // Reset the shared SessionManager mock's call history
     SessionManager.getInstance.mock.resetCalls();
     for (const fn of Object.values(sessionInstance)) fn.mock.resetCalls();
 

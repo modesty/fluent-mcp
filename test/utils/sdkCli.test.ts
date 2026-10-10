@@ -1,8 +1,7 @@
 /**
  * Tests for resolveSdkCli. Uses the real implementation and the real config
  * (sdkCliFixture is deliberately NOT registered) so we verify it locates the
- * bundled @servicenow/sdk CLI in this repo. Only the logger is silenced, as the
- * Jest setup did.
+ * bundled @servicenow/sdk CLI in this repo. Only the logger is silenced.
  */
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';

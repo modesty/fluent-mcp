@@ -29,7 +29,7 @@ import { configFixture, loggerFixture } from '../support/fixtures.js';
  *  - the logger, to keep stderr quiet.
  *  - config, which reads the real shipped res/ content (the project root is the
  *    runner's cwd) so resources/read and tools/call exercise the bundled
- *    resources, exactly as the Jest suite's own config override did.
+ *    resources.
  */
 type SdkCliInvocation = { command: string; baseArgs: string[] };
 

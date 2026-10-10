@@ -1,9 +1,9 @@
 /**
  * Call-history assertions for native `mock.fn()` values.
  *
- * Native mocks expose `fn.mock.calls[i].arguments` where Jest exposed tuples, so
- * these helpers keep the Jest-style intent (any call matches; no call matches)
- * without a matcher library. Argument comparison uses strict deep equality.
+ * Native mocks expose `fn.mock.calls[i].arguments`, so these helpers check
+ * calls directly (any call matches; no call matches) without a matcher library.
+ * Argument comparison uses strict deep equality.
  */
 import assert from 'node:assert/strict';
 import { inspect, isDeepStrictEqual } from 'node:util';
@@ -14,8 +14,7 @@ export interface RecordedMock {
 }
 
 /**
- * Asserts that at least one call received exactly the expected arguments
- * (the Jest `toHaveBeenCalledWith` intent).
+ * Asserts that at least one call received exactly the expected arguments.
  */
 export function assertCalledWith(fn: RecordedMock, ...expected: unknown[]): void {
   const received = fn.mock.calls.map((call) => call.arguments);
@@ -30,7 +29,7 @@ export function assertCalledTimes(fn: RecordedMock, times: number): void {
   assert.equal(fn.mock.calls.length, times);
 }
 
-/** Asserts that a mock was never called (the Jest `not.toHaveBeenCalled` intent). */
+/** Asserts that a mock was never called. */
 export function assertNotCalled(fn: RecordedMock): void {
   assert.equal(fn.mock.calls.length, 0, `expected no calls; received ${inspect(fn.mock.calls.map((c) => c.arguments))}`);
 }

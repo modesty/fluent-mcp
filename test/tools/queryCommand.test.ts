@@ -36,7 +36,7 @@ const SDK_BIN = '/test/node_modules/@servicenow/sdk/bin/index.js';
 
 type ProcessFn = CommandProcessor['process'];
 
-/** Asserts every expected token appears in argv (the Jest arrayContaining intent). */
+/** Asserts every expected token appears in argv (order-insensitive). */
 function assertContainsAll(actual: readonly string[], expected: readonly string[]): void {
   for (const token of expected) {
     assert.ok(actual.includes(token), `expected argv to contain ${JSON.stringify(token)}; received ${JSON.stringify(actual)}`);

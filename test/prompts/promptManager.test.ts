@@ -8,7 +8,7 @@
  * Native runner: configuration is NOT mocked. The real getProjectRootPath() and
  * resourcePaths resolve to the staged copy of the shipped res/ tree
  * (.test-build/<stage>/res), so the instruction summaries load from the shipped
- * content, which is what the Jest config mock pointed at. Only the logger is
+ * content, which the suite's assertions read. Only the logger is
  * replaced, to keep the run quiet.
  */
 import { describe, it, mock } from 'node:test';

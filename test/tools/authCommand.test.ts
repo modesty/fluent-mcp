@@ -4,7 +4,7 @@ import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures
 import type { CommandProcessor, CommandResult } from '../../src/utils/types.js';
 
 // AuthCommand reads the neutral project root from config, resolves the bundled
-// SDK CLI, and logs. All three are replaced the way the Jest setup replaced them.
+// SDK CLI, and logs. All three are replaced with fixtures.
 mock.module('../../src/config.js', configFixture().mockOptions);
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 mock.module('../../src/utils/sdkCli.js', sdkCliFixture().mockOptions);
@@ -31,7 +31,7 @@ function createMockCmdWriter() {
   return { process: processFn } satisfies CommandProcessor;
 }
 
-/** Asserts every expected token appears in argv (the Jest arrayContaining intent). */
+/** Asserts every expected token appears in argv (order-insensitive). */
 function assertContainsAll(actual: readonly string[], expected: readonly string[]): void {
   for (const token of expected) {
     assert.ok(actual.includes(token), `expected argv to contain ${JSON.stringify(token)}; received ${JSON.stringify(actual)}`);

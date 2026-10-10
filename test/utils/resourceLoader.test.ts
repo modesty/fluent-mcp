@@ -29,7 +29,7 @@ const config = configFixture({
 });
 mock.module('../../src/config.js', config.mockOptions);
 
-// Logger is silenced under Jest; the fixture keeps the native run quiet the same way.
+// The logger fixture keeps the run quiet.
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 
 const { ResourceLoader } = await import('../../src/utils/resourceLoader.js');

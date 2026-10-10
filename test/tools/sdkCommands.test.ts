@@ -5,7 +5,7 @@ import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures
 import type { CLICommand, ProcessResult } from '../../src/utils/types.js';
 
 // The SDK commands read the neutral project root and resolve the bundled CLI
-// through config/sdkCli; the Jest setup mocked both for every suite.
+// through config/sdkCli, both replaced explicitly here.
 mock.module('../../src/config.js', configFixture().mockOptions);
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 mock.module('../../src/utils/sdkCli.js', sdkCliFixture().mockOptions);

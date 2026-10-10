@@ -14,7 +14,7 @@
 		"target": "es2022",
 		"module": "nodenext",
 		"lib": ["es2022"],
-		"types": ["node", "jest"],
+		"types": ["node"],
 		"skipLibCheck": true,
 		"skipDefaultLibCheck": true,
 		"esModuleInterop": true,

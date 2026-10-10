@@ -5,8 +5,7 @@
  * Native runner: the real node:fs stays in place and only the three functions
  * the resource loader uses are stubbed on the shared object, with the running
  * test's mock tracker (restored when the test ends). Configuration is
- * configFixture() with its default resource paths, the same values the Jest
- * setup supplied.
+ * configFixture() with its default resource paths, the fixture's default values.
  */
 import { beforeEach, describe, it, mock } from 'node:test';
 import type { TestContext } from 'node:test';

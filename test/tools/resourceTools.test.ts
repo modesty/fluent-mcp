@@ -5,8 +5,7 @@
  * real ResourceLoader reads canned directory listings and file contents. The
  * stubs are installed with the running test's mock tracker and restored when
  * the test ends. Configuration uses configFixture() with its default resource
- * paths (/test/res/spec, /test/res/snippet, /test/res/instruct) - the same
- * values the Jest setup supplied - because the stubs key on those path
+ * paths (/test/res/spec, /test/res/snippet, /test/res/instruct) - because the stubs key on those path
  * segments, which a staged checkout path could otherwise collide with.
  */
 import { beforeEach, describe, it, mock } from 'node:test';
