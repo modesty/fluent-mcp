@@ -1,75 +1,99 @@
 /**
  * Tests for InstallCommand with SDK v4.5.0 --skip-flow-activation flag
  */
-import { InstallCommand } from '../../src/tools/commands/installCommand.js';
+import { beforeEach, describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { assertCalledWith } from '../support/mockAssertions.js';
+import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
+import type { CommandProcessor } from '../../src/utils/types.js';
 
-jest.mock('../../src/utils/logger.js', () => require('../mocks/index.js').createLoggerMock());
-jest.mock('../../src/config.js', () => require('../mocks/index.js').createConfigMock());
-jest.mock('../../src/utils/sessionManager.js', () => require('../mocks/index.js').createSessionManagerMock());
+// Session replacement: the command resolves its working directory from the
+// initialized session, which this suite pins to a fixed path.
+const session = {
+  getWorkingDirectory: mock.fn((): string | undefined => '/mock/working/dir'),
+  setWorkingDirectory: mock.fn(),
+  getAuthAlias: mock.fn((): string | undefined => undefined),
+  setAuthAlias: mock.fn(),
+  getAuthValidationResult: mock.fn(),
+  setAuthValidationResult: mock.fn(),
+};
+
+mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
+mock.module('../../src/config.js', configFixture().mockOptions);
+mock.module('../../src/utils/sdkCli.js', sdkCliFixture().mockOptions);
+mock.module('../../src/utils/sessionManager.js', {
+  namedExports: { SessionManager: { getInstance: () => session } },
+});
+
+const { InstallCommand } = await import('../../src/tools/commands/installCommand.js');
+
+const SDK_BIN = '/test/node_modules/@servicenow/sdk/bin/index.js';
+
+type ProcessFn = CommandProcessor['process'];
 
 describe('InstallCommand', () => {
-  let mockProcessor: { process: jest.Mock };
+  let mockProcessor: { process: ReturnType<typeof mock.fn<ProcessFn>> };
 
   beforeEach(() => {
-    jest.clearAllMocks();
     mockProcessor = {
-      process: jest.fn().mockResolvedValue({
+      process: mock.fn<ProcessFn>(async () => ({
         success: true,
         output: 'Mock install output',
-        exitCode: 0
-      })
+        exitCode: 0,
+      })),
     };
   });
 
   describe('Command metadata', () => {
-    test('should have correct name and description', () => {
-      const command = new InstallCommand(mockProcessor as any);
-      expect(command.name).toBe('deploy_fluent_app');
-      expect(command.description).toContain('Deploy');
+    it('should have correct name and description', () => {
+      const command = new InstallCommand(mockProcessor);
+      assert.equal(command.name, 'deploy_fluent_app');
+      assert.ok(command.description.includes('Deploy'));
     });
 
-    test('should have skipFlowActivation argument', () => {
-      const command = new InstallCommand(mockProcessor as any);
+    it('should have skipFlowActivation argument', () => {
+      const command = new InstallCommand(mockProcessor);
       const skipArg = command.arguments.find(arg => arg.name === 'skipFlowActivation');
 
-      expect(skipArg).toBeDefined();
-      expect(skipArg?.type).toBe('boolean');
-      expect(skipArg?.required).toBe(false);
-      expect(skipArg?.description).toContain('flow activation');
+      assert.notEqual(skipArg, undefined);
+      assert.equal(skipArg?.type, 'boolean');
+      assert.equal(skipArg?.required, false);
+      assert.ok(skipArg?.description.includes('flow activation'));
     });
 
-    test('should advertise workingDirectory, auth, skipFlowActivation, async, and debug', () => {
-      const command = new InstallCommand(mockProcessor as any);
+    it('should advertise workingDirectory, auth, skipFlowActivation, async, and debug', () => {
+      const command = new InstallCommand(mockProcessor);
       const argNames = command.arguments.map(arg => arg.name);
-      expect(argNames).toEqual(['workingDirectory', 'auth', 'skipFlowActivation', 'async', 'debug']);
+      assert.deepStrictEqual(argNames, ['workingDirectory', 'auth', 'skipFlowActivation', 'async', 'debug']);
     });
 
-    test('should describe async as the SDK v4.12.0+ default with a synchronous escape hatch', () => {
-      const command = new InstallCommand(mockProcessor as any);
+    it('should describe async as the SDK v4.12.0+ default with a synchronous escape hatch', () => {
+      const command = new InstallCommand(mockProcessor);
       const asyncArg = command.arguments.find(arg => arg.name === 'async');
-      expect(asyncArg?.type).toBe('boolean');
-      expect(asyncArg?.required).toBe(false);
-      expect(asyncArg?.description).toContain('CLI default true since SDK v4.12.0');
-      expect(asyncArg?.description).toContain('Set false to force a synchronous install');
+      assert.equal(asyncArg?.type, 'boolean');
+      assert.equal(asyncArg?.required, false);
+      assert.ok(asyncArg?.description.includes('CLI default true since SDK v4.12.0'));
+      assert.ok(asyncArg?.description.includes('Set false to force a synchronous install'));
     });
 
-    test('should budget 15 minutes because the async install poll has no CLI-side cap', () => {
+    it('should budget 15 minutes because the async install poll has no CLI-side cap', () => {
       // SDK v4.12.0 polls the install tracker with `while (true)`; the runner
       // timeout is the only bound, and killing mid-poll skips flow activation.
-      const command = new InstallCommand(mockProcessor as any);
-      expect(command.timeoutMs).toBe(900_000);
+      const command = new InstallCommand(mockProcessor);
+      assert.equal(command.timeoutMs, 900_000);
     });
   });
 
   describe('Command execution', () => {
-    test('should execute install without skipFlowActivation', async () => {
-      const command = new InstallCommand(mockProcessor as any);
+    it('should execute install without skipFlowActivation', async () => {
+      const command = new InstallCommand(mockProcessor);
       const result = await command.execute({});
 
-      expect(result.success).toBe(true);
-      expect(mockProcessor.process).toHaveBeenCalledWith(
+      assert.equal(result.success, true);
+      assertCalledWith(
+        mockProcessor.process,
         process.execPath,
-        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'install'],
+        [SDK_BIN, 'install'],
         '/mock/working/dir',
         undefined, // stdinInput
         900000,   // timeoutMs
@@ -77,14 +101,15 @@ describe('InstallCommand', () => {
       );
     });
 
-    test('should add --skip-flow-activation flag when true', async () => {
-      const command = new InstallCommand(mockProcessor as any);
+    it('should add --skip-flow-activation flag when true', async () => {
+      const command = new InstallCommand(mockProcessor);
       const result = await command.execute({ skipFlowActivation: true });
 
-      expect(result.success).toBe(true);
-      expect(mockProcessor.process).toHaveBeenCalledWith(
+      assert.equal(result.success, true);
+      assertCalledWith(
+        mockProcessor.process,
         process.execPath,
-        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'install', '--skip-flow-activation'],
+        [SDK_BIN, 'install', '--skip-flow-activation'],
         '/mock/working/dir',
         undefined, // stdinInput
         900000,   // timeoutMs
@@ -92,45 +117,46 @@ describe('InstallCommand', () => {
       );
     });
 
-    test('should NOT add --skip-flow-activation flag when false', async () => {
-      const command = new InstallCommand(mockProcessor as any);
+    it('should NOT add --skip-flow-activation flag when false', async () => {
+      const command = new InstallCommand(mockProcessor);
       const result = await command.execute({ skipFlowActivation: false });
 
-      expect(result.success).toBe(true);
-      const processArgs = mockProcessor.process.mock.calls[0][1];
-      expect(processArgs).not.toContain('--skip-flow-activation');
+      assert.equal(result.success, true);
+      const processArgs = mockProcessor.process.mock.calls[0].arguments[1];
+      assert.ok(!processArgs.includes('--skip-flow-activation'));
     });
 
-    test('should emit the yargs negation --no-async when async is false', async () => {
-      const command = new InstallCommand(mockProcessor as any);
+    it('should emit the yargs negation --no-async when async is false', async () => {
+      const command = new InstallCommand(mockProcessor);
       await command.execute({ async: false });
 
-      const processArgs = mockProcessor.process.mock.calls[0][1];
-      expect(processArgs).toEqual(['/test/node_modules/@servicenow/sdk/bin/index.js', 'install', '--no-async']);
+      const processArgs = mockProcessor.process.mock.calls[0].arguments[1];
+      assert.deepStrictEqual(processArgs, [SDK_BIN, 'install', '--no-async']);
     });
 
-    test('should emit --async when async is true and nothing when it is omitted', async () => {
-      const command = new InstallCommand(mockProcessor as any);
+    it('should emit --async when async is true and nothing when it is omitted', async () => {
+      const command = new InstallCommand(mockProcessor);
       await command.execute({ async: true });
       await command.execute({});
 
-      expect(mockProcessor.process.mock.calls[0][1]).toContain('--async');
-      expect(mockProcessor.process.mock.calls[1][1]).not.toContain('--async');
-      expect(mockProcessor.process.mock.calls[1][1]).not.toContain('--no-async');
+      assert.ok(mockProcessor.process.mock.calls[0].arguments[1].includes('--async'));
+      assert.ok(!mockProcessor.process.mock.calls[1].arguments[1].includes('--async'));
+      assert.ok(!mockProcessor.process.mock.calls[1].arguments[1].includes('--no-async'));
     });
 
-    test('should include auth and skip-flow-activation together', async () => {
-      const command = new InstallCommand(mockProcessor as any);
+    it('should include auth and skip-flow-activation together', async () => {
+      const command = new InstallCommand(mockProcessor);
       const result = await command.execute({
         auth: 'my-alias',
         skipFlowActivation: true,
         debug: true
       });
 
-      expect(result.success).toBe(true);
-      expect(mockProcessor.process).toHaveBeenCalledWith(
+      assert.equal(result.success, true);
+      assertCalledWith(
+        mockProcessor.process,
         process.execPath,
-        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'install', '--auth', 'my-alias', '--skip-flow-activation', '--debug'],
+        [SDK_BIN, 'install', '--auth', 'my-alias', '--skip-flow-activation', '--debug'],
         '/mock/working/dir',
         undefined, // stdinInput
         900000,   // timeoutMs

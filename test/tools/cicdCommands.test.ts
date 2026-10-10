@@ -6,58 +6,89 @@
  * and the per-leaf argument legality checks that keep an unusable combination
  * from reaching the CLI as an opaque failure.
  */
-import { CicdAppCommand } from '../../src/tools/commands/cicdAppCommand.js';
-import { CicdTestCommand } from '../../src/tools/commands/cicdTestCommand.js';
-import { SessionManager } from '../../src/utils/sessionManager.js';
+import { beforeEach, afterEach, describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { assertCalledWith, assertNotCalled } from '../support/mockAssertions.js';
+import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
+import type { CommandProcessor } from '../../src/utils/types.js';
 
-jest.mock('../../src/utils/logger.js', () => require('../mocks/index.js').createLoggerMock());
-jest.mock('../../src/config.js', () => require('../mocks/index.js').createConfigMock());
-// Default the session to a resolvable auth alias so the required-auth gate passes;
-// individual tests override getAuthAlias to exercise the unauthenticated path.
-jest.mock('../../src/utils/sessionManager.js', () =>
-  require('../mocks/index.js').createSessionManagerMock({
-    getAuthAlias: jest.fn().mockReturnValue('session-alias'),
-  })
-);
+// Session replacement. Default the session to a resolvable auth alias so the
+// required-auth gate passes; individual tests override getAuthAlias to exercise
+// the unauthenticated path.
+const session = {
+  getWorkingDirectory: mock.fn((): string | undefined => '/mock/working/dir'),
+  setWorkingDirectory: mock.fn(),
+  getAuthAlias: mock.fn((): string | undefined => 'session-alias'),
+  setAuthAlias: mock.fn(),
+  getAuthValidationResult: mock.fn(),
+  setAuthValidationResult: mock.fn(),
+};
+
+// Commands that need no Fluent project run in the project root (neutral cwd).
+const config = configFixture();
+config.getProjectRootPath.mock.mockImplementation(() => '/mock/project/root');
+
+mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
+mock.module('../../src/config.js', config.mockOptions);
+mock.module('../../src/utils/sdkCli.js', sdkCliFixture().mockOptions);
+mock.module('../../src/utils/sessionManager.js', {
+  namedExports: { SessionManager: { getInstance: () => session } },
+});
+
+const { CicdAppCommand } = await import('../../src/tools/commands/cicdAppCommand.js');
+const { CicdTestCommand } = await import('../../src/tools/commands/cicdTestCommand.js');
 
 const SDK_BIN = '/test/node_modules/@servicenow/sdk/bin/index.js';
 
+type ProcessFn = CommandProcessor['process'];
+type MockProcessor = { process: ReturnType<typeof mock.fn<ProcessFn>> };
+
+function createProcessor(): MockProcessor {
+  return {
+    process: mock.fn<ProcessFn>(async () => ({ success: true, output: '{"ok":true}', exitCode: 0 })),
+  };
+}
+
+/** Restores the session defaults a prior test's per-call override may have changed. */
+function resetSession(): void {
+  session.getAuthAlias.mock.mockImplementation(() => 'session-alias');
+  session.getWorkingDirectory.mock.mockImplementation(() => '/mock/working/dir');
+}
+
 describe('CicdAppCommand', () => {
-  let mockProcessor: { process: jest.Mock };
+  let mockProcessor: MockProcessor;
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    (SessionManager.getInstance().getAuthAlias as jest.Mock).mockReturnValue('session-alias');
-    mockProcessor = {
-      process: jest.fn().mockResolvedValue({ success: true, output: '{"ok":true}', exitCode: 0 }),
-    };
+    resetSession();
+    mockProcessor = createProcessor();
   });
 
-  test('should expose destructive metadata with action as the only required argument', () => {
-    const command = new CicdAppCommand(mockProcessor as never);
-    expect(command.name).toBe('cicd_fluent_app');
-    expect(command.annotations.destructiveHint).toBe(true);
-    expect(command.annotations.idempotentHint).toBe(false);
-    expect(command.annotations.openWorldHint).toBe(true);
+  it('should expose destructive metadata with action as the only required argument', () => {
+    const command = new CicdAppCommand(mockProcessor);
+    assert.equal(command.name, 'cicd_fluent_app');
+    assert.equal(command.annotations.destructiveHint, true);
+    assert.equal(command.annotations.idempotentHint, false);
+    assert.equal(command.annotations.openWorldHint, true);
 
     const required = command.arguments.filter((a) => a.required).map((a) => a.name);
-    expect(required).toEqual(['action']);
+    assert.deepStrictEqual(required, ['action']);
   });
 
-  test('should cover the poll window so the CLI reports its own timeout first', () => {
-    const command = new CicdAppCommand(mockProcessor as never);
+  it('should cover the poll window so the CLI reports its own timeout first', () => {
+    const command = new CicdAppCommand(mockProcessor);
     // The CLI polls for up to 900_000 ms by default; the runner timeout must sit
     // above it, or the child is killed before the CLI can report cleanly.
-    expect(command.timeoutMs).toBeGreaterThan(900_000);
+    assert.ok((command.timeoutMs ?? 0) > 900_000);
   });
 
-  test('should build install argv with the subcommand token, JSON envelope, and session auth', async () => {
-    const command = new CicdAppCommand(mockProcessor as never);
+  it('should build install argv with the subcommand token, JSON envelope, and session auth', async () => {
+    const command = new CicdAppCommand(mockProcessor);
 
     const result = await command.execute({ action: 'install', appSysId: 'abc123', appVersion: '1.0.0' });
 
-    expect(result.success).toBe(true);
-    expect(mockProcessor.process).toHaveBeenCalledWith(
+    assert.equal(result.success, true);
+    assertCalledWith(
+      mockProcessor.process,
       process.execPath,
       [
         SDK_BIN, 'cicd', 'install',
@@ -73,210 +104,206 @@ describe('CicdAppCommand', () => {
     );
   });
 
-  test('should emit the --no-wait negation rather than dropping a false value', async () => {
-    const command = new CicdAppCommand(mockProcessor as never);
+  it('should emit the --no-wait negation rather than dropping a false value', async () => {
+    const command = new CicdAppCommand(mockProcessor);
 
     await command.execute({ action: 'publish', scope: 'x_myco_app', wait: false });
 
-    const argv = mockProcessor.process.mock.calls[0][1] as string[];
-    expect(argv).toContain('--no-wait');
-    expect(argv).not.toContain('--wait');
+    const argv = mockProcessor.process.mock.calls[0].arguments[1];
+    assert.ok(argv.includes('--no-wait'));
+    assert.ok(!argv.includes('--wait'));
   });
 
-  test('should pass publish-only and install-only flags through', async () => {
-    const command = new CicdAppCommand(mockProcessor as never);
+  it('should pass publish-only and install-only flags through', async () => {
+    const command = new CicdAppCommand(mockProcessor);
 
     await command.execute({ action: 'publish', scope: 'x_myco_app', devNotes: 'release notes' });
-    expect(mockProcessor.process.mock.calls[0][1]).toContain('--dev-notes');
+    assert.ok(mockProcessor.process.mock.calls[0].arguments[1].includes('--dev-notes'));
 
-    mockProcessor.process.mockClear();
+    mockProcessor.process.mock.resetCalls();
     await command.execute({ action: 'install', scope: 'x_myco_app', autoUpgradeBaseApp: true });
-    expect(mockProcessor.process.mock.calls[0][1]).toContain('--auto-upgrade-base-app');
+    assert.ok(mockProcessor.process.mock.calls[0].arguments[1].includes('--auto-upgrade-base-app'));
   });
 
-  test('should reject an unknown action instead of interpolating it into argv', async () => {
-    const command = new CicdAppCommand(mockProcessor as never);
+  it('should reject an unknown action instead of interpolating it into argv', async () => {
+    const command = new CicdAppCommand(mockProcessor);
 
     const result = await command.execute({ action: 'uninstall' });
 
-    expect(result.success).toBe(false);
-    expect(result.output).toContain('install, publish, rollback');
-    expect(mockProcessor.process).not.toHaveBeenCalled();
+    assert.equal(result.success, false);
+    assert.ok(result.output.includes('install, publish, rollback'));
+    assertNotCalled(mockProcessor.process);
   });
 
-  test('should reject scope and appSysId together', async () => {
-    const command = new CicdAppCommand(mockProcessor as never);
+  it('should reject scope and appSysId together', async () => {
+    const command = new CicdAppCommand(mockProcessor);
 
     const result = await command.execute({ action: 'install', scope: 'x_myco_app', appSysId: 'abc123' });
 
-    expect(result.success).toBe(false);
-    expect(result.output).toContain('mutually exclusive');
-    expect(mockProcessor.process).not.toHaveBeenCalled();
+    assert.equal(result.success, false);
+    assert.ok(result.output.includes('mutually exclusive'));
+    assertNotCalled(mockProcessor.process);
   });
 
-  test('should require appVersion for rollback', async () => {
-    const command = new CicdAppCommand(mockProcessor as never);
+  it('should require appVersion for rollback', async () => {
+    const command = new CicdAppCommand(mockProcessor);
 
     const result = await command.execute({ action: 'rollback', appSysId: 'abc123' });
 
-    expect(result.success).toBe(false);
-    expect(result.output).toContain("'appVersion' is required");
-    expect(mockProcessor.process).not.toHaveBeenCalled();
+    assert.equal(result.success, false);
+    assert.ok(result.output.includes("'appVersion' is required"));
+    assertNotCalled(mockProcessor.process);
   });
 
-  test('should reject install-only arguments on a non-install action', async () => {
-    const command = new CicdAppCommand(mockProcessor as never);
+  it('should reject install-only arguments on a non-install action', async () => {
+    const command = new CicdAppCommand(mockProcessor);
 
     const result = await command.execute({ action: 'publish', scope: 'x_myco_app', baseAppVersion: '2.0.0' });
 
-    expect(result.success).toBe(false);
-    expect(result.output).toContain('baseAppVersion');
-    expect(mockProcessor.process).not.toHaveBeenCalled();
+    assert.equal(result.success, false);
+    assert.ok(result.output.includes('baseAppVersion'));
+    assertNotCalled(mockProcessor.process);
   });
 
-  test('should accept punctuation in devNotes but reject control characters', async () => {
-    const command = new CicdAppCommand(mockProcessor as never);
+  it('should accept punctuation in devNotes but reject control characters', async () => {
+    const command = new CicdAppCommand(mockProcessor);
 
     // Release notes routinely contain punctuation the base shell-metacharacter
     // check rejects; it is inert on the shell-free path and must pass through.
     const notes = 'Fixes (SN-123); adds retry & backoff';
     const ok = await command.execute({ action: 'publish', scope: 'x_myco_app', devNotes: notes });
-    expect(ok.success).toBe(true);
-    const argv = mockProcessor.process.mock.calls[0][1] as string[];
-    expect(argv[argv.indexOf('--dev-notes') + 1]).toBe(notes);
+    assert.equal(ok.success, true);
+    const argv = mockProcessor.process.mock.calls[0].arguments[1];
+    assert.equal(argv[argv.indexOf('--dev-notes') + 1], notes);
 
-    mockProcessor.process.mockClear();
+    mockProcessor.process.mock.resetCalls();
     const bad = await command.execute({ action: 'publish', scope: 'x_myco_app', devNotes: 'line1\nline2' });
-    expect(bad.success).toBe(false);
-    expect(bad.output).toContain('control characters');
-    expect(mockProcessor.process).not.toHaveBeenCalled();
+    assert.equal(bad.success, false);
+    assert.ok(bad.output.includes('control characters'));
+    assertNotCalled(mockProcessor.process);
   });
 
-  test('should fail with an actionable message when no auth alias can be resolved', async () => {
-    (SessionManager.getInstance().getAuthAlias as jest.Mock).mockReturnValue(undefined);
-    const command = new CicdAppCommand(mockProcessor as never);
+  it('should fail with an actionable message when no auth alias can be resolved', async () => {
+    session.getAuthAlias.mock.mockImplementation(() => undefined);
+    const command = new CicdAppCommand(mockProcessor);
 
     const result = await command.execute({ action: 'install', appSysId: 'abc123' });
 
-    expect(result.success).toBe(false);
-    expect(result.output).toContain('now-sdk auth --add');
-    expect(mockProcessor.process).not.toHaveBeenCalled();
+    assert.equal(result.success, false);
+    assert.ok(result.output.includes('now-sdk auth --add'));
+    assertNotCalled(mockProcessor.process);
   });
 
-  test('should reject an output format the CLI does not declare', async () => {
-    const command = new CicdAppCommand(mockProcessor as never);
+  it('should reject an output format the CLI does not declare', async () => {
+    const command = new CicdAppCommand(mockProcessor);
 
     const result = await command.execute({ action: 'install', appSysId: 'abc123', output: 'yaml' });
 
-    expect(result.success).toBe(false);
-    expect(result.output).toContain('json, raw');
-    expect(mockProcessor.process).not.toHaveBeenCalled();
+    assert.equal(result.success, false);
+    assert.ok(result.output.includes('json, raw'));
+    assertNotCalled(mockProcessor.process);
   });
 
-  test('should pass a bracket select path through to --select', async () => {
-    const command = new CicdAppCommand(mockProcessor as never);
+  it('should pass a bracket select path through to --select', async () => {
+    const command = new CicdAppCommand(mockProcessor);
 
     await command.execute({
       action: 'install', appSysId: 'abc123', select: 'result.links.results[0].id',
     });
 
-    const argv = mockProcessor.process.mock.calls[0][1] as string[];
-    expect(argv[argv.indexOf('--select') + 1]).toBe('result.links.results[0].id');
+    const argv = mockProcessor.process.mock.calls[0].arguments[1];
+    assert.equal(argv[argv.indexOf('--select') + 1], 'result.links.results[0].id');
   });
 
   describe('without a Fluent project directory', () => {
     beforeEach(() => {
-      (SessionManager.getInstance().getWorkingDirectory as jest.Mock).mockReturnValue(undefined);
+      session.getWorkingDirectory.mock.mockImplementation(() => undefined);
     });
 
     afterEach(() => {
-      (SessionManager.getInstance().getWorkingDirectory as jest.Mock).mockReturnValue('/mock/working/dir');
+      session.getWorkingDirectory.mock.mockImplementation(() => '/mock/working/dir');
     });
 
     // The CLI defaults --app-version from the cwd's package.json. Outside a Fluent
     // project the only cwd available is the MCP server's own install directory, so
     // an inferred version would be this server's version, not the app's.
-    test.each(['install', 'publish'])(
-      'should require appVersion rather than let the CLI infer this server version (%s)',
-      async (action) => {
-        const command = new CicdAppCommand(mockProcessor as never);
+    for (const action of ['install', 'publish']) {
+      it(`should require appVersion rather than let the CLI infer this server version (${action})`, async () => {
+        const command = new CicdAppCommand(mockProcessor);
 
         const result = await command.execute({ action, scope: 'x_myco_app' });
 
-        expect(result.success).toBe(false);
-        expect(result.output).toContain("requires 'appVersion'");
-        expect(mockProcessor.process).not.toHaveBeenCalled();
-      }
-    );
+        assert.equal(result.success, false);
+        assert.ok(result.output.includes("requires 'appVersion'"));
+        assertNotCalled(mockProcessor.process);
+      });
+    }
 
-    test('should proceed once the application and version are both explicit', async () => {
-      const command = new CicdAppCommand(mockProcessor as never);
+    it('should proceed once the application and version are both explicit', async () => {
+      const command = new CicdAppCommand(mockProcessor);
 
       const result = await command.execute({
         action: 'install', scope: 'x_myco_app', appVersion: '2.1.0',
       });
 
-      expect(result.success).toBe(true);
-      const [, argv, cwd] = mockProcessor.process.mock.calls[0];
-      expect(argv).toContain('--app-version');
-      expect(argv).toContain('2.1.0');
+      assert.equal(result.success, true);
+      const [, argv, cwd] = mockProcessor.process.mock.calls[0].arguments;
+      assert.ok(argv.includes('--app-version'));
+      assert.ok(argv.includes('2.1.0'));
       // Neutral cwd only: both project-derived defaults were supplied explicitly.
-      expect(cwd).toBe('/mock/project/root');
+      assert.equal(cwd, '/mock/project/root');
     });
 
-    test('should still name the identifier as the first missing piece', async () => {
-      const command = new CicdAppCommand(mockProcessor as never);
+    it('should still name the identifier as the first missing piece', async () => {
+      const command = new CicdAppCommand(mockProcessor);
 
       const result = await command.execute({ action: 'install' });
 
-      expect(result.success).toBe(false);
-      expect(result.output).toContain('could not identify the application');
-      expect(mockProcessor.process).not.toHaveBeenCalled();
+      assert.equal(result.success, false);
+      assert.ok(result.output.includes('could not identify the application'));
+      assertNotCalled(mockProcessor.process);
     });
   });
 });
 
 describe('CicdTestCommand', () => {
-  let mockProcessor: { process: jest.Mock };
+  let mockProcessor: MockProcessor;
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    (SessionManager.getInstance().getAuthAlias as jest.Mock).mockReturnValue('session-alias');
-    mockProcessor = {
-      process: jest.fn().mockResolvedValue({ success: true, output: '{"ok":true}', exitCode: 0 }),
-    };
+    resetSession();
+    mockProcessor = createProcessor();
   });
 
   // `run` executes real ATF steps, which create/update/delete records under the
   // runner's impersonation. Annotations are per-tool, so the annotation must follow
   // the widest blast radius the tool can reach rather than its read-only leaves.
-  test('should expose destructive metadata requiring target and action', () => {
-    const command = new CicdTestCommand(mockProcessor as never);
-    expect(command.name).toBe('cicd_fluent_test');
-    expect(command.annotations.destructiveHint).toBe(true);
-    expect(command.annotations.openWorldHint).toBe(true);
+  it('should expose destructive metadata requiring target and action', () => {
+    const command = new CicdTestCommand(mockProcessor);
+    assert.equal(command.name, 'cicd_fluent_test');
+    assert.equal(command.annotations.destructiveHint, true);
+    assert.equal(command.annotations.openWorldHint, true);
 
     const required = command.arguments.filter((a) => a.required).map((a) => a.name);
-    expect(required).toEqual(['target', 'action']);
+    assert.deepStrictEqual(required, ['target', 'action']);
   });
 
   // These leaves read nothing from the project, so no working directory is
   // accepted: a broken FLUENT_MCP_WORKING_DIR must not block a result lookup.
-  test('should not depend on a Fluent project directory', async () => {
-    (SessionManager.getInstance().getWorkingDirectory as jest.Mock).mockReturnValue('relative/not/absolute');
-    const command = new CicdTestCommand(mockProcessor as never);
+  it('should not depend on a Fluent project directory', async () => {
+    session.getWorkingDirectory.mock.mockImplementation(() => 'relative/not/absolute');
+    const command = new CicdTestCommand(mockProcessor);
 
-    expect(command.arguments.some((a) => a.name === 'workingDirectory')).toBe(false);
+    assert.equal(command.arguments.some((a) => a.name === 'workingDirectory'), false);
 
     const result = await command.execute({ target: 'test', action: 'result', resultId: 'res-1' });
 
-    expect(result.success).toBe(true);
-    expect(mockProcessor.process.mock.calls[0][2]).toBe('/mock/project/root');
-    (SessionManager.getInstance().getWorkingDirectory as jest.Mock).mockReturnValue('/mock/working/dir');
+    assert.equal(result.success, true);
+    assert.equal(mockProcessor.process.mock.calls[0].arguments[2], '/mock/project/root');
+    session.getWorkingDirectory.mock.mockImplementation(() => '/mock/working/dir');
   });
 
-  test('should build testsuite run argv with both nested subcommand tokens', async () => {
-    const command = new CicdTestCommand(mockProcessor as never);
+  it('should build testsuite run argv with both nested subcommand tokens', async () => {
+    const command = new CicdTestCommand(mockProcessor);
 
     const result = await command.execute({
       target: 'testsuite',
@@ -284,8 +311,9 @@ describe('CicdTestCommand', () => {
       testSuiteName: 'Regression Suite',
     });
 
-    expect(result.success).toBe(true);
-    expect(mockProcessor.process).toHaveBeenCalledWith(
+    assert.equal(result.success, true);
+    assertCalledWith(
+      mockProcessor.process,
       process.execPath,
       [
         SDK_BIN, 'cicd', 'testsuite', 'run',
@@ -300,147 +328,147 @@ describe('CicdTestCommand', () => {
     );
   });
 
-  test('should build test watch argv from a progressId', async () => {
-    const command = new CicdTestCommand(mockProcessor as never);
+  it('should build test watch argv from a progressId', async () => {
+    const command = new CicdTestCommand(mockProcessor);
 
     await command.execute({ target: 'test', action: 'watch', progressId: 'prog-1' });
 
-    const argv = mockProcessor.process.mock.calls[0][1] as string[];
-    expect(argv.slice(0, 4)).toEqual([SDK_BIN, 'cicd', 'test', 'watch']);
-    expect(argv).toContain('--progress-id');
-    expect(argv).toContain('prog-1');
+    const argv = mockProcessor.process.mock.calls[0].arguments[1];
+    assert.deepStrictEqual(argv.slice(0, 4), [SDK_BIN, 'cicd', 'test', 'watch']);
+    assert.ok(argv.includes('--progress-id'));
+    assert.ok(argv.includes('prog-1'));
   });
 
-  test('should omit both polling flags for the result leaf, which is a plain read', async () => {
-    const command = new CicdTestCommand(mockProcessor as never);
+  it('should omit both polling flags for the result leaf, which is a plain read', async () => {
+    const command = new CicdTestCommand(mockProcessor);
 
     await command.execute({ target: 'testsuite', action: 'result', resultId: 'res-1' });
 
-    const argv = mockProcessor.process.mock.calls[0][1] as string[];
-    expect(argv).toContain('--result-id');
-    expect(argv).not.toContain('--wait');
-    expect(argv).not.toContain('--no-wait');
-    expect(argv).not.toContain('--poll-timeout');
+    const argv = mockProcessor.process.mock.calls[0].arguments[1];
+    assert.ok(argv.includes('--result-id'));
+    assert.ok(!argv.includes('--wait'));
+    assert.ok(!argv.includes('--no-wait'));
+    assert.ok(!argv.includes('--poll-timeout'));
   });
 
-  test('should reject unknown target and action tokens', async () => {
-    const command = new CicdTestCommand(mockProcessor as never);
+  it('should reject unknown target and action tokens', async () => {
+    const command = new CicdTestCommand(mockProcessor);
 
     const badTarget = await command.execute({ target: 'suite', action: 'run' });
-    expect(badTarget.success).toBe(false);
-    expect(badTarget.output).toContain('testsuite, test');
+    assert.equal(badTarget.success, false);
+    assert.ok(badTarget.output.includes('testsuite, test'));
 
     const badAction = await command.execute({ target: 'test', action: 'rerun' });
-    expect(badAction.success).toBe(false);
-    expect(badAction.output).toContain('run, watch, result');
+    assert.equal(badAction.success, false);
+    assert.ok(badAction.output.includes('run, watch, result'));
 
-    expect(mockProcessor.process).not.toHaveBeenCalled();
+    assertNotCalled(mockProcessor.process);
   });
 
-  test('should require an identifier to run, and reject both at once', async () => {
-    const command = new CicdTestCommand(mockProcessor as never);
+  it('should require an identifier to run, and reject both at once', async () => {
+    const command = new CicdTestCommand(mockProcessor);
 
     const missing = await command.execute({ target: 'testsuite', action: 'run' });
-    expect(missing.success).toBe(false);
-    expect(missing.output).toContain("either 'testSuiteSysId' or 'testSuiteName'");
+    assert.equal(missing.success, false);
+    assert.ok(missing.output.includes("either 'testSuiteSysId' or 'testSuiteName'"));
 
     const both = await command.execute({
       target: 'test', action: 'run', testSysId: 'a', testName: 'b',
     });
-    expect(both.success).toBe(false);
-    expect(both.output).toContain('mutually exclusive');
+    assert.equal(both.success, false);
+    assert.ok(both.output.includes('mutually exclusive'));
   });
 
-  test('should require progressId for watch and resultId for result', async () => {
-    const command = new CicdTestCommand(mockProcessor as never);
+  it('should require progressId for watch and resultId for result', async () => {
+    const command = new CicdTestCommand(mockProcessor);
 
     const watch = await command.execute({ target: 'test', action: 'watch' });
-    expect(watch.success).toBe(false);
-    expect(watch.output).toContain("'progressId' is required");
+    assert.equal(watch.success, false);
+    assert.ok(watch.output.includes("'progressId' is required"));
 
     const result = await command.execute({ target: 'test', action: 'result' });
-    expect(result.success).toBe(false);
-    expect(result.output).toContain("'resultId' is required");
+    assert.equal(result.success, false);
+    assert.ok(result.output.includes("'resultId' is required"));
   });
 
-  test('should reject suite-only arguments on a single test', async () => {
-    const command = new CicdTestCommand(mockProcessor as never);
+  it('should reject suite-only arguments on a single test', async () => {
+    const command = new CicdTestCommand(mockProcessor);
 
     const result = await command.execute({
       target: 'test', action: 'run', testName: 'My Test', isPerformanceRun: true,
     });
 
-    expect(result.success).toBe(false);
-    expect(result.output).toContain('isPerformanceRun');
-    expect(mockProcessor.process).not.toHaveBeenCalled();
+    assert.equal(result.success, false);
+    assert.ok(result.output.includes('isPerformanceRun'));
+    assertNotCalled(mockProcessor.process);
   });
 
-  test('should reject an unsupported browserName', async () => {
-    const command = new CicdTestCommand(mockProcessor as never);
+  it('should reject an unsupported browserName', async () => {
+    const command = new CicdTestCommand(mockProcessor);
 
     const result = await command.execute({
       target: 'testsuite', action: 'run', testSuiteName: 'Suite', browserName: 'opera',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.output).toContain('any, chrome, firefox, edge, ie, safari');
+    assert.equal(result.success, false);
+    assert.ok(result.output.includes('any, chrome, firefox, edge, ie, safari'));
   });
 
-  test('should accept punctuation in suite and test names but reject control characters', async () => {
-    const command = new CicdTestCommand(mockProcessor as never);
+  it('should accept punctuation in suite and test names but reject control characters', async () => {
+    const command = new CicdTestCommand(mockProcessor);
 
     const suiteName = 'Incident (Regression) & Cleanup';
     const ok = await command.execute({ target: 'testsuite', action: 'run', testSuiteName: suiteName });
-    expect(ok.success).toBe(true);
-    const argv = mockProcessor.process.mock.calls[0][1] as string[];
-    expect(argv[argv.indexOf('--test-suite-name') + 1]).toBe(suiteName);
+    assert.equal(ok.success, true);
+    const argv = mockProcessor.process.mock.calls[0].arguments[1];
+    assert.equal(argv[argv.indexOf('--test-suite-name') + 1], suiteName);
 
-    mockProcessor.process.mockClear();
+    mockProcessor.process.mock.resetCalls();
     const bad = await command.execute({ target: 'test', action: 'run', testName: 'bad\tname' });
-    expect(bad.success).toBe(false);
-    expect(bad.output).toContain('control characters');
-    expect(mockProcessor.process).not.toHaveBeenCalled();
+    assert.equal(bad.success, false);
+    assert.ok(bad.output.includes('control characters'));
+    assertNotCalled(mockProcessor.process);
   });
 
-  test('should fail with an actionable message when no auth alias can be resolved', async () => {
-    (SessionManager.getInstance().getAuthAlias as jest.Mock).mockReturnValue(undefined);
-    const command = new CicdTestCommand(mockProcessor as never);
+  it('should fail with an actionable message when no auth alias can be resolved', async () => {
+    session.getAuthAlias.mock.mockImplementation(() => undefined);
+    const command = new CicdTestCommand(mockProcessor);
 
     const result = await command.execute({ target: 'testsuite', action: 'result', resultId: 'res-1' });
 
-    expect(result.success).toBe(false);
-    expect(result.output).toContain('now-sdk auth --add');
-    expect(mockProcessor.process).not.toHaveBeenCalled();
+    assert.equal(result.success, false);
+    assert.ok(result.output.includes('now-sdk auth --add'));
+    assertNotCalled(mockProcessor.process);
   });
 
-  test('should reject an output format the CLI does not declare', async () => {
-    const command = new CicdTestCommand(mockProcessor as never);
+  it('should reject an output format the CLI does not declare', async () => {
+    const command = new CicdTestCommand(mockProcessor);
 
     const result = await command.execute({
       target: 'test', action: 'result', resultId: 'res-1', output: 'table',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.output).toContain('json, raw');
-    expect(mockProcessor.process).not.toHaveBeenCalled();
+    assert.equal(result.success, false);
+    assert.ok(result.output.includes('json, raw'));
+    assertNotCalled(mockProcessor.process);
   });
 
-  test('should pass a bracket select path through but reject one outside the grammar', async () => {
-    const command = new CicdTestCommand(mockProcessor as never);
+  it('should pass a bracket select path through but reject one outside the grammar', async () => {
+    const command = new CicdTestCommand(mockProcessor);
 
     const select = 'result.rollup_results[0].status';
     const ok = await command.execute({ target: 'testsuite', action: 'result', resultId: 'res-1', select });
-    expect(ok.success).toBe(true);
-    const argv = mockProcessor.process.mock.calls[0][1] as string[];
-    expect(argv[argv.indexOf('--select') + 1]).toBe(select);
+    assert.equal(ok.success, true);
+    const argv = mockProcessor.process.mock.calls[0].arguments[1];
+    assert.equal(argv[argv.indexOf('--select') + 1], select);
 
-    mockProcessor.process.mockClear();
+    mockProcessor.process.mock.resetCalls();
     const bad = await command.execute({
       target: 'testsuite', action: 'result', resultId: 'res-1', select: 'result.*.status',
     });
-    expect(bad.success).toBe(false);
-    expect(bad.output).toContain("Argument 'select' must be a dot/bracket path");
-    expect(mockProcessor.process).not.toHaveBeenCalled();
+    assert.equal(bad.success, false);
+    assert.ok(bad.output.includes("Argument 'select' must be a dot/bracket path"));
+    assertNotCalled(mockProcessor.process);
   });
 
   // SDK v4.12.0 `cicd test logs`: a single GET with --result-id (required),
@@ -448,15 +476,15 @@ describe('CicdTestCommand', () => {
   // so the CLI declares no --wait/--poll-timeout on it, and it exists under
   // `test` only — there is no `testsuite logs`.
   describe('logs action (SDK v4.12.0+)', () => {
-    test('should build test logs argv with pattern and limit and no polling flags', async () => {
-      const command = new CicdTestCommand(mockProcessor as never);
+    it('should build test logs argv with pattern and limit and no polling flags', async () => {
+      const command = new CicdTestCommand(mockProcessor);
 
       const result = await command.execute({
         target: 'test', action: 'logs', resultId: 'res-1', pattern: 'error|fail', limit: 50,
       });
 
-      expect(result.success).toBe(true);
-      expect(mockProcessor.process.mock.calls[0][1]).toEqual([
+      assert.equal(result.success, true);
+      assert.deepStrictEqual(mockProcessor.process.mock.calls[0].arguments[1], [
         SDK_BIN, 'cicd', 'test', 'logs',
         '--result-id', 'res-1',
         '--pattern', 'error|fail',
@@ -466,92 +494,98 @@ describe('CicdTestCommand', () => {
       ]);
     });
 
-    test('should let the CLI default the limit and send no pattern when both are omitted', async () => {
-      const command = new CicdTestCommand(mockProcessor as never);
+    it('should let the CLI default the limit and send no pattern when both are omitted', async () => {
+      const command = new CicdTestCommand(mockProcessor);
 
       await command.execute({ target: 'test', action: 'logs', resultId: 'res-1' });
 
-      const argv = mockProcessor.process.mock.calls[0][1] as string[];
-      expect(argv).not.toContain('--pattern');
-      expect(argv).not.toContain('--limit');
+      const argv = mockProcessor.process.mock.calls[0].arguments[1];
+      assert.ok(!argv.includes('--pattern'));
+      assert.ok(!argv.includes('--limit'));
     });
 
-    test('should accept regex metacharacters in pattern but reject control characters', async () => {
-      const command = new CicdTestCommand(mockProcessor as never);
+    it('should accept regex metacharacters in pattern but reject control characters', async () => {
+      const command = new CicdTestCommand(mockProcessor);
 
       const ok = await command.execute({
         target: 'test', action: 'logs', resultId: 'res-1', pattern: '^(Step|Assert)\\s+[0-9]+ failed$',
       });
-      expect(ok.success).toBe(true);
+      assert.equal(ok.success, true);
 
-      mockProcessor.process.mockClear();
+      mockProcessor.process.mock.resetCalls();
       const bad = await command.execute({ target: 'test', action: 'logs', resultId: 'res-1', pattern: 'error\nfail' });
-      expect(bad.success).toBe(false);
-      expect(bad.output).toContain("Invalid characters in argument 'pattern'");
-      expect(mockProcessor.process).not.toHaveBeenCalled();
+      assert.equal(bad.success, false);
+      assert.ok(bad.output.includes("Invalid characters in argument 'pattern'"));
+      assertNotCalled(mockProcessor.process);
     });
 
-    test('should reject logs on a test suite, which the CLI does not offer', async () => {
-      const command = new CicdTestCommand(mockProcessor as never);
+    it('should reject logs on a test suite, which the CLI does not offer', async () => {
+      const command = new CicdTestCommand(mockProcessor);
 
       const result = await command.execute({ target: 'testsuite', action: 'logs', resultId: 'res-1' });
 
-      expect(result.success).toBe(false);
-      expect(result.output).toContain('action="logs" is only available with target="test"');
-      expect(mockProcessor.process).not.toHaveBeenCalled();
+      assert.equal(result.success, false);
+      assert.ok(result.output.includes('action="logs" is only available with target="test"'));
+      assertNotCalled(mockProcessor.process);
     });
 
-    test('should require resultId for logs', async () => {
-      const command = new CicdTestCommand(mockProcessor as never);
+    it('should require resultId for logs', async () => {
+      const command = new CicdTestCommand(mockProcessor);
 
       const result = await command.execute({ target: 'test', action: 'logs' });
 
-      expect(result.success).toBe(false);
-      expect(result.output).toContain("Argument 'resultId' is required when action=\"logs\"");
+      assert.equal(result.success, false);
+      assert.ok(result.output.includes("Argument 'resultId' is required when action=\"logs\""));
     });
 
-    test.each([
-      [{ wait: false }],
-      [{ pollTimeout: 60000 }],
-    ])('should reject polling arguments on logs (%p)', async (extra) => {
-      const command = new CicdTestCommand(mockProcessor as never);
+    for (const [label, extra] of [
+      ['{"wait": false}', { wait: false }],
+      ['{"pollTimeout": 60000}', { pollTimeout: 60000 }],
+    ] as const) {
+      it(`should reject polling arguments on logs (${label})`, async () => {
+        const command = new CicdTestCommand(mockProcessor);
 
-      const result = await command.execute({ target: 'test', action: 'logs', resultId: 'res-1', ...extra });
+        const result = await command.execute({ target: 'test', action: 'logs', resultId: 'res-1', ...extra });
 
-      expect(result.success).toBe(false);
-      expect(result.output).toContain('not accepted when action="logs"');
-      expect(mockProcessor.process).not.toHaveBeenCalled();
-    });
+        assert.equal(result.success, false);
+        assert.ok(result.output.includes('not accepted when action="logs"'));
+        assertNotCalled(mockProcessor.process);
+      });
+    }
 
-    test.each([
+    for (const [name, value] of [
       ['pattern', 'error'],
       ['limit', 10],
-    ])('should reject %s outside the logs action', async (name, value) => {
-      const command = new CicdTestCommand(mockProcessor as never);
+    ] as const) {
+      it(`should reject ${name} outside the logs action`, async () => {
+        const command = new CicdTestCommand(mockProcessor);
 
-      const result = await command.execute({ target: 'test', action: 'result', resultId: 'res-1', [name]: value });
+        const result = await command.execute({ target: 'test', action: 'result', resultId: 'res-1', [name]: value });
 
-      expect(result.success).toBe(false);
-      expect(result.output).toContain(`Argument '${name}' is only valid with action="logs"`);
-    });
+        assert.equal(result.success, false);
+        assert.ok(result.output.includes(`Argument '${name}' is only valid with action="logs"`));
+      });
+    }
 
-    test.each([0, -1, 2.5])('should reject a non-positive-integer limit (%p)', async (limit) => {
-      const command = new CicdTestCommand(mockProcessor as never);
+    for (const limit of [0, -1, 2.5]) {
+      it(`should reject a non-positive-integer limit (${limit})`, async () => {
+        const command = new CicdTestCommand(mockProcessor);
 
-      const result = await command.execute({ target: 'test', action: 'logs', resultId: 'res-1', limit });
+        const result = await command.execute({ target: 'test', action: 'logs', resultId: 'res-1', limit });
 
-      expect(result.success).toBe(false);
-      expect(result.output).toContain("Argument 'limit' must be a positive integer");
-    });
+        assert.equal(result.success, false);
+        assert.ok(result.output.includes("Argument 'limit' must be a positive integer"));
+      });
+    }
 
-    test('should still send polling flags for run and watch only', async () => {
-      const command = new CicdTestCommand(mockProcessor as never);
+    it('should still send polling flags for run and watch only', async () => {
+      const command = new CicdTestCommand(mockProcessor);
 
       await command.execute({ target: 'test', action: 'watch', progressId: 'p-1', wait: false, pollTimeout: 1000 });
 
-      const argv = mockProcessor.process.mock.calls[0][1] as string[];
-      expect(argv).toContain('--no-wait');
-      expect(argv).toContain('--poll-timeout');
+      const argv = mockProcessor.process.mock.calls[0].arguments[1];
+      assert.ok(argv.includes('--no-wait'));
+      assert.ok(argv.includes('--poll-timeout'));
     });
   });
 });

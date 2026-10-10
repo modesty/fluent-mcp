@@ -1,8 +1,21 @@
+import { beforeEach, describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { assertCalledTimes } from '../support/mockAssertions.js';
+import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
+import type { CLICommand, ProcessResult } from '../../src/utils/types.js';
+
+// The SDK commands read the neutral project root and resolve the bundled CLI
+// through config/sdkCli; the Jest setup mocked both for every suite.
+mock.module('../../src/config.js', configFixture().mockOptions);
+mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
+mock.module('../../src/utils/sdkCli.js', sdkCliFixture().mockOptions);
+
 // Import command tools from individual modules
-import { CommandFactory } from '../../src/tools/registry/commandFactory.js';
-import { CLIExecutor } from '../../src/tools/processors/cliExecutor.js';
-import { NodeProcessRunner } from '../../src/tools/processors/processRunner.js';
-import { CommandProcessor, ProcessResult } from '../../src/utils/types.js';
+const { CommandFactory } = await import('../../src/tools/registry/commandFactory.js');
+const { CLIExecutor } = await import('../../src/tools/processors/cliExecutor.js');
+const { NodeProcessRunner } = await import('../../src/tools/processors/processRunner.js');
+
+const SDK_BIN = '/test/node_modules/@servicenow/sdk/bin/index.js';
 
 // Mock the NodeProcessRunner for testing
 class MockProcessRunner extends NodeProcessRunner {
@@ -44,8 +57,15 @@ class MockProcessRunner extends NodeProcessRunner {
 
 describe('SDK Command Tools', () => {
   let mockRunner: MockProcessRunner;
-  let executor: CLIExecutor;
-  let commands: any[];
+  let executor: InstanceType<typeof CLIExecutor>;
+  let commands: CLICommand[];
+
+  /** The SdkInfoCommand, which every test in this suite drives. */
+  function sdkInfo(): CLICommand {
+    const sdkInfoCommand = commands.find((cmd) => cmd.name === 'sdk_info');
+    assert.notEqual(sdkInfoCommand, undefined);
+    return sdkInfoCommand as CLICommand;
+  }
 
   beforeEach(() => {
     mockRunner = new MockProcessRunner();
@@ -53,53 +73,50 @@ describe('SDK Command Tools', () => {
     commands = CommandFactory.createCommands(executor, executor);
   });
 
-  test('SdkInfoCommand should execute correctly with -v flag', async () => {
-    const sdkInfoCommand = commands.find((cmd) => cmd.name === 'sdk_info');
-    expect(sdkInfoCommand).toBeDefined();
+  it('SdkInfoCommand should execute correctly with -v flag', async () => {
+    const sdkInfoCommand = sdkInfo();
 
     const result = await sdkInfoCommand.execute({ flag: '-v' });
-    expect(result.success).toBe(true);
+    assert.equal(result.success, true);
 
     // Basic presence check
-    expect(result.output).toContain('ServiceNow SDK v');
+    assert.ok(result.output.includes('ServiceNow SDK v'));
 
     // Extract version using regex and validate semantic versioning format
     const versionRegex = /ServiceNow SDK v(\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)/;
     const match = result.output.match(versionRegex);
 
     // Verify version string was found and extracted
-    expect(match).not.toBeNull();
-    expect(match).toBeDefined();
+    assert.notEqual(match, null);
+    assert.notEqual(match, undefined);
 
     // Extract the version without the prefix
     const versionString = match ? match[1] : '';
 
     // Validate the format of the extracted version using semantic versioning regex
     const semverRegex = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
-    expect(versionString).toMatch(semverRegex);
+    assert.match(versionString, semverRegex);
 
     // Validate version components are valid numbers
     const versionParts = versionString.split('.');
-    expect(Number(versionParts[0])).toBeGreaterThanOrEqual(0); // Major
-    expect(Number(versionParts[1])).toBeGreaterThanOrEqual(0); // Minor
+    assert.ok(Number(versionParts[0]) >= 0); // Major
+    assert.ok(Number(versionParts[1]) >= 0); // Minor
 
     // For patch, we need to handle potential pre-release/build metadata
     const patchPart = versionParts[2].split(/[-+]/)[0]; // Extract patch number before any pre-release/build metadata
-    expect(Number(patchPart)).toBeGreaterThanOrEqual(0); // Patch
+    assert.ok(Number(patchPart) >= 0); // Patch
   });
 
-  test('SdkInfoCommand should execute correctly with -h flag (general help)', async () => {
-    const sdkInfoCommand = commands.find((cmd) => cmd.name === 'sdk_info');
-    expect(sdkInfoCommand).toBeDefined();
+  it('SdkInfoCommand should execute correctly with -h flag (general help)', async () => {
+    const sdkInfoCommand = sdkInfo();
 
     const result = await sdkInfoCommand.execute({ flag: '-h' });
-    expect(result.success).toBe(true);
-    expect(result.output).toContain('ServiceNow SDK Help information');
+    assert.equal(result.success, true);
+    assert.ok(result.output.includes('ServiceNow SDK Help information'));
   });
 
-  test('SdkInfoCommand should execute correctly with -h flag and specific command', async () => {
-    const sdkInfoCommand = commands.find((cmd) => cmd.name === 'sdk_info');
-    expect(sdkInfoCommand).toBeDefined();
+  it('SdkInfoCommand should execute correctly with -h flag and specific command', async () => {
+    const sdkInfoCommand = sdkInfo();
 
     // Set up specific mock response
     const mockOutput = 'Help for auth command';
@@ -107,7 +124,14 @@ describe('SDK Command Tools', () => {
 
     // Override the run method directly for this test
     const originalRun = mockRunner.run;
-    mockRunner.run = jest.fn().mockImplementation(async (_command, args) => {
+    const run = mock.fn(async (
+      _command: string,
+      args: string[] = [],
+      _cwd?: string,
+      _stdinInput?: string,
+      _timeoutMs?: number,
+      _signal?: AbortSignal
+    ): Promise<ProcessResult> => {
       // Check if this is the specific auth help command we're testing
       if (args.includes('auth') && args.includes('--help')) {
         return {
@@ -120,61 +144,60 @@ describe('SDK Command Tools', () => {
       // Otherwise call the original implementation
       return originalRun.call(mockRunner, _command, args);
     });
+    mockRunner.run = run;
 
     // Execute the command
     const result = await sdkInfoCommand.execute({ flag: '-h', command: 'auth' });
 
     // Verify the command succeeded
-    expect(result.success).toBe(true);
+    assert.equal(result.success, true);
 
     // Verify the mock output is correctly returned in the result
-    expect(result.output).toContain(mockOutput);
-    expect(result.exitCode).toBe(mockExitCode);
-    expect(result.error).toBeUndefined();
+    assert.ok(result.output.includes(mockOutput));
+    assert.equal(result.exitCode, mockExitCode);
+    assert.equal(result.error, undefined);
 
     // Verify the command was called with expected arguments
-    expect(mockRunner.run).toHaveBeenCalledWith(
-      process.execPath,
-      expect.arrayContaining(['/test/node_modules/@servicenow/sdk/bin/index.js', 'auth', '--help']),
-      expect.any(String),  // Working directory should be provided (project root path)
-      undefined, // stdinInput
-      10000,    // timeoutMs
-      undefined  // signal
-    );
+    assertCalledTimes(run, 1);
+    const [command, args, cwd, stdinInput, timeoutMs, signal] = run.mock.calls[0].arguments;
+    assert.equal(command, process.execPath);
+    for (const token of [SDK_BIN, 'auth', '--help']) {
+      assert.ok(args?.includes(token), `expected argv to contain ${token}; received ${JSON.stringify(args)}`);
+    }
+    assert.equal(typeof cwd, 'string'); // Working directory should be provided (project root path)
+    assert.equal(stdinInput, undefined);
+    assert.equal(timeoutMs, 10000);
+    assert.equal(signal, undefined);
 
     // Restore the original run method
     mockRunner.run = originalRun;
   });
 
-  test('SdkInfoCommand should reject -lm flag (no longer supported)', async () => {
-    const sdkInfoCommand = commands.find((cmd) => cmd.name === 'sdk_info');
-    expect(sdkInfoCommand).toBeDefined();
+  it('SdkInfoCommand should reject -lm flag (no longer supported)', async () => {
+    const sdkInfoCommand = sdkInfo();
 
     const result = await sdkInfoCommand.execute({ flag: '-lm' });
-    expect(result.success).toBe(false);
-    expect(result.error?.message).toContain('Invalid flag');
+    assert.equal(result.success, false);
+    assert.ok(result.error?.message.includes('Invalid flag'));
   });
 
-  test('SdkInfoCommand should handle invalid flags', async () => {
-    const sdkInfoCommand = commands.find((cmd) => cmd.name === 'sdk_info');
-    expect(sdkInfoCommand).toBeDefined();
+  it('SdkInfoCommand should handle invalid flags', async () => {
+    const sdkInfoCommand = sdkInfo();
 
     const result = await sdkInfoCommand.execute({ flag: '--invalid' });
-    expect(result.success).toBe(false);
-    expect(result.error).toBeDefined();
-    expect(result.error?.message).toContain('Invalid flag');
+    assert.equal(result.success, false);
+    assert.notEqual(result.error, undefined);
+    assert.ok(result.error?.message.includes('Invalid flag'));
   });
 
-  test('SdkInfoCommand should handle missing required flag parameter', async () => {
-    const sdkInfoCommand = commands.find((cmd) => cmd.name === 'sdk_info');
-    expect(sdkInfoCommand).toBeDefined();
+  it('SdkInfoCommand should handle missing required flag parameter', async () => {
+    const sdkInfoCommand = sdkInfo();
 
-    await expect(sdkInfoCommand.execute({})).rejects.toThrow("Missing required argument 'flag'");
+    await assert.rejects(sdkInfoCommand.execute({}), /Missing required argument 'flag'/);
   });
 
-  test('SdkInfoCommand should handle errors correctly', async () => {
-    const sdkInfoCommand = commands.find((cmd) => cmd.name === 'sdk_info');
-    expect(sdkInfoCommand).toBeDefined();
+  it('SdkInfoCommand should handle errors correctly', async () => {
+    const sdkInfoCommand = sdkInfo();
 
     // Override the run method directly for this specific test
     const originalRun = mockRunner.run;
@@ -187,9 +210,9 @@ describe('SDK Command Tools', () => {
     };
 
     const result = await sdkInfoCommand.execute({ flag: '-v' });
-    expect(result.success).toBe(false);
-    expect(result.exitCode).toBe(1);
-    expect(result.error).toBeDefined();
+    assert.equal(result.success, false);
+    assert.equal(result.exitCode, 1);
+    assert.notEqual(result.error, undefined);
 
     // Restore the original run method
     mockRunner.run = originalRun;

@@ -5,52 +5,81 @@
  * required-authentication gate, and the query-specific validation that permits
  * encoded-query operators while rejecting shell-injection characters.
  */
-import { QueryCommand } from '../../src/tools/commands/queryCommand.js';
-import { SessionManager } from '../../src/utils/sessionManager.js';
+import { beforeEach, describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { assertCalledWith, assertNotCalled } from '../support/mockAssertions.js';
+import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
+import type { CommandProcessor } from '../../src/utils/types.js';
 
-jest.mock('../../src/utils/logger.js', () => require('../mocks/index.js').createLoggerMock());
-jest.mock('../../src/config.js', () => require('../mocks/index.js').createConfigMock());
-// Default the session to a resolvable auth alias so the required-auth gate passes;
-// individual tests override getAuthAlias to exercise the unauthenticated path.
-jest.mock('../../src/utils/sessionManager.js', () =>
-  require('../mocks/index.js').createSessionManagerMock({
-    getAuthAlias: jest.fn().mockReturnValue('session-alias'),
-  })
-);
+// Session replacement. Default the session to a resolvable auth alias so the
+// required-auth gate passes; individual tests override getAuthAlias to exercise
+// the unauthenticated path.
+const session = {
+  getWorkingDirectory: mock.fn((): string | undefined => '/mock/working/dir'),
+  setWorkingDirectory: mock.fn(),
+  getAuthAlias: mock.fn((): string | undefined => 'session-alias'),
+  setAuthAlias: mock.fn(),
+  getAuthValidationResult: mock.fn(),
+  setAuthValidationResult: mock.fn(),
+};
+
+mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
+mock.module('../../src/config.js', configFixture().mockOptions);
+mock.module('../../src/utils/sdkCli.js', sdkCliFixture().mockOptions);
+mock.module('../../src/utils/sessionManager.js', {
+  namedExports: { SessionManager: { getInstance: () => session } },
+});
+
+const { QueryCommand } = await import('../../src/tools/commands/queryCommand.js');
+
+const SDK_BIN = '/test/node_modules/@servicenow/sdk/bin/index.js';
+
+type ProcessFn = CommandProcessor['process'];
+
+/** Asserts every expected token appears in argv (the Jest arrayContaining intent). */
+function assertContainsAll(actual: readonly string[], expected: readonly string[]): void {
+  for (const token of expected) {
+    assert.ok(actual.includes(token), `expected argv to contain ${JSON.stringify(token)}; received ${JSON.stringify(actual)}`);
+  }
+}
 
 describe('QueryCommand', () => {
-  let mockProcessor: { process: jest.Mock };
+  let mockProcessor: { process: ReturnType<typeof mock.fn<ProcessFn>> };
+
+  /** argv handed to the processor on its n-th call. */
+  const argvOf = (call = 0): string[] => mockProcessor.process.mock.calls[call].arguments[1];
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    // clearAllMocks resets call records but not implementations; re-assert the
-    // default alias so a prior test's per-call override cannot leak.
-    (SessionManager.getInstance().getAuthAlias as jest.Mock).mockReturnValue('session-alias');
+    // Re-assert the default alias and working directory so a prior test's
+    // per-call override cannot leak.
+    session.getAuthAlias.mock.mockImplementation(() => 'session-alias');
+    session.getWorkingDirectory.mock.mockImplementation(() => '/mock/working/dir');
     mockProcessor = {
-      process: jest.fn().mockResolvedValue({ success: true, output: '{"records":[]}', exitCode: 0 }),
+      process: mock.fn<ProcessFn>(async () => ({ success: true, output: '{"records":[]}', exitCode: 0 })),
     };
   });
 
-  test('should expose read-only metadata with required table and query', () => {
-    const command = new QueryCommand(mockProcessor as never);
-    expect(command.name).toBe('query_fluent_records');
-    expect(command.annotations.readOnlyHint).toBe(true);
-    expect(command.timeoutMs).toBe(60_000);
+  it('should expose read-only metadata with required table and query', () => {
+    const command = new QueryCommand(mockProcessor);
+    assert.equal(command.name, 'query_fluent_records');
+    assert.equal(command.annotations.readOnlyHint, true);
+    assert.equal(command.timeoutMs, 60_000);
 
     const required = command.arguments.filter((a) => a.required).map((a) => a.name);
-    expect(required).toEqual(['table', 'query']);
+    assert.deepStrictEqual(required, ['table', 'query']);
   });
 
-  test('should build argv with positional table, literal query, JSON envelope, and session auth', async () => {
-    const command = new QueryCommand(mockProcessor as never);
+  it('should build argv with positional table, literal query, JSON envelope, and session auth', async () => {
+    const command = new QueryCommand(mockProcessor);
 
     const result = await command.execute({ table: 'incident', query: 'active=true^priority<=2' });
 
-    expect(result.success).toBe(true);
-    expect(mockProcessor.process).toHaveBeenCalledWith(
+    assert.equal(result.success, true);
+    assertCalledWith(
+      mockProcessor.process,
       process.execPath,
       [
-        '/test/node_modules/@servicenow/sdk/bin/index.js', 'query', 'incident',
+        SDK_BIN, 'query', 'incident',
         '--query', 'active=true^priority<=2',
         '--output', 'json',
         '--auth', 'session-alias',
@@ -62,18 +91,18 @@ describe('QueryCommand', () => {
     );
   });
 
-  test('should prefer an explicitly provided auth alias over the session alias', async () => {
-    const command = new QueryCommand(mockProcessor as never);
+  it('should prefer an explicitly provided auth alias over the session alias', async () => {
+    const command = new QueryCommand(mockProcessor);
 
     await command.execute({ table: 'incident', query: 'active=true', auth: 'explicit-alias' });
 
-    const argv = mockProcessor.process.mock.calls[0][1] as string[];
-    expect(argv).toEqual(expect.arrayContaining(['--auth', 'explicit-alias']));
-    expect(argv).not.toContain('session-alias');
+    const argv = argvOf();
+    assertContainsAll(argv, ['--auth', 'explicit-alias']);
+    assert.ok(!argv.includes('session-alias'));
   });
 
-  test('should map optional flags and append --debug', async () => {
-    const command = new QueryCommand(mockProcessor as never);
+  it('should map optional flags and append --debug', async () => {
+    const command = new QueryCommand(mockProcessor);
 
     await command.execute({
       table: 'sys_user',
@@ -86,13 +115,13 @@ describe('QueryCommand', () => {
       debug: true,
     });
 
-    const argv = mockProcessor.process.mock.calls[0][1] as string[];
-    expect(argv.slice(0, 3)).toEqual([
-      '/test/node_modules/@servicenow/sdk/bin/index.js',
+    const argv = argvOf();
+    assert.deepStrictEqual(argv.slice(0, 3), [
+      SDK_BIN,
       'query',
       'sys_user',
     ]);
-    expect(argv).toEqual(expect.arrayContaining([
+    assertContainsAll(argv, [
       '--query', 'active=true',
       '--fields', 'name,email',
       '--limit', '50',
@@ -101,113 +130,127 @@ describe('QueryCommand', () => {
       '--no-count',
       '--output', 'json',
       '--debug',
-    ]));
+    ]);
   });
 
-  test('should emit --no-exclude-reference-link only when excludeReferenceLink is false', async () => {
-    const command = new QueryCommand(mockProcessor as never);
+  it('should emit --no-exclude-reference-link only when excludeReferenceLink is false', async () => {
+    const command = new QueryCommand(mockProcessor);
 
     await command.execute({ table: 'incident', query: 'active=true', excludeReferenceLink: false });
-    const argv = mockProcessor.process.mock.calls[0][1] as string[];
-    expect(argv).toContain('--no-exclude-reference-link');
+    const argv = argvOf();
+    assert.ok(argv.includes('--no-exclude-reference-link'));
 
-    mockProcessor.process.mockClear();
+    mockProcessor.process.mock.resetCalls();
     await command.execute({ table: 'incident', query: 'active=true', excludeReferenceLink: true });
-    const argv2 = mockProcessor.process.mock.calls[0][1] as string[];
-    expect(argv2).not.toContain('--no-exclude-reference-link');
+    const argv2 = argvOf();
+    assert.ok(!argv2.includes('--no-exclude-reference-link'));
   });
 
-  test('should fail fast when no auth alias is available (neither provided nor in session)', async () => {
-    (SessionManager.getInstance().getAuthAlias as jest.Mock).mockReturnValue(undefined);
-    const command = new QueryCommand(mockProcessor as never);
+  it('should fail fast when no auth alias is available (neither provided nor in session)', async () => {
+    session.getAuthAlias.mock.mockImplementation(() => undefined);
+    const command = new QueryCommand(mockProcessor);
 
     const result = await command.execute({ table: 'incident', query: 'active=true' });
 
-    expect(result.success).toBe(false);
-    expect(result.error?.message).toMatch(/requires authentication to a ServiceNow instance/i);
-    expect(mockProcessor.process).not.toHaveBeenCalled();
+    assert.equal(result.success, false);
+    assert.match(result.error?.message ?? '', /requires authentication to a ServiceNow instance/i);
+    assertNotCalled(mockProcessor.process);
   });
 
-  test('should still accept an explicit auth alias when the session has none', async () => {
-    (SessionManager.getInstance().getAuthAlias as jest.Mock).mockReturnValue(undefined);
-    const command = new QueryCommand(mockProcessor as never);
+  it('should still accept an explicit auth alias when the session has none', async () => {
+    session.getAuthAlias.mock.mockImplementation(() => undefined);
+    const command = new QueryCommand(mockProcessor);
 
     const result = await command.execute({ table: 'incident', query: 'active=true', auth: 'explicit-alias' });
 
-    expect(result.success).toBe(true);
-    const argv = mockProcessor.process.mock.calls[0][1] as string[];
-    expect(argv).toEqual(expect.arrayContaining(['--auth', 'explicit-alias']));
+    assert.equal(result.success, true);
+    assertContainsAll(argvOf(), ['--auth', 'explicit-alias']);
   });
 
-  test.each([
+  for (const query of [
     "name=O'Reilly",
     'name="quoted"&active=true',
     'path=foo\\bar',
     'name=`literal`$(whoami);*.ts',
-  ])('should pass printable punctuation as one literal query argv entry: %s', async (query) => {
-    const command = new QueryCommand(mockProcessor as never);
-    const result = await command.execute({ table: 'incident', query });
+  ]) {
+    it(`should pass printable punctuation as one literal query argv entry: ${query}`, async () => {
+      const command = new QueryCommand(mockProcessor);
+      const result = await command.execute({ table: 'incident', query });
 
-    expect(result.success).toBe(true);
-    const argv = mockProcessor.process.mock.calls[0][1] as string[];
-    const queryIndex = argv.indexOf('--query');
-    expect(argv[queryIndex + 1]).toBe(query);
+      assert.equal(result.success, true);
+      const argv = argvOf();
+      const queryIndex = argv.indexOf('--query');
+      assert.equal(argv[queryIndex + 1], query);
+    });
+  }
+
+  it('should reject encoded queries containing control characters', async () => {
+    const command = new QueryCommand(mockProcessor);
+    await assert.rejects(
+      command.execute({ table: 'incident', query: 'active=true\nmalicious' }),
+      /Invalid characters in argument 'query'/
+    );
+    assertNotCalled(mockProcessor.process);
   });
 
-  test('should reject encoded queries containing control characters', async () => {
-    const command = new QueryCommand(mockProcessor as never);
-    await expect(command.execute({ table: 'incident', query: 'active=true\nmalicious' }))
-      .rejects.toThrow(/Invalid characters in argument 'query'/);
-    expect(mockProcessor.process).not.toHaveBeenCalled();
+  it('should reject an empty or whitespace-only query', async () => {
+    const command = new QueryCommand(mockProcessor);
+    await assert.rejects(
+      command.execute({ table: 'incident', query: '' }),
+      /Missing required argument 'query'/
+    );
+    await assert.rejects(
+      command.execute({ table: 'incident', query: '   ' }),
+      /Missing required argument 'query'/
+    );
+    assertNotCalled(mockProcessor.process);
   });
 
-  test('should reject an empty or whitespace-only query', async () => {
-    const command = new QueryCommand(mockProcessor as never);
-    await expect(command.execute({ table: 'incident', query: '' }))
-      .rejects.toThrow(/Missing required argument 'query'/);
-    await expect(command.execute({ table: 'incident', query: '   ' }))
-      .rejects.toThrow(/Missing required argument 'query'/);
-    expect(mockProcessor.process).not.toHaveBeenCalled();
+  it('should reject an invalid displayValue', async () => {
+    const command = new QueryCommand(mockProcessor);
+    await assert.rejects(
+      command.execute({ table: 'incident', query: 'active=true', displayValue: 'yes' }),
+      /displayValue/
+    );
   });
 
-  test('should reject an invalid displayValue', async () => {
-    const command = new QueryCommand(mockProcessor as never);
-    await expect(command.execute({ table: 'incident', query: 'active=true', displayValue: 'yes' }))
-      .rejects.toThrow(/displayValue/);
-  });
-
-  test('should reject a table name with shell metacharacters', async () => {
-    const command = new QueryCommand(mockProcessor as never);
-    await expect(command.execute({ table: 'incident;ls', query: 'active=true' }))
-      .rejects.toThrow();
+  it('should reject a table name with shell metacharacters', async () => {
+    const command = new QueryCommand(mockProcessor);
+    await assert.rejects(command.execute({ table: 'incident;ls', query: 'active=true' }));
   });
 
   // The SDK's --select extractor accepts numeric subscripts (sdk-cli
   // util/json-select.ts), and this tool documents `records[0].sys_id` — the base
   // shell sanitizer rejects brackets, so the select path needs its own grammar.
-  test.each([
+  for (const select of [
     'records[0].sys_id',
     'result.records[10].opened_by.display_value',
     'ok',
-  ])('should pass a documented select path through to --select: %s', async (select) => {
-    const command = new QueryCommand(mockProcessor as never);
-    const result = await command.execute({ table: 'incident', query: 'active=true', select });
+  ]) {
+    it(`should pass a documented select path through to --select: ${select}`, async () => {
+      const command = new QueryCommand(mockProcessor);
+      const result = await command.execute({ table: 'incident', query: 'active=true', select });
 
-    expect(result.success).toBe(true);
-    const argv = mockProcessor.process.mock.calls[0][1] as string[];
-    expect(argv[argv.indexOf('--select') + 1]).toBe(select);
-  });
+      assert.equal(result.success, true);
+      const argv = argvOf();
+      assert.equal(argv[argv.indexOf('--select') + 1], select);
+    });
+  }
 
-  test.each([
+  for (const select of [
     'records[0]; rm -rf /',
     'records[*].sys_id',
     'records["0"].sys_id',
     'records[0].sys id',
     '',
-  ])('should reject a select path outside the SDK grammar: %s', async (select) => {
-    const command = new QueryCommand(mockProcessor as never);
-    await expect(command.execute({ table: 'incident', query: 'active=true', select }))
-      .rejects.toThrow(/Argument 'select' must be a dot\/bracket path/);
-    expect(mockProcessor.process).not.toHaveBeenCalled();
-  });
+  ]) {
+    it(`should reject a select path outside the SDK grammar: ${select}`, async () => {
+      const command = new QueryCommand(mockProcessor);
+      await assert.rejects(
+        command.execute({ table: 'incident', query: 'active=true', select }),
+        /Argument 'select' must be a dot\/bracket path/
+      );
+      assertNotCalled(mockProcessor.process);
+    });
+  }
 });

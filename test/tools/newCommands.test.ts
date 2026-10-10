@@ -1,35 +1,63 @@
 /**
  * Tests for new SDK commands: Download, Clean, and Pack
  */
-import { CommandFactory } from '../../src/tools/registry/commandFactory.js';
-import { NodeProcessRunner } from '../../src/tools/processors/processRunner.js';
-import { DownloadCommand, CleanCommand, PackCommand, ExplainCommand } from '../../src/tools/commands/index.js';
+import { beforeEach, describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { assertCalledWith, assertNotCalled } from '../support/mockAssertions.js';
+import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
+import type { CommandProcessor } from '../../src/utils/types.js';
 
-jest.mock('../../src/utils/logger.js', () => require('../mocks/index.js').createLoggerMock());
-jest.mock('../../src/config.js', () => require('../mocks/index.js').createConfigMock());
-jest.mock('../../src/utils/sessionManager.js', () => require('../mocks/index.js').createSessionManagerMock());
+// Session replacement: commands resolve their working directory from the
+// initialized session, which this suite pins to a fixed path.
+const session = {
+  getWorkingDirectory: mock.fn((): string | undefined => '/mock/working/dir'),
+  setWorkingDirectory: mock.fn(),
+  getAuthAlias: mock.fn((): string | undefined => undefined),
+  setAuthAlias: mock.fn(),
+  getAuthValidationResult: mock.fn(),
+  setAuthValidationResult: mock.fn(),
+};
+
+// Neutral cwd for commands that need no Fluent project (explain) is the project root.
+const config = configFixture();
+config.getProjectRootPath.mock.mockImplementation(() => '/mock/project/root');
+
+mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
+mock.module('../../src/config.js', config.mockOptions);
+mock.module('../../src/utils/sdkCli.js', sdkCliFixture().mockOptions);
+mock.module('../../src/utils/sessionManager.js', {
+  namedExports: { SessionManager: { getInstance: () => session } },
+});
+
+const { CommandFactory } = await import('../../src/tools/registry/commandFactory.js');
+const { DownloadCommand, CleanCommand, PackCommand, ExplainCommand } = await import(
+  '../../src/tools/commands/index.js'
+);
+
+const SDK_BIN = '/test/node_modules/@servicenow/sdk/bin/index.js';
+
+type ProcessFn = CommandProcessor['process'];
 
 describe('New SDK Commands', () => {
-  let mockProcessor: { process: jest.Mock };
+  let mockProcessor: { process: ReturnType<typeof mock.fn<ProcessFn>> };
 
   beforeEach(() => {
-    jest.clearAllMocks();
     mockProcessor = {
-      process: jest.fn().mockResolvedValue({
+      process: mock.fn<ProcessFn>(async () => ({
         success: true,
         output: 'Mock command output',
         exitCode: 0
-      })
+      }))
     };
   });
 
   describe('DownloadCommand', () => {
-    test('should create DownloadCommand with correct metadata', () => {
-      const command = new DownloadCommand(mockProcessor as any);
+    it('should create DownloadCommand with correct metadata', () => {
+      const command = new DownloadCommand(mockProcessor);
 
-      expect(command.name).toBe('download_fluent_app');
-      expect(command.description).toContain('Download application metadata from a ServiceNow instance');
-      expect(command.arguments.map((arg) => arg.name)).toEqual([
+      assert.equal(command.name, 'download_fluent_app');
+      assert.ok(command.description.includes('Download application metadata from a ServiceNow instance'));
+      assert.deepStrictEqual(command.arguments.map((arg) => arg.name), [
         'workingDirectory',
         'auth',
         'directory',
@@ -41,40 +69,41 @@ describe('New SDK Commands', () => {
 
       // Check required directory argument
       const directoryArg = command.arguments.find(arg => arg.name === 'directory');
-      expect(directoryArg).toBeDefined();
-      expect(directoryArg?.required).toBe(true);
-      expect(directoryArg?.type).toBe('string');
-      expect(directoryArg?.description).toBe('Path to expand application');
+      assert.notEqual(directoryArg, undefined);
+      assert.equal(directoryArg?.required, true);
+      assert.equal(directoryArg?.type, 'string');
+      assert.equal(directoryArg?.description, 'Path to expand application');
 
       // Check optional source argument
       const sourceArg = command.arguments.find(arg => arg.name === 'source');
-      expect(sourceArg).toBeDefined();
-      expect(sourceArg?.required).toBe(false);
-      expect(sourceArg?.type).toBe('string');
+      assert.notEqual(sourceArg, undefined);
+      assert.equal(sourceArg?.required, false);
+      assert.equal(sourceArg?.type, 'string');
 
       // Check optional incremental argument
       const incrementalArg = command.arguments.find(arg => arg.name === 'incremental');
-      expect(incrementalArg).toBeDefined();
-      expect(incrementalArg?.required).toBe(false);
-      expect(incrementalArg?.type).toBe('boolean');
+      assert.notEqual(incrementalArg, undefined);
+      assert.equal(incrementalArg?.required, false);
+      assert.equal(incrementalArg?.type, 'boolean');
 
       // Check optional debug argument
       const debugArg = command.arguments.find(arg => arg.name === 'debug');
-      expect(debugArg).toBeDefined();
-      expect(debugArg?.required).toBe(false);
-      expect(debugArg?.type).toBe('boolean');
+      assert.notEqual(debugArg, undefined);
+      assert.equal(debugArg?.required, false);
+      assert.equal(debugArg?.type, 'boolean');
     });
 
-    test('should execute download command with required directory', async () => {
-      const command = new DownloadCommand(mockProcessor as any);
+    it('should execute download command with required directory', async () => {
+      const command = new DownloadCommand(mockProcessor);
 
       const result = await command.execute({ directory: 'my-app' });
 
-      expect(result.success).toBe(true);
-      expect(result.output).toContain('Mock command output');
-      expect(mockProcessor.process).toHaveBeenCalledWith(
+      assert.equal(result.success, true);
+      assert.ok(result.output.includes('Mock command output'));
+      assertCalledWith(
+        mockProcessor.process,
         process.execPath,
-        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'download', 'my-app'],
+        [SDK_BIN, 'download', 'my-app'],
         '/mock/working/dir',
         undefined, // stdinInput
         600000,   // timeoutMs
@@ -82,8 +111,8 @@ describe('New SDK Commands', () => {
       );
     });
 
-    test('should execute download command with all arguments', async () => {
-      const command = new DownloadCommand(mockProcessor as any);
+    it('should execute download command with all arguments', async () => {
+      const command = new DownloadCommand(mockProcessor);
 
       const result = await command.execute({
         directory: 'my-app',
@@ -92,10 +121,11 @@ describe('New SDK Commands', () => {
         debug: true
       });
 
-      expect(result.success).toBe(true);
-      expect(mockProcessor.process).toHaveBeenCalledWith(
+      assert.equal(result.success, true);
+      assertCalledWith(
+        mockProcessor.process,
         process.execPath,
-        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'download', 'my-app', '--source', './src', '--incremental', '--debug'],
+        [SDK_BIN, 'download', 'my-app', '--source', './src', '--incremental', '--debug'],
         '/mock/working/dir',
         undefined, // stdinInput
         600000,   // timeoutMs
@@ -105,12 +135,12 @@ describe('New SDK Commands', () => {
   });
 
   describe('CleanCommand', () => {
-    test('should create CleanCommand with correct metadata', () => {
-      const command = new CleanCommand(mockProcessor as any);
+    it('should create CleanCommand with correct metadata', () => {
+      const command = new CleanCommand(mockProcessor);
 
-      expect(command.name).toBe('clean_fluent_app');
-      expect(command.description).toContain('Delete the build output directory');
-      expect(command.arguments.map((arg) => arg.name)).toEqual([
+      assert.equal(command.name, 'clean_fluent_app');
+      assert.ok(command.description.includes('Delete the build output directory'));
+      assert.deepStrictEqual(command.arguments.map((arg) => arg.name), [
         'workingDirectory',
         'source',
         'debug',
@@ -118,27 +148,28 @@ describe('New SDK Commands', () => {
 
       // Check optional source argument
       const sourceArg = command.arguments.find(arg => arg.name === 'source');
-      expect(sourceArg).toBeDefined();
-      expect(sourceArg?.required).toBe(false);
-      expect(sourceArg?.type).toBe('string');
-      expect(sourceArg?.description).toBe('Path to the directory that contains package.json configuration');
+      assert.notEqual(sourceArg, undefined);
+      assert.equal(sourceArg?.required, false);
+      assert.equal(sourceArg?.type, 'string');
+      assert.equal(sourceArg?.description, 'Path to the directory that contains package.json configuration');
 
       // Check optional debug argument
       const debugArg = command.arguments.find(arg => arg.name === 'debug');
-      expect(debugArg).toBeDefined();
-      expect(debugArg?.required).toBe(false);
-      expect(debugArg?.type).toBe('boolean');
+      assert.notEqual(debugArg, undefined);
+      assert.equal(debugArg?.required, false);
+      assert.equal(debugArg?.type, 'boolean');
     });
 
-    test('should execute clean command without arguments', async () => {
-      const command = new CleanCommand(mockProcessor as any);
+    it('should execute clean command without arguments', async () => {
+      const command = new CleanCommand(mockProcessor);
 
       const result = await command.execute({});
 
-      expect(result.success).toBe(true);
-      expect(mockProcessor.process).toHaveBeenCalledWith(
+      assert.equal(result.success, true);
+      assertCalledWith(
+        mockProcessor.process,
         process.execPath,
-        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'clean'],
+        [SDK_BIN, 'clean'],
         '/mock/working/dir',
         undefined, // stdinInput
         15000,    // timeoutMs
@@ -146,18 +177,19 @@ describe('New SDK Commands', () => {
       );
     });
 
-    test('should execute clean command with source and debug', async () => {
-      const command = new CleanCommand(mockProcessor as any);
+    it('should execute clean command with source and debug', async () => {
+      const command = new CleanCommand(mockProcessor);
 
       const result = await command.execute({
         source: 'src',
         debug: true
       });
 
-      expect(result.success).toBe(true);
-      expect(mockProcessor.process).toHaveBeenCalledWith(
+      assert.equal(result.success, true);
+      assertCalledWith(
+        mockProcessor.process,
         process.execPath,
-        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'clean', '--source', 'src', '--debug'],
+        [SDK_BIN, 'clean', '--source', 'src', '--debug'],
         '/mock/working/dir',
         undefined, // stdinInput
         15000,    // timeoutMs
@@ -167,12 +199,12 @@ describe('New SDK Commands', () => {
   });
 
   describe('PackCommand', () => {
-    test('should create PackCommand with correct metadata', () => {
-      const command = new PackCommand(mockProcessor as any);
+    it('should create PackCommand with correct metadata', () => {
+      const command = new PackCommand(mockProcessor);
 
-      expect(command.name).toBe('pack_fluent_app');
-      expect(command.description).toContain('Package a built Fluent');
-      expect(command.arguments.map((arg) => arg.name)).toEqual([
+      assert.equal(command.name, 'pack_fluent_app');
+      assert.ok(command.description.includes('Package a built Fluent'));
+      assert.deepStrictEqual(command.arguments.map((arg) => arg.name), [
         'workingDirectory',
         'source',
         'debug',
@@ -180,27 +212,28 @@ describe('New SDK Commands', () => {
 
       // Check optional source argument
       const sourceArg = command.arguments.find(arg => arg.name === 'source');
-      expect(sourceArg).toBeDefined();
-      expect(sourceArg?.required).toBe(false);
-      expect(sourceArg?.type).toBe('string');
-      expect(sourceArg?.description).toBe('Path to the directory that contains package.json configuration');
+      assert.notEqual(sourceArg, undefined);
+      assert.equal(sourceArg?.required, false);
+      assert.equal(sourceArg?.type, 'string');
+      assert.equal(sourceArg?.description, 'Path to the directory that contains package.json configuration');
 
       // Check optional debug argument
       const debugArg = command.arguments.find(arg => arg.name === 'debug');
-      expect(debugArg).toBeDefined();
-      expect(debugArg?.required).toBe(false);
-      expect(debugArg?.type).toBe('boolean');
+      assert.notEqual(debugArg, undefined);
+      assert.equal(debugArg?.required, false);
+      assert.equal(debugArg?.type, 'boolean');
     });
 
-    test('should execute pack command without arguments', async () => {
-      const command = new PackCommand(mockProcessor as any);
+    it('should execute pack command without arguments', async () => {
+      const command = new PackCommand(mockProcessor);
 
       const result = await command.execute({});
 
-      expect(result.success).toBe(true);
-      expect(mockProcessor.process).toHaveBeenCalledWith(
+      assert.equal(result.success, true);
+      assertCalledWith(
+        mockProcessor.process,
         process.execPath,
-        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'pack'],
+        [SDK_BIN, 'pack'],
         '/mock/working/dir',
         undefined, // stdinInput
         30000,    // timeoutMs
@@ -208,18 +241,19 @@ describe('New SDK Commands', () => {
       );
     });
 
-    test('should execute pack command with source and debug', async () => {
-      const command = new PackCommand(mockProcessor as any);
+    it('should execute pack command with source and debug', async () => {
+      const command = new PackCommand(mockProcessor);
 
       const result = await command.execute({
         source: './build',
         debug: true
       });
 
-      expect(result.success).toBe(true);
-      expect(mockProcessor.process).toHaveBeenCalledWith(
+      assert.equal(result.success, true);
+      assertCalledWith(
+        mockProcessor.process,
         process.execPath,
-        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'pack', '--source', './build', '--debug'],
+        [SDK_BIN, 'pack', '--source', './build', '--debug'],
         '/mock/working/dir',
         undefined, // stdinInput
         30000,    // timeoutMs
@@ -229,56 +263,57 @@ describe('New SDK Commands', () => {
   });
 
   describe('ExplainCommand', () => {
-    test('should create ExplainCommand with correct metadata', () => {
-      const command = new ExplainCommand(mockProcessor as any);
+    it('should create ExplainCommand with correct metadata', () => {
+      const command = new ExplainCommand(mockProcessor);
 
-      expect(command.name).toBe('explain_fluent_api');
-      expect(command.description).toContain('Look up Fluent SDK documentation');
-      expect(command.description).toContain('no authentication or active Fluent project required');
-      expect(command.annotations).toEqual({ readOnlyHint: true, idempotentHint: true });
-      expect(command.arguments).toHaveLength(6);
+      assert.equal(command.name, 'explain_fluent_api');
+      assert.ok(command.description.includes('Look up Fluent SDK documentation'));
+      assert.ok(command.description.includes('no authentication or active Fluent project required'));
+      assert.deepStrictEqual(command.annotations, { readOnlyHint: true, idempotentHint: true });
+      assert.equal(command.arguments.length, 6);
 
       // topic is optional in v4.6.0 (required only when list=false)
       const topicArg = command.arguments.find(arg => arg.name === 'topic');
-      expect(topicArg).toBeDefined();
-      expect(topicArg?.required).toBe(false);
-      expect(topicArg?.type).toBe('string');
+      assert.notEqual(topicArg, undefined);
+      assert.equal(topicArg?.required, false);
+      assert.equal(topicArg?.type, 'string');
 
       const listArg = command.arguments.find(arg => arg.name === 'list');
-      expect(listArg).toBeDefined();
-      expect(listArg?.required).toBe(false);
-      expect(listArg?.type).toBe('boolean');
+      assert.notEqual(listArg, undefined);
+      assert.equal(listArg?.required, false);
+      assert.equal(listArg?.type, 'boolean');
 
       const peekArg = command.arguments.find(arg => arg.name === 'peek');
-      expect(peekArg).toBeDefined();
-      expect(peekArg?.required).toBe(false);
-      expect(peekArg?.type).toBe('boolean');
+      assert.notEqual(peekArg, undefined);
+      assert.equal(peekArg?.required, false);
+      assert.equal(peekArg?.type, 'boolean');
 
       const formatArg = command.arguments.find(arg => arg.name === 'format');
-      expect(formatArg).toBeDefined();
-      expect(formatArg?.required).toBe(false);
-      expect(formatArg?.type).toBe('string');
+      assert.notEqual(formatArg, undefined);
+      assert.equal(formatArg?.required, false);
+      assert.equal(formatArg?.type, 'string');
 
       const sourceArg = command.arguments.find(arg => arg.name === 'source');
-      expect(sourceArg).toBeDefined();
-      expect(sourceArg?.required).toBe(false);
-      expect(sourceArg?.type).toBe('string');
+      assert.notEqual(sourceArg, undefined);
+      assert.equal(sourceArg?.required, false);
+      assert.equal(sourceArg?.type, 'string');
 
       const debugArg = command.arguments.find(arg => arg.name === 'debug');
-      expect(debugArg).toBeDefined();
-      expect(debugArg?.required).toBe(false);
-      expect(debugArg?.type).toBe('boolean');
+      assert.notEqual(debugArg, undefined);
+      assert.equal(debugArg?.required, false);
+      assert.equal(debugArg?.type, 'boolean');
     });
 
-    test('should execute basic topic lookup without --source', async () => {
-      const command = new ExplainCommand(mockProcessor as any);
+    it('should execute basic topic lookup without --source', async () => {
+      const command = new ExplainCommand(mockProcessor);
 
       const result = await command.execute({ topic: 'BusinessRule' });
 
-      expect(result.success).toBe(true);
-      expect(mockProcessor.process).toHaveBeenCalledWith(
+      assert.equal(result.success, true);
+      assertCalledWith(
+        mockProcessor.process,
         process.execPath,
-        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', 'BusinessRule'],
+        [SDK_BIN, 'explain', 'BusinessRule'],
         '/mock/project/root',
         undefined,
         15000,
@@ -286,8 +321,8 @@ describe('New SDK Commands', () => {
       );
     });
 
-    test('should pass --source when explicitly provided', async () => {
-      const command = new ExplainCommand(mockProcessor as any);
+    it('should pass --source when explicitly provided', async () => {
+      const command = new ExplainCommand(mockProcessor);
 
       const result = await command.execute({
         topic: 'Acl',
@@ -295,10 +330,11 @@ describe('New SDK Commands', () => {
         debug: true,
       });
 
-      expect(result.success).toBe(true);
-      expect(mockProcessor.process).toHaveBeenCalledWith(
+      assert.equal(result.success, true);
+      assertCalledWith(
+        mockProcessor.process,
         process.execPath,
-        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', 'Acl', '--source', './src', '--debug'],
+        [SDK_BIN, 'explain', 'Acl', '--source', './src', '--debug'],
         '/mock/project/root',
         undefined,
         15000,
@@ -306,15 +342,16 @@ describe('New SDK Commands', () => {
       );
     });
 
-    test('should pass --list when list=true (no topic required)', async () => {
-      const command = new ExplainCommand(mockProcessor as any);
+    it('should pass --list when list=true (no topic required)', async () => {
+      const command = new ExplainCommand(mockProcessor);
 
       const result = await command.execute({ list: true });
 
-      expect(result.success).toBe(true);
-      expect(mockProcessor.process).toHaveBeenCalledWith(
+      assert.equal(result.success, true);
+      assertCalledWith(
+        mockProcessor.process,
         process.execPath,
-        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', '--list'],
+        [SDK_BIN, 'explain', '--list'],
         '/mock/project/root',
         undefined,
         15000,
@@ -322,15 +359,16 @@ describe('New SDK Commands', () => {
       );
     });
 
-    test('should combine --list with a topic filter', async () => {
-      const command = new ExplainCommand(mockProcessor as any);
+    it('should combine --list with a topic filter', async () => {
+      const command = new ExplainCommand(mockProcessor);
 
       const result = await command.execute({ list: true, topic: 'flow' });
 
-      expect(result.success).toBe(true);
-      expect(mockProcessor.process).toHaveBeenCalledWith(
+      assert.equal(result.success, true);
+      assertCalledWith(
+        mockProcessor.process,
         process.execPath,
-        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', 'flow', '--list'],
+        [SDK_BIN, 'explain', 'flow', '--list'],
         '/mock/project/root',
         undefined,
         15000,
@@ -338,8 +376,8 @@ describe('New SDK Commands', () => {
       );
     });
 
-    test('should pass --peek and --format=raw', async () => {
-      const command = new ExplainCommand(mockProcessor as any);
+    it('should pass --peek and --format=raw', async () => {
+      const command = new ExplainCommand(mockProcessor);
 
       const result = await command.execute({
         topic: 'BusinessRule',
@@ -347,10 +385,11 @@ describe('New SDK Commands', () => {
         format: 'raw',
       });
 
-      expect(result.success).toBe(true);
-      expect(mockProcessor.process).toHaveBeenCalledWith(
+      assert.equal(result.success, true);
+      assertCalledWith(
+        mockProcessor.process,
         process.execPath,
-        ['/test/node_modules/@servicenow/sdk/bin/index.js', 'explain', 'BusinessRule', '--format', 'raw', '--peek'],
+        [SDK_BIN, 'explain', 'BusinessRule', '--format', 'raw', '--peek'],
         '/mock/project/root',
         undefined,
         15000,
@@ -358,38 +397,38 @@ describe('New SDK Commands', () => {
       );
     });
 
-    test('should return error when neither topic nor list is provided', async () => {
-      const command = new ExplainCommand(mockProcessor as any);
+    it('should return error when neither topic nor list is provided', async () => {
+      const command = new ExplainCommand(mockProcessor);
 
       const result = await command.execute({});
 
-      expect(result.success).toBe(false);
-      expect(result.output).toContain('Provide a topic');
-      expect(mockProcessor.process).not.toHaveBeenCalled();
+      assert.equal(result.success, false);
+      assert.ok(result.output.includes('Provide a topic'));
+      assertNotCalled(mockProcessor.process);
     });
 
-    test('should reject invalid format value', async () => {
-      const command = new ExplainCommand(mockProcessor as any);
+    it('should reject invalid format value', async () => {
+      const command = new ExplainCommand(mockProcessor);
 
       const result = await command.execute({ topic: 'BusinessRule', format: 'json' });
 
-      expect(result.success).toBe(false);
-      expect(result.output).toContain('Invalid format');
-      expect(mockProcessor.process).not.toHaveBeenCalled();
+      assert.equal(result.success, false);
+      assert.ok(result.output.includes('Invalid format'));
+      assertNotCalled(mockProcessor.process);
     });
   });
 
   describe('CommandFactory Integration', () => {
-    test('should include new commands in CommandFactory.createCommands', () => {
-      const mockExecutor = { process: jest.fn() };
-      const commands = CommandFactory.createCommands(mockExecutor as any);
+    it('should include new commands in CommandFactory.createCommands', () => {
+      const mockExecutor = { process: mock.fn<ProcessFn>() };
+      const commands = CommandFactory.createCommands(mockExecutor);
 
       const commandNames = commands.map(cmd => cmd.name);
 
-      expect(commandNames).toContain('download_fluent_app');
-      expect(commandNames).toContain('clean_fluent_app');
-      expect(commandNames).toContain('pack_fluent_app');
-      expect(commandNames).toContain('explain_fluent_api');
+      assert.ok(commandNames.includes('download_fluent_app'));
+      assert.ok(commandNames.includes('clean_fluent_app'));
+      assert.ok(commandNames.includes('pack_fluent_app'));
+      assert.ok(commandNames.includes('explain_fluent_api'));
     });
   });
 });

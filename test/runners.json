@@ -26,6 +26,18 @@
     "test/server/wireProtocol.test.ts",
     "test/tools/processRunner.test.ts",
     "test/tools/processRunner.robustness.test.ts",
-    "test/tools/responseTimeout.test.ts"
+    "test/tools/responseTimeout.test.ts",
+    "test/tools/authCommand.test.ts",
+    "test/tools/cicdCommands.test.ts",
+    "test/tools/commandRegistry.test.ts",
+    "test/tools/installCommand.test.ts",
+    "test/tools/newCommands.test.ts",
+    "test/tools/queryCommand.test.ts",
+    "test/tools/sdkCommands.test.ts",
+    "test/tools/sessionAwareCommand.test.ts",
+    "test/tools/transformCommand.test.ts",
+    "test/tools/structuredContent.test.ts",
+    "test/tools/shellInjection.test.ts",
+    "test/tools/lazyAuth.integration.test.ts"
   ]
 }
