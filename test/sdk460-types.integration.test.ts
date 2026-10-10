@@ -3,6 +3,8 @@
  * These tests read actual resource files from disk (no mocks) to verify content correctness
  * for the four new metadata types introduced in v4.6.0 and updates to existing resources.
  */
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ServiceNowMetadataType } from '../src/types.js';
@@ -18,10 +20,10 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
 
   describe('Enum completeness', () => {
     it('should have new v4.6.0 enum entries', () => {
-      expect(ServiceNowMetadataType.CUSTOM_ACTION).toBe('custom-action');
-      expect(ServiceNowMetadataType.INBOUND_EMAIL_ACTION).toBe('inbound-email-action');
-      expect(ServiceNowMetadataType.SP_HEADER_FOOTER).toBe('sp-header-footer');
-      expect(ServiceNowMetadataType.SP_PAGE_ROUTE_MAP).toBe('sp-page-route-map');
+      assert.equal(ServiceNowMetadataType.CUSTOM_ACTION, 'custom-action');
+      assert.equal(ServiceNowMetadataType.INBOUND_EMAIL_ACTION, 'inbound-email-action');
+      assert.equal(ServiceNowMetadataType.SP_HEADER_FOOTER, 'sp-header-footer');
+      assert.equal(ServiceNowMetadataType.SP_PAGE_ROUTE_MAP, 'sp-page-route-map');
     });
   });
 
@@ -37,13 +39,13 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
       for (const metadataType of v460Types) {
         const specFile = path.join(SPEC_DIR, `fluent_spec_${metadataType}.md`);
         const instructFile = path.join(INSTRUCT_DIR, `fluent_instruct_${metadataType}.md`);
-        expect(fs.existsSync(specFile)).toBe(true);
-        expect(fs.existsSync(instructFile)).toBe(true);
+        assert.equal(fs.existsSync(specFile), true);
+        assert.equal(fs.existsSync(instructFile), true);
 
         const snippetCandidates = fs
           .readdirSync(SNIPPET_DIR)
           .filter((file) => file.startsWith(`fluent_snippet_${metadataType}_`) && file.endsWith('.md'));
-        expect(snippetCandidates.length).toBeGreaterThan(0);
+        assert.ok(snippetCandidates.length > 0);
       }
     });
   });
@@ -61,7 +63,7 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
         'sys_hub_action_type_definition',
       ];
       for (const term of expectedTerms) {
-        expect(content).toContain(term);
+        assert.ok(content.includes(term));
       }
     });
 
@@ -69,28 +71,28 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_custom-action.md'), 'utf-8'
       );
-      expect(content).toContain('@servicenow/sdk/automation');
-      expect(content).toContain('Action');
-      expect(content).toContain('wfa.action');
-      expect(content).toContain('Cross-scope');
+      assert.ok(content.includes('@servicenow/sdk/automation'));
+      assert.ok(content.includes('Action'));
+      assert.ok(content.includes('wfa.action'));
+      assert.ok(content.includes('Cross-scope'));
     });
 
     it('should have snippet 0001 defining a custom action with steps', () => {
       const content = fs.readFileSync(
         path.join(SNIPPET_DIR, 'fluent_snippet_custom-action_0001.md'), 'utf-8'
       );
-      expect(content).toContain('Action(');
-      expect(content).toContain('wfa.actionStep');
-      expect(content).toContain('inputs');
-      expect(content).toContain('outputs');
+      assert.ok(content.includes('Action('));
+      assert.ok(content.includes('wfa.actionStep'));
+      assert.ok(content.includes('inputs'));
+      assert.ok(content.includes('outputs'));
     });
 
     it('should have snippet 0002 invoking a custom action from a Flow', () => {
       const content = fs.readFileSync(
         path.join(SNIPPET_DIR, 'fluent_snippet_custom-action_0002.md'), 'utf-8'
       );
-      expect(content).toContain('Flow(');
-      expect(content).toContain('wfa.action(');
+      assert.ok(content.includes('Flow('));
+      assert.ok(content.includes('wfa.action('));
     });
   });
 
@@ -107,7 +109,7 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
         'record_action', 'reply_email',
       ];
       for (const term of expectedTerms) {
-        expect(content).toContain(term);
+        assert.ok(content.includes(term));
       }
     });
 
@@ -115,28 +117,28 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_inbound-email-action.md'), 'utf-8'
       );
-      expect(content).toContain('InboundEmailAction');
-      expect(content).toContain('sys_email_action');
-      expect(content).toContain('record_action');
-      expect(content).toContain('reply_email');
-      expect(content).toContain('fieldAction');
+      assert.ok(content.includes('InboundEmailAction'));
+      assert.ok(content.includes('sys_email_action'));
+      assert.ok(content.includes('record_action'));
+      assert.ok(content.includes('reply_email'));
+      assert.ok(content.includes('fieldAction'));
     });
 
     it('should have snippet 0001 with record_action and fieldAction example', () => {
       const content = fs.readFileSync(
         path.join(SNIPPET_DIR, 'fluent_snippet_inbound-email-action_0001.md'), 'utf-8'
       );
-      expect(content).toContain('InboundEmailAction(');
-      expect(content).toContain("action: 'record_action'");
-      expect(content).toContain('fieldAction');
+      assert.ok(content.includes('InboundEmailAction('));
+      assert.ok(content.includes("action: 'record_action'"));
+      assert.ok(content.includes('fieldAction'));
     });
 
     it('should have snippet 0002 with reply_email example', () => {
       const content = fs.readFileSync(
         path.join(SNIPPET_DIR, 'fluent_snippet_inbound-email-action_0002.md'), 'utf-8'
       );
-      expect(content).toContain("action: 'reply_email'");
-      expect(content).toContain('replyEmail');
+      assert.ok(content.includes("action: 'reply_email'"));
+      assert.ok(content.includes('replyEmail'));
     });
   });
 
@@ -152,7 +154,7 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
         'static', 'htmlTemplate', 'serverScript', 'clientScript', 'customCss',
       ];
       for (const term of expectedTerms) {
-        expect(content).toContain(term);
+        assert.ok(content.includes(term));
       }
     });
 
@@ -160,25 +162,25 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_sp-header-footer.md'), 'utf-8'
       );
-      expect(content).toContain('SPHeaderFooter');
-      expect(content).toContain('static');
-      expect(content).toContain('Now.include');
+      assert.ok(content.includes('SPHeaderFooter'));
+      assert.ok(content.includes('static'));
+      assert.ok(content.includes('Now.include'));
     });
 
     it('should have snippet 0001 with static header example', () => {
       const content = fs.readFileSync(
         path.join(SNIPPET_DIR, 'fluent_snippet_sp-header-footer_0001.md'), 'utf-8'
       );
-      expect(content).toContain('SPHeaderFooter(');
-      expect(content).toContain('static: true');
+      assert.ok(content.includes('SPHeaderFooter('));
+      assert.ok(content.includes('static: true'));
     });
 
     it('should have snippet 0002 with dynamic (non-static) footer example', () => {
       const content = fs.readFileSync(
         path.join(SNIPPET_DIR, 'fluent_snippet_sp-header-footer_0002.md'), 'utf-8'
       );
-      expect(content).toContain('SPHeaderFooter(');
-      expect(content).toContain('static: false');
+      assert.ok(content.includes('SPHeaderFooter('));
+      assert.ok(content.includes('static: false'));
     });
   });
 
@@ -195,7 +197,7 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
         'portals', 'roles', 'order',
       ];
       for (const term of expectedTerms) {
-        expect(content).toContain(term);
+        assert.ok(content.includes(term));
       }
     });
 
@@ -203,27 +205,27 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_sp-page-route-map.md'), 'utf-8'
       );
-      expect(content).toContain('SPPageRouteMap');
-      expect(content).toContain('sp_page_route_map');
-      expect(content).toContain('routeFromPage');
-      expect(content).toContain('routeToPage');
+      assert.ok(content.includes('SPPageRouteMap'));
+      assert.ok(content.includes('sp_page_route_map'));
+      assert.ok(content.includes('routeFromPage'));
+      assert.ok(content.includes('routeToPage'));
     });
 
     it('should have snippet 0001 with basic redirect example', () => {
       const content = fs.readFileSync(
         path.join(SNIPPET_DIR, 'fluent_snippet_sp-page-route-map_0001.md'), 'utf-8'
       );
-      expect(content).toContain('SPPageRouteMap(');
-      expect(content).toContain('routeFromPage');
-      expect(content).toContain('routeToPage');
+      assert.ok(content.includes('SPPageRouteMap('));
+      assert.ok(content.includes('routeFromPage'));
+      assert.ok(content.includes('routeToPage'));
     });
 
     it('should have snippet 0002 with portal+role scoping example', () => {
       const content = fs.readFileSync(
         path.join(SNIPPET_DIR, 'fluent_snippet_sp-page-route-map_0002.md'), 'utf-8'
       );
-      expect(content).toContain('portals:');
-      expect(content).toContain('roles:');
+      assert.ok(content.includes('portals:'));
+      assert.ok(content.includes('roles:'));
     });
   });
 
@@ -232,16 +234,16 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(SPEC_DIR, 'fluent_spec_form.md'), 'utf-8'
       );
-      expect(content).toContain('publicly exported in SDK v4.6.0');
-      expect(content).not.toContain('not yet exported');
+      assert.ok(content.includes('publicly exported in SDK v4.6.0'));
+      assert.ok(!content.includes('not yet exported'));
     });
 
     it('instruct should mark Form() as primary, Record-based as fallback', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_form.md'), 'utf-8'
       );
-      expect(content).toContain('publicly supported as of SDK v4.6.0');
-      expect(content).toContain('Fallback');
+      assert.ok(content.includes('publicly supported as of SDK v4.6.0'));
+      assert.ok(content.includes('Fallback'));
     });
   });
 
@@ -250,19 +252,19 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(SPEC_DIR, 'fluent_spec_flow.md'), 'utf-8'
       );
-      expect(content).toContain('wfa.subflow');
-      expect(content).toContain('SDK 4.6.0');
-      expect(content).toContain('Custom Action');
+      assert.ok(content.includes('wfa.subflow'));
+      assert.ok(content.includes('SDK 4.6.0'));
+      assert.ok(content.includes('Custom Action'));
     });
 
     it('instruct should document subflow-of-subflow and custom-action capabilities', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_flow.md'), 'utf-8'
       );
-      expect(content).toContain('SDK v4.6.0');
-      expect(content).toContain('Subflow');
-      expect(content).toContain('Custom Action');
-      expect(content).toContain('Cross-scope');
+      assert.ok(content.includes('SDK v4.6.0'));
+      assert.ok(content.includes('Subflow'));
+      assert.ok(content.includes('Custom Action'));
+      assert.ok(content.includes('Cross-scope'));
     });
   });
 
@@ -271,18 +273,18 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_ai-agent.md'), 'utf-8'
       );
-      expect(content).toContain('securityAcl');
-      expect(content).toContain('MANDATORY');
-      expect(content).toContain('SDK v4.6.0');
-      expect(content).toContain('Auto-generated ACL');
+      assert.ok(content.includes('securityAcl'));
+      assert.ok(content.includes('MANDATORY'));
+      assert.ok(content.includes('SDK v4.6.0'));
+      assert.ok(content.includes('Auto-generated ACL'));
     });
 
     it('ai-agent-workflow instruct should document auto-ACL generation', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_ai-agent-workflow.md'), 'utf-8'
       );
-      expect(content).toContain('SDK v4.6.0');
-      expect(content).toContain('Auto-generated ACL');
+      assert.ok(content.includes('SDK v4.6.0'));
+      assert.ok(content.includes('Auto-generated ACL'));
     });
   });
 
@@ -291,25 +293,25 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_now-assist-skill-config.md'), 'utf-8'
       );
-      expect(content).toContain('SDK v4.6.0');
-      expect(content).toContain('auto-generated');
+      assert.ok(content.includes('SDK v4.6.0'));
+      assert.ok(content.includes('auto-generated'));
       // Standard outputs that get auto-generated when outputs array is omitted
-      expect(content).toContain('response');
-      expect(content).toContain('provider');
-      expect(content).toContain('errorcode');
-      expect(content).toContain('status');
-      expect(content).toContain('error');
+      assert.ok(content.includes('response'));
+      assert.ok(content.includes('provider'));
+      assert.ok(content.includes('errorcode'));
+      assert.ok(content.includes('status'));
+      assert.ok(content.includes('error'));
     });
 
     it('instruct should document new dataType options and truncate rules', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_now-assist-skill-config.md'), 'utf-8'
       );
-      expect(content).toContain('glide_record');
-      expect(content).toContain('simple_array');
-      expect(content).toContain('json_object');
-      expect(content).toContain('json_array');
-      expect(content).toContain('truncate');
+      assert.ok(content.includes('glide_record'));
+      assert.ok(content.includes('simple_array'));
+      assert.ok(content.includes('json_object'));
+      assert.ok(content.includes('json_array'));
+      assert.ok(content.includes('truncate'));
     });
   });
 
@@ -318,18 +320,18 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(SPEC_DIR, 'fluent_spec_table.md'), 'utf-8'
       );
-      expect(content).toContain('OverrideColumn');
-      expect(content).toContain('baseTable');
-      expect(content).toContain('SDK v4.6.0');
+      assert.ok(content.includes('OverrideColumn'));
+      assert.ok(content.includes('baseTable'));
+      assert.ok(content.includes('SDK v4.6.0'));
     });
 
     it('instruct should document OverrideColumn as the v4.6.0 dict-override mechanism', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_table.md'), 'utf-8'
       );
-      expect(content).toContain('SDK v4.6.0');
-      expect(content).toContain('OverrideColumn');
-      expect(content).toContain('sys_dictionary_override');
+      assert.ok(content.includes('SDK v4.6.0'));
+      assert.ok(content.includes('OverrideColumn'));
+      assert.ok(content.includes('sys_dictionary_override'));
     });
   });
 
@@ -338,12 +340,12 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(PROMPT_DIR, 'coding_in_fluent.md'), 'utf-8'
       );
-      expect(content).toContain('SDK v4.6.0');
-      expect(content).toContain('Declarative Form API');
-      expect(content).toContain('Subflow-of-subflow');
-      expect(content).toContain('Custom Actions');
-      expect(content).toContain('AIAF auto-ACL');
-      expect(content).toContain('Table dictionary overrides');
+      assert.ok(content.includes('SDK v4.6.0'));
+      assert.ok(content.includes('Declarative Form API'));
+      assert.ok(content.includes('Subflow-of-subflow'));
+      assert.ok(content.includes('Custom Actions'));
+      assert.ok(content.includes('AIAF auto-ACL'));
+      assert.ok(content.includes('Table dictionary overrides'));
     });
   });
 });

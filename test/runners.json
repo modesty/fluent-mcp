@@ -13,6 +13,15 @@
     "test/utils/logger.test.ts",
     "test/utils/loggingManager.test.ts",
     "test/utils/sessionManager.test.ts",
-    "test/utils/sdkCli.test.ts"
+    "test/utils/sdkCli.test.ts",
+    "test/sdk440-types.integration.test.ts",
+    "test/sdk450-types.integration.test.ts",
+    "test/sdk460-types.integration.test.ts",
+    "test/sdk470-types.integration.test.ts",
+    "test/sdk480-types.integration.test.ts",
+    "test/sdk490-types.integration.test.ts",
+    "test/sdk4101-types.integration.test.ts",
+    "test/sdk4112-types.integration.test.ts",
+    "test/sdk4136-types.integration.test.ts"
   ]
 }
