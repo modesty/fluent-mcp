@@ -1,6 +1,5 @@
 // rollup.config.mjs - Using .mjs extension to force ES modules mode
 import { builtinModules } from 'node:module';
-import json from '@rollup/plugin-json';
 import nodeResolve from '@rollup/plugin-node-resolve';
 import terser from '@rollup/plugin-terser';
 import typescript from '@rollup/plugin-typescript';
@@ -37,7 +36,6 @@ export default [
     treeshake: false,
     plugins: [
       typescript({ tsconfig: './tsconfig.json' }),
-      json(),
       nodeResolve({
         preferBuiltins: true,
         exportConditions: ['node'],
