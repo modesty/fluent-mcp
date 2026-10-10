@@ -1,52 +1,63 @@
-import { SessionManager } from "../../src/utils/sessionManager.js";
+import { beforeEach, describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { loggerFixture } from '../support/fixtures.js';
 
-jest.mock("../../src/utils/logger.js", () => require('../mocks/index.js').createLoggerMock());
+// SessionManager only logs through the shared logger; keep the run quiet as Jest did.
+const { logger, mockOptions: loggerOptions } = loggerFixture();
+mock.module('../../src/utils/logger.js', loggerOptions);
 
-describe("SessionManager", () => {
+const { SessionManager } = await import('../../src/utils/sessionManager.js');
+
+/** SessionManager is a singleton; dropping the cached instance gives each test a fresh one. */
+function resetSingleton(): void {
+  (SessionManager as unknown as { instance?: unknown }).instance = undefined;
+}
+
+describe('SessionManager', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    for (const level of Object.values(logger)) level.mock.resetCalls();
     // Reset the singleton instance before each test
-    (SessionManager as any).instance = undefined;
+    resetSingleton();
   });
 
-  test("should initialize with empty session data", () => {
+  it('should initialize with empty session data', () => {
     const manager = SessionManager.getInstance();
-    expect(manager.getWorkingDirectory()).toBeUndefined();
+    assert.equal(manager.getWorkingDirectory(), undefined);
   });
 
-  test("should maintain singleton instance", () => {
+  it('should maintain singleton instance', () => {
     const manager1 = SessionManager.getInstance();
     const manager2 = SessionManager.getInstance();
-    expect(manager1).toBe(manager2);
+    assert.equal(manager1, manager2);
   });
 
-  test("should set working directory", () => {
+  it('should set working directory', () => {
     const manager = SessionManager.getInstance();
-    
-    manager.setWorkingDirectory("/new-dir");
-    expect(manager.getWorkingDirectory()).toBe("/new-dir");
+
+    manager.setWorkingDirectory('/new-dir');
+    assert.equal(manager.getWorkingDirectory(), '/new-dir');
   });
 
-  test("should clear session data", () => {
+  it('should clear session data', () => {
     const manager = SessionManager.getInstance();
-    
-    manager.setWorkingDirectory("/test-dir");
-    expect(manager.getWorkingDirectory()).toBe("/test-dir");
-    
+
+    manager.setWorkingDirectory('/test-dir');
+    assert.equal(manager.getWorkingDirectory(), '/test-dir');
+
     manager.clearSession();
-    expect(manager.getWorkingDirectory()).toBeUndefined();
+    assert.equal(manager.getWorkingDirectory(), undefined);
   });
-  
-  test("should reset session on new instance", () => {
+
+  it('should reset session on new instance', () => {
     // Get first instance and set working directory
     const manager1 = SessionManager.getInstance();
-    manager1.setWorkingDirectory("/test-dir");
-    
+    manager1.setWorkingDirectory('/test-dir');
+
     // Force new instance
-    (SessionManager as any).instance = undefined;
-    
+    resetSingleton();
+
     // Get new instance and verify it starts with empty data
     const manager2 = SessionManager.getInstance();
-    expect(manager2.getWorkingDirectory()).toBeUndefined();
+    assert.equal(manager2.getWorkingDirectory(), undefined);
   });
 });

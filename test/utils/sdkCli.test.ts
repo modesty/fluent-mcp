@@ -1,13 +1,17 @@
 /**
- * Tests for resolveSdkCli. Uses the real implementation (the global mock in
- * setup.js is bypassed via jest.requireActual) so we verify it locates the
- * bundled @servicenow/sdk CLI in this repo.
+ * Tests for resolveSdkCli. Uses the real implementation and the real config
+ * (sdkCliFixture is deliberately NOT registered) so we verify it locates the
+ * bundled @servicenow/sdk CLI in this repo. Only the logger is silenced, as the
+ * Jest setup did.
  */
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { loggerFixture } from '../support/fixtures.js';
 
-const { resolveSdkCli, resetSdkCliCache } = jest.requireActual(
-  '../../src/utils/sdkCli.js'
-) as typeof import('../../src/utils/sdkCli.js');
+mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
+
+const { resolveSdkCli, resetSdkCliCache } = await import('../../src/utils/sdkCli.js');
 
 describe('resolveSdkCli', () => {
   beforeEach(() => resetSdkCliCache());
@@ -16,36 +20,34 @@ describe('resolveSdkCli', () => {
   it('resolves the bundled SDK CLI with the current Node executable', () => {
     const { command, baseArgs } = resolveSdkCli();
 
-    expect(command).toBe(process.execPath);
-    expect(baseArgs).toHaveLength(1);
+    assert.equal(command, process.execPath);
+    assert.equal(baseArgs.length, 1);
     const binPath = baseArgs[0];
-    expect(binPath.endsWith('bin/index.js')).toBe(true);
-    expect(binPath).toContain('@servicenow/sdk');
-    expect(fs.existsSync(binPath)).toBe(true);
+    assert.equal(binPath.endsWith('bin/index.js'), true);
+    assert.ok(binPath.includes('@servicenow/sdk'));
+    assert.equal(fs.existsSync(binPath), true);
   });
 
   it('never returns a package-runner invocation', () => {
     const { command, baseArgs } = resolveSdkCli();
-    expect(command).not.toBe('now-sdk');
-    expect(command).not.toBe('npx');
-    expect(baseArgs).not.toContain('now-sdk');
-    expect(baseArgs).not.toContain('@servicenow/sdk');
+    assert.notEqual(command, 'now-sdk');
+    assert.notEqual(command, 'npx');
+    assert.ok(!baseArgs.includes('now-sdk'));
+    assert.ok(!baseArgs.includes('@servicenow/sdk'));
   });
 
   it('memoizes the resolution', () => {
     const first = resolveSdkCli();
     const second = resolveSdkCli();
-    expect(second).toBe(first);
+    assert.equal(second, first);
   });
 
-  it('fails closed instead of falling back to npx when the bundled CLI is missing', () => {
-    const existsSpy = jest.spyOn(fs, 'existsSync').mockReturnValue(false);
-    try {
-      expect(() => resolveSdkCli()).toThrow(
-        /Unable to resolve the bundled @servicenow\/sdk CLI.*installation is incomplete/
-      );
-    } finally {
-      existsSpy.mockRestore();
-    }
+  it('fails closed instead of falling back to npx when the bundled CLI is missing', (t) => {
+    t.mock.method(fs, 'existsSync', () => false);
+
+    assert.throws(
+      () => resolveSdkCli(),
+      /Unable to resolve the bundled @servicenow\/sdk CLI.*installation is incomplete/
+    );
   });
 });

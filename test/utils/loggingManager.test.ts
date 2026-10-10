@@ -1,164 +1,144 @@
 /**
  * Tests for LoggingManager
+ *
+ * Native runner: the logger and config mocks are registered before the module
+ * under test is imported, so it is loaded with dynamic import() below them.
  */
-import { LoggingManager } from "../../src/utils/loggingManager.js";
-import { ServerStatus } from "../../src/types.js";
-import logger from "../../src/utils/logger.js";
+import { beforeEach, describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { assertCalledWith } from '../support/mockAssertions.js';
+import { configFixture, loggerFixture } from '../support/fixtures.js';
 
-// Mock the logger
-jest.mock("../../src/utils/logger.js", () => {
-  return {
-    debug: jest.fn(),
-    info: jest.fn(),
-    notice: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    critical: jest.fn(),
-    alert: jest.fn(),
-    emergency: jest.fn(),
-    __esModule: true,
-    default: {
-      debug: jest.fn(),
-      info: jest.fn(),
-      notice: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-      critical: jest.fn(),
-      alert: jest.fn(),
-      emergency: jest.fn(),
-    }
-  };
-});
+// Mock the logger (the code under test imports the default export)
+const { logger, mockOptions: loggerOptions } = loggerFixture();
+mock.module('../../src/utils/logger.js', loggerOptions);
+mock.module('../../src/config.js', configFixture().mockOptions);
 
-describe("LoggingManager", () => {
-  let loggingManager: LoggingManager;
-  
+const { LoggingManager } = await import('../../src/utils/loggingManager.js');
+const { ServerStatus } = await import('../../src/types.js');
+
+describe('LoggingManager', () => {
+  let loggingManager: InstanceType<typeof LoggingManager>;
+
   beforeEach(() => {
-    jest.clearAllMocks();
+    for (const level of Object.values(logger)) level.mock.resetCalls();
     loggingManager = new LoggingManager();
   });
 
-  test("should log server starting", () => {
+  it('should log server starting', () => {
     // Act
     loggingManager.logServerStarting();
-    
-    // Assert
-    expect(logger.info).toHaveBeenCalledWith(
-      "Starting MCP server...",
-      expect.objectContaining({ version: expect.any(String) })
+
+    // Assert: message plus a context carrying a string version
+    assert.ok(
+      logger.info.mock.calls.some(
+        ({ arguments: args }) =>
+          args[0] === 'Starting MCP server...' &&
+          typeof (args[1] as { version?: unknown } | undefined)?.version === 'string'
+      )
     );
   });
 
-  test.each([
-    ["authenticated", "info"],
-    ["skipped", "debug"],
-    ["not_authenticated", "notice"],
-    ["validation_error", "warn"],
-  ] as const)("should log %s auth status at %s severity", (status, method) => {
-    loggingManager.logAuthValidationResult({
-      status,
-      message: `Auth status: ${status}`,
-      timestamp: "2026-07-29T00:00:00.000Z",
-      alias: "dev",
-      host: "dev.example.com",
-      authType: "oauth",
-      actionRequired: "now-sdk auth --add https://dev.example.com",
-    });
+  const authStatusCases = [
+    ['authenticated', 'info'],
+    ['skipped', 'debug'],
+    ['not_authenticated', 'notice'],
+    ['validation_error', 'warn'],
+  ] as const;
 
-    expect(logger[method]).toHaveBeenCalledWith(
-      `Auth status: ${status}`,
-      {
+  for (const [status, method] of authStatusCases) {
+    it(`should log ${status} auth status at ${method} severity`, () => {
+      loggingManager.logAuthValidationResult({
         status,
-        timestamp: "2026-07-29T00:00:00.000Z",
-        alias: "dev",
-        host: "dev.example.com",
-        authType: "oauth",
-        actionRequired: "now-sdk auth --add https://dev.example.com",
-      }
-    );
-  });
+        message: `Auth status: ${status}`,
+        timestamp: '2026-07-29T00:00:00.000Z',
+        alias: 'dev',
+        host: 'dev.example.com',
+        authType: 'oauth',
+        actionRequired: 'now-sdk auth --add https://dev.example.com',
+      });
 
-  test("should log server started", () => {
+      assertCalledWith(logger[method], `Auth status: ${status}`, {
+        status,
+        timestamp: '2026-07-29T00:00:00.000Z',
+        alias: 'dev',
+        host: 'dev.example.com',
+        authType: 'oauth',
+        actionRequired: 'now-sdk auth --add https://dev.example.com',
+      });
+    });
+  }
+
+  it('should log server started', () => {
     // Act
     loggingManager.logServerStarted();
-    
+
     // Assert
-    expect(logger.info).toHaveBeenCalledWith("MCP server initialized and connected via stdio");
+    assertCalledWith(logger.info, 'MCP server initialized and connected via stdio');
   });
 
-  test("should log server already running", () => {
+  it('should log server already running', () => {
     // Act
     loggingManager.logServerAlreadyRunning();
-    
+
     // Assert
-    expect(logger.info).toHaveBeenCalledWith("MCP server is already running");
+    assertCalledWith(logger.info, 'MCP server is already running');
   });
 
-  test("should log server not running", () => {
+  it('should log server not running', () => {
     // Act
     loggingManager.logServerNotRunning(ServerStatus.STOPPED);
-    
+
     // Assert
-    expect(logger.info).toHaveBeenCalledWith("MCP server is not running", { status: ServerStatus.STOPPED });
+    assertCalledWith(logger.info, 'MCP server is not running', { status: ServerStatus.STOPPED });
   });
 
-  test("should log server stopping", () => {
+  it('should log server stopping', () => {
     // Act
     loggingManager.logServerStopping();
-    
+
     // Assert
-    expect(logger.info).toHaveBeenCalledWith("Stopping MCP server...");
+    assertCalledWith(logger.info, 'Stopping MCP server...');
   });
 
-  test("should log server stopped", () => {
+  it('should log server stopped', () => {
     // Act
     loggingManager.logServerStopped();
-    
+
     // Assert
-    expect(logger.info).toHaveBeenCalledWith("MCP server stopped");
+    assertCalledWith(logger.info, 'MCP server stopped');
   });
 
-  test("should log server start failed", () => {
+  it('should log server start failed', () => {
     // Arrange
-    const error = new Error("Test error");
-    
+    const error = new Error('Test error');
+
     // Act
     loggingManager.logServerStartFailed(error, ServerStatus.STOPPED);
-    
+
     // Assert
-    expect(logger.error).toHaveBeenCalledWith(
-      "Failed to start MCP server",
-      error,
-      { status: ServerStatus.STOPPED }
-    );
+    assertCalledWith(logger.error, 'Failed to start MCP server', error, { status: ServerStatus.STOPPED });
   });
 
-  test("should log server stop failed", () => {
+  it('should log server stop failed', () => {
     // Arrange
-    const error = new Error("Test error");
-    
+    const error = new Error('Test error');
+
     // Act
     loggingManager.logServerStopFailed(error, ServerStatus.STOPPING);
-    
+
     // Assert
-    expect(logger.error).toHaveBeenCalledWith(
-      "Error stopping MCP server",
-      error,
-      { status: ServerStatus.STOPPING }
-    );
+    assertCalledWith(logger.error, 'Error stopping MCP server', error, { status: ServerStatus.STOPPING });
   });
 
-  test("should log resource listing failed", () => {
+  it('should log resource listing failed', () => {
     // Arrange
-    const error = new Error("Test error");
-    
+    const error = new Error('Test error');
+
     // Act
     loggingManager.logResourceListingFailed(error);
-    
+
     // Assert
-    expect(logger.error).toHaveBeenCalledWith(
-      "Error listing resources",
-      error
-    );
+    assertCalledWith(logger.error, 'Error listing resources', error);
   });
 });

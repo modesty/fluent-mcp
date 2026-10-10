@@ -8,6 +8,11 @@
     "test/utils/mcpErrors.test.ts",
     "test/promptGuidance.integration.test.ts",
     "test/promptExplainAlignment.integration.test.ts",
-    "test/res/atfParentType.test.ts"
+    "test/res/atfParentType.test.ts",
+    "test/tools/toolSchema.test.ts",
+    "test/utils/logger.test.ts",
+    "test/utils/loggingManager.test.ts",
+    "test/utils/sessionManager.test.ts",
+    "test/utils/sdkCli.test.ts"
   ]
 }
