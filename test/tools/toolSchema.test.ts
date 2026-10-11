@@ -7,20 +7,25 @@
  * Both are now derived from a single source of truth — src/tools/toolSchema.ts —
  * so this test locks in that they can never drift again: same property set, same
  * required set, matching types, and consistent optional/nullable handling.
+ *
+ * Native runner: the logger mock is registered before the command modules are
+ * imported, so they are loaded with dynamic import() below the registration.
  */
-import { CommandFactory } from '../../src/tools/registry/commandFactory.js';
-import { CommandRegistry } from '../../src/tools/registry/commandRegistry.js';
-import { CheckAuthStatusCommand } from '../../src/tools/resources/resourceTools.js';
-import {
-  buildInputZodShape,
-  buildInputZodSchema,
-  buildInputJsonSchema,
-} from '../../src/tools/toolSchema.js';
+import { describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { loggerFixture } from '../support/fixtures.js';
 import type { CLICommand, CommandProcessor } from '../../src/utils/types.js';
 
-jest.mock('../../src/utils/logger.js', () => require('../mocks/index.js').createLoggerMock());
+mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 
-const mockProcessor = { process: jest.fn() } as unknown as CommandProcessor;
+const { CommandFactory } = await import('../../src/tools/registry/commandFactory.js');
+const { CommandRegistry } = await import('../../src/tools/registry/commandRegistry.js');
+const { CheckAuthStatusCommand } = await import('../../src/tools/resources/resourceTools.js');
+const { buildInputZodShape, buildInputZodSchema, buildInputJsonSchema } = await import(
+  '../../src/tools/toolSchema.js'
+);
+
+const mockProcessor = { process: mock.fn() } as unknown as CommandProcessor;
 
 /** A valid sample value for each declared arg type, for behavioral parse checks. */
 function sampleValue(type: string): unknown {
@@ -37,6 +42,12 @@ const JSON_TYPE: Record<string, string> = {
   string: 'string', number: 'number', boolean: 'boolean', array: 'array',
 };
 
+interface AdvertisedProperty {
+  type?: string;
+  description?: string;
+  anyOf?: unknown;
+}
+
 describe('Tool input schema — advertised (tools/list) and enforced (tools/call)', () => {
   const commands: CLICommand[] = [
     ...CommandFactory.createCommands(mockProcessor, mockProcessor),
@@ -49,7 +60,7 @@ describe('Tool input schema — advertised (tools/list) and enforced (tools/call
   const byName = new Map(advertised.map((t) => [t.name, t]));
 
   it('advertises every registered command', () => {
-    expect(advertised.length).toBe(commands.length);
+    assert.equal(advertised.length, commands.length);
   });
 
   it('advertises explicit workingDirectory only on Fluent project commands', () => {
@@ -71,9 +82,9 @@ describe('Tool input schema — advertised (tools/list) and enforced (tools/call
         (argument) => argument.name === 'workingDirectory'
       );
       if (projectCommands.has(command.name)) {
-        expect(workingDirectory).toBeDefined();
+        assert.notEqual(workingDirectory, undefined);
       } else {
-        expect(workingDirectory).toBeUndefined();
+        assert.equal(workingDirectory, undefined);
       }
     }
   });
@@ -83,51 +94,54 @@ describe('Tool input schema — advertised (tools/list) and enforced (tools/call
       const tool = byName.get(command.name)!;
       const inputSchema = tool.inputSchema as {
         type: string;
-        properties?: Record<string, any>;
+        properties?: Record<string, AdvertisedProperty>;
         required?: string[];
       };
       const argNames = command.arguments.map((a) => a.name);
       const requiredNames = command.arguments.filter((a) => a.required).map((a) => a.name);
 
       it('advertised schema is derived from the shared builder (no hand-built drift)', () => {
-        expect(inputSchema).toEqual(buildInputJsonSchema(command.arguments));
+        assert.deepStrictEqual(inputSchema, buildInputJsonSchema(command.arguments));
       });
 
       it('advertises an object schema with exactly the declared properties', () => {
-        expect(inputSchema.type).toBe('object');
-        expect(new Set(Object.keys(inputSchema.properties ?? {}))).toEqual(new Set(argNames));
+        assert.equal(inputSchema.type, 'object');
+        assert.deepStrictEqual(
+          new Set(Object.keys(inputSchema.properties ?? {})),
+          new Set(argNames)
+        );
       });
 
       it('advertised required set matches the declared required args', () => {
-        expect(new Set(inputSchema.required ?? [])).toEqual(new Set(requiredNames));
+        assert.deepStrictEqual(new Set(inputSchema.required ?? []), new Set(requiredNames));
       });
 
       it('advertises every argument with a renderer-friendly top-level type', () => {
         for (const arg of command.arguments) {
           const prop = (inputSchema.properties ?? {})[arg.name];
-          expect(prop).toBeDefined();
-          expect(prop.type).toBe(JSON_TYPE[arg.type]);
-          expect(prop.description).toBe(arg.description);
-          expect(prop.anyOf).toBeUndefined();
+          assert.notEqual(prop, undefined);
+          assert.equal(prop.type, JSON_TYPE[arg.type]);
+          assert.equal(prop.description, arg.description);
+          assert.equal(prop.anyOf, undefined);
           if (arg.required) {
-            expect(inputSchema.required ?? []).toContain(arg.name);
+            assert.ok((inputSchema.required ?? []).includes(arg.name));
           } else {
             // Optional args remain optional, but null compatibility is handled
             // by Zod preprocessing rather than being advertised as a union.
-            expect(inputSchema.required ?? []).not.toContain(arg.name);
+            assert.ok(!(inputSchema.required ?? []).includes(arg.name));
           }
         }
       });
 
       it('enforced Zod shape accepts required-filled input with optionals as null', () => {
         const shape = buildInputZodShape(command.arguments);
-        expect(new Set(Object.keys(shape))).toEqual(new Set(argNames));
+        assert.deepStrictEqual(new Set(Object.keys(shape)), new Set(argNames));
 
         const input: Record<string, unknown> = {};
         for (const arg of command.arguments) {
           input[arg.name] = arg.required ? sampleValue(arg.type) : null;
         }
-        expect(buildInputZodSchema(command.arguments).safeParse(input).success).toBe(true);
+        assert.equal(buildInputZodSchema(command.arguments).safeParse(input).success, true);
       });
 
       it('accepts null for optional arguments as omitted input', () => {
@@ -141,18 +155,17 @@ describe('Tool input schema — advertised (tools/list) and enforced (tools/call
         input[optional.name] = null;
 
         const parsed = buildInputZodSchema(command.arguments).safeParse(input);
-        expect(parsed.success).toBe(true);
+        assert.equal(parsed.success, true);
       });
 
       it('enforced Zod shape rejects input missing a required arg', () => {
         if (requiredNames.length === 0) return; // nothing required to omit
-        const shape = buildInputZodShape(command.arguments);
         const input: Record<string, unknown> = {};
         for (const arg of command.arguments) {
           if (arg.required && arg.name === requiredNames[0]) continue; // omit one required
           if (arg.required) input[arg.name] = sampleValue(arg.type);
         }
-        expect(buildInputZodSchema(command.arguments).safeParse(input).success).toBe(false);
+        assert.equal(buildInputZodSchema(command.arguments).safeParse(input).success, false);
       });
 
       it('enforced Zod schema rejects undeclared arguments', () => {
@@ -160,7 +173,7 @@ describe('Tool input schema — advertised (tools/list) and enforced (tools/call
         for (const arg of command.arguments) {
           if (arg.required) input[arg.name] = sampleValue(arg.type);
         }
-        expect(buildInputZodSchema(command.arguments).safeParse(input).success).toBe(false);
+        assert.equal(buildInputZodSchema(command.arguments).safeParse(input).success, false);
       });
     });
   }

@@ -1,3 +1,5 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import { CommandRegistry } from '../../src/tools/registry/commandRegistry.js';
 import { CLICommand, CommandResult } from '../../src/utils/types.js';
 
@@ -22,10 +24,9 @@ describe('CommandRegistry', () => {
     registry.register(command('a_first'));
     registry.register(command('middle'));
 
-    expect(registry.toMCPTools().map((tool) => tool.name)).toEqual([
-      'a_first',
-      'middle',
-      'z_last',
-    ]);
+    assert.deepStrictEqual(
+      registry.toMCPTools().map((tool) => tool.name),
+      ['a_first', 'middle', 'z_last']
+    );
   });
 });

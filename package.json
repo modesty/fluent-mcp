@@ -20,7 +20,7 @@
   "homepage": "https://github.com/modesty/fluent-mcp",
   "repository": {
     "type": "git",
-    "url": "git://github.com/modesty/fluent-mcp.git"
+    "url": "git+https://github.com/modesty/fluent-mcp.git"
   },
   "main": "./dist/index.js",
   "exports": {
@@ -30,33 +30,42 @@
     "fluent-mcp": "./dist/index.js"
   },
   "scripts": {
+    "prebuild": "node scripts/clean-dist.mjs",
     "build": "rollup -c rollup.config.mjs",
+    "prebuild:dev": "node scripts/clean-dist.mjs",
     "build:dev": "rollup -c rollup.config.mjs --environment NODE_ENV:development",
+    "dev:watch": "rollup -c rollup.config.mjs --environment NODE_ENV:development --watch",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts",
+    "dev": "npm run build:dev && node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
     "lint": "eslint 'src/**/*.ts' --config eslint.config.js",
     "lint:fix": "eslint 'src/**/*.ts' --config eslint.config.js --fix",
-    "test": "jest",
+    "test": "node scripts/run-native-tests.mjs",
+    "test:coverage": "node scripts/run-native-tests.mjs --coverage",
+    "test:watch": "node scripts/run-native-tests.mjs --watch",
     "validate:snippets": "bash scripts/validate-snippets.sh",
     "validate:specs": "node scripts/validate-specs.mjs",
     "validate:instructs": "node scripts/validate-instructs.mjs",
     "bundle": "npm run build && node scripts/bundle.mjs",
     "inspect": "npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector node dist/index.js",
-    "inspect:dev": "npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector ts-node src/index.ts",
-    "inspect:published": "npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector npx @modesty/fluent-mcp"
+    "inspect:dev": "npm run build:dev && npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector node dist/index.js",
+    "inspect:published": "npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector npx @modesty/fluent-mcp",
+    "prepublishOnly": "npm run build && npm test"
   },
   "type": "module",
+  "packageManager": "npm@12.2.0",
   "engines": {
-    "node": ">=20.18.0"
+    "node": ">=22.23.2",
+    "npm": ">=10.9.8"
   },
   "devEngines": {
     "packageManager": {
       "name": "npm",
-      "version": ">=11.4.1"
+      "version": ">=10.9.8"
     }
   },
   "dependencies": {
-    "@modelcontextprotocol/core": "2.0.0",
     "@modelcontextprotocol/server": "2.0.0",
     "@servicenow/sdk": "4.13.6",
     "zod": "^4.4.3"
@@ -64,20 +73,13 @@
   "devDependencies": {
     "@anthropic-ai/mcpb": "2.1.2",
     "@eslint/js": "^10.0.1",
-    "@rollup/plugin-commonjs": "^29.0.3",
-    "@rollup/plugin-json": "^6.1.0",
-    "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-terser": "^1.0.0",
     "@rollup/plugin-typescript": "^12.3.0",
-    "@types/jest": "^30.0.0",
-    "@types/node": "26.2.0",
+    "@types/node": "22.20.5",
     "@typescript-eslint/eslint-plugin": "8.67.0",
     "@typescript-eslint/parser": "8.67.0",
     "eslint": "10.8.1",
-    "jest": "^30.4.2",
     "rollup": "4.62.4",
-    "ts-jest": "29.4.12",
-    "ts-node": "^10.9.2",
     "tslib": "^2.8.1",
     "typescript": "~6.0.3"
   },

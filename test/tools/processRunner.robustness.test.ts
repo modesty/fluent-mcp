@@ -6,10 +6,24 @@
  *  - P0.3: an external abort signal (MCP client cancellation) kills the child.
  *  - P0.4: stdout/stderr are bounded (head + tail + elision marker).
  *
- * These spawn real short-lived Node child processes (config is globally mocked
- * in setup.js, providing servicenowSdk.commandTimeoutMs).
+ * These spawn real short-lived Node child processes (config and logger are
+ * replaced with the shared fixtures, providing servicenowSdk.commandTimeoutMs).
+ *
+ * node:test has no default per-test timeout. A child that is never killed would
+ * hang the run, so each test carries an explicit timeout to keep that failure
+ * mode a failure.
  */
-import { NodeProcessRunner } from '../../src/tools/processors/processRunner.js';
+import { describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { configFixture, loggerFixture } from '../support/fixtures.js';
+
+mock.module('../../src/config.js', configFixture().mockOptions);
+mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
+
+const { NodeProcessRunner } = await import('../../src/tools/processors/processRunner.js');
+
+/** Explicit per-test timeout (with slack for a loaded machine). */
+const TEST_TIMEOUT_MS = 10_000;
 
 /** A child that writes `text` to stdout immediately, then hangs indefinitely. */
 function hangingChildArgs(text: string): string[] {
@@ -17,7 +31,7 @@ function hangingChildArgs(text: string): string[] {
 }
 
 describe('NodeProcessRunner — timeout returns partial output (P0.2)', () => {
-  it('resolves (does not reject) with buffered stdout and a non-zero exit on timeout', async () => {
+  it('resolves (does not reject) with buffered stdout and a non-zero exit on timeout', { timeout: TEST_TIMEOUT_MS }, async () => {
     const runner = new NodeProcessRunner();
     const result = await runner.run(
       process.execPath,
@@ -28,14 +42,14 @@ describe('NodeProcessRunner — timeout returns partial output (P0.2)', () => {
     );
 
     // Partial stdout is preserved, not discarded.
-    expect(result.stdout).toContain('partial-before-timeout');
+    assert.ok(result.stdout.includes('partial-before-timeout'));
     // Distinct non-zero exit code (124 = timeout convention).
-    expect(result.exitCode).toBe(124);
+    assert.equal(result.exitCode, 124);
     // A human-readable note is appended to stderr.
-    expect(result.stderr).toMatch(/timed out after 250ms/i);
+    assert.match(result.stderr, /timed out after 250ms/i);
   });
 
-  it('honors an operator/config timeout override over the per-call timeout', async () => {
+  it('honors an operator/config timeout override over the per-call timeout', { timeout: TEST_TIMEOUT_MS }, async () => {
     // overrideTimeoutMs simulates FLUENT_MCP_COMMAND_TIMEOUT_MS being set: it must
     // win even when the caller passes a much larger per-call timeout.
     const runner = new NodeProcessRunner({ overrideTimeoutMs: 200 });
@@ -48,35 +62,39 @@ describe('NodeProcessRunner — timeout returns partial output (P0.2)', () => {
       600_000 // caller asked for 10 minutes; the override must clamp to 200ms
     );
 
-    expect(result.exitCode).toBe(124);
-    expect(Date.now() - start).toBeLessThan(5_000); // proves the override, not the 10-min value, applied
+    assert.equal(result.exitCode, 124);
+    assert.ok(Date.now() - start < 5_000); // proves the override, not the 10-min value, applied
   });
 });
 
 describe('NodeProcessRunner — client cancellation kills the child (P0.3)', () => {
-  it('aborting the signal terminates the process and returns partial output', async () => {
+  it('aborting the signal terminates the process and returns partial output', { timeout: TEST_TIMEOUT_MS }, async () => {
     const runner = new NodeProcessRunner();
     const controller = new AbortController();
 
     // Abort shortly after the child has emitted its first output. If the child
     // were NOT killed it hangs forever and this test would time out.
     const timer = setTimeout(() => controller.abort(), 150);
-    const result = await runner.run(
-      process.execPath,
-      hangingChildArgs('emitted-then-cancelled'),
-      undefined,
-      undefined,
-      600_000, // long timeout so the *signal*, not the timeout, ends the process
-      controller.signal
-    );
-    clearTimeout(timer);
+    let result;
+    try {
+      result = await runner.run(
+        process.execPath,
+        hangingChildArgs('emitted-then-cancelled'),
+        undefined,
+        undefined,
+        600_000, // long timeout so the *signal*, not the timeout, ends the process
+        controller.signal
+      );
+    } finally {
+      clearTimeout(timer);
+    }
 
-    expect(result.stdout).toContain('emitted-then-cancelled');
-    expect(result.exitCode).toBe(130); // cancellation convention
-    expect(result.stderr).toMatch(/cancelled/i);
+    assert.ok(result.stdout.includes('emitted-then-cancelled'));
+    assert.equal(result.exitCode, 130); // cancellation convention
+    assert.match(result.stderr, /cancelled/i);
   });
 
-  it('kills immediately when the signal is already aborted', async () => {
+  it('kills immediately when the signal is already aborted', { timeout: TEST_TIMEOUT_MS }, async () => {
     const runner = new NodeProcessRunner();
     const result = await runner.run(
       process.execPath,
@@ -87,13 +105,13 @@ describe('NodeProcessRunner — client cancellation kills the child (P0.3)', () 
       AbortSignal.abort()
     );
 
-    expect(result.exitCode).toBe(130);
-    expect(result.stderr).toMatch(/cancelled/i);
+    assert.equal(result.exitCode, 130);
+    assert.match(result.stderr, /cancelled/i);
   });
 });
 
 describe('NodeProcessRunner — output is bounded (P0.4)', () => {
-  it('truncates oversized stdout to head + tail with an elision marker', async () => {
+  it('truncates oversized stdout to head + tail with an elision marker', { timeout: TEST_TIMEOUT_MS }, async () => {
     const runner = new NodeProcessRunner({ maxOutputChars: 200 }); // head 120 / tail 80
     const result = await runner.run(
       process.execPath,
@@ -101,23 +119,23 @@ describe('NodeProcessRunner — output is bounded (P0.4)', () => {
       ['-e', "process.stdout.write('A'.repeat(2000) + 'B'.repeat(2000))"]
     );
 
-    expect(result.exitCode).toBe(0);
+    assert.equal(result.exitCode, 0);
     // Bounded well below the 4000 chars emitted.
-    expect(result.stdout.length).toBeLessThan(300);
+    assert.ok(result.stdout.length < 300);
     // Head retained, tail retained, middle elided with a marker.
-    expect(result.stdout.startsWith('A')).toBe(true);
-    expect(result.stdout.endsWith('B')).toBe(true);
-    expect(result.stdout).toMatch(/characters truncated/);
+    assert.ok(result.stdout.startsWith('A'));
+    assert.ok(result.stdout.endsWith('B'));
+    assert.match(result.stdout, /characters truncated/);
   });
 
-  it('does not truncate output within the budget', async () => {
+  it('does not truncate output within the budget', { timeout: TEST_TIMEOUT_MS }, async () => {
     const runner = new NodeProcessRunner({ maxOutputChars: 200 });
     const result = await runner.run(
       process.execPath,
       ["-e", "process.stdout.write('short output')"]
     );
 
-    expect(result.stdout).toBe('short output');
-    expect(result.stdout).not.toMatch(/characters truncated/);
+    assert.equal(result.stdout, 'short output');
+    assert.doesNotMatch(result.stdout, /characters truncated/);
   });
 });

@@ -1,3 +1,5 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import {
   McpInternalError,
   McpResourceNotFoundError,
@@ -7,10 +9,10 @@ describe('MCP protocol errors', () => {
   it('classifies a missing resource as invalid params', () => {
     const error = new McpResourceNotFoundError('sn-spec://missing');
 
-    expect(error).toBeInstanceOf(Error);
-    expect(error.name).toBe('McpResourceNotFoundError');
-    expect(error.code).toBe(-32602);
-    expect(error.message).toBe('Resource not found: sn-spec://missing');
+    assert.ok(error instanceof Error);
+    assert.equal(error.name, 'McpResourceNotFoundError');
+    assert.equal(error.code, -32602);
+    assert.equal(error.message, 'Resource not found: sn-spec://missing');
   });
 
   it('includes optional resource details', () => {
@@ -19,7 +21,8 @@ describe('MCP protocol errors', () => {
       'Unknown snippet id'
     );
 
-    expect(error.message).toBe(
+    assert.equal(
+      error.message,
       'Resource not found: sn-snippet://table/9999 - Unknown snippet id'
     );
   });
@@ -28,9 +31,9 @@ describe('MCP protocol errors', () => {
     const cause = new Error('disk unavailable');
     const error = new McpInternalError('Could not load resource', cause);
 
-    expect(error.name).toBe('McpInternalError');
-    expect(error.code).toBe(-32603);
-    expect(error.message).toBe('Internal error: Could not load resource');
-    expect(error.cause).toBe(cause);
+    assert.equal(error.name, 'McpInternalError');
+    assert.equal(error.code, -32603);
+    assert.equal(error.message, 'Internal error: Could not load resource');
+    assert.equal(error.cause, cause);
   });
 });

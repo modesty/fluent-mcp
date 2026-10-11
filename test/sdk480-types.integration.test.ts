@@ -4,6 +4,8 @@
  * for the new metadata types (playbook, rest-message, alias, alias-template, retry-policy,
  * data-lookup) and the cross-cutting capabilities introduced in v4.8.0.
  */
+import { describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ServiceNowMetadataType } from '../src/types.js';
@@ -30,19 +32,23 @@ const NEW_TYPES: Array<[keyof typeof ServiceNowMetadataType, string]> = [
 
 describe('SDK v4.8.0 Types - Integration Tests', () => {
   describe('Enum completeness', () => {
-    it.each(NEW_TYPES)('should have the new v4.8.0 enum entry %s', (key, value) => {
-      expect(ServiceNowMetadataType[key]).toBe(value);
-    });
+    for (const [key, value] of NEW_TYPES) {
+      it(`should have the new v4.8.0 enum entry ${key}`, () => {
+        assert.equal(ServiceNowMetadataType[key], value);
+      });
+    }
   });
 
   describe('New resource files exist for each new type', () => {
-    it.each(NEW_TYPES)('%s has spec/instruct/snippet coverage (%s)', (_key, value) => {
-      expect(fs.existsSync(path.join(SPEC_DIR, `fluent_spec_${value}.md`))).toBe(true);
-      expect(fs.existsSync(path.join(INSTRUCT_DIR, `fluent_instruct_${value}.md`))).toBe(true);
-      const snippets = fs.readdirSync(SNIPPET_DIR)
-        .filter((f) => f.startsWith(`fluent_snippet_${value}_`) && f.endsWith('.md'));
-      expect(snippets.length).toBeGreaterThan(0);
-    });
+    for (const [key, value] of NEW_TYPES) {
+      it(`${key} has spec/instruct/snippet coverage (${value})`, () => {
+        assert.equal(fs.existsSync(path.join(SPEC_DIR, `fluent_spec_${value}.md`)), true);
+        assert.equal(fs.existsSync(path.join(INSTRUCT_DIR, `fluent_instruct_${value}.md`)), true);
+        const snippets = fs.readdirSync(SNIPPET_DIR)
+          .filter((f) => f.startsWith(`fluent_snippet_${value}_`) && f.endsWith('.md'));
+        assert.ok(snippets.length > 0);
+      });
+    }
   });
 
   describe('PlaybookDefinition resources', () => {
@@ -53,23 +59,23 @@ describe('SDK v4.8.0 Types - Integration Tests', () => {
         'wfa.playbook.trigger', 'wfa.playbook.lane', 'wfa.playbook.activity', 'startRule',
         'restartRule', 'ActivityDefinitions', 'parentTable',
       ]) {
-        expect(content).toContain(term);
+        assert.ok(content.includes(term));
       }
     });
 
     it('instruct should explain lanes callback and the required triggers array', () => {
       const content = read(INSTRUCT_DIR, 'fluent_instruct_playbook.md');
-      expect(content).toContain('@servicenow/sdk/automation');
-      expect(content).toContain('three arguments');
-      expect(content).toContain('callback');
-      expect(content).toContain('required even when empty');
+      assert.ok(content.includes('@servicenow/sdk/automation'));
+      assert.ok(content.includes('three arguments'));
+      assert.ok(content.includes('callback'));
+      assert.ok(content.includes('required even when empty'));
     });
 
     it('snippet 0001 should define a playbook with a trigger, lane, and activity', () => {
       const content = read(SNIPPET_DIR, 'fluent_snippet_playbook_0001.md');
-      expect(content).toContain('PlaybookDefinition(');
-      expect(content).toContain('wfa.playbook.lane(');
-      expect(content).toContain('wfa.playbook.activity(');
+      assert.ok(content.includes('PlaybookDefinition('));
+      assert.ok(content.includes('wfa.playbook.lane('));
+      assert.ok(content.includes('wfa.playbook.activity('));
     });
   });
 
@@ -77,7 +83,7 @@ describe('SDK v4.8.0 Types - Integration Tests', () => {
     it('spec should declare RestMessage with functions and variables', () => {
       const content = read(SPEC_DIR, 'fluent_spec_rest-message.md');
       for (const term of ['RestMessage(', 'sys_rest_message', 'functions', 'httpMethod', 'variables', 'queryParams', 'authenticationType']) {
-        expect(content).toContain(term);
+        assert.ok(content.includes(term));
       }
     });
   });
@@ -86,21 +92,21 @@ describe('SDK v4.8.0 Types - Integration Tests', () => {
     it('alias spec should document connection/credential types and composable references', () => {
       const content = read(SPEC_DIR, 'fluent_spec_alias.md');
       for (const term of ['Alias(', 'sys_alias', 'connectionType', 'retryPolicy', 'configurationTemplate']) {
-        expect(content).toContain(term);
+        assert.ok(content.includes(term));
       }
     });
 
     it('alias-template spec should document dynamicDataSchema and defaultDataTemplate', () => {
       const content = read(SPEC_DIR, 'fluent_spec_alias-template.md');
       for (const term of ['AliasTemplate(', 'sys_alias_templates', 'dynamicDataSchema', 'defaultDataTemplate', 'connectionFields', 'credentialFields']) {
-        expect(content).toContain(term);
+        assert.ok(content.includes(term));
       }
     });
 
     it('retry-policy spec should document the discriminated strategies', () => {
       const content = read(SPEC_DIR, 'fluent_spec_retry-policy.md');
       for (const term of ['RetryPolicy(', 'sys_retry_policy', 'fixed_time_interval', 'exponential_backoff', 'retry_after', 'maxElapsedTime']) {
-        expect(content).toContain(term);
+        assert.ok(content.includes(term));
       }
     });
   });
@@ -109,23 +115,23 @@ describe('SDK v4.8.0 Types - Integration Tests', () => {
     it('spec should document matcher/source tables and match/set rules', () => {
       const content = read(SPEC_DIR, 'fluent_spec_data-lookup.md');
       for (const term of ['DataLookup(', 'dl_definition', 'sourceTable', 'matcherTable', 'matchRules', 'setRules', 'dl_matcher']) {
-        expect(content).toContain(term);
+        assert.ok(content.includes(term));
       }
     });
 
     it('instruct should warn about runOnUpdate default and active matcher rows', () => {
       const content = read(INSTRUCT_DIR, 'fluent_instruct_data-lookup.md');
-      expect(content).toContain('runOnUpdate');
-      expect(content).toContain('active = true');
+      assert.ok(content.includes('runOnUpdate'));
+      assert.ok(content.includes('active = true'));
     });
   });
 
   describe('Cross-cutting capabilities in coding_in_fluent prompt (v4.8.0)', () => {
     it('should list SDK v4.8.0 capabilities including the new APIs and Now.del', () => {
       const content = read(PROMPT_DIR, 'coding_in_fluent.md');
-      expect(content).toContain('SDK v4.8.0');
+      assert.ok(content.includes('SDK v4.8.0'));
       for (const term of ['PlaybookDefinition', 'RestMessage', 'Alias', 'RetryPolicy', 'DataLookup', 'Now.del()', '$meta', 'now-sdk query']) {
-        expect(content).toContain(term);
+        assert.ok(content.includes(term));
       }
     });
   });
@@ -133,42 +139,44 @@ describe('SDK v4.8.0 Types - Integration Tests', () => {
   describe('Existing resource updates (v4.8.0)', () => {
     it('acl spec should document field typing and $meta installMethod', () => {
       const content = read(SPEC_DIR, 'fluent_spec_acl.md');
-      expect(content).toContain('SystemColumns');
-      expect(content).toContain('$meta');
-      expect(content).toContain('installMethod');
+      assert.ok(content.includes('SystemColumns'));
+      assert.ok(content.includes('$meta'));
+      assert.ok(content.includes('installMethod'));
     });
 
     it('user-preference spec should document $override and $meta', () => {
       const content = read(SPEC_DIR, 'fluent_spec_user-preference.md');
-      expect(content).toContain('$override');
-      expect(content).toContain('$meta');
+      assert.ok(content.includes('$override'));
+      assert.ok(content.includes('$meta'));
     });
 
     it('table spec should note the accessibleFrom public default', () => {
       const content = read(SPEC_DIR, 'fluent_spec_table.md');
-      expect(content).toContain('SDK 4.8.0');
-      expect(content).toContain('public');
+      assert.ok(content.includes('SDK 4.8.0'));
+      assert.ok(content.includes('public'));
     });
 
     it("scheduled-script spec should NOT claim a $meta property (not in installed SDK)", () => {
       const content = read(SPEC_DIR, 'fluent_spec_scheduled-script.md');
-      expect(content).not.toContain('$meta');
+      assert.ok(!content.includes('$meta'));
     });
   });
 
   describe('CLI tool updates (v4.8.0) — query command', () => {
     it('should register the query_fluent_records command in the factory', () => {
-      const mockExecutor = { process: jest.fn() };
+      const mockExecutor = { process: mock.fn() };
       const commands = CommandFactory.createCommands(mockExecutor as never);
-      expect(commands.map((c) => c.name)).toContain('query_fluent_records');
+      assert.ok(commands.map((c) => c.name).includes('query_fluent_records'));
     });
 
     it('QueryCommand should require table and query, and be read-only', () => {
-      const cmd = new QueryCommand({ process: jest.fn() } as never);
-      expect(cmd.name).toBe('query_fluent_records');
-      expect(cmd.annotations.readOnlyHint).toBe(true);
+      const cmd = new QueryCommand({ process: mock.fn() } as never);
+      assert.equal(cmd.name, 'query_fluent_records');
+      assert.equal(cmd.annotations.readOnlyHint, true);
       const required = cmd.arguments.filter((a) => a.required).map((a) => a.name);
-      expect(required).toEqual(expect.arrayContaining(['table', 'query']));
+      for (const name of ['table', 'query']) {
+        assert.ok(required.includes(name), `required arguments should include ${name}`);
+      }
     });
   });
 });

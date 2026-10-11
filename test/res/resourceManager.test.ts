@@ -1,114 +1,123 @@
 /**
  * Tests for ResourceManager
+ *
+ * Native runner: the ResourceLoader module is replaced before ResourceManager is
+ * imported. The loader constructor mock uses a `function` implementation so it
+ * can be called with `new`, and every instance shares the same method mocks.
  */
-import { ResourceManager } from "../../src/res/resourceManager.js";
+import { beforeEach, describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { loggerFixture } from '../support/fixtures.js';
 
-// Mock the ResourceLoader
-jest.mock("../../src/utils/resourceLoader.js", () => {
-  // Create a mock implementation with controlled behavior
-  const mockGetAvailableMetadataTypes = jest.fn().mockResolvedValue([
-    "business-rule",
-    "script-action",
-    "script-include",
-    "service-portal",
-    "table",
-    "ui-action",
-    "ui-page"
-  ]);
-  
-  const mockGetResource = jest.fn().mockImplementation((resourceType, metadataType, id) => {
-    return Promise.resolve({
-      content: `Mock content for ${resourceType} - ${metadataType}${id ? ` - ${id}` : ''}`,
-      path: `/mock/path/${resourceType}/${metadataType}${id ? `_${id}` : ''}.md`,
-      metadataType,
-      resourceType,
-      found: true
-    });
-  });
-  
-  const mockListSnippets = jest.fn().mockImplementation((metadataType) => {
-    return Promise.resolve(["0001", "0002", "0003"]);
-  });
-  
-  return {
-    ResourceLoader: jest.fn().mockImplementation(() => ({
-      getAvailableMetadataTypes: mockGetAvailableMetadataTypes,
-      getResource: mockGetResource,
-      listSnippets: mockListSnippets
-    })),
-    ResourceType: {
-      SPEC: "spec",
-      SNIPPET: "snippet",
-      INSTRUCT: "instruct"
-    }
-  };
+// Mock the ResourceLoader with controlled behavior
+const getAvailableMetadataTypes = mock.fn(async () => [
+  'business-rule',
+  'script-action',
+  'script-include',
+  'service-portal',
+  'table',
+  'ui-action',
+  'ui-page',
+]);
+
+const getResource = mock.fn(
+  async (resourceType: string, metadataType: string, id?: string): Promise<Record<string, unknown>> => ({
+    content: `Mock content for ${resourceType} - ${metadataType}${id ? ` - ${id}` : ''}`,
+    path: `/mock/path/${resourceType}/${metadataType}${id ? `_${id}` : ''}.md`,
+    metadataType,
+    resourceType,
+    found: true,
+  })
+);
+
+const listSnippets = mock.fn(async (_metadataType: string) => ['0001', '0002', '0003']);
+
+const ResourceLoader = mock.fn(function () {
+  return { getAvailableMetadataTypes, getResource, listSnippets };
 });
 
-describe("ResourceManager", () => {
-  let resourceManager: ResourceManager;
+mock.module('../../src/utils/resourceLoader.js', {
+  namedExports: {
+    ResourceLoader,
+    ResourceType: {
+      SPEC: 'spec',
+      SNIPPET: 'snippet',
+      INSTRUCT: 'instruct',
+    },
+  },
+});
+
+// The logger fixture keeps the run quiet.
+mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
+
+const { ResourceManager } = await import('../../src/res/resourceManager.js');
+
+describe('ResourceManager', () => {
+  let resourceManager: InstanceType<typeof ResourceManager>;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    for (const fn of [getAvailableMetadataTypes, getResource, listSnippets, ResourceLoader]) {
+      fn.mock.resetCalls();
+    }
     resourceManager = new ResourceManager();
   });
 
-  test("should initialize and load metadata types", async () => {
+  it('should initialize and load metadata types', async () => {
     await resourceManager.initialize();
-    expect(resourceManager.getMetadataTypes()).toEqual([
-      "business-rule",
-      "script-action",
-      "script-include",
-      "service-portal",
-      "table",
-      "ui-action",
-      "ui-page"
+    assert.deepStrictEqual(resourceManager.getMetadataTypes(), [
+      'business-rule',
+      'script-action',
+      'script-include',
+      'service-portal',
+      'table',
+      'ui-action',
+      'ui-page',
     ]);
   });
-  
-  test("should list resources correctly", async () => {
+
+  it('should list resources correctly', async () => {
     await resourceManager.initialize();
     const resources = await resourceManager.listResources();
-    
+
     // Should have 7 metadata types * (1 spec + 1 instruct + 1 snippet) = 21 resources
-    expect(resources.length).toBe(21);
-    
+    assert.equal(resources.length, 21);
+
     // Check for spec resources
-    const specResources = resources.filter(r => r.uri.startsWith('sn-spec://'));
-    expect(specResources.length).toBe(7);
-    
+    const specResources = resources.filter((r) => r.uri.startsWith('sn-spec://'));
+    assert.equal(specResources.length, 7);
+
     // Check for instruction resources
-    const instructResources = resources.filter(r => r.uri.startsWith('sn-instruct://'));
-    expect(instructResources.length).toBe(7);
-    
+    const instructResources = resources.filter((r) => r.uri.startsWith('sn-instruct://'));
+    assert.equal(instructResources.length, 7);
+
     // Check for snippet resources
-    const snippetResources = resources.filter(r => r.uri.startsWith('sn-snippet://'));
-    expect(snippetResources.length).toBe(7);
-    
+    const snippetResources = resources.filter((r) => r.uri.startsWith('sn-snippet://'));
+    assert.equal(snippetResources.length, 7);
+
     // Check that each resource has the required properties
-    resources.forEach(resource => {
-      expect(resource).toHaveProperty('uri');
-      expect(resource).toHaveProperty('name'); // Required by MCP protocol
-      expect(resource).toHaveProperty('title');
-      expect(resource).toHaveProperty('mimeType', 'text/markdown');
+    resources.forEach((resource) => {
+      assert.ok('uri' in resource);
+      assert.ok('name' in resource); // Required by MCP protocol
+      assert.ok('title' in resource);
+      assert.ok('mimeType' in resource);
+      assert.equal(resource.mimeType, 'text/markdown');
       // Name shape was previously only asserted against the (never-executed)
       // registerAll path; asserted here so it stays covered on the live path.
-      expect(resource.name).toMatch(/^sn-(spec|instruct|snippet)-/);
+      assert.match(resource.name, /^sn-(spec|instruct|snippet)-/);
     });
   });
 
-  test("should classify a missing resource instead of returning success text", async () => {
-    const loader = resourceManager.getResourceLoader();
-    (loader.getResource as jest.Mock).mockResolvedValueOnce({
+  it('should classify a missing resource instead of returning success text', async () => {
+    // resourceManager.getResourceLoader().getResource is the shared getResource mock,
+    // so queueing the next result on it controls what readResource sees.
+    getResource.mock.mockImplementationOnce(async () => ({
       content: '',
       found: false,
-    });
+    }));
 
-    await expect(
-      resourceManager.readResource('sn-spec://missing')
-    ).rejects.toMatchObject({
+    await assert.rejects(resourceManager.readResource('sn-spec://missing'), {
       code: -32602,
       name: 'McpResourceNotFoundError',
     });
   });
-
 });

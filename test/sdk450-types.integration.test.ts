@@ -2,11 +2,13 @@
  * Integration tests for SDK v4.5.0 metadata coverage
  * These tests read actual resource files from disk (no mocks) to verify content correctness.
  */
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ServiceNowMetadataType } from '../src/types.js';
 
-// Use process.cwd() as project root (same as setup.js mock for getProjectRootPath)
+// Use process.cwd() as project root (the repository root under npm run)
 const PROJECT_ROOT = process.cwd();
 const RES_DIR = path.join(PROJECT_ROOT, 'res');
 const SPEC_DIR = path.join(RES_DIR, 'spec');
@@ -17,10 +19,10 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
 
   describe('Enum completeness', () => {
     it('should have new v4.5.0 enum entries', () => {
-      expect(ServiceNowMetadataType.INSTANCE_SCAN).toBe('instance-scan');
-      expect(ServiceNowMetadataType.NOW_ASSIST_SKILL_CONFIG).toBe('now-assist-skill-config');
-      expect(ServiceNowMetadataType.AI_AGENT).toBe('ai-agent');
-      expect(ServiceNowMetadataType.AI_AGENT_WORKFLOW).toBe('ai-agent-workflow');
+      assert.equal(ServiceNowMetadataType.INSTANCE_SCAN, 'instance-scan');
+      assert.equal(ServiceNowMetadataType.NOW_ASSIST_SKILL_CONFIG, 'now-assist-skill-config');
+      assert.equal(ServiceNowMetadataType.AI_AGENT, 'ai-agent');
+      assert.equal(ServiceNowMetadataType.AI_AGENT_WORKFLOW, 'ai-agent-workflow');
     });
   });
 
@@ -36,13 +38,13 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
       for (const metadataType of v450Types) {
         const specFile = path.join(SPEC_DIR, `fluent_spec_${metadataType}.md`);
         const instructFile = path.join(INSTRUCT_DIR, `fluent_instruct_${metadataType}.md`);
-        expect(fs.existsSync(specFile)).toBe(true);
-        expect(fs.existsSync(instructFile)).toBe(true);
+        assert.equal(fs.existsSync(specFile), true);
+        assert.equal(fs.existsSync(instructFile), true);
 
         const snippetCandidates = fs
           .readdirSync(SNIPPET_DIR)
           .filter((file) => file.startsWith(`fluent_snippet_${metadataType}_`) && file.endsWith('.md'));
-        expect(snippetCandidates.length).toBeGreaterThan(0);
+        assert.ok(snippetCandidates.length > 0);
       }
     });
   });
@@ -58,7 +60,7 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
         'columnType', 'conditions', 'priority', 'shortDescription',
       ];
       for (const term of expectedTerms) {
-        expect(content).toContain(term);
+        assert.ok(content.includes(term));
       }
     });
 
@@ -71,7 +73,7 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
         'ColumnTypeCheck', 'TableCheck', 'category',
       ];
       for (const term of expectedTerms) {
-        expect(content).toContain(term);
+        assert.ok(content.includes(term));
       }
     });
 
@@ -79,26 +81,26 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(SNIPPET_DIR, 'fluent_snippet_instance-scan_0001.md'), 'utf-8'
       );
-      expect(content).toContain('LinterCheck(');
-      expect(content).toContain('script');
-      expect(content).toContain('priority');
+      assert.ok(content.includes('LinterCheck('));
+      assert.ok(content.includes('script'));
+      assert.ok(content.includes('priority'));
     });
 
     it('should have snippet 0002 with ScriptOnlyCheck example', () => {
       const content = fs.readFileSync(
         path.join(SNIPPET_DIR, 'fluent_snippet_instance-scan_0002.md'), 'utf-8'
       );
-      expect(content).toContain('ScriptOnlyCheck(');
-      expect(content).toContain('script');
+      assert.ok(content.includes('ScriptOnlyCheck('));
+      assert.ok(content.includes('script'));
     });
 
     it('should have snippet 0003 with ColumnTypeCheck and TableCheck', () => {
       const content = fs.readFileSync(
         path.join(SNIPPET_DIR, 'fluent_snippet_instance-scan_0003.md'), 'utf-8'
       );
-      expect(content).toContain('ColumnTypeCheck(');
-      expect(content).toContain('TableCheck(');
-      expect(content).toContain('columnType');
+      assert.ok(content.includes('ColumnTypeCheck('));
+      assert.ok(content.includes('TableCheck('));
+      assert.ok(content.includes('columnType'));
     });
   });
 
@@ -107,20 +109,20 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(SPEC_DIR, 'fluent_spec_now-assist-skill-config.md'), 'utf-8'
       );
-      expect(content).toContain('NowAssistSkillConfig(');
-      expect(content).toContain('$id');
-      expect(content).toContain('name');
-      expect(content).toContain('securityControls');
-      expect(content).toContain('inputs');
-      expect(content).toContain('outputs');
+      assert.ok(content.includes('NowAssistSkillConfig('));
+      assert.ok(content.includes('$id'));
+      assert.ok(content.includes('name'));
+      assert.ok(content.includes('securityControls'));
+      assert.ok(content.includes('inputs'));
+      assert.ok(content.includes('outputs'));
     });
 
     it('should have instruct with guidance', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_now-assist-skill-config.md'), 'utf-8'
       );
-      expect(content).toContain('@servicenow/sdk/core');
-      expect(content).toContain('NowAssistSkillConfig');
+      assert.ok(content.includes('@servicenow/sdk/core'));
+      assert.ok(content.includes('NowAssistSkillConfig'));
     });
   });
 
@@ -129,19 +131,19 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(SPEC_DIR, 'fluent_spec_ai-agent.md'), 'utf-8'
       );
-      expect(content).toContain('AiAgent(');
-      expect(content).toContain('$id');
-      expect(content).toContain('agentRole');
-      expect(content).toContain('tools');
+      assert.ok(content.includes('AiAgent('));
+      assert.ok(content.includes('$id'));
+      assert.ok(content.includes('agentRole'));
+      assert.ok(content.includes('tools'));
     });
 
     it('should have instruct with guidance', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_ai-agent.md'), 'utf-8'
       );
-      expect(content).toContain('@servicenow/sdk/core');
-      expect(content).toContain('AiAgent');
-      expect(content).toContain('AiAgenticWorkflow');
+      assert.ok(content.includes('@servicenow/sdk/core'));
+      assert.ok(content.includes('AiAgent'));
+      assert.ok(content.includes('AiAgenticWorkflow'));
     });
   });
 
@@ -150,18 +152,18 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(SPEC_DIR, 'fluent_spec_ai-agent-workflow.md'), 'utf-8'
       );
-      expect(content).toContain('AiAgenticWorkflow(');
-      expect(content).toContain('$id');
-      expect(content).toContain('executionMode');
-      expect(content).toContain('triggerConfig');
+      assert.ok(content.includes('AiAgenticWorkflow('));
+      assert.ok(content.includes('$id'));
+      assert.ok(content.includes('executionMode'));
+      assert.ok(content.includes('triggerConfig'));
     });
 
     it('should have instruct with guidance', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_ai-agent-workflow.md'), 'utf-8'
       );
-      expect(content).toContain('@servicenow/sdk/core');
-      expect(content).toContain('AiAgenticWorkflow');
+      assert.ok(content.includes('@servicenow/sdk/core'));
+      assert.ok(content.includes('AiAgenticWorkflow'));
     });
   });
 
@@ -170,31 +172,25 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(SPEC_DIR, 'fluent_spec_service-portal.md'), 'utf-8'
       );
-      expect(content).toContain('SPPage(');
-      expect(content).toContain('SPTheme(');
-      expect(content).toContain('SPMenu(');
-      expect(content).toContain('SPWidget('); // existing API still present
+      assert.ok(content.includes('SPPage('));
+      assert.ok(content.includes('SPTheme('));
+      assert.ok(content.includes('SPMenu('));
+      assert.ok(content.includes('SPWidget(')); // existing API still present
     });
 
     it('should contain SPPage, SPTheme, and SPMenu guidance in instruct', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_service-portal.md'), 'utf-8'
       );
-      expect(content).toContain('SPPage');
-      expect(content).toContain('SPTheme');
-      expect(content).toContain('SPMenu');
+      assert.ok(content.includes('SPPage'));
+      assert.ok(content.includes('SPTheme'));
+      assert.ok(content.includes('SPMenu'));
     });
 
     it('should have new snippets for SPPage, SPTheme, and SPMenu', () => {
-      expect(
-        fs.existsSync(path.join(SNIPPET_DIR, 'fluent_snippet_service-portal_0016.md'))
-      ).toBe(true);
-      expect(
-        fs.existsSync(path.join(SNIPPET_DIR, 'fluent_snippet_service-portal_0017.md'))
-      ).toBe(true);
-      expect(
-        fs.existsSync(path.join(SNIPPET_DIR, 'fluent_snippet_service-portal_0018.md'))
-      ).toBe(true);
+      assert.equal(fs.existsSync(path.join(SNIPPET_DIR, 'fluent_snippet_service-portal_0016.md')), true);
+      assert.equal(fs.existsSync(path.join(SNIPPET_DIR, 'fluent_snippet_service-portal_0017.md')), true);
+      assert.equal(fs.existsSync(path.join(SNIPPET_DIR, 'fluent_snippet_service-portal_0018.md')), true);
     });
   });
 
@@ -203,18 +199,18 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(SPEC_DIR, 'fluent_spec_scheduled-script.md'), 'utf-8'
       );
-      expect(content).toContain('ScheduledScript(');
-      expect(content).toContain('@servicenow/sdk/core');
-      expect(content).toContain('frequency');
-      expect(content).toContain('timeZone');
+      assert.ok(content.includes('ScheduledScript('));
+      assert.ok(content.includes('@servicenow/sdk/core'));
+      assert.ok(content.includes('frequency'));
+      assert.ok(content.includes('timeZone'));
     });
 
     it('should reference Fluent API in instruct', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_scheduled-script.md'), 'utf-8'
       );
-      expect(content).toContain('ScheduledScript');
-      expect(content).toContain('@servicenow/sdk/core');
+      assert.ok(content.includes('ScheduledScript'));
+      assert.ok(content.includes('@servicenow/sdk/core'));
     });
   });
 
@@ -223,16 +219,16 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(SPEC_DIR, 'fluent_spec_flow.md'), 'utf-8'
       );
-      expect(content).toContain("default: 'system' since SDK v4.5.0");
+      assert.ok(content.includes("default: 'system' since SDK v4.5.0"));
     });
 
     it('should document auto-publish and skip-flow-activation in instruct', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_flow.md'), 'utf-8'
       );
-      expect(content).toContain('auto-published');
-      expect(content).toContain('--skip-flow-activation');
-      expect(content).toContain("since SDK v4.5.0");
+      assert.ok(content.includes('auto-published'));
+      assert.ok(content.includes('--skip-flow-activation'));
+      assert.ok(content.includes("since SDK v4.5.0"));
     });
   });
 });

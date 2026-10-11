@@ -261,7 +261,7 @@ Added `custom-action`, `inbound-email-action`, `sp-header-footer`, and `sp-page-
 
 ## Configuration
 
-**Requirements:** Node.js 20.18.0+, npm 11.4.1+, `@servicenow/sdk` 4.13.6
+**Requirements:** Node.js 22.23.2+, npm 10.9.8+, `@servicenow/sdk` 4.13.6 (the repository's development toolchain is Node 22.23.3 per `.nvmrc` and npm 12.2.0)
 
 ### MCP Client Setup
 
@@ -373,7 +373,7 @@ npx -p @modelcontextprotocol/inspector@2.10.0 mcp-inspector npx @modesty/fluent-
 # Or for local development (built server)
 npm run build && npm run inspect
 
-# Or against the TypeScript entry point, no build required
+# Or against a development build (rebuilt before the inspector starts)
 npm run inspect:dev
 ```
 
@@ -431,6 +431,25 @@ npm run inspect:dev
 - List metadata (`-lm`) returns available Fluent metadata types
 - No unexpected protocol errors; command logs are emitted on stderr rather than through MCP `notifications/message`
 - Commands execute within 2-3 seconds
+
+## Development
+
+**Setup:** Node.js 22.23.2 or later (`.nvmrc` pins 22.23.3) and npm 10.9.8 or later. Run `npm ci` from a fresh checkout.
+
+| Task | Command |
+|---|---|
+| Build the server | `npm run build` (cleans `dist/` first) |
+| Run the development build | `npm run dev` (rebuilds, then runs `dist/index.js`) |
+| Rebuild the development bundle on change | `npm run dev:watch` |
+| Lint and type-check | `npm run lint`, `npm run typecheck`, `npm run typecheck:test` |
+| Run all tests | `npm test` |
+| Run one test file | `node scripts/run-native-tests.mjs test/<path>.test.ts` |
+| Coverage report | `npm run test:coverage` (writes `coverage/lcov.info`) |
+| Re-run tests on change | `npm run test:watch` |
+| Validate resources | `npm run validate:specs`, `npm run validate:instructs`, `npm run validate:snippets` |
+| Package the MCPB bundle | `npm run bundle` |
+
+Tests use Node's built-in test runner (`node:test`) with `node:assert/strict`. Module mocks are experimental in Node 22, so the test scripts enable `--experimental-test-module-mocks` for the test process only. Coverage reports only the source files a test loads.
 
 ## License
 

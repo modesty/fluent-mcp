@@ -1,67 +1,55 @@
 /**
  * Unit tests for resource loader
+ *
+ * Native runner: module mocks are registered before the module under test is
+ * imported. Static imports are hoisted above mock.module(), so the loader and
+ * its dependencies are loaded with dynamic import() below the registrations.
  */
-import fs from "fs";
-import path from "path";
-import * as nodeFs from 'node:fs';
-import { ResourceLoader } from "../../src/utils/resourceLoader.js";
-import { ResourceType } from "../../src/utils/types.js";
+import { beforeEach, describe, it, mock } from 'node:test';
+import assert from 'node:assert/strict';
+import { assertCalledWith, assertNotCalled } from '../support/mockAssertions.js';
+import { configFixture, loggerFixture } from '../support/fixtures.js';
 
-// Mock configuration
-jest.mock('../../src/config.js', () => ({
-  getConfig: jest.fn().mockReturnValue({
-    resourcePaths: {
-      spec: "/mock/path/to/spec",
-      snippet: "/mock/path/to/snippet",
-      instruct: "/mock/path/to/instruct",
-    }
-  })
-}));
+// Filesystem mocks shared by the default and named node:fs exports. The loader
+// uses the default import; the assertions below read these same functions.
+const readdir = mock.fn(async (_dir: string): Promise<string[]> => []);
+const readFile = mock.fn(async (_file: string, _encoding?: string): Promise<string> => '');
+const existsSync = mock.fn((_path: string): boolean => false);
+const fsMock = { promises: { readdir, readFile }, existsSync };
 
-// Mock filesystem - node:fs implementation
-jest.mock('node:fs', () => {
-  return {
-    promises: {
-      readdir: jest.fn().mockResolvedValue([]),
-      readFile: jest.fn().mockResolvedValue(""),
-    },
-    existsSync: jest.fn().mockReturnValue(false),
-  };
+mock.module('node:fs', { defaultExport: fsMock, namedExports: fsMock });
+
+// Configuration with the mock resource paths this suite asserts against.
+const config = configFixture({
+  resourcePaths: {
+    spec: '/mock/path/to/spec',
+    snippet: '/mock/path/to/snippet',
+    instruct: '/mock/path/to/instruct',
+  },
 });
+mock.module('../../src/config.js', config.mockOptions);
 
-// Also mock standard fs since the code might be using either import
-jest.mock('fs', () => {
-  return {
-    promises: {
-      readdir: jest.fn().mockResolvedValue([]),
-      readFile: jest.fn().mockResolvedValue(""),
-    },
-    existsSync: jest.fn().mockReturnValue(false),
-  };
-});
+// The logger fixture keeps the run quiet.
+mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
+
+const { ResourceLoader } = await import('../../src/utils/resourceLoader.js');
+const { ResourceType } = await import('../../src/utils/types.js');
+
+function resetFilesystemMocks(): void {
+  readdir.mock.resetCalls();
+  readFile.mock.resetCalls();
+  existsSync.mock.resetCalls();
+  readdir.mock.mockImplementation(async () => []);
+  readFile.mock.mockImplementation(async () => '');
+  existsSync.mock.mockImplementation(() => false);
+}
 
 describe('ResourceLoader', () => {
-  let resourceLoader: ResourceLoader;
-
-  // Clear mocks after each test
-  afterEach(() => {
-    jest.clearAllMocks();
-  });
+  let resourceLoader: InstanceType<typeof ResourceLoader>;
 
   // Create a fresh resourceLoader instance before each test
   beforeEach(() => {
-    jest.clearAllMocks();
-    
-    // Setup default mocks to avoid undefined returns
-    (fs.promises.readdir as jest.Mock).mockResolvedValue([]);
-    (fs.promises.readFile as jest.Mock).mockResolvedValue("");
-    (fs.existsSync as jest.Mock).mockReturnValue(false);
-    
-    // Also ensure node:fs mocks are setup the same way
-    (nodeFs.promises.readdir as jest.Mock).mockResolvedValue([]);
-    (nodeFs.promises.readFile as jest.Mock).mockResolvedValue("");
-    (nodeFs.existsSync as jest.Mock).mockReturnValue(false);
-    
+    resetFilesystemMocks();
     resourceLoader = new ResourceLoader();
   });
 
@@ -74,42 +62,35 @@ describe('ResourceLoader', () => {
         'fluent_spec_client-script.md',
         'some-other-file.md',
       ];
-      
-      // Clear any previous mocks and set up a specific mock for this test
-      jest.clearAllMocks();
-      
-      // Setup both node:fs and regular fs mocks
-      (fs.promises.readdir as jest.Mock).mockResolvedValue(mockFiles);
-      (nodeFs.promises.readdir as jest.Mock).mockResolvedValue(mockFiles);
+
+      readdir.mock.mockImplementation(async () => mockFiles);
 
       const types = await resourceLoader.getAvailableMetadataTypes();
-      
+
       // Just check that we have some metadata types that we expect
-      expect(types).toContain('business-rule');
-      expect(types).toContain('script-include');
-      expect(types).toContain('client-script');
-      
+      assert.ok(types.includes('business-rule'));
+      assert.ok(types.includes('script-include'));
+      assert.ok(types.includes('client-script'));
+
       // Since the code may now use the ServiceNowMetadataType enum directly,
       // we just check that some key types were called
-      expect(nodeFs.promises.readdir).toHaveBeenCalled();
+      assert.ok(readdir.mock.callCount() > 0);
     });
 
     it('should return ServiceNowMetadataType values if directory read fails', async () => {
-      // Mock fs.readdir to throw an error
-      jest.clearAllMocks();
-      
       // Both node:fs and regular fs should throw the same error
       const mockError = new Error('Directory read error');
-      (fs.promises.readdir as jest.Mock).mockRejectedValue(mockError);
-      (nodeFs.promises.readdir as jest.Mock).mockRejectedValue(mockError);
+      readdir.mock.mockImplementation(async () => {
+        throw mockError;
+      });
 
       const types = await resourceLoader.getAvailableMetadataTypes();
-      
+
       // With the new implementation, we should get values from ServiceNowMetadataType enum
-      expect(types).not.toEqual([]);
-      expect(types).toContain('business-rule');
-      expect(types).toContain('script-include');
-      expect(types).toContain('client-script');
+      assert.notDeepStrictEqual(types, []);
+      assert.ok(types.includes('business-rule'));
+      assert.ok(types.includes('script-include'));
+      assert.ok(types.includes('client-script'));
     });
   });
 
@@ -118,41 +99,25 @@ describe('ResourceLoader', () => {
       const metadataType = 'business-rule';
       const mockContent = '# API Specification for Business Rules\n... content ...';
       const expectedPath = '/mock/path/to/spec/fluent_spec_business-rule.md';
-      
-      // Setup mocks for this specific test
-      jest.clearAllMocks();
-      
-      // Mock both fs and node:fs
-      (fs.existsSync as jest.Mock).mockImplementation((path) => 
-        path === expectedPath ? true : false
-      );
-      (nodeFs.existsSync as jest.Mock).mockImplementation((path) => 
-        path === expectedPath ? true : false
-      );
-      
-      (fs.promises.readFile as jest.Mock).mockImplementation((path, encoding) => 
-        path === expectedPath 
-          ? Promise.resolve(mockContent) 
-          : Promise.reject(new Error(`File not found: ${path}`))
-      );
-      (nodeFs.promises.readFile as jest.Mock).mockImplementation((path, encoding) => 
-        path === expectedPath 
-          ? Promise.resolve(mockContent) 
-          : Promise.reject(new Error(`File not found: ${path}`))
-      );
-      
+
+      existsSync.mock.mockImplementation((path: string) => path === expectedPath);
+      readFile.mock.mockImplementation(async (path: string) => {
+        if (path === expectedPath) return mockContent;
+        throw new Error(`File not found: ${path}`);
+      });
+
       const result = await resourceLoader.getResource(ResourceType.SPEC, metadataType);
-      
-      expect(result).toEqual({
+
+      assert.deepStrictEqual(result, {
         content: mockContent,
         path: expectedPath,
         metadataType: 'business-rule',
         resourceType: 'spec',
         found: true,
       });
-      
-      expect(nodeFs.existsSync).toHaveBeenCalledWith(expectedPath);
-      expect(nodeFs.promises.readFile).toHaveBeenCalledWith(expectedPath, 'utf-8');
+
+      assertCalledWith(existsSync, expectedPath);
+      assertCalledWith(readFile, expectedPath, 'utf-8');
     });
 
     it('should return resource content for specific snippet', async () => {
@@ -160,41 +125,25 @@ describe('ResourceLoader', () => {
       const id = '0002';
       const mockContent = '# Snippet 0002 for Business Rules\n... content ...';
       const expectedPath = '/mock/path/to/snippet/fluent_snippet_business-rule_0002.md';
-      
-      // Setup mocks for this specific test
-      jest.clearAllMocks();
-      
-      // Mock both fs and node:fs
-      (fs.existsSync as jest.Mock).mockImplementation((path) => 
-        path === expectedPath ? true : false
-      );
-      (nodeFs.existsSync as jest.Mock).mockImplementation((path) => 
-        path === expectedPath ? true : false
-      );
-      
-      (fs.promises.readFile as jest.Mock).mockImplementation((path, encoding) => 
-        path === expectedPath 
-          ? Promise.resolve(mockContent) 
-          : Promise.reject(new Error(`File not found: ${path}`))
-      );
-      (nodeFs.promises.readFile as jest.Mock).mockImplementation((path, encoding) => 
-        path === expectedPath 
-          ? Promise.resolve(mockContent) 
-          : Promise.reject(new Error(`File not found: ${path}`))
-      );
-      
+
+      existsSync.mock.mockImplementation((path: string) => path === expectedPath);
+      readFile.mock.mockImplementation(async (path: string) => {
+        if (path === expectedPath) return mockContent;
+        throw new Error(`File not found: ${path}`);
+      });
+
       const result = await resourceLoader.getResource(ResourceType.SNIPPET, metadataType, id);
-      
-      expect(result).toEqual({
+
+      assert.deepStrictEqual(result, {
         content: mockContent,
         path: expectedPath,
         metadataType: 'business-rule',
         resourceType: 'snippet',
         found: true,
       });
-      
-      expect(nodeFs.existsSync).toHaveBeenCalledWith(expectedPath);
-      expect(nodeFs.promises.readFile).toHaveBeenCalledWith(expectedPath, 'utf-8');
+
+      assertCalledWith(existsSync, expectedPath);
+      assertCalledWith(readFile, expectedPath, 'utf-8');
     });
 
     it('should fall back to first snippet if specific ID not found', async () => {
@@ -203,88 +152,60 @@ describe('ResourceLoader', () => {
       const mockContent = '# Default Snippet for Business Rules\n... content ...';
       const specificPath = '/mock/path/to/snippet/fluent_snippet_business-rule_9999.md';
       const defaultPath = '/mock/path/to/snippet/fluent_snippet_business-rule_0001.md';
-      
-      // Setup proper mock sequence
-      jest.clearAllMocks();
-      
-      // Mock both fs and node:fs
-      (fs.existsSync as jest.Mock).mockImplementation((path) => {
-        if (path === specificPath) return false;
-        if (path === defaultPath) return true;
-        return false;
+
+      existsSync.mock.mockImplementation((path: string) => path === defaultPath);
+      readFile.mock.mockImplementation(async (path: string) => {
+        if (path === defaultPath) return mockContent;
+        throw new Error(`File not found: ${path}`);
       });
-      (nodeFs.existsSync as jest.Mock).mockImplementation((path) => {
-        if (path === specificPath) return false;
-        if (path === defaultPath) return true;
-        return false;
-      });
-      
-      (fs.promises.readFile as jest.Mock).mockImplementation((path, encoding) => {
-        if (path === defaultPath) return Promise.resolve(mockContent);
-        return Promise.reject(new Error(`File not found: ${path}`));
-      });
-      (nodeFs.promises.readFile as jest.Mock).mockImplementation((path, encoding) => {
-        if (path === defaultPath) return Promise.resolve(mockContent);
-        return Promise.reject(new Error(`File not found: ${path}`));
-      });
-      
+
       const result = await resourceLoader.getResource(ResourceType.SNIPPET, metadataType, id);
-      
-      expect(result).toEqual({
+
+      assert.deepStrictEqual(result, {
         content: mockContent,
         path: defaultPath,
         metadataType: 'business-rule',
         resourceType: 'snippet',
         found: true,
       });
-      
-      expect(nodeFs.existsSync).toHaveBeenCalledWith(specificPath);
-      expect(nodeFs.existsSync).toHaveBeenCalledWith(defaultPath);
-      expect(nodeFs.promises.readFile).toHaveBeenCalledWith(defaultPath, 'utf-8');
+
+      assertCalledWith(existsSync, specificPath);
+      assertCalledWith(existsSync, defaultPath);
+      assertCalledWith(readFile, defaultPath, 'utf-8');
     });
 
     it('should return not found if resource does not exist', async () => {
       const metadataType = 'non-existent-type';
       const expectedPath = '/mock/path/to/instruct/fluent_instruct_non-existent-type.md';
-      
-      // Explicitly set mock for this test
-      jest.clearAllMocks();
-      
-      // Mock both fs and node:fs
-      (fs.existsSync as jest.Mock).mockReturnValue(false);
-      (nodeFs.existsSync as jest.Mock).mockReturnValue(false);
-      
+
+      existsSync.mock.mockImplementation(() => false);
+
       const result = await resourceLoader.getResource(ResourceType.INSTRUCT, metadataType);
-      
-      expect(result).toEqual({
+
+      assert.deepStrictEqual(result, {
         content: '',
         path: expectedPath,
         metadataType: 'non-existent-type',
         resourceType: 'instruct',
         found: false,
       });
-      
-      expect(nodeFs.existsSync).toHaveBeenCalledWith(expectedPath);
-      expect(nodeFs.promises.readFile).not.toHaveBeenCalled();
+
+      assertCalledWith(existsSync, expectedPath);
+      assertNotCalled(readFile);
     });
 
     it('should handle errors gracefully', async () => {
       const metadataType = 'business-rule';
-      const expectedPath = '/mock/path/to/instruct/fluent_instruct_business-rule.md';
       const mockError = new Error('File read error');
-      
-      jest.clearAllMocks();
-      
-      // Mock both fs and node:fs
-      (fs.existsSync as jest.Mock).mockReturnValue(true);
-      (nodeFs.existsSync as jest.Mock).mockReturnValue(true);
-      
-      (fs.promises.readFile as jest.Mock).mockRejectedValue(mockError);
-      (nodeFs.promises.readFile as jest.Mock).mockRejectedValue(mockError);
-      
+
+      existsSync.mock.mockImplementation(() => true);
+      readFile.mock.mockImplementation(async () => {
+        throw mockError;
+      });
+
       const result = await resourceLoader.getResource(ResourceType.INSTRUCT, metadataType);
-      
-      expect(result).toEqual({
+
+      assert.deepStrictEqual(result, {
         content: '',
         path: '', // The actual implementation clears the path on error
         metadataType: 'business-rule',
@@ -303,17 +224,13 @@ describe('ResourceLoader', () => {
         'fluent_snippet_business-rule_0003.md',
         'fluent_snippet_client-script_0001.md', // Should be filtered out
       ];
-      
-      jest.clearAllMocks();
-      
-      // Mock both fs and node:fs
-      (fs.promises.readdir as jest.Mock).mockResolvedValue(mockFiles);
-      (nodeFs.promises.readdir as jest.Mock).mockResolvedValue(mockFiles);
-      
+
+      readdir.mock.mockImplementation(async () => mockFiles);
+
       const snippetIds = await resourceLoader.listSnippets(metadataType);
-      
-      expect(snippetIds).toEqual(['0001', '0002', '0003']);
-      expect(nodeFs.promises.readdir).toHaveBeenCalledWith('/mock/path/to/snippet');
+
+      assert.deepStrictEqual(snippetIds, ['0001', '0002', '0003']);
+      assertCalledWith(readdir, '/mock/path/to/snippet');
     });
 
     it('should return empty array if no snippets found', async () => {
@@ -322,31 +239,25 @@ describe('ResourceLoader', () => {
         'fluent_snippet_business-rule_0001.md',
         'fluent_snippet_client-script_0001.md',
       ];
-      
-      jest.clearAllMocks();
-      
-      // Mock both fs and node:fs
-      (fs.promises.readdir as jest.Mock).mockResolvedValue(mockFiles);
-      (nodeFs.promises.readdir as jest.Mock).mockResolvedValue(mockFiles);
-      
+
+      readdir.mock.mockImplementation(async () => mockFiles);
+
       const snippetIds = await resourceLoader.listSnippets(metadataType);
-      
-      expect(snippetIds).toEqual([]);
+
+      assert.deepStrictEqual(snippetIds, []);
     });
 
     it('should handle directory read errors', async () => {
       const metadataType = 'business-rule';
       const mockError = new Error('Directory read error');
-      
-      jest.clearAllMocks();
-      
-      // Mock both fs and node:fs
-      (fs.promises.readdir as jest.Mock).mockRejectedValue(mockError);
-      (nodeFs.promises.readdir as jest.Mock).mockRejectedValue(mockError);
-      
+
+      readdir.mock.mockImplementation(async () => {
+        throw mockError;
+      });
+
       const snippetIds = await resourceLoader.listSnippets(metadataType);
-      
-      expect(snippetIds).toEqual([]);
+
+      assert.deepStrictEqual(snippetIds, []);
     });
   });
 });

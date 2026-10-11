@@ -19,6 +19,8 @@
  * `CatalogItemRecordProducer`, and the instance-scan checks carry no
  * `Now.Internal.Meta` in their declarations.
  */
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ServiceNowMetadataType } from '../src/types.js';
@@ -39,26 +41,30 @@ const NEW_TYPES: Array<[keyof typeof ServiceNowMetadataType, string]> = [
 
 describe('SDK v4.10.1 Types - Integration Tests', () => {
   describe('Enum completeness', () => {
-    it.each(NEW_TYPES)('should have the new v4.10.1 enum entry %s', (key, value) => {
-      expect(ServiceNowMetadataType[key]).toBe(value);
-    });
+    for (const [key, value] of NEW_TYPES) {
+      it(`should have the new v4.10.1 enum entry ${key}`, () => {
+        assert.equal(ServiceNowMetadataType[key], value);
+      });
+    }
 
     it('should have grown to at least 67 metadata types (65 before v4.10.1 + state-model + atf-list)', () => {
       // Lower bound, not an equality: the exact total is a moving target owned by the
       // newest version's integration test (see sdk4112-types.integration.test.ts).
       // This assertion only guards that the two v4.10.1 additions were not lost.
-      expect(Object.values(ServiceNowMetadataType).length).toBeGreaterThanOrEqual(67);
+      assert.ok(Object.values(ServiceNowMetadataType).length >= 67);
     });
   });
 
   describe('New resource files exist for each new type', () => {
-    it.each(NEW_TYPES)('%s has spec/instruct/snippet coverage (%s)', (_key, value) => {
-      expect(fs.existsSync(path.join(SPEC_DIR, `fluent_spec_${value}.md`))).toBe(true);
-      expect(fs.existsSync(path.join(INSTRUCT_DIR, `fluent_instruct_${value}.md`))).toBe(true);
-      const snippets = fs.readdirSync(SNIPPET_DIR)
-        .filter((f) => f.startsWith(`fluent_snippet_${value}_`) && f.endsWith('.md'));
-      expect(snippets.length).toBeGreaterThan(0);
-    });
+    for (const [key, value] of NEW_TYPES) {
+      it(`${key} has spec/instruct/snippet coverage (${value})`, () => {
+        assert.equal(fs.existsSync(path.join(SPEC_DIR, `fluent_spec_${value}.md`)), true);
+        assert.equal(fs.existsSync(path.join(INSTRUCT_DIR, `fluent_instruct_${value}.md`)), true);
+        const snippets = fs.readdirSync(SNIPPET_DIR)
+          .filter((f) => f.startsWith(`fluent_snippet_${value}_`) && f.endsWith('.md'));
+        assert.ok(snippets.length > 0);
+      });
+    }
   });
 
   describe('state-model (StateModel state machine) resources', () => {
@@ -70,50 +76,50 @@ describe('SDK v4.10.1 Types - Integration Tests', () => {
         'chg_model', 'prb_model', 'prb_task_model',
         'stateField', 'transitions', 'conditions',
       ]) {
-        expect(content).toContain(term);
+        assert.ok(content.includes(term));
       }
     });
 
     it('spec should document the closed unions and the build-validated open unions', () => {
       const content = read(SPEC_DIR, 'fluent_spec_state-model.md');
       // Closed unions — invalid literals are a compile error.
-      expect(content).toContain("'general' | 'rca' | 'model'");
-      expect(content).toContain("'standard' | 'normal' | 'emergency'");
-      expect(content).toContain("'read' | 'write'");
+      assert.ok(content.includes("'general' | 'rca' | 'model'"));
+      assert.ok(content.includes("'standard' | 'normal' | 'emergency'"));
+      assert.ok(content.includes("'read' | 'write'"));
       // Open-but-build-validated condition types; note the lowercase 'h' in 'Not On hold'.
-      expect(content).toContain("'Transition Condition'");
-      expect(content).toContain("'Mandatory Fields'");
-      expect(content).toContain("'Not On hold'");
-      expect(content).toContain('allowImplementation');
+      assert.ok(content.includes("'Transition Condition'"));
+      assert.ok(content.includes("'Mandatory Fields'"));
+      assert.ok(content.includes("'Not On hold'"));
+      assert.ok(content.includes('allowImplementation'));
     });
 
     it('spec should carry the mutual-exclusion, clobber, and identity caveats', () => {
       const content = read(SPEC_DIR, 'fluent_spec_state-model.md');
-      expect(content).toContain('MUTUALLY EXCLUSIVE');
-      expect(content).toMatch(/clobber/i);
-      expect(content).toContain('Now.del(');
+      assert.ok(content.includes('MUTUALLY EXCLUSIVE'));
+      assert.match(content, /clobber/i);
+      assert.ok(content.includes('Now.del('));
     });
 
     it('spec should record that StateModel does NOT accept $meta', () => {
       const content = read(SPEC_DIR, 'fluent_spec_state-model.md');
       // The overview guide lists StateModel among $meta.useEsLatest consumers, but
       // state-model/StateModel.d.ts carries no Now.Internal.Meta. Package wins.
-      expect(content).toContain('does NOT accept `$meta`');
+      assert.ok(content.includes('does NOT accept `$meta`'));
     });
 
     it('instruct should forbid gating transitions with a Business Rule abort', () => {
       const content = read(INSTRUCT_DIR, 'fluent_instruct_state-model.md');
-      expect(content).toContain('setAbortAction');
-      expect(content).toContain('conditions');
-      expect(content).toContain('evaluateTransition');
+      assert.ok(content.includes('setAbortAction'));
+      assert.ok(content.includes('conditions'));
+      assert.ok(content.includes('evaluateTransition'));
     });
 
     it('snippet 0001 should define a gated transition with a Mandatory Fields condition', () => {
       const content = read(SNIPPET_DIR, 'fluent_snippet_state-model_0001.md');
-      expect(content).toContain('StateModel(');
-      expect(content).toContain('transitions');
-      expect(content).toContain("'Mandatory Fields'");
-      expect(content).toContain('initial: true');
+      assert.ok(content.includes('StateModel('));
+      assert.ok(content.includes('transitions'));
+      assert.ok(content.includes("'Mandatory Fields'"));
+      assert.ok(content.includes('initial: true'));
     });
   });
 
@@ -128,121 +134,121 @@ describe('SDK v4.10.1 Types - Integration Tests', () => {
         'atf.list.listUIActionVisibility',
         'atf.list.clickListUIAction',
       ]) {
-        expect(content).toContain(step);
+        assert.ok(content.includes(step));
       }
     });
 
     it('spec should document the step unions and the first_record output', () => {
       const content = read(SPEC_DIR, 'fluent_spec_atf-list.md');
-      expect(content).toContain("'related_list' | 'list'");
-      expect(content).toContain('first_record');
-      expect(content).toContain("'no_record_present' | 'record_present'");
-      expect(content).toContain('list_banner_button');
-      expect(content).toContain("'' | 'single_record' | 'all_records'");
+      assert.ok(content.includes("'related_list' | 'list'"));
+      assert.ok(content.includes('first_record'));
+      assert.ok(content.includes("'no_record_present' | 'record_present'"));
+      assert.ok(content.includes('list_banner_button'));
+      assert.ok(content.includes("'' | 'single_record' | 'all_records'"));
     });
 
     it('instruct should carry the non-guessable relatedList format and its lookup', () => {
       const content = read(INSTRUCT_DIR, 'fluent_instruct_atf-list.md');
-      expect(content).toContain('fluent_instruct_atf.md');
-      expect(content).toContain('ATFRelatedListUtil');
-      expect(content).toContain('REL:');
+      assert.ok(content.includes('fluent_instruct_atf.md'));
+      assert.ok(content.includes('ATFRelatedListUtil'));
+      assert.ok(content.includes('REL:'));
       // clickListUIAction has real side effects and must be called out.
-      expect(content).toContain('clickListUIAction');
+      assert.ok(content.includes('clickListUIAction'));
     });
 
     it('snippet 0001 should chain a filter into the read-only steps', () => {
       const content = read(SNIPPET_DIR, 'fluent_snippet_atf-list_0001.md');
-      expect(content).toContain('Test(');
-      expect(content).toContain('atf.list.applyFilterToList(');
-      expect(content).toContain('first_record');
-      expect(content).toContain('task.parent');
+      assert.ok(content.includes('Test('));
+      assert.ok(content.includes('atf.list.applyFilterToList('));
+      assert.ok(content.includes('first_record'));
+      assert.ok(content.includes('task.parent'));
     });
   });
 
   describe('Changed API resources (v4.10.1)', () => {
     it('table spec should document the actions object form and deprecate the array form', () => {
       const content = read(SPEC_DIR, 'fluent_spec_table.md');
-      expect(content).toContain('TableActionAccess');
-      expect(content).toMatch(/deprecated/i);
+      assert.ok(content.includes('TableActionAccess'));
+      assert.match(content, /deprecated/i);
       // The array form is a complete enumeration — the trap worth naming.
-      expect(content).toMatch(/complete enumeration/i);
+      assert.match(content, /complete enumeration/i);
     });
 
     it('table instruct should steer to the object form', () => {
       const content = read(INSTRUCT_DIR, 'fluent_instruct_table.md');
-      expect(content).toContain('actions: { read: true');
-      expect(content).toMatch(/complete enumeration/i);
+      assert.ok(content.includes('actions: { read: true'));
+      assert.match(content, /complete enumeration/i);
     });
 
     it('column spec should document mtom and the corrected referenceKey meaning', () => {
       const content = read(SPEC_DIR, 'fluent_spec_column.md');
-      expect(content).toContain('mtom');
-      expect(content).toContain('referenceKey');
-      expect(content).toContain('sys_m2m');
+      assert.ok(content.includes('mtom'));
+      assert.ok(content.includes('referenceKey'));
+      assert.ok(content.includes('sys_m2m'));
       // referenceKey no longer means many-to-many; that moved to mtom.
-      expect(content).toMatch(/instead of sys_id/i);
+      assert.match(content, /instead of sys_id/i);
     });
 
     it('ui-action spec should document iconName and showIconOnly on both form and list', () => {
       const content = read(SPEC_DIR, 'fluent_spec_ui-action.md');
-      expect((content.match(/iconName/g) ?? []).length).toBeGreaterThanOrEqual(2);
-      expect((content.match(/showIconOnly/g) ?? []).length).toBeGreaterThanOrEqual(2);
-      expect(content).toContain('retina_icons');
+      assert.ok((content.match(/iconName/g) ?? []).length >= 2);
+      assert.ok((content.match(/showIconOnly/g) ?? []).length >= 2);
+      assert.ok(content.includes('retina_icons'));
     });
 
     it('form spec should document $meta.installMethod as newly functional', () => {
       const content = read(SPEC_DIR, 'fluent_spec_form.md');
-      expect(content).toContain('$meta');
-      expect(content).toContain('installMethod');
-      expect(content).toContain('first install');
+      assert.ok(content.includes('$meta'));
+      assert.ok(content.includes('installMethod'));
+      assert.ok(content.includes('first install'));
     });
 
     it('playbook spec should document timerSchedule on startWithDelay', () => {
       const content = read(SPEC_DIR, 'fluent_spec_playbook.md');
-      expect(content).toContain('timerSchedule');
-      expect(content).toContain('cmn_schedule');
+      assert.ok(content.includes('timerSchedule'));
+      assert.ok(content.includes('cmn_schedule'));
       // Present on all three discriminated variants.
-      expect((content.match(/timerSchedule/g) ?? []).length).toBeGreaterThanOrEqual(3);
+      assert.ok((content.match(/timerSchedule/g) ?? []).length >= 3);
     });
 
     it('catalog-variable spec should document the widened dependentQuestion union', () => {
       const content = read(SPEC_DIR, 'fluent_spec_catalog-variable.md');
-      expect(content).toContain('dependentQuestion');
-      expect(content).toContain('useDynamicDefault');
-      expect(content).toContain('dotWalkPath');
-      expect(content).toContain('ReferenceVariable');
-      expect(content).toContain('RequestedForVariable');
+      assert.ok(content.includes('dependentQuestion'));
+      assert.ok(content.includes('useDynamicDefault'));
+      assert.ok(content.includes('dotWalkPath'));
+      assert.ok(content.includes('ReferenceVariable'));
+      assert.ok(content.includes('RequestedForVariable'));
     });
 
     it('catalog-ui-policy spec should document the new action variable property', () => {
       const content = read(SPEC_DIR, 'fluent_spec_catalog-ui-policy.md');
-      expect(content).toContain('variable');
-      expect(content).toContain('variableName');
+      assert.ok(content.includes('variable'));
+      assert.ok(content.includes('variableName'));
     });
 
     it('catalog-client-script spec should document the order property', () => {
       const content = read(SPEC_DIR, 'fluent_spec_catalog-client-script.md');
-      expect(content).toContain('order');
+      assert.ok(content.includes('order'));
     });
   });
 
   describe('Cross-cutting capabilities in coding_in_fluent prompt (v4.10.1)', () => {
     it('should list SDK v4.10.1 capabilities including both new types and the changed APIs', () => {
       const content = read(PROMPT_DIR, 'coding_in_fluent.md');
-      expect(content).toContain('SDK v4.10.1');
+      assert.ok(content.includes('SDK v4.10.1'));
       for (const term of [
         'StateModel', 'atf.list', 'useEsLatest', 'TableActionAccess',
         'mtom', 'iconName', 'timerSchedule', 'dependentQuestion',
         'sys_domain', 'now-sdk cicd',
       ]) {
-        expect(content).toContain(term);
+        assert.ok(content.includes(term));
       }
     });
 
     it('should name the four framework-managed fields $override cannot set', () => {
       const content = read(PROMPT_DIR, 'coding_in_fluent.md');
       for (const field of ['sys_id', 'sys_scope', 'sys_update_name', 'sys_domainpath']) {
-        expect(content).toContain(field);
+        assert.ok(content.includes(field));
       }
     });
   });
@@ -250,16 +256,16 @@ describe('SDK v4.10.1 Types - Integration Tests', () => {
   describe('State Model steering added to the guides it supersedes', () => {
     it('business-rule instruct should redirect state-machine work to a State Model', () => {
       const content = read(INSTRUCT_DIR, 'fluent_instruct_business-rule.md');
-      expect(content).toContain('State Model');
-      expect(content).toContain('setAbortAction');
+      assert.ok(content.includes('State Model'));
+      assert.ok(content.includes('setAbortAction'));
       // The transform no longer infers add_message from message.
-      expect(content).toContain('addMessage: true');
+      assert.ok(content.includes('addMessage: true'));
     });
 
     it('data-policy instruct should distinguish a state condition from a transition gate', () => {
       const content = read(INSTRUCT_DIR, 'fluent_instruct_data-policy.md');
-      expect(content).toContain('State Model');
-      expect(content).toContain('Mandatory Fields');
+      assert.ok(content.includes('State Model'));
+      assert.ok(content.includes('Mandatory Fields'));
     });
   });
 
@@ -269,28 +275,28 @@ describe('SDK v4.10.1 Types - Integration Tests', () => {
       const instruct = read(INSTRUCT_DIR, 'fluent_instruct_catalog-variable.md');
       // The release note calls this "dependent questions" controlling "visibility or
       // options"; the shipped guide files it under "Dynamic Default Values".
-      expect(spec).toMatch(/dynamic[-\s]\*?default/i);
-      expect(instruct).toMatch(/dynamic[-\s]\*?default/i);
+      assert.match(spec, /dynamic[-\s]\*?default/i);
+      assert.match(instruct, /dynamic[-\s]\*?default/i);
       // Visibility belongs to CatalogUiPolicy — the correction must name the real owner.
-      expect(instruct).toContain('CatalogUiPolicy');
+      assert.ok(instruct.includes('CatalogUiPolicy'));
     });
 
     it('atf-server spec keeps runServerSideScript, which was NOT new in 4.10.x', () => {
       const content = read(SPEC_DIR, 'fluent_spec_atf-server.md');
       // Already present in 4.9.0; the note's "added surface support" is a correction.
-      expect(content).toContain('runServerSideScript');
-      expect(content).not.toContain('SDK v4.10');
+      assert.ok(content.includes('runServerSideScript'));
+      assert.ok(!content.includes('SDK v4.10'));
     });
 
     it('state-model spec does not claim $meta support the declaration lacks', () => {
       const content = read(SPEC_DIR, 'fluent_spec_state-model.md');
-      expect(content).not.toContain('$meta: {');
+      assert.ok(!content.includes('$meta: {'));
     });
 
     it('business-rule spec keeps addMessage as the explicit switch (no surface change)', () => {
       const content = read(SPEC_DIR, 'fluent_spec_business-rule.md');
-      expect(content).toContain('addMessage');
-      expect(content).toContain('message');
+      assert.ok(content.includes('addMessage'));
+      assert.ok(content.includes('message'));
     });
   });
 });
