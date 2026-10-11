@@ -11,8 +11,9 @@
  *   .test-build/<stage>/test/...       compiled tests
  *
  * Only the requested files are compiled, so an in-progress file in another part
- * of test/ cannot block an unrelated run. Each stage is an independent directory,
- * so concurrent runs with different stage names do not interfere.
+ * of test/ cannot block an unrelated run. Each stage is an independent directory.
+ * Stage names are validated (see stageRootFor), so every stage, and every deletion
+ * of one, stays directly under .test-build/.
  *
  * Nothing here is published: `files` in package.json lists only dist and res,
  * and .test-build/ is outside both.
@@ -22,9 +23,41 @@ import { copyFileSync, cpSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { ownedSpawnOptions } from './process-tree.mjs';
+
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const buildRoot = path.join(projectRoot, '.test-build');
 export const tscBin = path.join(projectRoot, 'node_modules', 'typescript', 'bin', 'tsc');
+
+/** A stage name is one plain directory name: no separators, no leading dot, so no `..`. */
+const STAGE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+/**
+ * Absolute staging root for a stage name. Validated before anything is deleted: the
+ * name must be one plain segment, and the resolved root must sit directly inside
+ * .test-build/ (so `..`, separators, and absolute paths are rejected).
+ * @param {string} stage
+ * @returns {string}
+ */
+export function stageRootFor(stage) {
+  if (!STAGE_NAME.test(stage)) {
+    throw new Error(`Invalid stage name "${stage}": use letters, digits, '.', '_' or '-', starting with a letter or digit.`);
+  }
+  const stageRoot = path.join(buildRoot, stage);
+  if (path.relative(buildRoot, stageRoot) !== stage) {
+    throw new Error(`Stage "${stage}" resolves outside ${buildRoot}`);
+  }
+  return stageRoot;
+}
+
+/**
+ * Removes a stage directory. Deletion goes through stageRootFor, so it can only
+ * reach a direct child of .test-build/.
+ * @param {string} stage
+ */
+export function removeStage(stage) {
+  rmSync(stageRootFor(stage), { recursive: true, force: true });
+}
 
 /**
  * Compile the given test files into .test-build/<stage>/ and stage package
@@ -35,7 +68,7 @@ export const tscBin = path.join(projectRoot, 'node_modules', 'typescript', 'bin'
  */
 export function stageTests(testFiles, stage = 'default') {
   if (testFiles.length === 0) throw new Error('stageTests requires at least one test file');
-  const stageRoot = path.join(buildRoot, stage);
+  const stageRoot = stageRootFor(stage);
   rmSync(stageRoot, { recursive: true, force: true });
   mkdirSync(stageRoot, { recursive: true });
 
@@ -53,8 +86,11 @@ export function stageTests(testFiles, stage = 'default') {
   };
   writeFileSync(path.join(stageRoot, 'tsconfig.json'), JSON.stringify(stageConfig, null, 2) + '\n');
 
+  // Owned like the runner's children (see process-tree.mjs): a terminal's Ctrl+C reaches only
+  // the wrapper, which acts on it after this compile returns (a few seconds for the full suite).
   execFileSync(process.execPath, [tscBin, '-p', path.join(stageRoot, 'tsconfig.json')], {
     cwd: projectRoot,
+    ...ownedSpawnOptions(),
     stdio: 'inherit',
   });
   copyFileSync(path.join(projectRoot, 'package.json'), path.join(stageRoot, 'package.json'));
