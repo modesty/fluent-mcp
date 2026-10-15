@@ -76,12 +76,14 @@ class WireClient {
     this.client.onmessage = (message) => { this.received.push(message as Frame); };
   }
 
-  static async connect(): Promise<WireClient> {
+  static async connect(firstRequestId = 1): Promise<WireClient> {
     const [clientEnd, serverEnd] = InMemoryTransport.createLinkedPair();
     const server = new FluentMcpServer();
     await server.start(serverEnd);
     await clientEnd.start();
-    return new WireClient(clientEnd, server);
+    const wire = new WireClient(clientEnd, server);
+    wire.nextId = firstRequestId;
+    return wire;
   }
 
   /** Sends a 2026-era request: every request carries the `_meta` envelope. */
@@ -380,6 +382,28 @@ describe('dual-era wire protocol', () => {
       assert.ok(res.result.instructions.includes('explain_fluent_api'));
     });
 
+    it('rebuilds after a modern discovery probe followed by a legacy initialize', async () => {
+      const probe = await wire.modern('server/discover');
+      assert.equal(probe.error, undefined);
+
+      const initialized = await wire.legacyInitialize();
+      assert.equal(initialized.error, undefined);
+      assert.equal(initialized.result.protocolVersion, LEGACY_VERSION);
+      await wire.notify('notifications/initialized');
+
+      const tools = await wire.legacy('tools/list');
+      assert.equal(tools.error, undefined);
+      assert.ok(tools.result.tools.some((tool: Frame) => tool.name === 'get-api-spec'));
+      assert.equal(tools.result.ttlMs, undefined);
+      const called = await wire.legacy('tools/call', {
+        name: 'get-api-spec', arguments: { metadataType: 'business-rule' },
+      });
+      assert.equal(called.error, undefined);
+      assert.equal(called.result.isError, false);
+      assert.ok(called.result.content[0].text.length > 100);
+      assert.deepStrictEqual(wire.serverInitiatedRequests(), []);
+    });
+
     it('does not declare roots, sampling, elicitation or logging as server capabilities', async () => {
       const res = await wire.legacyInitialize();
 
@@ -413,7 +437,7 @@ describe('dual-era wire protocol', () => {
       assert.equal(res.result.cacheScope, undefined);
     });
 
-    it('serves the same tool set as the modern era', async () => {
+    it('serves identical tool schemas and annotations in both eras', async () => {
       await wire.legacyInitialize();
       await wire.notify('notifications/initialized');
 
@@ -421,6 +445,15 @@ describe('dual-era wire protocol', () => {
       const names = res.result.tools.map((t: Frame) => t.name);
       assert.ok(names.includes('init_fluent_app'));
       assert.deepStrictEqual(names, [...names].sort());
+
+      const modernWire = await WireClient.connect();
+      try {
+        const modern = await modernWire.modern('tools/list');
+        assert.equal(modern.error, undefined);
+        assert.deepStrictEqual(res.result.tools, modern.result.tools);
+      } finally {
+        await modernWire.close();
+      }
     });
 
     it('serves resources and prompts, and still reports a miss as -32602', async () => {
@@ -468,20 +501,21 @@ describe('dual-era wire protocol', () => {
 describe('wire-level cancellation at the process boundary (W13)', () => {
   let wire: WireClient;
 
-  beforeEach(async () => {
-    wire = await WireClient.connect();
-  });
-
   afterEach(async () => {
     await wire?.close();
   });
 
-  const eras: Array<[string, boolean]> = [
-    ['2026-07-28', true],
-    ['2025-11-25', false],
+  const cases: Array<[string, boolean, number]> = [
+    ['2026-07-28', true, 0],
+    ['2026-07-28', true, 1],
+    ['2025-11-25', false, 0],
+    ['2025-11-25', false, 1],
   ];
-  for (const [_era, modern] of eras) {
-    it(`cancels a live tools/call through the child process for the ${_era} era`, { timeout: 20_000 }, async () => {
+  for (const [_era, modern, requestId] of cases) {
+    it(`cancels tools/call id ${requestId} through the child process for the ${_era} era`, { timeout: 20_000 }, async () => {
+      // Legacy consumes one id for initialize. Negative ids are legal JSON-RPC
+      // ids, so starting at -1 lets the first tool request exercise id zero.
+      wire = await WireClient.connect(requestId - (modern ? 0 : 1));
       const tempDir = await mkdtemp(path.join(os.tmpdir(), 'fluent-mcp-cancel-'));
       const pidPath = path.join(tempDir, 'child.pid');
       let childPid: number | undefined;
@@ -503,6 +537,7 @@ describe('wire-level cancellation at the process boundary (W13)', () => {
             name: 'sdk_info',
             arguments: { flag: '-v' },
           }, 1_000);
+        assert.equal(pending.requestId, requestId);
         const cancelledResponse = pending.response.catch(() => undefined);
 
         childPid = await waitForPidFile(pidPath);
@@ -515,7 +550,7 @@ describe('wire-level cancellation at the process boundary (W13)', () => {
 
         await waitForProcessExit(childPid);
 
-        // sdk@2.0.0 aborts a cancelled request and intentionally suppresses its
+        // The SDK aborts a cancelled request and intentionally suppresses its
         // response. The existing process-runner robustness test proves the
         // underlying result is exit 130 with the cancellation/SIGKILL text;
         // this wire test proves the cancellation reaches that process boundary.
