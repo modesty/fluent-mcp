@@ -37,12 +37,15 @@ The server requires **no client capabilities** and issues **no server→client r
 
 ### Protocol Behavior
 
-- Dual-era stdio: a 2026-07-28 opening (per-request `_meta` envelope, `server/discover`) and a 2025-11-25 `initialize` are both served from the same handler set; the SDK entry point pins one era per connection.
+- Dual-era stdio on `@modelcontextprotocol/server@2.3.1`: a 2026-07-28 opening (per-request `_meta` envelope, `server/discover`) and a 2025-11-25 `initialize` are both served from the same handler set; the SDK entry point pins one era per connection.
 - The six cacheable results of 2026-07-28 (`tools/list`, `prompts/list`, `resources/list`, `resources/templates/list`, `resources/read`, `server/discover`) advertise `ttlMs: 3600000` / `cacheScope: 'public'` — everything they return is static for the process lifetime.
 - The server advertises instructions during initialization; `tools/list` is a side-effect-free read that returns tools in deterministic name order.
 - Optional tool arguments advertise their canonical JSON types so clients render normal form fields. The enforced call schema additionally accepts `null` as an omitted value; `workingDirectory` also treats an empty string as omitted before applying the fallback chain.
 - Structured logs go to stderr, keeping stdout reserved for MCP protocol traffic. Runtime `logging/setLevel` and `notifications/message` are not used.
 - Resource misses use the standard JSON-RPC invalid-params code (`-32602`).
+- Closing stdin closes the connection and aborts in-flight commands. Clients must keep stdin open until they have read the responses they need.
+
+See the [MCP SDK 2.3.1 upgrade notes](doc/upgrade-mcp-2.3.1.md) for changed, deprecated, and newly added APIs and compatibility checks.
 
 ## Quick Start
 
@@ -126,7 +129,8 @@ Standardized URI patterns following MCP specification:
 | **API Specs** | `sn-spec://{type}` | `sn-spec://business-rule` | API documentation and parameters |
 | **Instructions** | `sn-instruct://{type}` | `sn-instruct://script-include` | Best practices and guidance |
 | **Code Snippets** | `sn-snippet://{type}/{id}` | `sn-snippet://acl/0001` | Practical code examples |
-| **Prompts** | `sn-prompt://{id}` | `sn-prompt://coding_in_fluent` | Development guides |
+
+Development guides are exposed through `prompts/list` and `prompts/get` (`coding_in_fluent` and `create_custom_ui`), and appear on the Inspector's **Prompts** tab.
 
 ### Supported Metadata Types
 

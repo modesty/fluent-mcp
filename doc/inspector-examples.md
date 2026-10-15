@@ -1,6 +1,6 @@
 # MCP Inspector Usage Examples for fluent-mcp
 
-This guide provides detailed examples and workflows for using the MCP Inspector to test and debug the fluent-mcp server.
+This guide describes the MCP Inspector 2.10.0 UI used to test the built fluent-mcp server. The live session negotiated MCP 2025-11-25; testing the newer protocol era separately remains necessary.
 
 ## Table of Contents
 - [Getting Started](#getting-started)
@@ -17,11 +17,10 @@ This guide provides detailed examples and workflows for using the MCP Inspector 
 
 **Option 1: Test the built server**
 ```bash
-npm run build
-npm run inspect
+npm run build && npm run inspect
 ```
 
-**Option 2: Test during development (no build)**
+**Option 2: Build and test the development bundle**
 ```bash
 npm run inspect:dev
 ```
@@ -33,10 +32,11 @@ npm run inspect:published
 
 ### Initial Connection
 
-1. The Inspector opens a web browser automatically
-2. You'll see the connection status in the Server Connection Pane
-3. Wait for "Connected" status
-4. The five capability tabs will become active: Resources, Prompts, Tools, Notifications
+1. Open the local Inspector URL printed in the terminal if the browser does not open automatically.
+2. On **Servers**, find the `node` server. It initially appears disconnected.
+3. Enable its connection switch and wait for the connected state.
+4. Use the top navigation: **Servers**, **Tools**, **Prompts**, and **Resources**.
+5. Use the right monitoring sidebar: **Console** displays server stderr; **Protocol** displays JSON-RPC traffic. These are separate views, and Console entries do not imply MCP logging support.
 
 ## Testing Tools
 
@@ -47,15 +47,16 @@ npm run inspect:published
 **Steps:**
 1. Navigate to the **Tools** tab
 2. Find `sdk_info` in the tools list
-3. Click on the tool to expand its details
+3. Select the tool to display its parameter form; use **Edit as JSON** when a JSON input is easier
 4. Set the `flag` parameter to `-v` (for version)
-5. Click **Execute**
-6. Verify the output shows the ServiceNow SDK version
+5. Click **Execute Tool**
+6. Inspect **Results** and verify the output shows the ServiceNow SDK version
 
 **Expected Output:**
 ```
-✅ Output:
-@servicenow/sdk version: 4.13.6
+ServiceNow SDK Version Information:
+
+4.13.6
 ```
 
 ### Example 2: Test check_auth_status Tool
@@ -66,7 +67,7 @@ npm run inspect:published
 1. Navigate to the **Tools** tab
 2. Find `check_auth_status` in the tools list
 3. Take no parameters — the tool accepts none
-4. Click **Execute**
+4. Click **Execute Tool**
 5. Verify the response reports whether a credential alias was resolved for `SN_INSTANCE_URL`
 
 **Expected Output:** a `structuredContent` payload describing the configured instance and
@@ -86,14 +87,15 @@ that no instance is configured and names the remedy rather than failing.
 1. Navigate to the **Tools** tab
 2. Find `build_fluent_app` in the tools list
 3. Set parameters:
+   - `workingDirectory`: the absolute path to a disposable Fluent project
    - `debug`: `true` (optional)
-4. Click **Execute**
+4. Click **Execute Tool**
 5. Check the output for build results
 
 **Notes:**
 - This command requires a valid Fluent project directory
 - If no working directory is set, you'll get an error message
-- Monitor the Notifications pane for detailed logging
+- Inspect **Results** for the build outcome and **Console** for server stderr
 
 ## Testing Resources
 
@@ -143,20 +145,17 @@ that no instance is configured and names the remedy rather than failing.
 - Best practices are included
 - Content is relevant to the metadata type
 
-### Example 7: Test Prompts
+### Example 7: Access the Coding Guide
 
-**Purpose:** Access development guides and best practices
+**Purpose:** Access the development guide through the prompt interface
 
 **Steps:**
-1. Navigate to the **Resources** tab
-2. Find `sn-prompt://coding_in_fluent`
-3. Click to view the prompt content
-4. Review the development guide
+1. Navigate to **Prompts**
+2. Select `coding_in_fluent`
+3. Click **Get Prompt**
+4. Review the returned messages, following [Example 8](#example-8-view-available-prompts)
 
-**What to Verify:**
-- Prompt content loads successfully
-- Guide provides actionable information
-- Content follows MCP prompt format
+The Resources view exposes `sn-spec://`, `sn-instruct://`, and `sn-snippet://` URIs. Prompt content is available through **Prompts**, not a resource URI.
 
 ## Testing Prompts
 
@@ -168,12 +167,15 @@ that no instance is configured and names the remedy rather than failing.
 1. Navigate to the **Prompts** tab
 2. View the list of available prompts
 3. Click on a prompt to see its details
-4. Review the prompt structure and arguments
+4. For `coding_in_fluent`, leave the optional `metadata_list` argument empty, or supply metadata types to tailor the prompt
+5. Click **Get Prompt**
+6. Inspect the returned messages and their text content
 
 **What to Verify:**
 - All prompts are listed
 - Each prompt has a clear description
 - Arguments are properly defined
+- **Get Prompt** returns non-empty messages for each listed prompt
 
 ## Environment Configuration
 
@@ -189,13 +191,13 @@ SN_INSTANCE_URL=https://dev12345.service-now.com \
 SN_AUTH_TYPE=oauth \
 npm run inspect
 ```
-3. Check the **Notifications** pane for initialization messages
+3. Connect the server on **Servers** and inspect **Console** for initialization messages
 4. Verify the environment variables are recognized
 
 **What to Verify:**
 - Server starts with environment variables
-- Auto-auth validation may trigger (if configured)
-- No errors in notifications
+- `check_auth_status` performs lazy authentication validation when requested
+- Instance tools have the required credential alias before a real instance operation is tested
 
 ### Example 10: Test with Different Environments
 
@@ -242,7 +244,7 @@ SN_INSTANCE_URL=https://company.service-now.com SN_AUTH_TYPE=oauth npm run inspe
    - Execute with test inputs
 
 5. **Monitor:**
-   - Watch Notifications for errors
+   - Inspect **Results**, **Console**, and **Protocol** for errors
    - Verify output format
    - Test edge cases
 
@@ -264,7 +266,7 @@ SN_INSTANCE_URL=https://company.service-now.com SN_AUTH_TYPE=oauth npm run inspe
    - Attempt to load the resource
 
 4. **Debug:**
-   - Check Notifications pane for errors
+   - Check **Console** for server errors and **Protocol** for failed resource reads
    - Verify file path is correct
    - Ensure naming matches convention
 
@@ -286,13 +288,14 @@ SN_INSTANCE_URL=https://company.service-now.com SN_AUTH_TYPE=oauth npm run inspe
    - Execute `build_fluent_app`
    - Check error message about working directory
 
-3. **Monitor notifications:**
-   - Look for "No working directory found" messages
-   - Verify fallback behavior logs
+3. **Verify the error:**
+   - Check **Results** for an actionable error naming `workingDirectory` and `FLUENT_MCP_WORKING_DIR`
+   - Confirm the server does not silently use its own installation directory
 
-4. **Simulate with directory:**
-   - Note: Inspector doesn't support init, but you can observe behavior
-   - Check that root context is used as fallback
+4. **Supply a directory:**
+   - Set the tool's `workingDirectory` argument to an absolute Fluent project path and execute again
+   - Alternatively, restart with `FLUENT_MCP_WORKING_DIR` set before launching Inspector
+   - Resolution is per-call argument → session → configuration → error; MCP Roots are not used
 
 ### Workflow 4: Validate All Capabilities
 
@@ -300,11 +303,10 @@ SN_INSTANCE_URL=https://company.service-now.com SN_AUTH_TYPE=oauth npm run inspe
 
 1. **Launch Inspector:**
    ```bash
-   npm run build
-   npm run inspect
+   npm run build && npm run inspect
    ```
 
-2. **Check Tools (should see 17 tools, in alphabetical order):**
+2. **Check Tools (17 tools: 13 SDK commands and four resource/authentication tools):**
    - build_fluent_app
    - check_auth_status
    - cicd_fluent_app
@@ -326,21 +328,23 @@ SN_INSTANCE_URL=https://company.service-now.com SN_AUTH_TYPE=oauth npm run inspe
    Note: authentication is handled lazily from environment variables and is surfaced
    through `check_auth_status`; there is no `manage_fluent_auth` tool.
 
-3. **Check Resources:**
-   - Verify all metadata types have specs
-   - Spot-check snippets
-   - Verify instructions load
-   - Test prompts
+3. **Check Resources and Prompts:**
+   - The tested build lists 224 resource URIs and zero resource templates
+   - Read every listed URI and verify non-empty `text/markdown` content
+   - Check API specifications, instructions, and snippets
+   - On **Prompts**, use **Get Prompt** for every listed prompt and inspect the messages
 
 4. **Execute smoke tests:**
    - Run `sdk_info` with `-v` flag
-   - Test a few non-destructive commands
-   - Verify error handling
+   - Exercise each resource tool and local SDK command using a disposable Fluent project
+   - Verify invalid arguments return actionable errors
+   - Use `check_auth_status` to establish whether live instance testing is available
+   - Without a configured `SN_INSTANCE_URL`, validation guards for `deploy_fluent_app`, `download_fluent_app`, `query_fluent_records`, `cicd_fluent_app`, and `cicd_fluent_test` do not establish successful instance operations
 
 5. **Monitor performance:**
    - Check response times
    - Look for timeout issues
-   - Verify no memory leaks in notifications
+   - Inspect terminal and **Console** output for runtime errors; a short UI test alone does not establish memory stability
 
 ## Troubleshooting
 
@@ -365,8 +369,8 @@ SN_INSTANCE_URL=https://company.service-now.com SN_AUTH_TYPE=oauth npm run inspe
 **Solutions:**
 1. Check command requires working directory (session-aware commands)
 2. Verify environment variables are set if needed
-3. Look at Notifications pane for detailed error messages
-4. Test the underlying SDK is installed: `now-cli --version`
+3. Inspect **Results** and **Console** for detailed error messages
+4. Test the bundled SDK through `sdk_info` with `flag: "-v"`
 
 ### Issue: Resources not appearing
 
@@ -378,7 +382,7 @@ SN_INSTANCE_URL=https://company.service-now.com SN_AUTH_TYPE=oauth npm run inspe
 1. Verify resource files exist in `res/` directory
 2. Check file naming follows convention
 3. Ensure `ResourceLoader` initialized correctly
-4. Look for initialization errors in Notifications
+4. Look for initialization errors in **Console**
 
 ### Issue: Environment variables not working
 
@@ -387,7 +391,7 @@ SN_INSTANCE_URL=https://company.service-now.com SN_AUTH_TYPE=oauth npm run inspe
 
 **Solutions:**
 1. Verify syntax: `VAR=value npm run inspect` (no spaces around `=`)
-2. Check server logs in Notifications pane
+2. Check server logs in **Console**
 3. Try setting in shell first: `export VAR=value`, then `npm run inspect`
 4. Verify the server code reads the environment variable
 
@@ -406,52 +410,53 @@ SN_INSTANCE_URL=https://company.service-now.com SN_AUTH_TYPE=oauth npm run inspe
 
 ### Custom Working Directory
 
-While the Inspector doesn't support setting working directories directly, you can:
+Project-aware tools expose `workingDirectory` in their input schema. Set it in the parameter form or **Edit as JSON**:
 
-1. Modify server code temporarily to set a default working directory
-2. Use environment variables in your command implementations
-3. Test working directory fallback behavior
+```json
+{
+  "workingDirectory": "/absolute/path/to/disposable-fluent-project"
+}
+```
+
+For a default shared by project-aware calls, launch with:
+
+```bash
+FLUENT_MCP_WORKING_DIR=/absolute/path/to/disposable-fluent-project npm run inspect
+```
+
+The path must be absolute, non-empty, and different from the filesystem root. Neither the Inspector connection nor the server's current directory supplies a project implicitly.
 
 ### Batch Testing with Scripts
 
-Create a test script to automate common checks:
+A launch script can print a manual checklist; it does not execute or verify the checks itself:
 
 ```bash
 #!/bin/bash
 # test-with-inspector.sh
+set -e
 
-echo "Building project..."
 npm run build
 
-echo "Starting Inspector..."
-npm run inspect
+echo "Inspector checklist:"
+echo "1. Connect the node server"
+echo "2. Verify all 17 tools are present"
+echo "3. Execute sdk_info with flag -v"
+echo "4. Read resources and get prompts"
+echo "5. Review Results, Console, and Protocol for errors"
 
-echo "Inspector should now be running. Test the following:"
-echo "1. Verify all 17 tools are present"
-echo "2. Execute sdk_info -v"
-echo "3. Check resources load"
-echo "4. Review notifications for errors"
+npm run inspect
 ```
 
 ### Integration with CI/CD
 
-While Inspector is primarily interactive, you can use it in CI for smoke tests:
-
-```yaml
-# .github/workflows/inspector-test.yml
-- name: Smoke test with Inspector
-  run: |
-    npm run build
-    # Launch Inspector in background, run automated tests
-    # (Requires headless browser setup)
-```
+The interactive Inspector launch is not a CI assertion. An automated check must connect a client, execute requests, assert the returned results, and stop the processes. Keep protocol tests and the repository's native test suite in CI; use the Inspector to verify the UI against the built artifact.
 
 ## Best Practices
 
 1. **Always rebuild** before testing changes: `npm run build`
-2. **Monitor Notifications** - they contain valuable debugging info
+2. **Monitor Results, Console, and Protocol** - distinguish tool results, server stderr, and JSON-RPC traffic
 3. **Test incrementally** - verify each change before moving on
-4. **Use dev mode** for rapid iteration without rebuilding
+4. **Use dev mode** to build and inspect the development bundle
 5. **Document test cases** - keep a checklist of scenarios to verify
 6. **Test error cases** - try invalid inputs to verify error handling
 7. **Check all tabs** - Tools, Resources, Prompts all provide unique insights
@@ -460,5 +465,5 @@ While Inspector is primarily interactive, you can use it in CI for smoke tests:
 
 - [MCP Inspector Documentation](https://modelcontextprotocol.io/docs/tools/inspector)
 - [fluent-mcp README](../README.md)
-- [fluent-mcp CLAUDE.md](../CLAUDE.md)
+- [fluent-mcp AGENTS.md](../AGENTS.md)
 - [Model Context Protocol Specification](https://spec.modelcontextprotocol.io)
