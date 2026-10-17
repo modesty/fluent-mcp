@@ -1,0 +1,6 @@
+interface:
+  display_name: "Fluent CLI"
+  short_description: "Build Fluent apps and query ServiceNow instances with now-sdk."
+
+policy:
+  allow_implicit_invocation: true
