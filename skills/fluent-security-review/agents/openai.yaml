@@ -1,0 +1,6 @@
+interface:
+  display_name: "Fluent Security Review"
+  short_description: "Run all 46 ServiceNow App security checks on either Fluent or classic XML apps."
+
+policy:
+  allow_implicit_invocation: true

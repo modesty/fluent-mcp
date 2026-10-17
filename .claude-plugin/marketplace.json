@@ -1,0 +1,13 @@
+{
+  "name": "modesty",
+  "owner": {
+    "name": "Modesty Zhang"
+  },
+  "plugins": [
+    {
+      "name": "fluent-skillset",
+      "source": "./",
+      "description": "ServiceNow Fluent (now-sdk) skills for building applications, querying live instances, and running security reviews."
+    }
+  ]
+}

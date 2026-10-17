@@ -1,0 +1,11 @@
+{
+  "name": "fluent-skillset",
+  "version": "0.8.1",
+  "description": "ServiceNow Fluent (now-sdk) skills for building applications, querying live instances, and running security reviews.",
+  "author": {
+    "name": "Modesty Zhang"
+  },
+  "repository": "https://github.com/modesty/fluent-mcp/",
+  "license": "Apache-2.0",
+  "keywords": ["servicenow", "fluent", "now-sdk", "security-review", "skill"]
+}

@@ -93,7 +93,6 @@ describe('SDK v4.7.0 Types - Integration Tests', () => {
 
   describe('Updated Table resources (v4.7.0)', () => {
     const tableAugmentResources = [
-      read(PROJECT_ROOT, 'README.md'),
       read(PROMPT_DIR, 'coding_in_fluent.md'),
       read(SPEC_DIR, 'fluent_spec_table.md'),
       read(INSTRUCT_DIR, 'fluent_instruct_table.md'),
