@@ -2,11 +2,10 @@
 /**
  * Deterministic General Best-Practice Scanner for ServiceNow Fluent & Classic XML Apps.
  *
- * Baseline derived from ServiceNow Application Scanner (sn_remotescan) rules in
- * certification-scanner-plugin, refined to eliminate legacy regex false positives
- * (e.g., GlideElement/Map .get() calls, callback-based g_form.getReference(),
- * packaged sys_id references, and multi-line comments) and to support both
- * Fluent (.now.ts / .ts / .js) and Classic XML (update/ / metadata/ / dictionary/) apps.
+ * Evaluates the 31 ServiceNow general best-practice checks (Scripting & Configuration),
+ * refined to avoid common regex false positives (e.g., GlideElement/Map .get() calls,
+ * callback-based g_form.getReference(), packaged sys_id references, and multi-line comments)
+ * across both Fluent (.now.ts / .ts / .js) and Classic XML (update/ / metadata/ / dictionary/) apps.
  *
  * Usage:
  *   node scan_general_checks.mjs [app-directory] [--json]

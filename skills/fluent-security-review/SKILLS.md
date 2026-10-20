@@ -3,6 +3,7 @@ name: fluent-security-review
 description: Perform a ServiceNow App security review across all 46 security checks for either Fluent (now.config.json) **or** classic XML (update/) applications.
 license: Apache-2.0
 compatibility: Works with Fluent projects (src/, metadata/) and classic ServiceNow XML apps (update/, unload/)
+allowed-tools: Bash(node *)
 metadata:
   argument-hint: "[app-directory]"
 ---
@@ -18,23 +19,27 @@ Action: Detect the application structure and scope before running the 46 securit
    - Scan Fluent source files under `src/` (`.now.ts`, `.ts`, `.js`, `.html`, `.scss`) and XML files under `metadata/` (including `metadata/update/` and `metadata/unload*/`).
 2. **Classic / Non-Fluent App (no `now.config.json`):**
    - Read scope from `sys_app_*.xml`, `sys_store_app_*.xml`, or `<sys_scope>` tags.
-   - Scan all XML payload files under `update/` and `unload/` (`unload.demo`).
-3. **Hybrid App:** Scan all of `src/`, `metadata/`, `update/`, and `unload/`.
+   - Scan all XML payload files under `update/`, `unload/` (`unload.demo`), and `dictionary/`.
+3. **Hybrid App:** Scan all of `src/`, `metadata/`, `update/`, `unload/`, and `dictionary/`.
 
-Rule: Evaluate every check below against the detected files. Mark checks targeting absent artifact types as **N/A** (count as passed/compliant where relevant).
+Rule: Run the security baseline scanner script first:
+
+```bash
+node <skill-dir>/scripts/scan_security_checks.mjs <app-directory>
+```
+
+Then read all four reference files in order and evaluate all 46 checks against the detected files (combining the deterministic script output with semantic inspection of context-dependent access control, data flow, and endpoint logic). Mark checks targeting absent artifact types as **N/A** (count as passed/compliant where relevant).
 
 ---
 
-## Security Checks (46 Items — Sorted by Impact)
+## Security Checks (46 Items — Sorted by Risk Level)
 
-Read all three reference files in order and evaluate every check against the detected application files:
+Read all four reference files in order and evaluate every check against the detected application files:
 
-1. **High Impact (16 checks)** — Cross-scope, global, system, or instance-wide exposure:
-   - Read [references/high_impact.md](./references/high_impact.md)
-2. **Medium Impact (25 checks)** — Scoped application data, endpoints, UI, and access control:
-   - Read [references/medium_impact.md](./references/medium_impact.md)
-3. **Low Impact (5 checks)** — Supply chain, packaging hygiene, privacy, and defense-in-depth:
-   - Read [references/low_impact.md](./references/low_impact.md)
+1. **Critical Risk Checks (7 checks)**: Read [references/critical_risk_checks.md](./references/critical_risk_checks.md)
+2. **High Risk Checks (26 checks)**: Read [references/high_risk_checks.md](./references/high_risk_checks.md)
+3. **Medium Risk Checks (12 checks)**: Read [references/medium_risk_checks.md](./references/medium_risk_checks.md)
+4. **Low / Process Risk Checks (1 check)**: Read [references/low_risk_checks.md](./references/low_risk_checks.md)
 
 ---
 
@@ -67,7 +72,7 @@ Always produce the review report using this exact Markdown structure:
 
 *(If no checks failed, write: "No security findings detected.")*
 
-### [P0 | P1 | P2 | P3 | P4] `<check_id>` — <Check Title> (Impact: High | Medium | Low)
+### [P0 | P1 | P2 | P3 | P4] `<check_id>` — <Check Title> (Impact: Critical | High | Medium | Low)
 - **Location:** `<file_path>:<line>`
 - **Issue:** Brief, clear statement of what failed.
 - **Suggested Fix:** Brief, clear, actionable remediation in plain English (with a minimal code/XML snippet when helpful).

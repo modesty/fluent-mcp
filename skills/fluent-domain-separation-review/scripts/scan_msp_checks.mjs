@@ -2,9 +2,8 @@
 /**
  * Deterministic MSP Ready / Domain Separation Scanner for ServiceNow Fluent & Classic XML Apps.
  *
- * Baseline derived from ServiceNow Application Scanner (sn_remotescan) rules in
- * certification-scanner-plugin (br_sys_domain, ui_action_sys_overrides) and the
- * 10 MSP Domain Separation checks in the Certification Master List.
+ * Evaluates the 10 MSP & Domain Separation checks across both Fluent
+ * (.now.ts / .ts / .js) and Classic XML (update/ / metadata/ / dictionary/) apps.
  *
  * Usage:
  *   node scan_msp_checks.mjs [app-directory] [--json]
