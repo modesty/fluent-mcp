@@ -1,0 +1,6 @@
+interface:
+  display_name: "Fluent General Review"
+  short_description: "Run all 31 ServiceNow Best Practice (Scripting & Config) checks on Fluent or classic XML apps."
+
+policy:
+  allow_implicit_invocation: true
