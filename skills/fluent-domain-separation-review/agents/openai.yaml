@@ -1,0 +1,6 @@
+interface:
+  display_name: "Fluent Domain Separation Review"
+  short_description: "Run all 10 ServiceNow MSP Ready / Domain Separation checks on Fluent or classic XML apps."
+
+policy:
+  allow_implicit_invocation: true
