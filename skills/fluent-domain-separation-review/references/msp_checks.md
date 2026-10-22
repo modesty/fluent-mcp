@@ -1,6 +1,6 @@
-# MSP Ready / Domain Separation Checks
+# MSP / Domain Separation Checks
 
-> **Scope Note:** These 10 checks evaluate **MSP Ready (Domain Separation)** compliance for ServiceNow scoped applications. Checks 1–2 (`br_sys_domain`, `ui_action_sys_overrides`) enforce baseline package domain hygiene, while Checks 3–10 enforce multi-tenant data isolation, process override semantics, and domain assignment when `glide.sys.domain.partitioning` is active.
+> **Scope Note:** These 10 checks evaluate **MSP Ready(Domain Separation)** readiness for ServiceNow scoped applications. Checks 1–2 (`br_sys_domain`, `ui_action_sys_overrides`) enforce baseline package domain hygiene, while Checks 3–10 enforce multi-tenant data isolation, process override semantics, and domain assignment when `glide.sys.domain.partitioning` is active.
 
 1. **`msp_getDefaultDomain_cross_scope` — Missing `'getDefaultDomain'` Cross-Scope Privilege** [P0] (Impact: Critical)
    - *Check:* Inspect `CrossScopePrivilege()` in `.now.ts` and `sys_scope_privilege*.xml` records. When an MSP-ready scoped application assigns records to the default domain (`global.getDefaultDomain()`), it must package an active `sys_scope_privilege` record with `target_name: 'getDefaultDomain'`, `target_scope: 'global'`, `target_type: 'scriptable'`, `operation: 'execute'`, and `status: 'allowed'`. Without this record, default-domain Business Rules fail at runtime on MSP instances.

@@ -2,8 +2,8 @@
 /**
  * Deterministic Performance Scanner for ServiceNow Fluent & Classic XML Apps.
  *
- * Evaluates the scriptable subset of the 18 ServiceNow Performance certification checks.
- * Ports the certification-scanner rules and fixes their false positives/negatives: comments are
+ * Evaluates the scriptable subset of the 18 ServiceNow Performance checks.
+ * Ports the legacy performance-scanner rules and fixes their false positives/negatives: comments are
  * masked without touching string literals (no line-start-only comment detection, no skipped long
  * lines), recursion is keyed on `current.update()` instead of any `.update()`, the transform-map
  * Run script is only checked when `run_script` is true, `sys_id` dot-walks are limited to
@@ -45,7 +45,7 @@ const MARKUP_EXTS = new Set(['.html', '.xhtml', '.jelly']);
 const MODULE_EXTS = ['.ts', '.js', '.mjs', '.cjs', '.tsx', '.jsx'];
 
 const AUDIT_TABLE_RE = /^sys_audit/;
-// Other large system tables named by certification policy PERF-1
+// Other large system tables named by performance policy PERF-1
 const LARGE_SYSTEM_TABLES = new Set(['syslog', 'syslog_transaction', 'sys_email']);
 
 // Classic sys_script.when values → Fluent BusinessRule `when` (sdk-build-plugins business-rule-plugin)
@@ -195,7 +195,7 @@ const CHECKS = {
 
 const MANUAL_NOTES = {
   sys_direct_ws: `sys_direct_ws is manual: review integration code and design docs for Table API / direct SOAP writes (exempt: em_event).`,
-  dictionary_type_change: `dictionary_type_change (Recert only) was not evaluated: rerun with --baseline <previous-version-dir>.`,
+  dictionary_type_change: `dictionary_type_change (Upgrade only) was not evaluated: rerun with --baseline <previous-version-dir>.`,
 };
 
 function finding(checkId, priority, location, issue, fix = CHECKS[checkId].fix) {

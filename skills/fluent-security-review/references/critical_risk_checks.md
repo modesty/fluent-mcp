@@ -15,7 +15,7 @@ Security checks classified as **Critical** risk for ServiceNow scoped applicatio
    - *Fix:* Enforce server-side authorization and record ownership checks using `GlideRecordSecure` or explicit `canRead()` / `canWrite()` / `canCreate()` / `canDelete()` guards before reading or mutating records.
 
 4. **`manual_security_review` — Manual Security Review (JARVIS & Application Files) ⚑** [P0] (Impact: Critical)
-   - *Check:* Perform a deep static security review across application files for high-risk platform vectors tracked by JARVIS and Certification Security:
+   - *Check:* Perform a deep static security review across application files for high-risk platform vectors tracked by JARVIS:
      - `GlideEvaluator`, `GlideScriptEvaluator`, `GlideFilter`, or `GlideController` invoked with untrusted/user-controlled input
      - `setDisplayValue()` called on `password` or `password2` fields (stores credentials in clear text instead of encrypting)
      - Deprecated `GlideEncrypter` (3DES) usage instead of KMF (`sn_kmf_ns`) or `CertificateEncryption`

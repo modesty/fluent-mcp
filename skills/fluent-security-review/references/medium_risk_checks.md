@@ -28,7 +28,7 @@ Security checks classified as **Medium** risk for ServiceNow scoped applications
 
 5. **`public_pages` — Public Pages (`sys_public`)** [P2] (Impact: Medium)
    - *Check:* Inspect `sys_public*.xml` and `Record({ table: 'sys_public' })` records. Entries in `sys_public` make UI Pages or tables publicly accessible without login.
-   - *Fix:* Remove `sys_public` records and protect pages with authenticated roles unless public unauthenticated access is strictly required and justified for certification review.
+   - *Fix:* Remove `sys_public` records and protect pages with authenticated roles unless public unauthenticated access is strictly required and justified.
 
 6. **`push_notification_install` — Push Notification Installations** [P3] (Impact: Medium)
    - *Check:* Check for any `sys_push_notif_app_install*.xml` (`Record({ table: 'sys_push_notif_app_install' })`) records captured in the application scope.

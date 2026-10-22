@@ -2,8 +2,8 @@
 
 Packaged schema, import, reporting, and integration configuration that degrades instance performance or upgrades.
 
-1. **`dictionary_type_change` — Dictionary Type Change** *(Recert only)* [P0] (Impact: Critical)
-   - *Check:* Compare every column's type with the previously certified version: the Fluent column constructor (`StringColumn` → `IntegerColumn`, or `GenericColumn({ columnType })`) or `sys_dictionary` `<internal_type>`. Changing the type of an existing column forces a data conversion on upgrade and can truncate or lose data. Run the scanner with `--baseline <previous-version-dir>`; without a baseline, inspect `git log -p` on table definitions. N/A for a first certification.
+1. **`dictionary_type_change` — Dictionary Type Change** *(Upgrade only)* [P0] (Impact: Critical)
+   - *Check:* Compare every column's type with the previously released version: the Fluent column constructor (`StringColumn` → `IntegerColumn`, or `GenericColumn({ columnType })`) or `sys_dictionary` `<internal_type>`. Changing the type of an existing column forces a data conversion on upgrade and can truncate or lose data. Run the scanner with `--baseline <previous-version-dir>`; without a baseline, inspect `git log -p` on table definitions. N/A for a first release.
    - *Fix:* Keep the existing column, add a new column with the new type, migrate data with a fix script, and retire the old column.
 
 2. **`sys_direct_ws` — Direct System Web Service Writes** *(Manual)* [P1] (Impact: High)
