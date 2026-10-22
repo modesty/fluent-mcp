@@ -1,6 +1,6 @@
 ---
 name: fluent-perf-review
-description: Perform a ServiceNow App performance review across all 18 Performance certification checks (plus general memory, CPU, and query efficiency) for either Fluent (now.config.json) **or** classic XML (update/) applications.
+description: Perform a ServiceNow App performance review across all 18 Performance checks (plus general memory, CPU, and query efficiency) for either Fluent (now.config.json) **or** classic XML (update/) applications.
 license: Apache-2.0
 compatibility: Works with Fluent projects (src/, metadata/) and classic ServiceNow XML apps (update/, unload/)
 allowed-tools: Bash(node *)
@@ -22,7 +22,7 @@ Action: Detect the application structure and scope before running the 18 perform
    - Scan all XML payload files under `update/`, `unload/` (`unload.demo`), and `dictionary/`.
 3. **Hybrid App:** Scan all of `src/`, `metadata/`, `update/`, `unload/`, and `dictionary/`.
 
-Rule: Run the deterministic performance scanner first (add `--baseline` for a recertification):
+Rule: Run the deterministic performance scanner first (add `--baseline` when reviewing an upgrade of a previously released version):
 
 ```bash
 node <skill-dir>/scripts/scan_perf_checks.mjs <app-directory> [--baseline <previous-version-dir>]

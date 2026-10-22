@@ -81,5 +81,5 @@ Always produce the review report using this exact Markdown structure:
 
 - **Status:** **PASS** *(0 P0/P1 findings)* | **FAIL** *(1 or more P0/P1 findings, or unresolved P2 functional/portability exposures)*
 - **Recommended Next Steps:**
-  1. Ordered, concise action items to remediate P0 → P1 → P2 → P3 findings and pass the certification review.
+  1. Ordered, concise action items to remediate P0 → P1 → P2 → P3 findings and pass the best-practice review.
 ```

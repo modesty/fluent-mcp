@@ -229,7 +229,7 @@ function scanHtmlAndExternalSources({ content, relFile, baseLine, findings }) {
         impact: 'High',
         location: `${relFile}:${lineNum}`,
         issue: `External source / frame tag detected ("${line.trim().slice(0, 80)}").`,
-        fix: `Remove <iframe>/<frame>/<embed>/<object> tags unless approved by a certification security exception.`,
+        fix: `Remove <iframe>/<frame>/<embed>/<object> tags unless approved by a documented security exception.`,
       });
     }
 

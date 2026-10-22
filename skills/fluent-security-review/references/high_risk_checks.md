@@ -44,7 +44,7 @@ Security checks classified as **High** risk for ServiceNow scoped applications.
 
 11. **`external_sources` — External Sources ⚑** [P2] (Impact: High)
     - *Check:* Scan `sys_ui_page*.xml`, `sys_ui_macro*.xml`, `sp_widget*.xml`, `sys_ui_script*.xml`, and `.html`/UI files for tags that load external sources or frames: `<iframe>`, `<frame>`, `<frameset>`, `<embed src=...>`, `<video src=...>`, `<input src=...>`, or `<object data=...>`.
-    - *Fix:* Remove `<iframe>` and external embed/object tags (`"If you can do it without an iframe, do it without an iframe"`), or document a valid business justification for certification security exception review and enforce strict `sandbox` and CSP headers.
+    - *Fix:* Remove `<iframe>` and external embed/object tags (`"If you can do it without an iframe, do it without an iframe"`), or document a valid business justification for a security exception and enforce strict `sandbox` and CSP headers.
 
 12. **`glidescopedevaluator` — GlideScopedEvaluator** [P1] (Impact: High)
     - *Check:* Search server scripts for `GlideScopedEvaluator`. When present, verify all four requirements:
