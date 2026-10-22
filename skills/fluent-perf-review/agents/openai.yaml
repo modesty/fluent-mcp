@@ -1,0 +1,6 @@
+interface:
+  display_name: "Fluent Performance Review"
+  short_description: "Run ServiceNow App Performance checks on Fluent or classic XML apps."
+
+policy:
+  allow_implicit_invocation: true
