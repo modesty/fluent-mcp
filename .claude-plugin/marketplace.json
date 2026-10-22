@@ -7,7 +7,7 @@
     {
       "name": "fluent-skillset",
       "source": "./",
-      "description": "ServiceNow Fluent (now-sdk) skills for building applications, querying live instances, and running security, general best-practice, and domain separation (MSP) reviews."
+      "description": "ServiceNow Fluent (now-sdk) skills for building applications, querying live instances, and running security, general best-practice, performance, and domain separation (MSP) reviews."
     }
   ]
 }

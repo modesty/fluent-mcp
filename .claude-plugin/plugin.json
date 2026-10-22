@@ -1,11 +1,11 @@
 {
   "name": "fluent-skillset",
-  "version": "0.9.1",
-  "description": "ServiceNow Fluent (now-sdk) skills for building applications, querying live instances, and running security, general best-practice, and domain separation (MSP) reviews.",
+  "version": "0.9.2",
+  "description": "ServiceNow Fluent (now-sdk) skills for building applications, querying live instances, and running security, general best-practice, performance, and domain separation (MSP) reviews.",
   "author": {
     "name": "Modesty Zhang"
   },
   "repository": "https://github.com/modesty/fluent-mcp/",
   "license": "Apache-2.0",
-  "keywords": ["servicenow", "fluent", "now-sdk", "security-review", "general-review", "domain-separation", "msp", "skill"]
+  "keywords": ["servicenow", "fluent", "now-sdk", "security-review", "general-review", "performance-review", "domain-separation", "msp", "skill"]
 }
