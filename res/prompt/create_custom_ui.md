@@ -95,6 +95,7 @@ Look up `ui-page-guide`, `ui-page-patterns-guide`, and `ui-page-theming-guide` w
 - Preloading content linked from HTML isn't supported (`rel="preload"`)
 - Relative style sheets linked from HTML aren't supported (`rel="stylesheet"`). Import your style sheets into code instead (`import "path/to/style-sheet"`)
 - `@import` in CSS files isn't supported (relative or remote) — import each style sheet from code instead
+- Never include `.ts` or `.tsx` extensions in import paths (`import App from './app'`, not `'./app.tsx'`) — TypeScript resolves them, and an extension fails the build with `TS5097` (SDK v4.14.0 `ui-page-guide`)
 - CSS modules aren't supported
 - Audio, video, and WASM files aren't supported
 - Output paths must be deterministic — don't configure hashed file names

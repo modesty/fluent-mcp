@@ -14,7 +14,7 @@ Test({
     table: 'cmdb_ci',
     fieldValues: { 'name': 'Before I wake' },
     assertType: 'record_successfully_inserted',
-    enforceSecurity: false,
+    enforceSecurity: true,
   })
 
   // Insert a record into 'change_request' with Configuration item = the configuration item from previous step and Planned start date = '2019-07-25 05:30:00', Planned end date = '2019-07-25 05:40:00', Short description = 'CI Already Scheduled'
@@ -28,7 +28,7 @@ Test({
       'short_description': 'CI Already Scheduled'
     },
     assertType: 'record_successfully_inserted',
-    enforceSecurity: false,
+    enforceSecurity: true,
   })
 
   // Insert another record into 'change_request' with Configuration item = the configuration item from previous step and Planned start date = '2019-07-25 05:30:00', Planned end date = '2019-07-25 05:40:00', Short description = 'CI Already Scheduled'
@@ -42,7 +42,7 @@ Test({
       'short_description': 'CI Already Scheduled'
     },
     assertType: 'record_successfully_inserted',
-    enforceSecurity: false,
+    enforceSecurity: true,
   })
 
   // Validate there is at least one record in 'conflict' matching query: Change = change from previous step and Type = CI Already Scheduled
@@ -50,7 +50,7 @@ Test({
     $id: Now.ID['0004'],
     table: 'conflict',
     fieldValues: `change=${changeRequestInsert2.recordId}^type=CI Already Scheduled`,
-    enforceSecurity: false,
+    enforceSecurity: true,
     assertType: 'records_match_query',
   })
 })

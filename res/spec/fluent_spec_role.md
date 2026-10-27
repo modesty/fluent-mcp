@@ -11,5 +11,7 @@ Role({
     grantable: true, // boolean, mandatory
     containsRoles: [get_sys_id('sys_user_role', '')], // array of Record<'sys_user_role'>, optional, either sys_id or Role object
     scopedAdmin: false, // boolean, mandatory
+    suffix: '', // string, optional (SDK v4.14.0+) - short identifier written to sys_user_role.suffix. Defaults to `name` minus the
+        // '<scope>.' prefix (e.g. 'manager' for 'x_acme.manager'); set it only to keep a different value (an explicit non-empty value wins)
 }): Role; // returns a Role object
 ```

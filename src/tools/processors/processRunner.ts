@@ -1,5 +1,6 @@
 import { spawn, SpawnOptionsWithoutStdio } from 'node:child_process';
-import { ProcessResult, ProcessRunner } from '../../utils/types.js';
+import { EXIT_CODE_CANCELLED, EXIT_CODE_TIMEOUT, ProcessResult, ProcessRunOptions, ProcessRunner } from '../../utils/types.js';
+import { BoundedBuffer, DEFAULT_MAX_OUTPUT_CHARS } from '../../utils/boundedOutput.js';
 import { getConfig } from '../../config.js';
 import logger from '../../utils/logger.js';
 
@@ -11,73 +12,11 @@ import logger from '../../utils/logger.js';
  */
 const FALLBACK_PROCESS_TIMEOUT_MS = 30_000;
 
-/**
- * Default cap on retained stdout/stderr per stream (characters). Protects server
- * memory against a runaway child and the model's token budget against oversized
- * output. Kept as head + tail with an elision marker (see BoundedBuffer).
- */
-const DEFAULT_MAX_OUTPUT_CHARS = 60_000;
-
-/** Fraction of the output budget retained from the head (the rest is the tail). */
-const HEAD_BUDGET_RATIO = 0.6;
-
 /** Delay before checking for prompts after stdout data (allows buffering) */
 const STDIN_PROMPT_CHECK_DELAY_MS = 50;
 
 /** Delay before closing stdin after all input lines written */
 const STDIN_CLOSE_DELAY_MS = 200;
-
-/** Exit code reported when a command is terminated for exceeding its timeout. */
-const EXIT_CODE_TIMEOUT = 124;
-
-/** Exit code reported when a command is cancelled by the MCP client. */
-const EXIT_CODE_CANCELLED = 130;
-
-/**
- * Accumulates streamed text while retaining at most `headMax + tailMax`
- * characters — the head (start of output) plus a sliding tail (most recent
- * output). Memory stays bounded regardless of how much a child process emits;
- * when output exceeds the budget the middle is dropped and reported via an
- * elision marker. `.toString()` reconstructs head + marker + tail.
- */
-class BoundedBuffer {
-  private head = '';
-  private tail = '';
-  private total = 0;
-
-  constructor(private readonly headMax: number, private readonly tailMax: number) {}
-
-  append(text: string): void {
-    if (!text) return;
-    this.total += text.length;
-
-    // Fill the head first; overflow (and everything after) feeds the sliding tail.
-    if (this.head.length < this.headMax) {
-      const room = this.headMax - this.head.length;
-      this.head += text.slice(0, room);
-      const overflow = text.slice(room);
-      if (overflow) this.pushTail(overflow);
-    } else {
-      this.pushTail(text);
-    }
-  }
-
-  private pushTail(text: string): void {
-    // Keep only the last `tailMax` chars. The transient `tail + text` is bounded
-    // by tailMax plus one stream chunk (Node caps 'data' events well below this).
-    this.tail = this.tailMax > 0 ? (this.tail + text).slice(-this.tailMax) : '';
-  }
-
-  private get truncated(): boolean {
-    return this.total > this.head.length + this.tail.length;
-  }
-
-  toString(): string {
-    if (!this.truncated) return this.head + this.tail;
-    const elided = this.total - this.head.length - this.tail.length;
-    return `${this.head}\n\n... [${elided} characters truncated] ...\n\n${this.tail}`;
-  }
-}
 
 /**
  * Spawns child processes to execute CLI commands.
@@ -94,15 +33,14 @@ class BoundedBuffer {
 export class NodeProcessRunner implements ProcessRunner {
   private readonly defaultTimeoutMs: number;
   private readonly overrideTimeoutMs?: number;
-  private readonly headMax: number;
-  private readonly tailMax: number;
+  private readonly maxOutputChars: number;
 
   /**
    * @param options Test/DI overrides. `overrideTimeoutMs` (an operator global
    *   override sourced from `FLUENT_MCP_COMMAND_TIMEOUT_MS`) wins over any
    *   per-call timeout; `defaultTimeoutMs` is the fallback when a call omits one.
    *   Both default from `config.servicenowSdk`. `maxOutputChars` caps retained
-   *   output per stream.
+   *   output per stream; a call may raise its stdout cap (`maxStdoutChars`).
    */
   constructor(options?: { defaultTimeoutMs?: number; overrideTimeoutMs?: number; maxOutputChars?: number }) {
     // Defensive read: some tests mock config without a `servicenowSdk` block.
@@ -112,9 +50,7 @@ export class NodeProcessRunner implements ProcessRunner {
     this.defaultTimeoutMs = options?.defaultTimeoutMs ?? sdk?.commandTimeoutMs ?? FALLBACK_PROCESS_TIMEOUT_MS;
     this.overrideTimeoutMs = options?.overrideTimeoutMs ?? sdk?.commandTimeoutOverrideMs;
 
-    const maxOutputChars = options?.maxOutputChars ?? DEFAULT_MAX_OUTPUT_CHARS;
-    this.headMax = Math.max(1, Math.floor(maxOutputChars * HEAD_BUDGET_RATIO));
-    this.tailMax = Math.max(0, maxOutputChars - this.headMax);
+    this.maxOutputChars = options?.maxOutputChars ?? DEFAULT_MAX_OUTPUT_CHARS;
   }
 
   /**
@@ -131,7 +67,8 @@ export class NodeProcessRunner implements ProcessRunner {
     cwd?: string,
     stdinInput?: string,
     timeoutMs?: number,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    runOptions?: ProcessRunOptions
   ): Promise<ProcessResult> {
     const effectiveTimeout = this.resolveTimeout(timeoutMs);
 
@@ -157,8 +94,8 @@ export class NodeProcessRunner implements ProcessRunner {
         return;
       }
 
-      const stdout = new BoundedBuffer(this.headMax, this.tailMax);
-      const stderr = new BoundedBuffer(this.headMax, this.tailMax);
+      const stdout = new BoundedBuffer(runOptions?.maxStdoutChars ?? this.maxOutputChars);
+      const stderr = new BoundedBuffer(this.maxOutputChars);
 
       // Single-settle guard: the timeout, an external abort, `close`, and `error`
       // can all fire around a kill. Whichever wins settles the promise exactly
@@ -321,6 +258,7 @@ export class NodeProcessRunner implements ProcessRunner {
       stdout: stdout.toString().trim(),
       stderr: note ? [err, note].filter(Boolean).join('\n') : err,
       exitCode,
+      ...(stdout.truncated ? { stdoutTruncated: true } : {}),
     };
   }
 }

@@ -10,7 +10,7 @@ Always reference the RiskAssessment API specifications for more details.
    - Do not use `Assessment()` to build a change risk assessment either: it writes `asmt_metric_type`, not `change_risk_asmt`.
 5. **There is no `table` and no `evaluationMethod` property.** The build fixes the target to `change_request` and forces `evaluation_method` to `risk_assessment`.
    - Passing either property is a type error. The SDK risk-assessment guide's wording "defaults `table` to change_request … avoid overriding it" wrongly implies it can be overridden.
-   - `now-sdk build` does not type-check. A `table` smuggled past the type with a ts-ignore really is written, so never do that.
+   - `now-sdk build` reports that type error too, but a `table` smuggled past the type with a ts-ignore really is written, so never do that.
 6. **Only `$id` and `name` are mandatory.** Set `condition` explicitly anyway — e.g. `'active=true'`, or `'type=emergency'` to risk-assess only emergency changes. Set every category `filter` explicitly too, as a **subset** of `condition`.
    - There is no "generate assessable records" step to re-run: Change Management creates them automatically.
    - A missing or disjoint filter shows up as a blank section on the change's Risk Assessment view, with nothing to fix it after the fact.
@@ -35,6 +35,7 @@ Always reference the RiskAssessment API specifications for more details.
     - **A different risk assessment shows:** that is instance ordering/precedence between `change_risk_asmt` records, which Fluent does not expose.
 13. **Cross-cutting properties.**
     - `RiskAssessment` accepts `protectionPolicy` (written as `sys_policy` on every row).
-    - It accepts `$override` (root row only; `sys_domain` cannot be overridden).
+    - It accepts `$override` (root row only; a `sys_domain` override is ignored with a warning).
+    - **SDK v4.14.0 — `domain` and `domainPath`** (defaults `'global'` and `'/'`, inherited from the shared assessment fields) put the risk assessment and its categories, metrics and answer definitions in a domain; thresholds do not inherit it. Always set both for a non-global domain — `domainPath` is not enforced, and `domain` alone silently writes `'/'`.
     - It does **not** accept `$meta`.
     - Thresholds, categories and metrics accept only `$id`.

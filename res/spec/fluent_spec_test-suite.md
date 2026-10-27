@@ -13,13 +13,15 @@ TestSuite({
   //    Test()'s own steps derive order. Two entry forms may be mixed freely in one array. ──
   tests: [
     // Entry form A — bare reference: a Test(...) return value, or a raw 32-char sys_id string.
-    // Always runs with abortOnFailure: false.
+    // Always runs with abortOnFailure: false. Only a STANDARD test (TestInstance) is accepted: a reusable test
+    // (Test({ isReusable: true, ... }), SDK v4.14.0+) is TS2322 - add the standard tests that call it instead.
     someTest,
     'a1b2c3d4e5f67890a1b2c3d4e5f67890',
 
     // Entry form B — object form, for the two overrides:
     {
-      test: someOtherTest, // ReturnType<typeof Test> | string, mandatory - the test to include
+      test: someOtherTest, // TestInstance | string, mandatory - the test to include (TestInstance = a standard
+        // Test(...) return value; typed ReturnType<typeof Test> before SDK v4.14.0)
       abortOnFailure: true, // boolean, optional (default false) - stop the REST of the suite
         // immediately if this test fails. IGNORED by ATF's cloud/parallel test runner, which always
         // runs every test in the suite regardless — informational only there

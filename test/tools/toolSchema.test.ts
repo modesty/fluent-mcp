@@ -71,6 +71,7 @@ describe('Tool input schema — advertised (tools/list) and enforced (tools/call
       'deploy_fluent_app',
       'download_fluent_app',
       'download_fluent_dependencies',
+      'fluent_exec_script', // only to locate `file` inside the project
       'fluent_transform',
       'init_fluent_app',
       'pack_fluent_app',

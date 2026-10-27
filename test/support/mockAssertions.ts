@@ -3,7 +3,8 @@
  *
  * Native mocks expose `fn.mock.calls[i].arguments`, so these helpers check
  * calls directly (any call matches; no call matches) without a matcher library.
- * Argument comparison uses strict deep equality.
+ * Argument comparison uses strict deep equality, ignoring trailing `undefined`
+ * arguments: a callee cannot tell `f(a)` from `f(a, undefined)`.
  */
 import assert from 'node:assert/strict';
 import { inspect, isDeepStrictEqual } from 'node:util';
@@ -13,13 +14,21 @@ export interface RecordedMock {
   mock: { calls: ReadonlyArray<{ arguments: unknown[] }> };
 }
 
+/** The arguments without trailing `undefined` entries. */
+function withoutTrailingUndefined(args: readonly unknown[]): unknown[] {
+  let end = args.length;
+  while (end > 0 && args[end - 1] === undefined) end--;
+  return args.slice(0, end);
+}
+
 /**
  * Asserts that at least one call received exactly the expected arguments.
  */
 export function assertCalledWith(fn: RecordedMock, ...expected: unknown[]): void {
   const received = fn.mock.calls.map((call) => call.arguments);
+  const wanted = withoutTrailingUndefined(expected);
   assert.ok(
-    received.some((args) => isDeepStrictEqual(args, expected)),
+    received.some((args) => isDeepStrictEqual(withoutTrailingUndefined(args), wanted)),
     `expected a call with ${inspect(expected)}; received ${inspect(received)}`
   );
 }

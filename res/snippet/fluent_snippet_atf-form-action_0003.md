@@ -50,7 +50,7 @@ Test({
         table: 'incident',
         fieldValues: `problem_id=${outputOfCreateProblem.recordId}`, // string, servicenow encoded query
         recordId: outputOfSave.recordId, // sys_id of the record
-        enforceSecurity: false, // boolean
+        enforceSecurity: true, // boolean
         assertType: 'record_validated' // 'record_validated' | 'record_not_found'
     })
 })

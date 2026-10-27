@@ -139,7 +139,12 @@ MultipleChoiceVariable({
 CheckboxVariable({
     question: '',           // mandatory
     defaultValue: false,    // boolean, optional
-    // + all base properties
+    selectionRequired: false, // boolean, optional - the checkbox must be ticked (written to the variable's mandatory column);
+                            // takes the place of `mandatory`, and
+                            // cannot be true together with readOnly or hidden
+    readOnly: false,        // boolean, optional
+    hidden: false,          // boolean, optional
+    // + base properties, EXCEPT `mandatory` (TS2353 - use selectionRequired)
 })
 
 // Yes / No dropdown (equivalent to true/false but displayed as Yes/No options)
@@ -210,7 +215,7 @@ LabelVariable({
 // NOTE: RichTextLabelVariable does NOT accept `question`; the content lives in `richText`.
 RichTextLabelVariable({
     richText: '',           // string, mandatory — rich-text / HTML content
-    // + base properties (excluding `question`)
+    // + base properties (excluding `question`; mandatory/readOnly/hidden are not accepted - TS2353)
 })
 
 // HTML content block (embedded HTML in the form)
@@ -269,18 +274,33 @@ AttachmentVariable({
 // Embedded UI Page
 UIPageVariable({
     question: '',           // mandatory — UI Page name or sys_id
-    // + all base properties
+    // + base properties, EXCEPT mandatory/readOnly/hidden (not accepted - TS2353)
 })
 
-// Custom variable (advanced — define your own type)
+// Custom variable (advanced — render the variable with your own component)
+// Set the property for EACH context the item is ordered in. All five are optional and the build does not require or
+// diagnose any of them, but a variable with none set renders BLANK in every context. `macro` + `widget` can be combined
+// (Platform UI + Service Portal), and `summaryMacro` pairs with `macro`.
 CustomVariable({
     question: '',           // mandatory
-    // + all base properties
+    macro: '',              // string | Record<'sys_ui_macro'> | UiMacro, optional — Jelly macro for Classic/Platform UI catalog forms.
+                            // A UiMacro() object from the same project is accepted as of SDK v4.14.0; also Now.ref() or a sys_id
+    summaryMacro: '',       // string | Record<'sys_ui_macro'> | UiMacro, optional — read-only rendering on confirmation and
+                            // summary pages (UiMacro accepted as of SDK v4.14.0); omit for the default summary rendering
+    widget: '',             // string | Record<'sp_widget'> | SPWidget, optional — Service Portal widget; an SPWidget() object from
+                            // the same project is accepted as of SDK v4.14.0 (it was a type error before)
+    macroponent: '',        // string | Record<'sys_ux_macroponent'>, optional — Next Experience / UI Builder workspaces
+    topicBlock: '',         // string | Record<'sys_cs_topic'>, optional — Virtual Agent topic block for conversational ordering
+    // + base properties, EXCEPT mandatory/readOnly/hidden (not accepted - TS2353). Scoped catalog client scripts run with
+    // `window` = null, so never bridge to the macro through window
 })
 
-// Custom variable with label
+// Custom variable with label — the same five context properties as CustomVariable.
+// `mandatory`, `hidden` and `readOnly` are NOT supported on custom UI component variables.
 CustomWithLabelVariable({
     question: '',           // mandatory
-    // + all base properties
+    macro: '',              // string | Record<'sys_ui_macro'> | UiMacro, optional (see CustomVariable)
+    // summaryMacro, widget, macroponent, topicBlock — as on CustomVariable
+    // + base properties, EXCEPT mandatory/readOnly/hidden (not accepted - TS2353)
 })
 ```

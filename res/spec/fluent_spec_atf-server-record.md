@@ -5,7 +5,8 @@ atf.server.recordQuery({ // all props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
   table: '', // table name
   fieldValues: '', // string, servicenow encoded query
-  enforceSecurity: true, // boolean; defaults to true in SDK v4.5.0
+  enforceSecurity: true, // boolean; recordQuery DEFAULTS TO FALSE (the other record steps default to true) - set it
+    // to true explicitly so the query runs with the test user's access
   assert: 'records_match_query', // 'records_match_query' | 'no_records_match_query';
 }): { table: string; 
     firstRecord: string; // sys_id of the first record

@@ -5,6 +5,7 @@ import {
   CommandResult,
   CommandResultFactory,
   EnsureAuthValidated,
+  ProcessRunOptions,
 } from '../../utils/types.js';
 import { BaseCLICommand } from './baseCommand.js';
 import { SessionManager } from '../../utils/sessionManager.js';
@@ -124,6 +125,7 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
    * @param timeoutMs Optional command-specific timeout (falls back to this.timeoutMs)
    * @param signal Optional abort signal from the MCP client (kills the child on cancel)
    * @param explicitWorkingDirectory The per-call `workingDirectory` tool argument, if supplied
+   * @param options Optional per-call process options (e.g. a raised stdout capture cap)
    * @returns The command result
    */
   protected async executeWithSessionWorkingDirectory(
@@ -132,7 +134,8 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
     stdinInput?: string,
     timeoutMs?: number,
     signal?: AbortSignal,
-    explicitWorkingDirectory?: unknown
+    explicitWorkingDirectory?: unknown,
+    options?: ProcessRunOptions
   ): Promise<CommandResult> {
     try {
       const workingDirectory = this.getWorkingDirectory(explicitWorkingDirectory);
@@ -143,7 +146,7 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
       }
 
       const effectiveTimeout = timeoutMs ?? this.timeoutMs;
-      return await this.commandProcessor.process(command, args, workingDirectory, stdinInput, effectiveTimeout, signal);
+      return await this.commandProcessor.process(command, args, workingDirectory, stdinInput, effectiveTimeout, signal, options);
     } catch (error) {
       return CommandResultFactory.fromError(error);
     }
@@ -162,6 +165,7 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
    * @param flagMapping Optional mapping of arg names to CLI flags
    * @param positionalArgs Optional positional arguments to append at the end
    * @param signal Optional abort signal from the MCP client (kills the child on cancel)
+   * @param options Optional per-call process options (e.g. a raised stdout capture cap)
    * @returns The command result
    */
   protected async executeSdkCommand(
@@ -169,7 +173,8 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
     args: Record<string, unknown>,
     flagMapping: Record<string, string | { flag: string; hasValue: boolean; negatable?: boolean }> = {},
     positionalArgs: string[] = [],
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: ProcessRunOptions
   ): Promise<CommandResult> {
     // Defense-in-depth: validate/sanitize the caller's args before they become CLI
     // tokens. The root injection defense is spawning shell-free (see processRunner);
@@ -226,7 +231,8 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
       undefined,
       this.resolveTimeoutMs(args),
       signal,
-      args.workingDirectory
+      args.workingDirectory,
+      options
     );
   }
 

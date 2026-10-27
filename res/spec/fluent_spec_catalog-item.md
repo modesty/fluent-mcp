@@ -68,7 +68,7 @@ CatalogItem({
     mandatoryAttachment: false, // boolean, optional — require attachment on submit
     hideAttachment: false,  // boolean, optional — cannot be true when mandatoryAttachment is true
     useScLayout: true,      // boolean, optional — use service catalog form layout, default: true
-    customCart: '',         // string | Record<'sys_ui_macro'>, optional — custom cart macro
+    customCart: '',         // string | Record<'sys_ui_macro'> | UiMacro, optional — custom cart macro; a UiMacro() object from the same project is accepted as of SDK v4.14.0 (see the ui-macro spec; use category: 'catalog')
     noCart: false,          // boolean, optional — legacy cart visibility flag
     noOrder: false,         // boolean, optional — legacy order visibility flag
     noOrderNow: false,      // boolean, optional — legacy order-now visibility flag

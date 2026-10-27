@@ -13,6 +13,22 @@
 // entry that sets its own hint/help/plural overrides the column-level value for that language.
 //   e.g. StringColumn({ label: 'Key', hint: 'Correlation key from the source system', help: 'Set by the integration', plural: 'Keys' })
 
+// ─── `createRoles`, `readRoles`, `writeRoles`, `deleteRoles` (SDK v4.14.0+) — applies to EVERY column type below ───
+// Optional `(string | Role)[]` on the base Column config (NOT on OverrideColumn). Field-level role lists written to
+// sys_dictionary.create_roles / read_roles / write_roles / delete_roles as comma-separated role NAMES (a `Role()` record
+// resolves to its `name`). Use ONE array entry per role: a role string containing a comma (e.g. 'admin,itil') is a
+// build ERROR (TS11). Since v4.14.0 every column is written with these four attributes, empty when unset.
+//   e.g. StringColumn({ label: 'Salary band', readRoles: [managerRole, 'itil'], writeRoles: [managerRole] })
+
+// ─── `array`, `arrayDenormalized` — applies to EVERY column type below ───
+// `array?: boolean` creates an off-row array table that stores the field's values.
+// `arrayDenormalized?: boolean` (SDK v4.14.0+) keeps that off-row array table AND also stores the values on the parent
+// row as a comma-separated string (bootstrap `array="denormalized"`, sys_dictionary `array_denormalized=true`).
+// ALWAYS set it together with `array: true`. The type does not require it, and omitting `array` is only a build HINT that
+// `now-sdk build` never prints - the bootstrap still writes `array="denormalized"`, but the sys_dictionary record gets the
+// contradictory pair `array=false` + `array_denormalized=true`.
+//   e.g. tags: StringColumn({ label: 'Tags', array: true, arrayDenormalized: true })
+
 // Creates a new Column (`sys_dictionary`)
 StringColumn({
  active: false, // boolean
@@ -79,6 +95,7 @@ ReferenceColumn({
  referenceTable: '', // undefined | string, optional
  referenceKey: '', // string, optional - a field on the REFERENCED table to store in the database INSTEAD OF sys_id; the field must be unique and required on the referenced table (e.g. 'email' for sys_user)
  referenceQual: '', // string, optional - filter the reference based on a filter condition or a referenced value. Mutually exclusive with dynamicRefQual
+ referenceQualCondition: '', // string, optional (SDK v4.14.0+) - the condition-builder value of the reference qualifier, i.e. the 'simple' slot (an encoded query such as 'active=true^EQ'), written to sys_dictionary.reference_qual_condition. It does NOT change the derived mode: `dynamicRefQual` still implies 'dynamic' and `referenceQual` 'advanced', else 'simple'. The snake_case spelling `reference_qual_condition` is NOT an alias - it is silently dropped
  useReferenceQualifier: 'simple', // 'simple' | 'dynamic' | 'advanced', optional - the type of reference qualifier applied to the field
  dynamicRefQual: '', // string | Record<'sys_filter_option_dynamic'>, optional - dynamic reference qualifier, use with useReferenceQualifier: 'dynamic'. Mutually exclusive with referenceQual
  referenceFloats: false, // boolean, optional - the referenced table's form gets an "edit" button in the related list for the current table
@@ -160,7 +177,13 @@ ListColumn({
  mandatory: false, // boolean
  maxLength: 0, // number | string (no SDK default)
  readOnly: false, // boolean
- referenceTable: '', // undefined | string, optional
+ referenceTable: '', // undefined | string, optional - table containing the possible values (reference-based list)
+ choices: {}, // object, optional - choice values for a choice-based list, e.g. { choice_1: { label: 'Choice1' } }
+ dropdown: 'none', // 'none' | 'dropdown_with_none' | 'suggestion' | 'dropdown_without_none', optional - how the choices display
+ useReferenceQualifier: 'simple', // 'simple' | 'dynamic' | 'advanced', optional - reference qualifier mode: 'simple' with an encoded query, 'advanced' with a `javascript:` qualifier, 'dynamic' with dynamicRefQual
+ referenceQual: '', // string, optional - encoded query (e.g. 'active=true') or `javascript:` expression for the reference picker. Mutually exclusive with dynamicRefQual
+ dynamicRefQual: '', // string | Record<'sys_filter_option_dynamic'>, optional - dynamic reference qualifier, use with useReferenceQualifier: 'dynamic'. Mutually exclusive with referenceQual
+ referenceQualCondition: '', // string, optional (SDK v4.14.0+) - condition-builder value of the reference qualifier, written to sys_dictionary.reference_qual_condition (same semantics as on ReferenceColumn)
 }): ListColumn // returns a ListColumn object
 
 FieldNameColumn({

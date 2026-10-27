@@ -3,6 +3,7 @@ import type { ToolsManager } from '../tools/toolsManager.js';
 import { SessionManager } from '../utils/sessionManager.js';
 import { CommandResultFactory } from '../utils/types.js';
 import { AuthValidationResult } from '../types.js';
+import { cliErrorMessage } from '../utils/cliError.js';
 
 /**
  * Perform auto-authentication validation if environment is configured
@@ -63,6 +64,26 @@ export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): 
   try {
     // Validate existing auth profiles using the registered AuthCommand via ToolsManager
     const listRes = await toolsManager.runAuth({ list: true });
+    if (listRes.exitCode !== 0) {
+      // `auth --list` exits 0 even with no profiles ("No credentials found"), so a
+      // non-zero exit means the profile store itself could not be read — e.g. the
+      // SDK v4.14.0+ encrypted store (credentials.enc) cannot be decrypted. Report
+      // that instead of treating it as "no matching profile" and attempting an add
+      // that would fail on the same read.
+      const failure = describeAuthListFailure(listRes.output);
+      logger.warn('Auto-auth failed: could not list auth profiles', { error: failure });
+      return createResult({
+        status: 'validation_error',
+        host,
+        authType,
+        message: `Auth validation failed: could not list auth profiles: ${failure}`,
+        actionRequired: isCredentialStoreFailure(failure)
+          ? "Run 'now-sdk auth --delete all' in a terminal, then add the profile again: " +
+            buildAuthCommand(instUrl, authType, deriveAliasFromInstance(instUrl))
+          : buildAuthCommand(instUrl, authType, deriveAliasFromInstance(instUrl)),
+        timestamp,
+      });
+    }
     const profiles = parseAuthListOutput(listRes.output);
 
     const matched = profiles.find((p) => urlsEqual(p.host, instUrl));
@@ -301,6 +322,28 @@ function deriveAliasFromInstance(instUrl: string): string {
   }
 }
 
+/**
+ * The CLI logs failures as `[now-sdk] ERROR: <message>` on stdout. Return those
+ * messages (or the trimmed output when none are tagged) for the validation result.
+ */
+function describeAuthListFailure(output: string): string {
+  return cliErrorMessage(output ?? '', '') ?? (output?.trim() || 'now-sdk auth --list exited with an error and no output');
+}
+
+/**
+ * Whether the SDK v4.14.0+ credential store (`credentials.enc` + OS-keychain key)
+ * is unreadable in a way only a reset recovers: the CLI's own non-TTY message
+ * (`credential-store/index.js`), which also covers a truncated or corrupted file.
+ * Deliberately narrower than "any store error": a file written by a newer now-sdk
+ * ("…written in format version N… Upgrade now-sdk") must not be reset, because that
+ * destroys the newer data; and a keyring write failure during migration ("Could not
+ * write the credential encryption key…") is fixed by unlocking the keyring, while a
+ * reset would also delete the legacy keychain entry older SDK installs still read.
+ */
+function isCredentialStoreFailure(message: string): boolean {
+  return /Stored credentials at .+ could not be read/.test(message);
+}
+
 /** Parse `now-sdk auth --list` stdout into profiles */
 function parseAuthListOutput(stdout: string): { alias: string; host?: string; type?: string; username?: string; defaultYes: boolean }[] {
   const profiles: { alias: string; host?: string; type?: string; username?: string; defaultYes: boolean }[] = [];
@@ -311,7 +354,11 @@ function parseAuthListOutput(stdout: string): { alias: string; host?: string; ty
 
   for (const raw of lines) {
     const line = raw.trimEnd();
-    const headerMatch = line.match(/^\*?\[([^\]]+)\]/);
+    // A profile header is alone on its line (`*[alias]` / `[alias]`), which keeps
+    // CLI log lines such as `[now-sdk] Listing all credentials:` from parsing as one.
+    // Hardening: current output prints log lines only before the profiles, where a
+    // bogus `now-sdk` profile had no fields and was harmless.
+    const headerMatch = line.trim().match(/^\*?\[([^\]]+)\]$/);
     if (headerMatch) {
       if (current) profiles.push(current);
       // Mark default if the header starts with '*'

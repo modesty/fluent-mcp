@@ -1,4 +1,5 @@
 import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
+import { ENVELOPE_RUN_OPTIONS, shapeEnvelopeResult } from '../../utils/jsonSelect.js';
 import { SessionAwareCLICommand } from './sessionAwareCommand.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
 import { getProjectRootPath } from '../../config.js';
@@ -186,7 +187,7 @@ export class CicdTestCommand extends SessionAwareCLICommand {
       name: 'select',
       type: 'string',
       required: false,
-      description: 'Dot/bracket path to extract from the output (e.g. "result.interpretedResult.summary.testStatus" or "result.rollup_results[0].status"). Implies machine-readable output.',
+      description: 'Dot/bracket path to extract from the JSON envelope `{ ok, result, progress?, interpretedResult? }` (e.g. "interpretedResult.summary.testStatus" or "progress.status"). interpretedResult and progress are top-level keys, not under result; a waiting watch (SDK v4.14.0+) reports its outcome under progress and interpretedResult with an empty result. An unresolved path yields null. Applied by this tool to a successful (ok: true) envelope only; on a failure the full envelope is returned so the error stays visible (the CLI\'s own --select would print only null).',
     },
     {
       name: 'debug',
@@ -345,19 +346,22 @@ export class CicdTestCommand extends SessionAwareCLICommand {
 
     sdkArgs.push('--auth', resolvedAuth);
     sdkArgs.push('--output', typeof args.output === 'string' ? args.output : 'json');
-    if (args.select) sdkArgs.push('--select', String(args.select));
     this.appendCommonFlags(sdkArgs, args);
 
     // These leaves resolve nothing from the current directory (unlike the app-repo
     // operations, which default the app sys_id/version from the project), so the
     // installed package directory is a neutral cwd for spawning the bundled CLI.
-    return this.commandProcessor.process(
+    // `select` is applied here, not forwarded as --select; stdout is captured
+    // whole so the envelope parses (see jsonSelect).
+    const result = await this.commandProcessor.process(
       command,
       sdkArgs,
       getProjectRootPath(),
       undefined,
       this.timeoutMs,
-      signal
+      signal,
+      ENVELOPE_RUN_OPTIONS
     );
+    return shapeEnvelopeResult(result, args.select, args.output === 'raw');
   }
 }

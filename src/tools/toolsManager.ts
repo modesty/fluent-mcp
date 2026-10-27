@@ -16,6 +16,7 @@ import {
 import { buildInputZodSchema } from './toolSchema.js';
 import { autoValidateAuthIfConfigured } from '../server/fluentInstanceAuth.js';
 import loggingManager from '../utils/loggingManager.js';
+import { stripAnsi } from '../utils/cliError.js';
 
 /**
  * Owns the command registry and registers it onto MCP server instances.
@@ -229,28 +230,21 @@ export class ToolsManager {
   }
 
   /**
-   * Strip ANSI escape codes from CLI output to avoid wasting LLM tokens.
-   * Covers CSI sequences (colors, cursor, 24-bit), OSC (title), and charset selectors.
-   */
-  private stripAnsi(text: string): string {
-    // eslint-disable-next-line no-control-regex
-    return text.replace(/\x1B(?:\[[0-9;:]*[A-Za-z]|\][^\x07\x1B]*(?:\x07|\x1B\\)|\([A-B0-2]|[>=])/g, '');
-  }
-
-  /**
    * Format the result of a command execution.
    * On success, returns clean output only (isError field already conveys success/failure).
    * On failure, returns concise error with output context.
    */
   formatResult(result: { success: boolean, output: string, exitCode?: number, error?: string }): string {
-    const cleanOutput = this.stripAnsi(result.output);
+    const cleanOutput = stripAnsi(result.output);
 
     if (result.success) {
       return cleanOutput;
     }
 
-    const errorMsg = result.error || 'Unknown error';
-    return cleanOutput
+    const errorMsg = result.error ? stripAnsi(result.error).trim() : 'the command reported no error message';
+    // Show the output only when it adds something beyond the message itself
+    // (a command-layer rejection carries the same text in both).
+    return cleanOutput && cleanOutput.trim() !== errorMsg
       ? `Error (exit ${result.exitCode}): ${errorMsg}\n\nOutput:\n${cleanOutput}`
       : `Error (exit ${result.exitCode}): ${errorMsg}`;
   }

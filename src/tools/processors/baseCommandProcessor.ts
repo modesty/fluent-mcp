@@ -1,4 +1,4 @@
-import { CommandProcessor, CommandResult } from '../../utils/types.js';
+import { CommandProcessor, CommandResult, ProcessRunOptions } from '../../utils/types.js';
 
 /**
  * Abstract base class for command processors with working directory resolution.
@@ -28,6 +28,7 @@ export abstract class BaseCommandProcessor implements CommandProcessor {
     customWorkingDir?: string,
     stdinInput?: string,
     timeoutMs?: number,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: ProcessRunOptions
   ): Promise<CommandResult>;
 }

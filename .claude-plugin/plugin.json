@@ -1,6 +1,6 @@
 {
   "name": "fluent-skillset",
-  "version": "0.9.3",
+  "version": "0.10.0",
   "description": "ServiceNow Fluent (now-sdk) skills for building applications, querying live instances, and running security, general best-practice, performance, and domain separation (MSP) reviews.",
   "author": {
     "name": "Modesty Zhang"

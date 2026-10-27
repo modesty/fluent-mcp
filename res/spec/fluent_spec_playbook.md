@@ -476,6 +476,14 @@ PlaybookDefinition(
 //   aiAgentRunWithRoles?: (string | Record<'sys_user_role'>)[]
 //   aiAgentSupportedActions?: ('update_record' | 'create_record' | 'mark_complete')[]
 //   conversationalAgents?: (string | Record<'sn_aia_agent'>)[] — AI agents from AI Agent Studio
+// (SDK v4.14.0+) enableAiAgent / aiAgentObjective / aiAgentExecutionMode / aiAgentRunAs are ALWAYS settable on an
+//   AI-capable definition, even when its aiAgentFieldDisplayPreferences omits them (the four OOB definitions already expose
+//   them, so this only matters for custom ActivityDefinitions). aiAgentObjAdditionalDetail, aiAgentRunWithRoles,
+//   aiAgentSupportedActions and conversationalAgents stay filtered by those preferences. aiAgentUser is @internal
+//   @deprecated — never author it.
+// Every AI field other than enableAiAgent only has an effect on an activity that also sets enableAiAgent: true — the SDK
+//   does not warn otherwise, the platform ignores the values, and transform does not reconstruct them from a record whose
+//   enable_ai_agent is false.
 // PLATFORM PREREQUISITES the SDK does NOT validate: the `sn_genai_platform` store app must be installed
 // and `sn_pa_designer.enable_agentic_playbooks` must be true, or the configuration has no runtime effect.
 

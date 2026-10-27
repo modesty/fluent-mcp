@@ -23,7 +23,7 @@ Test({
       'unauthorized': 'true'
     },
     assertType: 'record_successfully_inserted',
-    enforceSecurity: false
+    enforceSecurity: true
   })
 
   atf.form.openExistingRecord({

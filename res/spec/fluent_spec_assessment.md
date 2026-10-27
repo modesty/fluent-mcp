@@ -1,4 +1,4 @@
-# **Context:** Assessment API spec (SDK v4.12.0+): Defines a ServiceNow **assessment or survey** as one nested entity — one `Assessment()` call writes the definition row (`asmt_metric_type`) plus every category (`asmt_metric_category`), question/metric (`asmt_metric`) and answer option (`asmt_metric_definition`); the `metric_type`, `category` and `metric` foreign keys are wired from the nesting, so never set them. Import `Assessment` from `@servicenow/sdk/core`. **Side effects of a scored assessment** (`evaluationMethod: 'assessment'`, the default): two `sys_script` business rules on `table` — a trigger rule (`when: 'after'`, insert/update) that runs `AssessmentUtils.checkRecord()` guarded by `AssessmentUtils.conditionCheck()` against `condition`, and a delete rule (`when: 'before'`) that runs `AssessmentUtils.checkDeleteRecord()` — plus a **third** `sys_script` (after update, order 300) only when the assessment is scored, `scheduleType: 'scheduled'`, `userField` is set and `state: 'published'`, all together; and whenever `scheduleType: 'scheduled'`, a `sys_trigger` job that ships **inactive** (state 0, no `next_action`). Surveys (`evaluationMethod: 'survey'`) get none of these. **Build-time rules:** a scored assessment needs `table` and an **integer** `scaleFactor` (a **build diagnostic** — the type marks both optional, and `now-sdk build` does not type-check); definition keys must be integer strings; `state: 'published'` needs at least one category and at least one metric per category. Use `RiskAssessment` (`fluent_spec_risk-assessment.md`) for change-request risk.
+# **Context:** Assessment API spec (SDK v4.12.0+): Defines a ServiceNow **assessment or survey** as one nested entity — one `Assessment()` call writes the definition row (`asmt_metric_type`) plus every category (`asmt_metric_category`), question/metric (`asmt_metric`) and answer option (`asmt_metric_definition`); the `metric_type`, `category` and `metric` foreign keys are wired from the nesting, so never set them. Import `Assessment` from `@servicenow/sdk/core`. **Side effects of a scored assessment** (`evaluationMethod: 'assessment'`, the default): two `sys_script` business rules on `table` — a trigger rule (`when: 'after'`, insert/update) that runs `AssessmentUtils.checkRecord()` guarded by `AssessmentUtils.conditionCheck()` against `condition`, and a delete rule (`when: 'before'`) that runs `AssessmentUtils.checkDeleteRecord()` — plus a **third** `sys_script` (after update, order 300) only when the assessment is scored, `scheduleType: 'scheduled'`, `userField` is set and `state: 'published'`, all together; and whenever `scheduleType: 'scheduled'`, a `sys_trigger` job that ships **inactive** (state 0, no `next_action`). Surveys (`evaluationMethod: 'survey'`) get none of these. **Build-time rules:** a scored assessment needs `table` and an **integer** `scaleFactor` (a **build diagnostic** — the type marks both optional, so no type error catches an omission); definition keys must be integer strings; `state: 'published'` needs at least one category and at least one metric per category. Use `RiskAssessment` (`fluent_spec_risk-assessment.md`) for change-request risk.
 
 ```typescript
 // ══ FORM 1 of 2 — SCORED ASSESSMENT (evaluationMethod 'assessment', the default) ══
@@ -59,8 +59,13 @@ Assessment({
 
   // ── Cross-cutting (Now.Internal.WithIdAndMetadata) ──
   protectionPolicy: 'read', // 'read' | 'protected', optional - written as sys_policy on EVERY row, including the generated business rules
-  // $override: { u_custom: 'x' }, // Record<string, string | boolean | number>, optional - root row only. sys_domain is
-  //   hard-coded to global by the plugin, so a sys_domain override is IGNORED with a warning
+  domain: 'global', // string, optional (SDK v4.14.0+, default 'global') - domain sys_id (or 'global') written as sys_domain
+    // on the root row AND every nested category, metric and answer definition (generated ones included)
+  domainPath: '/', // string, optional (SDK v4.14.0+, default '/') - written as sys_domain_path on the same rows. The docs say
+    // it is required with a non-global `domain`, but the build does NOT enforce it: `domain` alone silently writes '/'.
+    // Always set both together for a non-global domain
+  // $override: { u_custom: 'x' }, // Record<string, string | boolean | number>, optional - root row only. A sys_domain
+  //   override is still IGNORED with a warning ("already set by the plugin") - use `domain` / `domainPath` instead
   // NOTE: Assessment does NOT accept `$meta` (no installMethod, no useEsLatest) - the type has no Now.Internal.Meta
 
   // ── CATEGORIES (asmt_metric_category): sections of the assessment ──
@@ -123,8 +128,8 @@ Assessment({
           stringOption: 'multiline', // 'singleLine' | 'singleLineWide' | 'multiline', optional (default 'singleLine')
           order: 200,
           dependsOn: Now.ref('asmt_metric', 'q_mfa'), // string | Record<'asmt_metric'>, optional - the parent metric.
-            // Use Now.ref('asmt_metric', '<sibling $id key>'). NOT Now.ID['<key>']: it builds, but once keys.ts registers the key
-            // its ExplicitKey type is no longer assignable to dependsOn and tsc fails
+            // Use Now.ref('asmt_metric', '<sibling $id key>'). NOT Now.ID['<key>']: the first build passes, but once keys.ts registers the
+            // key its ExplicitKey type is no longer assignable to dependsOn, so the NEXT now-sdk build (and tsc) fails with TS2322
           displayedWhenYesNo: '0', // string, optional - reveal value when the parent is yesNo: '1' = Yes, '0' = No
           // Pick the ONE reveal field matching the PARENT's dataType:
           //   displayedWhen: ['3'],          // parent choice / multipleSelection - definition KEYS, ALWAYS AN ARRAY
@@ -213,7 +218,7 @@ Assessment({
       //   'attachment' -> attachment, 'date' -> date, 'dateTime' -> datetime, 'imageScale' -> imagescale (definitions with
       //   selectedImage/unselectedImage), 'ranking' -> ranking (definitions), 'ratings' -> rating,
       //   'multipleSelection' -> multiplecheckbox (definitions)   - no branch-only fields
-      // A branch field on the wrong dataType (e.g. min on 'yesNo') is a tsc error - but NOT a build error.
+      // A branch field on the wrong dataType (e.g. min on 'yesNo') fails both tsc and now-sdk build (TS2353).
     },
   ],
 })

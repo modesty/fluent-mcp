@@ -32,9 +32,9 @@ Always reference the UI Page API specifications for more details.
 
 1. **Static HTML**: Use the `html` property for simple static content with standard HTML/XHTML markup.
 1. **Jelly templates**: Use Jelly tags (`<j:jelly>`, `<g:evaluate>`) for server-side dynamic content generation.
-1. **UI Macros**: Reference UI Macros (e.g., `<g2:ui_reference>`) to use reusable ServiceNow components.
+1. **UI Macros**: Reference UI Macros (e.g., `<g2:ui_reference>`) to use reusable ServiceNow components. To build your own reusable Jelly fragment, define it with `UiMacro()` (SDK v4.14.0+, see the `ui-macro` spec) and invoke it by tag: `<g:alert_banner />` in global, or the scope-qualified `<g:x_myapp_alert_banner />` in scope x_myapp.
 1. **Proper XML declaration**: When using Jelly, start with `<?xml version="1.0" encoding="utf-8" ?>`.
-1. **Namespace declarations**: Include required namespaces in Jelly root: `xmlns:j="jelly:core" xmlns:g="glide"`.
+1. **Namespace declarations**: Include required namespaces in Jelly root: `xmlns:j="jelly:core" xmlns:g="glide" xmlns:j2="null" xmlns:g2="null"` — `j2:`/`g2:` (phase two) tags need the last two.
 
 ## Client-Side Scripting
 

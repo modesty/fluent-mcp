@@ -14,12 +14,29 @@ Table({
     callerAccess: 'none', // 'none' | 'tracking' | 'restricted'
     // ACCESS PROPERTIES — the SDK derives NO defaults for `actions`, `allowClientScripts`, `allowConfiguration`,
     // `allowNewFields`, `allowUiActions` and `allowWebServiceAccess`. Each is written to the table's metadata ONLY
-    // if you set it in Fluent; anything you omit is left to the instance's own default at install time.
+    // if you set it in Fluent; anything you omit is left to the instance's own default at install time —
+    // UNLESS `basePolicy` is set (SDK v4.14.0+), which supplies the value of every access flag you leave unset.
+    basePolicy: 'private', // 'public' | 'private', optional (SDK v4.14.0+) — the default for access flags NOT set explicitly:
+        // 'public' = true, 'private' = false, across the four `actions`, `allowNewFields`, `allowUiActions` and
+        // `allowClientScripts`. `allowWebServiceAccess` stays TRUE under both policies (platform legacy behaviour), and
+        // `allowConfiguration` is NOT governed by it. Explicit values always win; the deprecated `actions` array form is
+        // unaffected because it is a complete enumeration. Written as the `base_policy` bootstrap attribute (flags it
+        // implies are omitted there) and as explicit flags on sys_db_object. Not allowed with `augments`, nor on a table
+        // written with the deprecated snake_case keys (read_only, allow_web_service_access, ...): that branch types every
+        // camelCase property, basePolicy included, as `never`
+    createRoles: [], // (string | Role)[], optional (SDK v4.14.0+) — roles that can CREATE records in this table
+    readRoles: [], // (string | Role)[], optional (SDK v4.14.0+) — roles that can READ records in this table
+    writeRoles: [], // (string | Role)[], optional (SDK v4.14.0+) — roles that can UPDATE records in this table
+    deleteRoles: [], // (string | Role)[], optional (SDK v4.14.0+) — roles that can DELETE records from this table.
+        // All four are written to the table's `collection` dictionary entry as comma-separated role NAMES (a `Role()`
+        // resolves to its `name`); one array entry per role — a role string containing a comma is a build ERROR (TS11).
+        // Since v4.14.0 the four attributes are written on every table and column, empty when unset. Not allowed with
+        // `augments` (each is typed `never` there)
     actions: { read: true, create: true, update: true, delete: false }, // TableActionAccess object (exported from '@servicenow/sdk/core'), all four keys optional: { read?, update?, delete?, create? }. Each action is THREE-STATE — `true` AND `false` are both written to metadata, an OMITTED action is not written at all. Prefer this object form; the array form (['read' | 'update' | 'delete' | 'create'][]) is DEPRECATED as of SDK v4.10.1 because it is a COMPLETE ENUMERATION: ['read'] writes read_access=true PLUS update_access=false, delete_access=false and create_access=false. (The SDK 4.13 table-api doc shows only `TableActionAccess`, but the installed type still accepts the deprecated array and it still writes those `false` values.)
-    allowWebServiceAccess: false, // boolean, no SDK-applied default
-    allowNewFields: false, // boolean, no SDK-applied default
-    allowUiActions: false, // boolean, no SDK-applied default
-    allowClientScripts: false, // boolean, no SDK-applied default
+    allowWebServiceAccess: false, // boolean, no SDK-applied default unless `basePolicy` is set (stays true under both policies)
+    allowNewFields: false, // boolean, no SDK-applied default unless `basePolicy` is set
+    allowUiActions: false, // boolean, no SDK-applied default unless `basePolicy` is set
+    allowClientScripts: false, // boolean, no SDK-applied default unless `basePolicy` is set
     allowConfiguration: false, // boolean, optional (SDK v4.13.3+) — allow design-time configuration of the table itself from other
         // application scopes ("Allow configuration" on the Application Access form); written as the `configuration_access`
         // attribute. No SDK-applied default: omitted means the platform inherits the value from the parent table
@@ -50,8 +67,8 @@ Table({
 // ─── TABLE AUGMENTS (SDK v4.7.0+) ───
 // Add columns to an EXISTING platform or cross-scope table (owned by another scope) without creating a new table.
 // Set `augments` to the target table name; when set, only `schema` and — SDK v4.13.0+ — `index` are allowed. All
-// other table-level properties (name, extends, label, display, audit, access flags, allowConfiguration, dbObjectId,
-// etc.) are rejected by the TypeScript compiler. The build produces `sys_dictionary` records for each column but does
+// other table-level properties (name, extends, label, display, audit, access flags, basePolicy, the table-level
+// createRoles/readRoles/writeRoles/deleteRoles, allowConfiguration, dbObjectId, etc.) are rejected by the TypeScript compiler. The build produces `sys_dictionary` records for each column but does
 // NOT create a `sys_db_object` (the table already exists). As of SDK v4.13.0 the augment's dictionary XML carries only
 // the table name and type, so augmenting no longer overwrites platform-set table attributes such as access flags.
 // Added column names MUST begin with the current app's ownership prefix to avoid collisions with platform fields:

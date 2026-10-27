@@ -40,7 +40,11 @@ RiskAssessment({
 
   // ── Cross-cutting (Now.Internal.WithIdAndMetadata) ──
   protectionPolicy: 'read', // 'read' | 'protected', optional - written as sys_policy on every row
-  // $override: { u_custom: 'x' }, // optional - root row only; sys_domain is hard-coded to global and cannot be overridden
+  domain: 'global', // string, optional (SDK v4.14.0+, default 'global') - domain sys_id (or 'global') written as sys_domain
+    // on the change_risk_asmt row and every nested category, metric and answer definition. Thresholds do NOT inherit it
+  domainPath: '/', // string, optional (SDK v4.14.0+, default '/') - written as sys_domain_path on the same rows. Not enforced
+    // with a non-global `domain` (it silently writes '/'), so always set both together
+  // $override: { u_custom: 'x' }, // optional - root row only; a sys_domain override is ignored with a warning - use `domain`
   // NOTE: RiskAssessment does NOT accept `$meta` (no installMethod, no useEsLatest)
 
   // ── THRESHOLDS (change_risk_asmt_threshold): map a score to a risk level ──

@@ -1,6 +1,6 @@
 {
   "name": "@modesty/fluent-mcp",
-  "version": "0.9.3",
+  "version": "0.10.0",
   "description": "MCP server for Fluent (ServiceNow SDK)",
   "keywords": [
     "Servicenow SDK",
@@ -67,7 +67,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.3.1",
-    "@servicenow/sdk": "4.13.6",
+    "@servicenow/sdk": "4.14.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

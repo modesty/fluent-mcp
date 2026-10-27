@@ -114,6 +114,7 @@ export enum ServiceNowMetadataType {
   TABLE = 'table',
   TEST_SUITE = 'test-suite',
   UI_ACTION = 'ui-action',
+  UI_MACRO = 'ui-macro',
   UI_PAGE = 'ui-page',
   UI_POLICY = 'ui-policy',
   USER_PREFERENCE = 'user-preference',

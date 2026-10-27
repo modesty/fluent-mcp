@@ -6,6 +6,7 @@ import { CatalogUiPolicy } from '@servicenow/sdk/core'
 // Creates a new Catalog UI Policy (`catalog_ui_policy`)
 CatalogUiPolicy({
     $id: Now.ID['my_catalog_ui_policy'], // string | Now.ID key, mandatory — unique identifier
+    $meta: { installMethod: 'demo' }, // optional (SDK v4.14.0+): { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean } — installMethod picks when the policy and its actions load ('demo' → demo data only); useEsLatest is accepted and the build adds a sys_es_latest_script row for the policy (as it does for every shape that sets it); the policy's scripts run client-side, so its runtime effect is not verified - leave it unset unless you need it
 
     // ─── Required ───
     shortDescription: '',   // string, mandatory — brief description of what this policy does

@@ -306,7 +306,7 @@ SN_INSTANCE_URL=https://company.service-now.com SN_AUTH_TYPE=oauth npm run inspe
    npm run build && npm run inspect
    ```
 
-2. **Check Tools (17 tools: 13 SDK commands and four resource/authentication tools):**
+2. **Check Tools (18 tools: 14 SDK commands and four resource/authentication tools):**
    - build_fluent_app
    - check_auth_status
    - cicd_fluent_app
@@ -316,6 +316,7 @@ SN_INSTANCE_URL=https://company.service-now.com SN_AUTH_TYPE=oauth npm run inspe
    - download_fluent_app
    - download_fluent_dependencies
    - explain_fluent_api
+   - fluent_exec_script
    - fluent_transform
    - get-api-spec
    - get-instruct
@@ -339,7 +340,7 @@ SN_INSTANCE_URL=https://company.service-now.com SN_AUTH_TYPE=oauth npm run inspe
    - Exercise each resource tool and local SDK command using a disposable Fluent project
    - Verify invalid arguments return actionable errors
    - Use `check_auth_status` to establish whether live instance testing is available
-   - Without a configured `SN_INSTANCE_URL`, validation guards for `deploy_fluent_app`, `download_fluent_app`, `query_fluent_records`, `cicd_fluent_app`, and `cicd_fluent_test` do not establish successful instance operations
+   - Without a configured `SN_INSTANCE_URL`, validation guards for `deploy_fluent_app`, `download_fluent_app`, `query_fluent_records`, `cicd_fluent_app`, `cicd_fluent_test`, and `fluent_exec_script` do not establish successful instance operations
 
 5. **Monitor performance:**
    - Check response times
@@ -439,7 +440,7 @@ npm run build
 
 echo "Inspector checklist:"
 echo "1. Connect the node server"
-echo "2. Verify all 17 tools are present"
+echo "2. Verify all 18 tools are present"
 echo "3. Execute sdk_info with flag -v"
 echo "4. Read resources and get prompts"
 echo "5. Review Results, Console, and Protocol for errors"

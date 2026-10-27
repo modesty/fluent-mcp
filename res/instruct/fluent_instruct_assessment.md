@@ -10,10 +10,10 @@ Always reference the Assessment API specifications for more details.
    - Do not copy the SDK's own "Scored Onboarding Survey" and "Minimal Survey" API-doc examples, or the JSDoc example on the `Assessment` type. All three omit `scaleFactor` without being surveys, so they **fail `now-sdk build`**.
    - A survey gets no business rules. The build forces the definition row's table to `asmt_metric_type` and its `condition` to the survey's own sys_id, so do not set `table` or `condition` on a survey.
 5. **A scored assessment needs `table` and an integer `scaleFactor`.** This is enforced by **build diagnostics, not by the type**: both are optional in TypeScript. The messages are "'table' is required when 'evaluationMethod' is 'assessment' (the default).", "'scaleFactor' is required when 'evaluationMethod' is 'assessment' (the default)." and "'scaleFactor' must be an integer.". Use 1, 10 or 100.
-6. **Know what the build checks and what only tsc checks.** `now-sdk build` does **not** type-check, and it does not print hints — only errors and warnings.
+6. **Know what the build checks.** As verified against SDK v4.14.0, `now-sdk build` reports TypeScript errors in `.now.ts` files, and it does not print hints — only errors and warnings.
    - The build catches the diagnostics in rules 5, 9, 13 and 15.
-   - Only tsc (or the IDE) catches the `dataType` discriminated-union errors: a branch field on the wrong `dataType` (e.g. `min` on `'yesNo'`), a `'reference'` metric without `referenceTable`, or a missing `dataType`.
-   - Type-check the project before trusting a green build.
+   - It also fails on the `dataType` discriminated-union errors: a branch field on the wrong `dataType` (e.g. `min` on `'yesNo'`, TS2353), a `'reference'` metric without `referenceTable` (TS2322), or a missing `dataType`.
+   - The type marks `table` and `scaleFactor` optional, so only the build diagnostics in rule 5 catch a missing one — an IDE shows no error for it.
 7. **"Conditions" are encoded-query strings, nothing more.** The SDK 4.12.0 release note says the API includes "post-deployment steps and conditions". There is no "post-deployment steps" API, no condition object, and no "asmt_condition" table. There are three levels of scoping:
    - The assessment `condition` decides which `table` records get assessed at all; the generated trigger rule evaluates it.
    - A category `filter` scopes one section.
@@ -36,7 +36,7 @@ Always reference the Assessment API specifications for more details.
     - `displayedWhenCheckbox` for a checkbox parent
     - `displayedWhenTemplate` for a template parent
 
-    **Do not use `Now.ID` for `dependsOn`**, even though the type's own JSDoc example does. It builds, but once `keys.ts` registers the key its `ExplicitKey` type is not assignable to `dependsOn`, and tsc fails.
+    **Do not use `Now.ID` for `dependsOn`**, even though the type's own JSDoc example does. The first build passes, but once `keys.ts` registers the key its `ExplicitKey` type is not assignable to `dependsOn`, so the next `now-sdk build` (and tsc) fails with TS2322.
 13. **Scripted default answers.** `method: 'defaultAnswerFromScript'` **requires** both `script` and `dependentPlugin`. The build errors say "A metric with method 'condscript' must also set ..." — `'condscript'` is the database name for `'defaultAnswerFromScript'`.
     - For this method, `script` must be an **inline string literal**. The build's check does not see `Now.include`, so `script: Now.include(...)` fails with "must also set 'script'".
     - `method: 'script'` accepts `Now.include`.
@@ -53,7 +53,8 @@ Always reference the Assessment API specifications for more details.
 18. **`filterField` segments the scorecard comparison pool; it does not rank.** For example, `'assignment_group'` on `incident` compares a record only against its own group. For a leaderboard across groups, build a report or Performance Analytics indicator.
 19. **Cross-cutting properties.**
     - `Assessment` accepts `protectionPolicy`, which is written as `sys_policy` on every generated row, including the business rules.
-    - It accepts `$override`, which applies to the root row only. `sys_domain` is hard-coded to global, so a `sys_domain` override is ignored with a warning.
+    - It accepts `$override`, which applies to the root row only. A `sys_domain` override is ignored with a warning; set the domain with `domain` / `domainPath` instead.
+    - **SDK v4.14.0 — `domain` and `domainPath`** (defaults `'global'` and `'/'`) put the assessment and every nested category, metric and answer definition in a domain. For a non-global domain always set both: the build does not enforce `domainPath`, and `domain` alone silently writes `'/'`. The release note's "improved support for setting domain" is exactly these two new properties.
     - It does **not** accept `$meta` (no `installMethod`, no `useEsLatest`).
     - Categories and metrics accept only `$id`.
     - Skip redundant defaults (`active: true`, `order: 100`, `weight: 10`).
