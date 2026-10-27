@@ -58,8 +58,9 @@ describe('SDK v4.13.6 Types - Integration Tests', () => {
       });
     }
 
-    it('should total 75 metadata types (71 before v4.12.x + assessment + risk-assessment + database-view + interceptor)', () => {
-      assert.equal(Object.values(ServiceNowMetadataType).length, 75);
+    it('should total at least 75 metadata types (71 before v4.12.x + assessment + risk-assessment + database-view + interceptor)', () => {
+      // The newest SDK integration test owns the exact total; this file guards only its own additions.
+      assert.ok(Object.values(ServiceNowMetadataType).length >= 75);
     });
 
     it('should keep the enum sorted by value so new entries landed in the right place', () => {
@@ -137,8 +138,11 @@ describe('SDK v4.13.6 Types - Integration Tests', () => {
       assert.ok(spec('assessment').includes('it MUST be an INLINE string literal'));
     });
 
-    it('instruct should warn that now-sdk build does not type-check', () => {
-      assert.ok(instruct('assessment').includes('`now-sdk build` does **not** type-check, and it does not print hints'));
+    it('instruct should state what the build checks (corrected in SDK v4.14.0: it does type-check .now.ts files)', () => {
+      // The 4.13.6 wording ("does **not** type-check") was wrong: sdk-build-core runs pre-emit
+      // diagnostics on .now.ts files in both 4.13.6 and 4.14.0. Hints are still not printed.
+      assert.ok(instruct('assessment').includes('`now-sdk build` reports TypeScript errors in `.now.ts` files, and it does not print hints'));
+      assert.ok(!instruct('assessment').includes('does **not** type-check'));
     });
 
     it('instruct should record that Now.include on a script default fails the build', () => {
@@ -260,10 +264,13 @@ describe('SDK v4.13.6 Types - Integration Tests', () => {
     });
 
     it('spec, instruct and snippet 0002 should carry the unverified-component caveat', () => {
+      // Whitespace-normalized: the caveat wraps across `//` comment lines in the spec and snippet.
+      // Since SDK v4.14.0 it covers only 'filter' and 'list-simple'; 'filter-group' now resolves.
+      const flat = (text: string) => text.replace(/\s*\n\s*(\/\/\s*)?/g, ' ');
       const caveat = 'absent from the SDK build plugin\'s component name-to-sys_id map, so the build writes them through as literal strings — verify on an instance, or pass the component sys_id instead.';
-      assert.ok(spec('dashboard').includes(caveat));
-      assert.ok(instruct('dashboard').includes(caveat));
-      assert.ok(snippets('dashboard')[1].includes(caveat));
+      assert.ok(flat(spec('dashboard')).includes(caveat));
+      assert.ok(flat(instruct('dashboard')).includes(caveat));
+      assert.ok(flat(snippets('dashboard')[1]).includes(caveat));
     });
 
     it('spec and instruct should mark the corrections as guide-documented, not new features', () => {

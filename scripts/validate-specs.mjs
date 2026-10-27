@@ -95,7 +95,7 @@ function setupScaffold() {
     'ImportSet', 'LicensingConfig', 'List', 'NowAssistSkillConfig', 'Property',
     'RestApi', 'RestMessage', 'RetryPolicy',
     'Role', 'StateModel', 'Test', 'TestSuite', 'UiPolicy', 'UserPreference', 'atf', 'Record',
-    'GraphQLApi', 'Assessment', 'RiskAssessment', 'DatabaseView', 'Interceptor',
+    'GraphQLApi', 'Assessment', 'RiskAssessment', 'DatabaseView', 'Interceptor', 'UiMacro',
     // Flow / automation surface (also exported from '@servicenow/sdk/automation')
     'Flow', 'FlowStage', 'Subflow', 'Table',
     'PlaybookDefinition', 'PlaybookTriggerTypes', 'ActivityDefinitions',

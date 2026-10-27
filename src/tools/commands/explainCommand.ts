@@ -8,8 +8,9 @@ import { getProjectRootPath } from '../../config.js';
  * Wraps: now-sdk explain [topic]
  *
  * As of SDK v4.6.0, `now-sdk explain` self-resolves documentation from its
- * own bundle and no longer requires a Fluent project or `--source`. The
- * previous scaffold layer that lived in this file is therefore removed.
+ * own bundle and no longer requires a Fluent project. The CLI declares no
+ * `--source` option (verified through SDK v4.14.0; yargs silently ignored the
+ * flag this tool used to forward), so the tool accepts no project path.
  *
  * `topic` is optional — required only when `list` is not true.
  */
@@ -44,12 +45,6 @@ export class ExplainCommand extends BaseCLICommand {
       description: 'Output format: "pretty" (terminal, default) or "raw" (plain markdown).',
     },
     {
-      name: 'source',
-      type: 'string',
-      required: false,
-      description: 'Optional path to a Fluent project directory. Not required in SDK v4.6.0+ — explain self-resolves from its own bundle.',
-    },
-    {
       name: 'debug',
       type: 'boolean',
       required: false,
@@ -78,7 +73,6 @@ export class ExplainCommand extends BaseCLICommand {
       sdkArgs.push(args.topic as string);
     }
 
-    if (args.source) sdkArgs.push('--source', args.source as string);
     if (args.format) sdkArgs.push('--format', args.format as string);
     if (args.list) sdkArgs.push('--list');
     if (args.peek) sdkArgs.push('--peek');

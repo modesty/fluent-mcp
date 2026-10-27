@@ -31,6 +31,7 @@ mock.module('../../src/utils/sessionManager.js', {
 });
 
 const { QueryCommand } = await import('../../src/tools/commands/queryCommand.js');
+const { ENVELOPE_RUN_OPTIONS } = await import('../../src/utils/jsonSelect.js');
 
 const SDK_BIN = '/test/node_modules/@servicenow/sdk/bin/index.js';
 
@@ -87,7 +88,8 @@ describe('QueryCommand', () => {
       '/mock/working/dir',
       undefined,
       60000,
-      undefined
+      undefined,
+      ENVELOPE_RUN_OPTIONS
     );
   });
 
@@ -227,15 +229,29 @@ describe('QueryCommand', () => {
     'result.records[10].opened_by.display_value',
     'ok',
   ]) {
-    it(`should pass a documented select path through to --select: ${select}`, async () => {
+    it(`should accept a documented select path without forwarding --select: ${select}`, async () => {
       const command = new QueryCommand(mockProcessor);
       const result = await command.execute({ table: 'incident', query: 'active=true', select });
 
       assert.equal(result.success, true);
-      const argv = argvOf();
-      assert.equal(argv[argv.indexOf('--select') + 1], select);
+      assert.ok(!argvOf().includes('--select'));
     });
   }
+
+  // The CLI applies --select to failure envelopes too (printing only null), so the
+  // tool applies it to a successful envelope and keeps a failure's full envelope.
+  it('should apply select to a successful envelope and keep a failure envelope whole', async () => {
+    mockProcessor.process.mock.mockImplementation(async () => ({
+      success: true, output: '{"ok":true,"hasMore":false,"records":[{"sys_id":"abc"}]}\n', exitCode: 0,
+    }));
+    const ok = await new QueryCommand(mockProcessor).execute({ table: 'incident', query: 'active=true', select: 'records[0].sys_id' });
+    assert.equal(ok.output, '"abc"');
+
+    const failure = '{"ok":false,"error":{"message":"Invalid table","status":400,"table":"nope"}}';
+    mockProcessor.process.mock.mockImplementation(async () => ({ success: false, output: failure, exitCode: 1 }));
+    const failed = await new QueryCommand(mockProcessor).execute({ table: 'nope', query: 'active=true', select: 'records[0].sys_id' });
+    assert.equal(failed.output, failure);
+  });
 
   for (const select of [
     'records[0]; rm -rf /',

@@ -59,7 +59,7 @@ describe('SDK v4.11.2 Types - Integration Tests', () => {
       // fronts the 18 atf-* step sub-types. It had an instruct file but no spec,
       // so get-api-spec('atf') failed while get-instruct('atf') succeeded.
       // Lower bound only: the exact total is owned by the newest version's test
-      // (sdk4136-types), so this file keeps guarding its own additions.
+      // (sdk4140-types), so this file keeps guarding its own additions.
       assert.ok(Object.values(ServiceNowMetadataType).length >= 71);
     });
 

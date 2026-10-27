@@ -36,7 +36,7 @@ Test({
       'category': ''
     },
     assertType: 'record_successfully_inserted',
-    enforceSecurity: false
+    enforceSecurity: true
   })
 
   const scaleCategoryRecord = atf.server.recordInsert({
@@ -47,7 +47,7 @@ Test({
       'category': ''
     },
     assertType: 'record_successfully_inserted',
-    enforceSecurity: false
+    enforceSecurity: true
   })
 
   atf.server.recordUpdate({
@@ -56,7 +56,7 @@ Test({
     fieldValues: { 'caller_id': createdUser.user },
     recordId: '',
     assertType: 'record_successfully_updated',
-    enforceSecurity: false
+    enforceSecurity: true
   })
 
   atf.server.recordUpdate({
@@ -65,7 +65,7 @@ Test({
     fieldValues: { 'caller_id': createdUser.user },
     recordId: '',
     assertType: 'record_successfully_updated',
-    enforceSecurity: false
+    enforceSecurity: true
   })
 
   atf.server.recordUpdate({
@@ -74,7 +74,7 @@ Test({
     fieldValues: { 'caller_id': createdUser.user },
     recordId: '',
     assertType: 'record_successfully_updated',
-    enforceSecurity: false
+    enforceSecurity: true
   })
 
   atf.form.openExistingRecord({

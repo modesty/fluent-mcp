@@ -4,7 +4,8 @@
  *          output + a non-zero exit code (rather than rejecting and discarding),
  *          and an operator/config timeout override supersedes the per-call value.
  *  - P0.3: an external abort signal (MCP client cancellation) kills the child.
- *  - P0.4: stdout/stderr are bounded (head + tail + elision marker).
+ *  - P0.4: stdout/stderr are bounded (head + tail + elision marker); a call may
+ *          raise its stdout cap, and a cut stdout is flagged.
  *
  * These spawn real short-lived Node child processes (config and logger are
  * replaced with the shared fixtures, providing servicenowSdk.commandTimeoutMs).
@@ -137,5 +138,18 @@ describe('NodeProcessRunner — output is bounded (P0.4)', () => {
 
     assert.equal(result.stdout, 'short output');
     assert.doesNotMatch(result.stdout, /characters truncated/);
+  });
+
+  it('flags a cut stdout, and lets a call raise the stdout cap without raising stderr\'s', { timeout: TEST_TIMEOUT_MS }, async () => {
+    const runner = new NodeProcessRunner({ maxOutputChars: 200 });
+    const childArgs = ['-e', "process.stdout.write('A'.repeat(2000)); process.stderr.write('E'.repeat(2000))"];
+
+    const bounded = await runner.run(process.execPath, childArgs);
+    assert.equal(bounded.stdoutTruncated, true);
+
+    const raised = await runner.run(process.execPath, childArgs, undefined, undefined, undefined, undefined, { maxStdoutChars: 5000 });
+    assert.equal(raised.stdout, 'A'.repeat(2000));
+    assert.equal(raised.stdoutTruncated, undefined);
+    assert.match(raised.stderr, /characters truncated/);
   });
 });

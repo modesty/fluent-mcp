@@ -270,7 +270,7 @@ describe('New SDK Commands', () => {
       assert.ok(command.description.includes('Look up Fluent SDK documentation'));
       assert.ok(command.description.includes('no authentication or active Fluent project required'));
       assert.deepStrictEqual(command.annotations, { readOnlyHint: true, idempotentHint: true });
-      assert.equal(command.arguments.length, 6);
+      assert.equal(command.arguments.length, 5);
 
       // topic is optional in v4.6.0 (required only when list=false)
       const topicArg = command.arguments.find(arg => arg.name === 'topic');
@@ -293,10 +293,8 @@ describe('New SDK Commands', () => {
       assert.equal(formatArg?.required, false);
       assert.equal(formatArg?.type, 'string');
 
-      const sourceArg = command.arguments.find(arg => arg.name === 'source');
-      assert.notEqual(sourceArg, undefined);
-      assert.equal(sourceArg?.required, false);
-      assert.equal(sourceArg?.type, 'string');
+      // `now-sdk explain` declares no --source option (through SDK v4.14.0), so none is advertised.
+      assert.equal(command.arguments.find(arg => arg.name === 'source'), undefined);
 
       const debugArg = command.arguments.find(arg => arg.name === 'debug');
       assert.notEqual(debugArg, undefined);
@@ -304,7 +302,7 @@ describe('New SDK Commands', () => {
       assert.equal(debugArg?.type, 'boolean');
     });
 
-    it('should execute basic topic lookup without --source', async () => {
+    it('should execute basic topic lookup', async () => {
       const command = new ExplainCommand(mockProcessor);
 
       const result = await command.execute({ topic: 'BusinessRule' });
@@ -321,7 +319,7 @@ describe('New SDK Commands', () => {
       );
     });
 
-    it('should pass --source when explicitly provided', async () => {
+    it('should never forward --source, which the explain CLI does not declare', async () => {
       const command = new ExplainCommand(mockProcessor);
 
       const result = await command.execute({
@@ -334,7 +332,7 @@ describe('New SDK Commands', () => {
       assertCalledWith(
         mockProcessor.process,
         process.execPath,
-        [SDK_BIN, 'explain', 'Acl', '--source', './src', '--debug'],
+        [SDK_BIN, 'explain', 'Acl', '--debug'],
         '/mock/project/root',
         undefined,
         15000,

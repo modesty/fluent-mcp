@@ -1,4 +1,4 @@
-# **Context:** Dashboard API spec: Used to create a ServiceNow Platform Analytics Dashboard (`par_dashboard`) — a configurable analytics and reporting page organized into tabs with positioned widgets. Every widget binds its data inline through `componentProps` (no separate report record). Dashboards can be linked to Workspaces via visibility rules. Layout, per-widget `componentProps` shapes, and filters below are documented in SDK v4.13.x guides (`dashboard-guide`, `dashboard-filters-guide`); the `Dashboard` types are unchanged.
+# **Context:** Dashboard API spec: Used to create a ServiceNow Platform Analytics Dashboard (`par_dashboard`) — a configurable analytics and reporting page organized into tabs with positioned widgets. Every widget binds its data inline through `componentProps` (no separate report record). Dashboards can be linked to Workspaces via visibility rules. Layout, per-widget `componentProps` shapes, and filters below are documented in SDK v4.13.x guides (`dashboard-guide`, `dashboard-filters-guide`). **SDK v4.14.0 changed the build:** `componentProps` is now written **verbatim** — the SDK's widget defaults are no longer merged under it at build time. Install still fills in the component's remaining default keys, so a partial object is fine; set `followFilters` + `filterConfigurations` explicitly on filter-following widgets, as the filters guide says. 4.14.0 also adds the widget `name` and resolves `'filter-group'` to its component sys_id.
 
 ```typescript
 import { Dashboard } from '@servicenow/sdk/core'
@@ -30,10 +30,17 @@ Dashboard({
                 {
                     $id: Now.ID['widget_by_priority'], // mandatory for each widget
                     component: 'vertical-bar', // string, mandatory — component name (kebab-case, case-insensitive) or component sys_id
+                    // Every widget record is written with sys_domain 'global' (SDK v4.14.0+; not configurable)
+                    name: 'Active incidents by priority', // string, optional (SDK v4.14.0+, default '') — accessible/display name,
+                                    // read by screen readers and shown in some component headers
                     // Record<string, unknown>, mandatory — ALL data binding is inline here (untyped, not compile-time checked).
-                    // A partial object is fine: the build merges the SDK's widget defaults under it.
+                    // SDK v4.14.0+: written VERBATIM. The build no longer merges the SDK's widget defaults under it (it falls back
+                    // to the full default set only when componentProps is absent, which the type forbids). Install fills in the
+                    // component's remaining default keys, so a partial object is fine - set the props whose value must differ.
                     componentProps: {
                         headerTitle: 'Active incidents by priority',
+                        followFilters: true,                       // follow dashboard filters — no longer a build default
+                        filterConfigurations: '@state.parFilters', // pair it with followFilters
                         dataSources: [
                             { sourceType: 'table', tableOrViewName: 'incident', filterQuery: 'active=true', id: 'ds_1' },
                         ],
@@ -63,13 +70,16 @@ Dashboard({
     // Time trend:          'column' | 'line' | 'spline' | 'area' | 'scatter' | 'step'
     // Two dimensions:      'heatmap' | 'pivot-table' | 'bubble' | 'boxplot'
     // Single value:        'single-score' | 'dial' | 'gauge'
-    // Other data:          'geomap' | 'indicator-scorecard' | 'list' | 'calendar-report'
+    // Other data:          'geomap' | 'list' | 'calendar-report' ('indicator-scorecard' resolves to a MALFORMED id — see below)
     // Static:              'heading' | 'rich-text' | 'image'
     // Legacy:              'compatibility-mode-widget'
     // string               — any other component, by its 32-character sys_id
     //
-    // Documented in SDK v4.13.x guides but NOT verified: 'filter', 'filter-group', 'list-simple'.
-    // Not verified: `filter`, `filter-group` and `list-simple` are absent from the SDK build plugin's component name-to-sys_id map, so the build writes them through as literal strings — verify on an instance, or pass the component sys_id instead.
+    // Filters:             'filter-group' (SDK v4.14.0+ resolves it to sys_id 'ba8b5fa922351c2027c524c91a134bf2')
+    //
+    // Documented in SDK v4.13.x guides but NOT verified: 'filter', 'list-simple'. Both are absent from the SDK build plugin's
+    // component name-to-sys_id map, so the build writes them through as literal strings — verify on an instance, or pass the
+    // component sys_id instead.
 
     // ─── componentProps by widget family (documented in SDK v4.13.x guides) ───
     // Shared header & border keys (every chart/score/list widget; not heading/rich-text/filter):
@@ -90,22 +100,26 @@ Dashboard({
     //   trendBy: { trendByFrequency: 'date', trendByFields: [{ field: 'sys_created_on', metric: 'metric_1' /* a metrics[].id */ }] }
     //   ('scatter'/'step' render "A 'Trend By' must be selected" without trendBy); optional period ('M'), autoAggregatePeriods, showForecast.
     // 'heatmap': both dimensions inside ONE groupBy entry's groupBy array.
-    // 'pivot-table': needs all of — newReporting: true + dataCategory: 'group' (the build default is newReporting: false);
+    // 'pivot-table': needs all of — newReporting: true + dataCategory: 'group' (the default is false);
     //   TWO separate groupBy entries with categoryIndex 0 (rows) and 1 (columns); metrics[].id + numberFormat: { customFormat: false };
     //   showFirstGroupAggregate / showSecondGroupAggregate / showTotalAggregate: true. Otherwise value cells render blank.
     // 'bubble' / 'boxplot': TWO separate groupBy entries (no categoryIndex). For 'boxplot', groupBy[0] is the box category
     //   and groupBy[1] the field whose per-category metric values form each box.
-    // 'single-score': metrics only, no groupBy; set showZero: true (build default false) or a zero COUNT renders "No score".
+    // 'single-score': metrics only, no groupBy; set showZero: true or a zero COUNT renders "No score" (component default false; the build applies none).
     // 'dial' / 'gauge': metrics only, plus minValue / maxValue (the arc is a fixed half-circle).
     // 'geomap': groupBy a location field (isChoice: false); mapSysId = a sys_report_map sys_id
     //   (default World '93b8a3a2d7101200bd4a4ebfae61033a'); match the map to the grouped values' granularity.
-    // 'indicator-scorecard': Platform Analytics indicators, not dataSources wiring —
+    // 'indicator-scorecard': SDK BUG (4.14.0 and earlier) — the build plugin maps this name to the malformed 33-character
+    //   id '9d31ba4d773ce32ef350d4A555b673f6e' (a stray 'A'), which deploys as a broken component reference. Pass the
+    //   macroponent sys_id instead: component: '9d31ba4d773ce32ef350d4555b673f6e' ("Indicator scorecard" in
+    //   sys_ux_macroponent, verified on an instance); a 32-hex sys_id is written as-is.
+    //   Platform Analytics indicators, not dataSources wiring —
     //   scorecardType 'list' | 'pivot'; sourceType '1' (indicators: [{ id /* pa_indicators sys_id */, label }]) |
     //   '0' (query on the indicator table) | '2' (indicatorGroup sys_id); breakdowns: [{ breakdownId /* pa_breakdowns sys_id */, ... }];
     //   metrics: { fields: ['lastScore', 'trend'], multiScore: {...} }; aggregateId 'default' or a PA aggregate sys_id.
     // 'list': aggregation-capable, wired like charts (dataSources, metrics, groupByField) plus table and columns;
     //   title headerTitle; show* toggles (showLinks, showViewAll, showColumnSorting, ...); wrapCellContent; limit.
-    // 'list-simple' (not verified, see above): flat filtered table — table, query, fixedQuery, columns, limit, maxColumns;
+    // 'list-simple' (component name not verified, see above): flat filtered table — table, query, fixedQuery, columns, limit, maxColumns;
     //   title listTitle (headerTitle is ignored); inverted hide* toggles (hideLinks, hideViewAll, ...); wordWrap. No dataSources/metrics.
     // Both lists: columns is ONE comma-separated string ('number,short_description,state'), not an array;
     //   no sort prop — sort in the query with ^ORDERBYDESC<field> (or ^ORDERBY<field>), never a bare ^ORDERBY.
@@ -115,7 +129,7 @@ Dashboard({
     // 'rich-text': { html }. 'image': { src: '/<db_image name, with extension>' } (same-origin image).
     // Unresolvable sys_ids (mapSysId, indicator/breakdown ids) deploy without error and render an empty widget.
 
-    // ─── Filters (documented in SDK v4.13.x guides; component names not verified, see above) ───
+    // ─── Filters (documented in SDK v4.13.x guides; 'filter' component name not verified, see above) ───
     // 'filter' componentProps:
     //   filterName, filterComponentType: 'multiselect' | 'singleselect' | 'date', isDashboard: true,
     //   datasource: { type, payload }   // SINGULAR, lowercase — where the selectable options come from (not dataSources)
@@ -132,8 +146,9 @@ Dashboard({
     //   showClear, showReset, cascadeScope, ...
     // Scope: a filter in topLayout.widgets drives following widgets on every tab; a filter in a tab's widgets drives only that tab.
     // The link is the target's table + field: a target { table: 'incident', field: 'priority' } narrows every incident-sourced widget in scope.
-    // Following is a build default: the plugin merges followFilters: true and filterConfigurations: '@state.parFilters'
-    //   into every widget's componentProps, so do not author them.
+    // Set followFilters: true + filterConfigurations: '@state.parFilters' on every widget that must follow filters (the
+    //   guide's rule). Data widgets carry both by default after install, but since SDK v4.14.0 the build no longer writes
+    //   them (componentProps is written verbatim; before v4.14.0 the plugin merged both into every widget).
 
     // ─── Visibilities ───
     visibilities: [         // DashboardVisibility[], optional — links dashboard to experiences (e.g., Workspaces)

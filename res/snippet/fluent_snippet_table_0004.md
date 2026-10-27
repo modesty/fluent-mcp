@@ -50,8 +50,8 @@ export const fx_configuration = Table({
         }),
         reference_currency: ReferenceColumn({
             label: 'Reference Currency',
-            use_reference_qualifier: 'simple',
-            reference_qual_condition: 'active=true^EQ',
+            useReferenceQualifier: 'simple',
+            referenceQualCondition: 'active=true^EQ', // camelCase (SDK v4.14.0+); the snake_case reference_qual_condition was silently dropped
             hint: 'Reference Currency',
             referenceTable: 'fx_currency',
         }),

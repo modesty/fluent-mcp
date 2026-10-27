@@ -1,4 +1,5 @@
 import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
+import { ENVELOPE_RUN_OPTIONS, shapeEnvelopeResult } from '../../utils/jsonSelect.js';
 import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 import { assertNoControlCharacters, screenSelectPathArg } from './argValidation.js';
 
@@ -93,7 +94,7 @@ export class QueryCommand extends SessionAwareCLICommand {
       name: 'select',
       type: 'string',
       required: false,
-      description: 'Dot/bracket path to extract from the output (SDK v4.10.0+), e.g. "records[0].sys_id". Implies machine-readable output; an unresolved path yields null rather than an error.',
+      description: 'Dot/bracket path to extract from the output (SDK v4.10.0+), e.g. "records[0].sys_id". An unresolved path yields null rather than an error. Applied by this tool to a successful (ok: true) envelope only; on a failure the full envelope is returned so the error stays visible (the CLI\'s own --select would print only null).',
     },
     {
       name: 'auth',
@@ -174,7 +175,9 @@ export class QueryCommand extends SessionAwareCLICommand {
     // via prefixFlags above, so it is intentionally absent from the flag mapping.
     const mappedArgs = { ...args, auth: resolvedAuth, output: args.output ?? 'json' };
 
-    return this.executeSdkCommand(
+    // `select` is applied here, not forwarded as --select; stdout is captured
+    // whole so the envelope parses (see jsonSelect).
+    const result = await this.executeSdkCommand(
       'query',
       mappedArgs,
       {
@@ -186,13 +189,14 @@ export class QueryCommand extends SessionAwareCLICommand {
         queryCategory: '--query-category',
         timeout: '--timeout',
         output: '--output',
-        select: '--select',
         auth: '--auth',
         noCount: { flag: '--no-count', hasValue: false },
         queryNoDomain: { flag: '--query-no-domain', hasValue: false },
       },
       prefixFlags,
-      signal
+      signal,
+      ENVELOPE_RUN_OPTIONS
     );
+    return shapeEnvelopeResult(result, args.select);
   }
 }

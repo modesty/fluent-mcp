@@ -3,8 +3,15 @@
 ```typescript
 // Fluent ATF Test — the container all atf.* steps are authored inside.
 // Only $id and name are mandatory; active defaults to true, failOnServerError defaults to FALSE.
-import { Test } from '@servicenow/sdk/core'
+import { Role, Test } from '@servicenow/sdk/core'
 import '@servicenow/sdk-core/global'
+
+// The app's role. Pass the Role() record to createUser - a role NAME string ('itil') is not resolved,
+// and the user would be created with no role.
+const incidentAgentRole = Role({
+  name: 'atf_0001.incident_agent',
+  containsRoles: ['itil'],
+})
 
 // Capture the return value only if a TestSuite() will reference this test.
 export const incidentCreateTest = Test({
@@ -14,15 +21,15 @@ export const incidentCreateTest = Test({
   active: true,
   failOnServerError: true, // set explicitly — the platform default is false
 }, (atf) => {
-  // ── atf.server: setup. createUser + impersonate avoids hardcoding a sys_id entirely.
-  //    (In real tests resolve references with get_sys_id('sys_user', 'user_name=admin').)
+  // ── atf.server: setup. Test as a DEDICATED user with the app's role, never as admin; createUser
+  //    impersonates the new user by default, and avoids hardcoding a sys_id entirely.
   atf.server.createUser({
     $id: Now.ID['atf_0001_user'],
     firstName: 'Ada',
     lastName: 'Tester',
-    roles: ['itil'],
+    roles: [incidentAgentRole], // (string | Role)[] - the Role() record, not its name
     impersonate: true,
-    description: 'Run the rest of the test as a fresh itil user', // a shared step value
+    description: 'Run the rest of the test as a fresh user with the app role', // a shared step value
   })
 
   // ── atf.form: standard-UI form lifecycle. See the `atf-form` sub-type for all 7 steps.
@@ -55,7 +62,7 @@ export const incidentCreateTest = Test({
     recordId: submitted.record_id,
     fieldValues: 'active=true^short_descriptionLIKEPrinter', // encoded query, not an object
     assert: 'record_validated',
-    enforceSecurity: false,
+    enforceSecurity: true, // keep ACLs on: the dedicated test user validates with its own access, never a bypass
   })
 
   atf.server.log({
@@ -64,7 +71,7 @@ export const incidentCreateTest = Test({
   })
 })
 
-// ── Where the 93 step APIs live — fetch the sub-type, not this file ──────────────────
+// ── Where the 92 step APIs live — fetch the sub-type, not this file ──────────────────
 // get-snippet / get-api-spec / get-instruct with the metadata type on the left:
 //
 //   atf-form                      atf.form.*             open/fill/submit, modals

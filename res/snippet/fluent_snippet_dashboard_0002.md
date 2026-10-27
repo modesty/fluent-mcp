@@ -1,13 +1,15 @@
-# Dashboard filters (component names NOT verified): a header 'filter' in topLayout drives widgets on every tab, and a tab-scoped 'filter-group' with priority + assigned-to child filters drives only its own tab
+# Dashboard filters ('filter' component name NOT verified): a header 'filter' in topLayout drives widgets on every tab, and a tab-scoped 'filter-group' with priority + assigned-to child filters drives only its own tab
 
 ```typescript
 import { Dashboard } from '@servicenow/sdk/core'
 
-// Not verified: `filter`, `filter-group` and `list-simple` are absent from the SDK build plugin's component name-to-sys_id map, so the build writes them through as literal strings — verify on an instance, or pass the component sys_id instead.
+// 'filter-group' resolves to its component sys_id (SDK v4.14.0+). Not verified: 'filter' (and 'list-simple') are absent from
+// the SDK build plugin's component name-to-sys_id map, so the build writes them through as literal strings — verify on an
+// instance, or pass the component sys_id instead.
 //
-// Following is a build default: the plugin merges followFilters: true and filterConfigurations: '@state.parFilters'
-// into every widget's componentProps, so the data widgets below do not author them. A filter narrows a widget
-// when one of its targets names the table + field the widget draws from (here: incident.priority / incident.assigned_to).
+// SDK v4.14.0+ writes componentProps VERBATIM (no SDK defaults merged at build time). Per the filters guide, every data
+// widget that must follow the filters sets followFilters: true + filterConfigurations: '@state.parFilters' explicitly. A filter narrows such a widget when one of
+// its targets names the table + field the widget draws from (here: incident.priority / incident.assigned_to).
 export const incidentFiltersDashboard = Dashboard({
     $id: Now.ID['incident_filters_dashboard'],
     name: 'Incident Filters Dashboard',
@@ -81,8 +83,11 @@ export const incidentFiltersDashboard = Dashboard({
                 {
                     $id: Now.ID['filtered_open_incidents_score'],
                     component: 'single-score',
+                    name: 'Open incidents', // accessible widget name (SDK v4.14.0+)
                     componentProps: {
                         headerTitle: 'Open incidents',
+                        followFilters: true,
+                        filterConfigurations: '@state.parFilters',
                         dataSources: [{ sourceType: 'table', tableOrViewName: 'incident', filterQuery: 'active=true', id: 'ds_1' }],
                         metrics: [{ dataSource: 'ds_1', aggregateFunction: 'COUNT', axisId: 'primary' }],
                         showZero: true,
@@ -94,8 +99,11 @@ export const incidentFiltersDashboard = Dashboard({
                 {
                     $id: Now.ID['filtered_by_category_chart'],
                     component: 'vertical-bar',
+                    name: 'Open incidents by category',
                     componentProps: {
                         headerTitle: 'Open incidents by category',
+                        followFilters: true,
+                        filterConfigurations: '@state.parFilters',
                         dataSources: [{ sourceType: 'table', tableOrViewName: 'incident', filterQuery: 'active=true', id: 'ds_1' }],
                         groupBy: [
                             {

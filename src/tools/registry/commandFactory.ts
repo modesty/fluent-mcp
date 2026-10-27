@@ -13,6 +13,7 @@ import {
   QueryCommand,
   CicdAppCommand,
   CicdTestCommand,
+  ExecScriptCommand,
 } from '../commands/index.js';
 
 /**
@@ -60,6 +61,7 @@ export class CommandFactory {
       new QueryCommand(executor, ensureAuthValidated),
       new CicdAppCommand(executor, ensureAuthValidated),
       new CicdTestCommand(executor, ensureAuthValidated),
+      new ExecScriptCommand(executor, ensureAuthValidated),
     ];
   }
 }

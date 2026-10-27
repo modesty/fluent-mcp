@@ -2,10 +2,12 @@
 
 An [MCP server](https://modelcontextprotocol.io) and AI skill suite that brings [ServiceNow Fluent SDK](https://www.servicenow.com/docs/bundle/yokohama-application-development/page/build/servicenow-sdk/concept/servicenow-fluent.html) (`@servicenow/sdk`) capabilities, API specifications, code snippets, and security reviews to AI-assisted development environments.
 
+Built for [@servicenow/sdk@v4.14.0](https://github.com/ServiceNow/sdk/releases/tag/v4.14.0).
+
 ## Key Features
 
-- **17 MCP Tools** — 13 ServiceNow SDK CLI command tools (`sdk_info`, `init`, `build`, `deploy`, `transform`, `dependencies`, `download`, `clean`, `pack`, `explain`, `query`, `cicd_fluent_app`, `cicd_fluent_test`) plus 4 resource/auth tools (`get-api-spec`, `get-snippet`, `get-instruct`, `check_auth_status`).
-- **75 ServiceNow Metadata Types** — Packaged API specs (`sn-spec://`), authoring instructions (`sn-instruct://`), runnable snippets (`sn-snippet://`), and workflow prompts (`coding_in_fluent`, `create_custom_ui`).
+- **18 MCP Tools** — 14 ServiceNow SDK CLI command tools (`sdk_info`, `init`, `build`, `deploy`, `transform`, `dependencies`, `download`, `clean`, `pack`, `explain`, `query`, `cicd_fluent_app`, `cicd_fluent_test`, `fluent_exec_script`) plus 4 resource/auth tools (`get-api-spec`, `get-snippet`, `get-instruct`, `check_auth_status`).
+- **76 ServiceNow Metadata Types** — Packaged API specs (`sn-spec://`), authoring instructions (`sn-instruct://`), runnable snippets (`sn-snippet://`), and workflow prompts (`coding_in_fluent`, `create_custom_ui`).
 - **AI Agent Skills** — Built-in skills (`fluent-cli`, `fluent-security-review`, `fluent-general-review`, `fluent-perf-review`, and `fluent-domain-separation-review`) installable as a plugin for Claude Code, Codex, Copilot, and other skill-enabled agents.
 - **Lazy Auto-Authentication** — Resolves and caches an SDK auth profile matching `SN_INSTANCE_URL` on first use.
 - **Explicit Working Directory Resolution** — Resolves project paths in strict order: `workingDirectory` argument → session (`init_fluent_app`) → `FLUENT_MCP_WORKING_DIR` → actionable error. Never guesses from `process.cwd()`.
@@ -52,9 +54,11 @@ Add `@modesty/fluent-mcp` to your MCP client configuration:
 | `FLUENT_MCP_LOG_LEVEL` | Minimum stderr log level (`debug`, `info`, `notice`, `warning`, `error`) | `info` |
 | `FLUENT_MCP_COMMAND_TIMEOUT_MS` | Operator override for CLI command timeout (ms) | Per-tool |
 | `NO_TELEMETRY` | Set to `1` to disable `@servicenow/sdk` CLI telemetry | — |
+| `SN_SDK_CREDENTIALS_DIR` | Directory of the SDK's encrypted profile store `credentials.enc` (SDK v4.14.0+; an empty value is treated as unset) | `~/.now-sdk` |
 
 > **Authentication Tip:** To register an instance profile manually, run:
 > `npx @servicenow/sdk auth --add <instance-url> --type <basic|oauth> --alias <alias>`
+> Since `@servicenow/sdk` 4.14.0, profiles are stored encrypted in `credentials.enc` with only the key in the OS keychain. The first auth lookup migrates existing keychain profiles silently; afterwards, profiles added with an older `now-sdk` are not visible to this server. If the store cannot be decrypted, `check_auth_status` reports it, and you must run `now-sdk auth --delete all` in a terminal and add the profile again. Do not reset for any other store error: a file written by a newer `now-sdk` needs that newer SDK, and a keyring write failure needs the OS keyring unlocked.
 > For headless CI/CD pipelines, set `SN_SDK_NODE_ENV=SN_SDK_CI_INSTALL` along with `SN_SDK_INSTANCE_URL` and `SN_SDK_USER`/`SN_SDK_USER_PWD` or `SN_SDK_OAUTH_CLIENT_ID`/`SN_SDK_OAUTH_CLIENT_SECRET`.
 
 ### MCPB Bundle (Optional)
@@ -90,16 +94,16 @@ This repository ships standalone AI agent skills under [`skills/`](./skills) pac
 
 ---
 
-## Available Tools (17)
+## Available Tools (18)
 
-### SDK Command Tools (13)
+### SDK Command Tools (14)
 
 | Tool | Description | Key Parameters |
 |------|-------------|----------------|
 | `sdk_info` | Get SDK version (`-v`) or command help (`-h`) | `flag`, `command` |
-| `explain_fluent_api` | Look up Fluent SDK docs for any API class, guide, or tag (no project required) | `topic`, `list`, `peek`, `format` (`pretty`\|`raw`), `source`, `debug` |
+| `explain_fluent_api` | Look up Fluent SDK docs for any API class, guide, or tag (no project required) | `topic`, `list`, `peek`, `format` (`pretty`\|`raw`), `debug` |
 | `init_fluent_app` | Initialize a new Fluent app or convert an existing app (non-interactive) | `workingDirectory`, `intent`, `appName`, `packageName`, `scopeName`, `template`, `from`, `auth`, `debug` |
-| `build_fluent_app` | Build the Fluent application package | `workingDirectory`, `debug` |
+| `build_fluent_app` | Build the Fluent application package | `workingDirectory`, `sourceMap`, `debug` |
 | `deploy_fluent_app` | Deploy/install the built package to a ServiceNow instance | `workingDirectory`, `auth`, `skipFlowActivation`, `async`, `debug` |
 | `fluent_transform` | Transform local XML or instance records into Fluent `.now.ts` source code | `workingDirectory`, `from`, `directory`, `table`, `id`, `force`, `format`, `timeoutSeconds`, `auth`, `debug` |
 | `download_fluent_dependencies` | Download application dependencies and script/table type definitions | `workingDirectory`, `auth`, `debug` |
@@ -109,12 +113,13 @@ This repository ships standalone AI agent skills under [`skills/`](./skills) pac
 | `query_fluent_records` | Read-only Table REST query against an instance (returns JSON envelope) | `workingDirectory`, `table`, `query`, `fields`, `limit`, `offset`, `displayValue`, `select`, `timeout`, `auth` |
 | `cicd_fluent_app` | Install, publish, or rollback an app via the `sn_cicd` API | `workingDirectory`, `action` (`install`\|`publish`\|`rollback`), `scope`\|`appSysId`, `appVersion`, `wait`, `pollTimeout`, `output`, `select` |
 | `cicd_fluent_test` | Run, watch, or fetch results/logs for ATF test suites and tests via `sn_cicd` | `target` (`testsuite`\|`test`), `action` (`run`\|`watch`\|`result`\|`logs`), `testSuiteSysId`\|`testSuiteName`, `testSysId`\|`testName`, `progressId`, `resultId`, `pattern`, `limit`, `wait`, `output`, `select` |
+| `fluent_exec_script` | Run a server-side script on the instance like Scripts - Background (`now-sdk exec`; admin role, destructive — approve every run; a timeout does not stop the script) | `script`\|`file` (a `.js` file inside the project, ≤ 64 KB; run from a private copy and echoed with its SHA-256), `workingDirectory`, `scope`, `reason`, `timeoutMs`, `serverLogs`, `select`, `auth` |
 
 ### Resource & Authentication Tools (4)
 
 | Tool | Description | Key Parameters |
 |------|-------------|----------------|
-| `get-api-spec` | Get the Fluent API specification for a metadata type (omit to list all 75 types) | `metadataType` (optional) |
+| `get-api-spec` | Get the Fluent API specification for a metadata type (omit to list all 76 types) | `metadataType` (optional) |
 | `get-snippet` | Get runnable Fluent code snippets for a metadata type | `metadataType`, `id` (optional) |
 | `get-instruct` | Get authoring rules, conventions, and pitfalls for a metadata type | `metadataType` |
 | `check_auth_status` | Validate and return the current ServiceNow instance authentication status | None |
@@ -130,9 +135,9 @@ This repository ships standalone AI agent skills under [`skills/`](./skills) pac
 | **Code Snippets** | `sn-snippet://{metadataType}/{id}` | Practical, build-validated code examples |
 | **Prompts** | `coding_in_fluent`, `create_custom_ui` | End-to-end authoring and custom UI guides |
 
-### Supported Metadata Types (75)
+### Supported Metadata Types (76)
 
-- **Core (25):** `acl`, `application-menu`, `business-rule`, `client-script`, `cross-scope-privilege`, `data-policy`, `field-style`, `form`, `import-set`, `instance-scan`, `interceptor`, `list`, `property`, `role`, `scheduled-script`, `script-action`, `script-include`, `scripted-rest`, `sla`, `state-model`, `table`, `ui-action`, `ui-page`, `ui-policy`, `user-preference`
+- **Core (26):** `acl`, `application-menu`, `business-rule`, `client-script`, `cross-scope-privilege`, `data-policy`, `field-style`, `form`, `import-set`, `instance-scan`, `interceptor`, `list`, `property`, `role`, `scheduled-script`, `script-action`, `script-include`, `scripted-rest`, `sla`, `state-model`, `table`, `ui-action`, `ui-macro`, `ui-page`, `ui-policy`, `user-preference`
 - **Table & View (3):** `column`, `column-generic`, `database-view`
 - **Service Catalog (6):** `catalog-item`, `catalog-item-record-producer`, `catalog-ui-policy`, `catalog-client-script`, `catalog-variable`, `variable-set`
 - **Email (2):** `email-notification`, `inbound-email-action`

@@ -28,6 +28,8 @@ export interface CommandResult {
    * Only consumed on success; ignored on error results.
    */
   structuredContent?: { [key: string]: unknown };
+  /** True when the runner cut the middle out of `output` for exceeding its capture cap. */
+  outputTruncated?: boolean;
 }
 
 /**
@@ -59,6 +61,28 @@ export interface ProcessResult {
   stdout: string;
   stderr: string;
   exitCode: number;
+  /** True when stdout exceeded its capture cap and its middle was dropped. */
+  stdoutTruncated?: boolean;
+}
+
+/** Per-call process options. */
+export interface ProcessRunOptions {
+  /**
+   * Stdout capture cap for this call (characters), in place of the runner's
+   * default. Raised by commands that must parse their whole JSON envelope.
+   */
+  maxStdoutChars?: number;
+}
+
+/** Exit code the process runner reports when it terminates a command for exceeding its timeout. */
+export const EXIT_CODE_TIMEOUT = 124;
+
+/** Exit code the process runner reports when the MCP client cancels a command. */
+export const EXIT_CODE_CANCELLED = 130;
+
+/** True when the runner stopped the child itself, so its output is partial. */
+export function isRunnerStoppedExit(exitCode: number | undefined): boolean {
+  return exitCode === EXIT_CODE_TIMEOUT || exitCode === EXIT_CODE_CANCELLED;
 }
 
 // Abstractions (Dependency Inversion)
@@ -70,7 +94,8 @@ export interface ProcessRunner {
     stdinInput?: string,
     timeoutMs?: number,
     /** Abort signal from the MCP client; aborting kills the child process. */
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: ProcessRunOptions
   ): Promise<ProcessResult>;
 }
 
@@ -90,7 +115,8 @@ export interface CommandProcessor {
     stdinInput?: string,
     timeoutMs?: number,
     /** Abort signal from the MCP client; propagated to the process runner. */
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: ProcessRunOptions
   ): Promise<CommandResult>;
 }
 

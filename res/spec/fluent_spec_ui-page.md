@@ -24,7 +24,8 @@ UiPage({
               // Can contain:
               // - Static XHTML/HTML markup
               // - Dynamically generated content using Jelly tags
-              // - Calls to UI Macros and Script Includes
+              // - Calls to UI Macros and Script Includes (define project macros with UiMacro() — see the ui-macro spec;
+              //   invoke a scoped one as <g:x_myapp_name />)
               // - AngularJS directives and templates
               // Example: '<div>Hello World</div>' or Jelly template
     

@@ -21,7 +21,7 @@ Test({
       'caller_id': '77ad8176731313005754660c4cf6a7de'
     },
     assertType: 'record_successfully_inserted',
-    enforceSecurity: false,
+    enforceSecurity: true,
   })
 
   atf.form.openExistingRecord({

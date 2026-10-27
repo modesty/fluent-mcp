@@ -15,3 +15,4 @@ export * from './explainCommand.js';
 export * from './queryCommand.js';
 export * from './cicdAppCommand.js';
 export * from './cicdTestCommand.js';
+export * from './execScriptCommand.js';

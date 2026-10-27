@@ -228,4 +228,21 @@ describe('ToolsManager', () => {
     assert.ok(formattedFail.includes('Failure output'));
     assert.ok(formattedFail.includes('Error message'));
   });
+
+  it('never reports "Unknown error" and does not repeat a message that equals the output', () => {
+    // A command-layer rejection carries the same text as output and error: print it once.
+    const rejection = toolsManager.formatResult({ success: false, output: 'Script file not found: /x.js', exitCode: 1, error: 'Script file not found: /x.js' });
+    assert.equal(rejection, 'Error (exit 1): Script file not found: /x.js');
+
+    // A CLI envelope plus its recovered message: the message leads, the envelope stays as context.
+    const envelope = '{"ok":false,"error":{"message":"No logs found"}}';
+    const cli = toolsManager.formatResult({ success: false, output: envelope, exitCode: 1, error: 'No logs found' });
+    assert.equal(cli, `Error (exit 1): No logs found\n\nOutput:\n${envelope}`);
+
+    // No message from either stream (the CLI's own --select over an error envelope prints only null;
+    // the tools apply select themselves, so this is only a fallback).
+    const silent = toolsManager.formatResult({ success: false, output: 'null', exitCode: 1 });
+    assert.ok(!silent.includes('Unknown error'));
+    assert.equal(silent, 'Error (exit 1): the command reported no error message\n\nOutput:\nnull');
+  });
 });

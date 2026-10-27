@@ -14,5 +14,7 @@ Property({
     },
     ignoreCache: false, // boolean, indicates whether to flush the cache after `value` is changed
     isPrivate: false, // boolean, indicates whether to include property in update sets			
+    suffix: '', // string, optional (SDK v4.14.0+) - short identifier written to sys_properties.suffix. Defaults to `name` minus the
+        // '<scope>.' prefix (e.g. 'timeout' for 'x_acme.timeout'); set it only to keep a different value (an explicit non-empty value wins)
 }): Property // returns a Property object
 ```

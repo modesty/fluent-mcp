@@ -23,7 +23,7 @@ Test({
       'state': 'Assess'
     },
     assertType: 'record_successfully_inserted',
-    enforceSecurity: false
+    enforceSecurity: true
   })
 
   atf.form.openExistingRecord({

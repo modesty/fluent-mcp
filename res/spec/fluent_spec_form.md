@@ -51,8 +51,21 @@ type AnnotationElement = {
 type FormatterElement = {
     type: 'formatter',           // mandatory — must be 'formatter'
     formatterRef: string,        // mandatory — Formatter key (e.g., 'Activities_Filtered'), sys_id, or Record<'sys_ui_formatter'>
-    formatterName?: string,      // optional — formatter name (auto-derived from formatterRef for predefined keys)
+    formatterName?: string,      // optional — the macro FILE NAME (e.g. 'activity.xml'). Derived when omitted: from a predefined
+                                 // Formatter.* key, or from a project Record<'sys_ui_formatter'>'s `formatter` field. REQUIRED only when
+                                 // formatterRef is the sys_id of a formatter not predefined in Formatter. If set it OVERRIDES the record's
+                                 // `formatter` field with no diagnostic, so keep the two identical. Neither value is ever scope-prefixed
 }
+
+// CUSTOM FORMATTER MACRO (UiMacro, SDK v4.14.0+) — when no built-in formatter fits:
+//   1. UiMacro({ $id, name: 'status_badge', xml }) — see the ui-macro spec. Formatter output is inserted inside a platform
+//      <table>, so the macro must emit <tr><td colspan="2">...</td></tr>, never a top-level <div>.
+//   2. Record({ table: 'sys_ui_formatter', data: { name: 'Status Badge', type: 'formatter', formatter: '<file name>', table: 'incident', active: true } })
+//   3. { type: 'formatter', formatterRef: <that record> } in the Form (formatterName is derived from the record's `formatter`).
+// The platform resolves the macro by EXACT match on its invocation key: in an app scope use the SCOPED file name
+// 'x_myapp_status_badge.xml' (the macro's scoped_name + '.xml'); in global, and for every OOB macro, the unprefixed
+// 'status_badge.xml'. The Form plugin copies the value as given with no prefixing, and an unprefixed name in a scoped
+// app builds cleanly but silently renders nothing.
 
 // ListElement — related list element (one-to-many, many-to-many, or custom relationship)
 // Implicit list (12M or M2M):

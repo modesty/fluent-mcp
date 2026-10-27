@@ -37,6 +37,7 @@ mock.module('../../src/utils/sessionManager.js', {
 
 const { CicdAppCommand } = await import('../../src/tools/commands/cicdAppCommand.js');
 const { CicdTestCommand } = await import('../../src/tools/commands/cicdTestCommand.js');
+const { ENVELOPE_RUN_OPTIONS } = await import('../../src/utils/jsonSelect.js');
 
 const SDK_BIN = '/test/node_modules/@servicenow/sdk/bin/index.js';
 
@@ -100,7 +101,8 @@ describe('CicdAppCommand', () => {
       '/mock/working/dir',
       undefined,
       command.timeoutMs,
-      undefined
+      undefined,
+      ENVELOPE_RUN_OPTIONS
     );
   });
 
@@ -204,15 +206,37 @@ describe('CicdAppCommand', () => {
     assertNotCalled(mockProcessor.process);
   });
 
-  it('should pass a bracket select path through to --select', async () => {
+  // The CLI applies --select to failure envelopes too (printing only null), so the
+  // tool never forwards it: it applies the path to a successful envelope only.
+  it('should apply a bracket select path locally and never forward --select', async () => {
+    mockProcessor.process.mock.mockImplementation(async () => ({
+      success: true, output: '{"ok":true,"result":{"links":{"results":[{"id":"r1"}]}}}', exitCode: 0,
+    }));
     const command = new CicdAppCommand(mockProcessor);
 
-    await command.execute({
+    const result = await command.execute({
       action: 'install', appSysId: 'abc123', select: 'result.links.results[0].id',
     });
 
-    const argv = mockProcessor.process.mock.calls[0].arguments[1];
-    assert.equal(argv[argv.indexOf('--select') + 1], 'result.links.results[0].id');
+    assert.equal(result.output, '"r1"');
+    assert.ok(!mockProcessor.process.mock.calls[0].arguments[1].includes('--select'));
+  });
+
+  it('should unquote a selected string with output raw, and keep a failure envelope whole', async () => {
+    mockProcessor.process.mock.mockImplementation(async () => ({
+      success: true, output: '{"ok":true,"result":{"links":{"progress":{"id":"p1"}}}}', exitCode: 0,
+    }));
+    const raw = await new CicdAppCommand(mockProcessor).execute({
+      action: 'install', appSysId: 'abc123', output: 'raw', select: 'result.links.progress.id',
+    });
+    assert.equal(raw.output, 'p1');
+
+    const failure = '{"ok":false,"error":{"message":"Forbidden"}}';
+    mockProcessor.process.mock.mockImplementation(async () => ({ success: false, output: failure, exitCode: 1 }));
+    const failed = await new CicdAppCommand(mockProcessor).execute({
+      action: 'install', appSysId: 'abc123', select: 'result.links.progress.id',
+    });
+    assert.equal(failed.output, failure);
   });
 
   describe('without a Fluent project directory', () => {
@@ -324,7 +348,8 @@ describe('CicdTestCommand', () => {
       '/mock/project/root',
       undefined,
       command.timeoutMs,
-      undefined
+      undefined,
+      ENVELOPE_RUN_OPTIONS
     );
   });
 
@@ -453,14 +478,17 @@ describe('CicdTestCommand', () => {
     assertNotCalled(mockProcessor.process);
   });
 
-  it('should pass a bracket select path through but reject one outside the grammar', async () => {
+  it('should apply a bracket select path locally but reject one outside the grammar', async () => {
+    mockProcessor.process.mock.mockImplementation(async () => ({
+      success: true, output: '{"ok":true,"result":{"rollup_results":[{"status":"success"}]}}', exitCode: 0,
+    }));
     const command = new CicdTestCommand(mockProcessor);
 
     const select = 'result.rollup_results[0].status';
     const ok = await command.execute({ target: 'testsuite', action: 'result', resultId: 'res-1', select });
     assert.equal(ok.success, true);
-    const argv = mockProcessor.process.mock.calls[0].arguments[1];
-    assert.equal(argv[argv.indexOf('--select') + 1], select);
+    assert.equal(ok.output, '"success"');
+    assert.ok(!mockProcessor.process.mock.calls[0].arguments[1].includes('--select'));
 
     mockProcessor.process.mock.resetCalls();
     const bad = await command.execute({

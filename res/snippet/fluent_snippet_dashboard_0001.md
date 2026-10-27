@@ -5,6 +5,8 @@ import { Dashboard } from '@servicenow/sdk/core'
 
 // All data binding is inline in componentProps (dataSources + metrics + groupBy / trendBy);
 // there is no separate report record. Widths/x use a 48-column grid: full = 48, half = 24, quarter = 12.
+// SDK v4.14.0+ writes componentProps verbatim (no SDK widget defaults merged in at build time); install fills in the
+// component's remaining defaults, so set only the props that must differ (e.g. showZero: true on single-score).
 export const incidentManagementDashboard = Dashboard({
     $id: Now.ID['incident_management_dashboard'],
     name: 'Incident Management Dashboard',
