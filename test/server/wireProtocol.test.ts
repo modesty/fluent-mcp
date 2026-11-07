@@ -212,6 +212,79 @@ async function readPidIfPresent(pidPath: string): Promise<number | undefined> {
   }
 }
 
+type Send = (method: string, params?: Record<string, unknown>) => Promise<Frame>;
+
+/** completion/complete on every advertised prompt argument and template variable. */
+async function assertCompletions(send: Send): Promise<void> {
+  const complete = async (ref: Frame, name: string, value: string, context?: Frame) => {
+    const res = await send('completion/complete', { ref, argument: { name, value }, ...(context && { context }) });
+    assert.equal(res.error, undefined, `${JSON.stringify(ref)} ${name}`);
+    return res.result.completion.values as string[];
+  };
+  const prompt = { type: 'ref/prompt', name: 'coding_in_fluent' };
+  assert.deepEqual(await complete(prompt, 'metadata_list', 'table,business-r'), ['table,business-rule']);
+  assert.ok((await complete(prompt, 'metadata_list', '')).includes('ui-macro'));
+
+  const spec = { type: 'ref/resource', uri: 'sn-spec://{metadataType}' };
+  const instruct = { type: 'ref/resource', uri: 'sn-instruct://{metadataType}' };
+  const snippet = { type: 'ref/resource', uri: 'sn-snippet://{metadataType}/{snippetId}' };
+  assert.deepEqual(await complete(spec, 'metadataType', 'script-i'), ['script-include']);
+  assert.deepEqual(await complete(instruct, 'metadataType', 'business-'), ['business-rule']);
+  assert.deepEqual(await complete(snippet, 'metadataType', 'business-'), ['business-rule']);
+  const ids = await complete(snippet, 'snippetId', '', { arguments: { metadataType: 'business-rule' } });
+  assert.ok(ids.includes('0001') && ids.includes('0002'));
+  assert.deepEqual(await complete(snippet, 'snippetId', ''), []);
+
+  for (const ref of [{ type: 'ref/prompt', name: 'no_such_prompt' }, { type: 'ref/resource', uri: 'sn-nope://{x}' }]) {
+    const res = await send('completion/complete', { ref, argument: { name: 'x', value: '' } });
+    assert.equal(res.error?.code, -32602, JSON.stringify(ref));
+  }
+}
+
+/** prompts/list and prompts/get as served by the SDK from registerPrompt. */
+async function assertPrompts(send: Send): Promise<void> {
+  const list = await send('prompts/list');
+  assert.deepStrictEqual(list.result.prompts.map((p: Frame) => [p.name, p.arguments]), [
+    ['coding_in_fluent', [{
+      name: 'metadata_list',
+      description: 'Comma-separated list of metadata types to include in the guide (e.g., "table,business-rule,script-include")',
+      required: false,
+    }]],
+    ['create_custom_ui', undefined],
+  ]);
+
+  // Prompt arguments are strings on the wire: the comma-separated form is split.
+  const got = await send('prompts/get', { name: 'coding_in_fluent', arguments: { metadata_list: 'state-model, atf-list' } });
+  const text = got.result.messages[0].content.text;
+  assert.ok(text.includes('### state-model') && text.includes('### atf-list'));
+  assert.ok(!text.includes('not a recognized Fluent metadata type'));
+
+  const ui = await send('prompts/get', { name: 'create_custom_ui' });
+  assert.ok(ui.result.messages[0].content.text.includes('# Create a Custom UI with React'));
+
+  // metadata_list is optional: without it the guide is returned uncustomized.
+  for (const args of [undefined, {}, { metadata_list: '' }]) {
+    const bare = await send('prompts/get', { name: 'coding_in_fluent', ...(args && { arguments: args }) });
+    const bareText = bare.result.messages[0].content.text;
+    assert.ok(bareText.includes('# Coding in ServiceNow Fluent'), JSON.stringify(args));
+    assert.ok(!bareText.includes('## Selected Metadata Types'), JSON.stringify(args));
+  }
+
+  const unknown = await send('prompts/get', { name: 'no_such_prompt' });
+  assert.equal(unknown.error?.code, -32602);
+
+  // Mosey: SDK quirk (present before W4, on both eras). Prompt arguments are
+  // Record<string, string>; the SDK checks request params against the protocol
+  // schema before any prompt handler runs and reports a non-string value as
+  // -32603 with the raw Zod issues, not -32602. Pinned so an SDK fix shows up
+  // here; until then a client must send the comma-separated string.
+  for (const value of [['table', 'flow'], 42]) {
+    const res = await send('prompts/get', { name: 'coding_in_fluent', arguments: { metadata_list: value } });
+    assert.equal(res.error?.code, -32603, JSON.stringify(value));
+    assert.match(res.error.message, /invalid_type/);
+  }
+}
+
 describe('dual-era wire protocol', () => {
   let wire: WireClient;
 
@@ -305,21 +378,14 @@ describe('dual-era wire protocol', () => {
       }
     });
 
-    it('declares no completions capability while prompts are hand-registered', async () => {
-      // The SDK's one completion/complete handler resolves prompt refs only from
-      // registerPrompt; advertising completions now would answer every listed
-      // prompt with "Prompt … not found". W4 adds completions with prompts.
+    it('declares completions and completes every prompt argument and template variable', async () => {
       const discover = await wire.modern('server/discover');
-      assert.equal(discover.result.capabilities.completions, undefined);
+      assert.deepEqual(discover.result.capabilities.completions, {});
+      await assertCompletions((method, params) => wire.modern(method, params));
     });
 
-    it('serves prompts/list and prompts/get', async () => {
-      const list = await wire.modern('prompts/list');
-      assert.ok(list.result.prompts.length > 0);
-
-      const name = list.result.prompts[0].name;
-      const got = await wire.modern('prompts/get', { name });
-      assert.ok(got.result.messages[0].content.text.length > 0);
+    it('serves prompts from registerPrompt; an unknown prompt is -32602, metadata_list is optional', async () => {
+      await assertPrompts((method, params) => wire.modern(method, params));
     });
 
     it('executes a tool call and returns its content', async () => {
@@ -501,6 +567,14 @@ describe('dual-era wire protocol', () => {
 
       const prompts = await wire.legacy('prompts/list');
       assert.ok(prompts.result.prompts.length > 0);
+    });
+
+    it('declares completions and serves the same prompts and completions as the modern era', async () => {
+      const init = await wire.legacyInitialize();
+      await wire.notify('notifications/initialized');
+      assert.deepEqual(init.result.capabilities.completions, {});
+      await assertPrompts((method, params) => wire.legacy(method, params));
+      await assertCompletions((method, params) => wire.legacy(method, params));
     });
 
     it('issues no server-initiated request even when the client advertises roots and elicitation', async () => {

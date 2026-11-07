@@ -1,161 +1,199 @@
-import { McpServer, GetPromptResult, ListPromptsResult, Prompt } from '@modelcontextprotocol/server';
+import { completable, McpServer } from '@modelcontextprotocol/server';
+import type { GetPromptResult } from '@modelcontextprotocol/server';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { z } from 'zod';
 import { getProjectRootPath } from '../config.js';
 import logger from '../utils/logger.js';
 import { CommandResultFactory, ResourceType } from '../utils/types.js';
 import { ResourceCatalog } from '../res/resourceCatalog.js';
 import { ServiceNowMetadataType } from '../types.js';
-import loggingManager from '../utils/loggingManager.js';
 
+/** Single source of truth for the supported metadata types (see src/types.ts). */
+const ALL_METADATA_TYPES: readonly string[] = Object.values(ServiceNowMetadataType);
+
+/** The one prompt argument the server knows how to render and complete. */
+const METADATA_LIST = 'metadata_list';
+
+/** One `arguments` entry of a prompt's front matter. */
+export interface PromptArgumentSpec {
+  name: string;
+  description: string;
+  required: boolean;
+}
+
+/** A prompt as loaded from `res/prompt/<name>.md`. */
+export interface PromptDefinition {
+  name: string;
+  title: string;
+  description: string;
+  arguments: PromptArgumentSpec[];
+  /** The markdown after the front matter: the message text sent to clients. */
+  body: string;
+}
+
+const unquote = (value: string): string => value.trim().replace(/^(["'])(.*)\1$/, '$2');
 
 /**
- * Manager for handling MCP prompts registration and access
+ * Parse one prompt file. The front matter has exactly the shape the bundled
+ * prompts use: `key: value` scalars plus one `arguments:` list of maps
+ * (`- name: …` then indented `description:` / `required:`). Anything else is
+ * rejected rather than silently ignored. CRLF is read as LF: the repository has
+ * no `.gitattributes`, so a Windows checkout may convert the files.
  */
-export class PromptManager {
-  private prompts: Map<string, Prompt> = new Map();
-  private promptContents: Map<string, string> = new Map();
+export function parsePromptFile(name: string, raw: string): PromptDefinition {
+  const match = raw.replace(/\r\n/g, '\n').match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  if (!match) throw new Error(`Prompt ${name}: missing front matter`);
 
-  /** Single source of truth for the supported metadata types (see src/types.ts). */
-  private static readonly ALL_METADATA_TYPES: string[] = Object.values(ServiceNowMetadataType);
-
-  /**
-   * Create a new PromptManager.
-   *
-   * Prompt content is loaded once by `initialize()` and shared; handlers are
-   * attached per MCP server instance by `registerOn()`, because the stdio entry
-   * may build more than one instance per connection (see ToolsManager).
-   */
-  constructor(private readonly resourceCatalog: ResourceCatalog = new ResourceCatalog()) {}
-
-  /**
-   * Initialize prompts by scanning the res/prompt/ directory and loading all .md files
-   */
-  async initialize(): Promise<void> {
-    try {
-      logger.debug(`Project root path: ${getProjectRootPath()}`);
-      logger.debug(`Current working directory: ${process.cwd()}`);
-
-      const promptDir = path.join(getProjectRootPath(), 'res', 'prompt');
-      await this.registerAllPrompts(promptDir);
-      if (this.prompts.size === 0) {
-        logger.warn(`No prompts found in ${promptDir} — expected at least one .md file`);
-      }
-      logger.debug(`Initialized PromptManager with ${this.prompts.size} prompts`);
-    } catch (error) {
-      logger.error(
-        'Error initializing prompts',
-        CommandResultFactory.normalizeError(error)
-      );
-      throw error;
+  const scalars: Record<string, string> = {};
+  const items: Record<string, string>[] = [];
+  let inArguments = false;
+  for (const line of match[1].split('\n')) {
+    if (!line.trim()) continue;
+    const key = line.match(/^(\w+):\s*(.*)$/);
+    const item = line.match(/^\s+-\s+(\w+):\s*(.+)$/);
+    const field = line.match(/^\s+(\w+):\s*(.+)$/);
+    if (key && key[2]) {
+      scalars[key[1]] = unquote(key[2]);
+      inArguments = false;
+    } else if (key?.[1] === 'arguments') {
+      inArguments = true;
+    } else if (inArguments && item) {
+      items.push({ [item[1]]: unquote(item[2]) });
+    } else if (inArguments && field && items.length > 0) {
+      items[items.length - 1][field[1]] = unquote(field[2]);
+    } else {
+      throw new Error(`Prompt ${name}: unsupported front matter line: ${line}`);
     }
   }
 
+  const { title, description } = scalars;
+  if (!title || !description) throw new Error(`Prompt ${name}: front matter needs a title and a description`);
+
+  const args = items.map((entry) => {
+    if (entry.name !== METADATA_LIST) {
+      throw new Error(`Prompt ${name}: unsupported argument "${entry.name}" (only ${METADATA_LIST} is rendered)`);
+    }
+    return { name: entry.name, description: entry.description ?? '', required: entry.required === 'true' };
+  });
+
+  return { name, title, description, arguments: args, body: match[2] };
+}
+
+/**
+ * Complete the last entry of a comma-separated `metadata_list`, keeping the
+ * entries already typed: "table,bus" → "table,business-rule".
+ */
+export function completeMetadataList(value: string): string[] {
+  const entries = value.split(',');
+  const current = entries.pop()!.trim().toLowerCase();
+  const chosen = new Set(entries.map((entry) => entry.trim().toLowerCase()));
+  const prefix = entries.length > 0 ? `${entries.join(',')},` : '';
+  return ALL_METADATA_TYPES
+    .filter((type) => type.startsWith(current) && !chosen.has(type))
+    .map((type) => prefix + type);
+}
+
+/** The Zod arguments schema advertised in `prompts/list` and enforced on `prompts/get`. */
+function argsSchemaFor(args: readonly PromptArgumentSpec[]) {
+  const shape: Record<string, z.ZodType<string | undefined>> = {};
+  for (const arg of args) {
+    const field = completable(z.string().describe(arg.description), completeMetadataList);
+    shape[arg.name] = arg.required ? field : field.optional();
+  }
+  return z.object(shape);
+}
+
+/**
+ * Serves the `res/prompt/*.md` prompts through the SDK's `registerPrompt`. The
+ * SDK owns `prompts/list`, `prompts/get` (including the -32602 answer for an
+ * unknown prompt or invalid arguments) and `completion/complete`; this class
+ * loads the files once and renders the message text.
+ */
+export class PromptManager {
+  private prompts: PromptDefinition[] = [];
+
   /**
-   * Register the prompt handlers on the given MCP server.
-   * @param mcpServer The MCP server instance to register onto
+   * Prompt content is loaded once by `initialize()` and shared; prompts are
+   * registered per MCP server instance by `registerOn()`, because the stdio
+   * entry may build more than one instance per connection (see ToolsManager).
    */
+  constructor(private readonly resourceCatalog: ResourceCatalog = new ResourceCatalog()) {}
+
+  /** Load every `res/prompt/*.md` file, in name order. */
+  async initialize(): Promise<void> {
+    const promptDir = path.join(getProjectRootPath(), 'res', 'prompt');
+    let files: string[];
+    try {
+      files = await fs.readdir(promptDir);
+    } catch (error) {
+      logger.warn(`Could not read prompt directory ${promptDir}: ${CommandResultFactory.normalizeError(error).message}`);
+      return;
+    }
+
+    const loaded: PromptDefinition[] = [];
+    for (const file of files.filter((f) => f.endsWith('.md')).sort()) {
+      const name = file.replace(/\.md$/, '');
+      try {
+        loaded.push(parsePromptFile(name, await fs.readFile(path.join(promptDir, file), 'utf-8')));
+      } catch (error) {
+        logger.error(`Failed to load prompt ${name}: ${CommandResultFactory.normalizeError(error).message}`);
+      }
+    }
+    this.prompts = loaded;
+    if (loaded.length === 0) logger.warn(`No prompts found in ${promptDir} — expected at least one .md file`);
+    logger.debug(`Initialized PromptManager with ${loaded.length} prompts`);
+  }
+
+  /** Register every loaded prompt on one server instance. */
   registerOn(mcpServer: McpServer): void {
-    const server = mcpServer?.server;
-    if (!server) return;
-
-    // Set up the prompts/list handler
-    server.setRequestHandler('prompts/list', async () => {
-      try {
-        const prompts = Array.from(this.prompts.values());
-        return { prompts } as ListPromptsResult;
-      } catch (error) {
-        loggingManager.logPromptListingFailed(error);
-        return { prompts: [] } as ListPromptsResult;
+    for (const prompt of this.prompts) {
+      const config = { title: prompt.title, description: prompt.description };
+      if (prompt.arguments.length === 0) {
+        mcpServer.registerPrompt(prompt.name, config, () => this.result(prompt, prompt.body));
+      } else {
+        mcpServer.registerPrompt(
+          prompt.name,
+          { ...config, argsSchema: argsSchemaFor(prompt.arguments) },
+          async (args) => this.result(prompt, await this.render(prompt.body, args[METADATA_LIST]))
+        );
       }
-    });
+    }
+  }
 
-    // Set up the prompts/get handler
-    server.setRequestHandler('prompts/get', async (request) => {
-      const { name, arguments: args } = request.params;
-      
-      logger.debug(`GetPromptRequest for prompt: ${name}, args: ${JSON.stringify(args)}`);
-      
-      const prompt = this.prompts.get(name);
-      if (!prompt) {
-        logger.error(`Unknown prompt requested: ${name}`);
-        throw new Error(`Unknown prompt: ${name}`);
-      }
-
-      try {
-        // Get the prompt content
-        const content = this.promptContents.get(name);
-        logger.debug(`Content map has keys: ${Array.from(this.promptContents.keys()).join(', ')}`);
-        logger.debug(`Content for ${name} exists: ${!!content}, length: ${content ? content.length : 0}`);
-        
-        if (!content) {
-          logger.error(`Prompt content not loaded for: ${name}`);
-          throw new Error(`Prompt content not loaded for: ${name}`);
-        }
-
-        // Process any arguments
-        let processedContent = content;
-        if (name === 'coding_in_fluent' && args?.metadata_list) {
-          processedContent = await this.renderCodingInFluent(content, args.metadata_list);
-        }
-
-        // Construct the prompt messages
-        const result = {
-          description: prompt.description,
-          messages: [
-            {
-              role: 'user',
-              content: {
-                type: 'text',
-                text: processedContent
-              }
-            }
-          ]
-        } as GetPromptResult;
-
-        logger.debug(`GetPromptRequest for '${name}' is returning content length: ${processedContent.length} bytes`);
-        
-        return result;
-      } catch (error) {
-        loggingManager.logPromptRetrievalFailed(name, error);
-        throw error;
-      }
-    });
+  private result(prompt: PromptDefinition, text: string): GetPromptResult {
+    return { description: prompt.description, messages: [{ role: 'user', content: { type: 'text', text } }] };
   }
 
   /**
-   * Render the `coding_in_fluent` prompt for the requested metadata types.
-   * For each requested type it injects a real authoring summary drawn from the
-   * shipped instruction resource plus explicit pointers to the resource tools
+   * Render a prompt for the requested metadata types. For each requested type
+   * it injects a real authoring summary drawn from the shipped instruction
+   * resource plus explicit pointers to the resource tools
    * (`get-api-spec`/`get-instruct`/`get-snippet`) and URIs (`sn-spec://` etc.),
-   * then appends the complete, enum-derived catalog of supported types. This
-   * replaces the previous generic "Use the appropriate Fluent API methods" stubs
-   * and the stale hardcoded type list (plan P0.1).
-   * @param baseContent The prompt body (without frontmatter).
-   * @param rawList The `metadata_list` argument. MCP prompt arguments are
-   *   string-valued on the wire, so the documented comma-separated form
-   *   ("table,business-rule") is what a conforming client sends; an array is
-   *   also accepted, and every element is split on commas either way.
-   * @returns The rendered prompt content.
+   * then appends the complete, enum-derived catalog of supported types.
+   * @param metadataList The comma-separated `metadata_list` argument (MCP prompt
+   *   arguments are strings on the wire, e.g. "table,business-rule"). An absent
+   *   or empty value renders the body unchanged.
    */
-  private async renderCodingInFluent(baseContent: string, rawList: unknown): Promise<string> {
-    const requested = (Array.isArray(rawList) ? rawList : [rawList])
-      .flatMap(value => String(value).split(','))
-      .map(value => value.trim().toLowerCase())
-      .filter(value => value.length > 0);
+  private async render(body: string, metadataList: string | undefined): Promise<string> {
+    if (!metadataList) return body;
+    const requested = metadataList
+      .split(',')
+      .map((value) => value.trim().toLowerCase())
+      .filter((value) => value.length > 0);
 
-    const sections = await Promise.all(requested.map(type => this.renderTypeSection(type)));
+    const sections = await Promise.all(requested.map((type) => this.renderTypeSection(type)));
 
-    const total = PromptManager.ALL_METADATA_TYPES.length;
+    const total = ALL_METADATA_TYPES.length;
     const catalog =
       `---\n\nAll ${total} supported metadata types (call \`get-api-spec\` with no arguments to list them at any time):\n\n` +
-      `${PromptManager.ALL_METADATA_TYPES.join(', ')}.`;
+      `${ALL_METADATA_TYPES.join(', ')}.`;
 
     const selected = sections.length > 0
       ? `\n\n## Selected Metadata Types\n\n${sections.join('\n\n')}`
       : '';
 
-    return `${baseContent}${selected}\n\n${catalog}`;
+    return `${body}${selected}\n\n${catalog}`;
   }
 
   /**
@@ -164,9 +202,9 @@ export class PromptManager {
    * Unknown types get an actionable correction instead of a stub.
    */
   private async renderTypeSection(type: string): Promise<string> {
-    if (!PromptManager.ALL_METADATA_TYPES.includes(type)) {
+    if (!ALL_METADATA_TYPES.includes(type)) {
       return `### ${type}\n\n\`${type}\` is not a recognized Fluent metadata type. ` +
-        `Call \`get-api-spec\` with no arguments to see all ${PromptManager.ALL_METADATA_TYPES.length} supported types.`;
+        `Call \`get-api-spec\` with no arguments to see all ${ALL_METADATA_TYPES.length} supported types.`;
     }
 
     const pointers =
@@ -205,170 +243,5 @@ export class PromptManager {
     }
     const summary = points.join(' ');
     return summary.length > maxChars ? `${summary.slice(0, maxChars).trimEnd()}…` : summary;
-  }
-
-  /**
-   * Parse YAML-style frontmatter from a markdown file.
-   * Returns the frontmatter fields and the body content (without the frontmatter block).
-   * If no frontmatter is present, returns empty metadata and full content.
-   */
-  private static parseFrontmatter(raw: string): { meta: Record<string, unknown>; body: string } {
-    const match = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-    if (!match) {
-      return { meta: {}, body: raw };
-    }
-
-    const yamlBlock = match[1];
-    const body = match[2];
-    const meta: Record<string, unknown> = {};
-
-    // Lightweight YAML parser — handles scalar key: value pairs and simple arrays
-    let currentKey: string | null = null;
-    let currentArray: Record<string, unknown>[] | null = null;
-    let currentItem: Record<string, unknown> | null = null;
-
-    for (const line of yamlBlock.split('\n')) {
-      // Top-level "key: value" (value may be quoted)
-      const scalarMatch = line.match(/^(\w+):\s*(.+)$/);
-      if (scalarMatch) {
-        if (currentKey && currentArray) {
-          if (currentItem && Object.keys(currentItem).length > 0) currentArray.push(currentItem);
-          meta[currentKey] = currentArray;
-        }
-        currentKey = null;
-        currentArray = null;
-        currentItem = null;
-
-        let val: string = scalarMatch[2].trim();
-        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-          val = val.slice(1, -1);
-        }
-        meta[scalarMatch[1]] = val === 'true' ? true : val === 'false' ? false : val;
-        continue;
-      }
-
-      // Top-level "key:" (start of array or nested object)
-      const blockKeyMatch = line.match(/^(\w+):$/);
-      if (blockKeyMatch) {
-        if (currentKey && currentArray) {
-          if (currentItem && Object.keys(currentItem).length > 0) currentArray.push(currentItem);
-          meta[currentKey] = currentArray;
-        }
-        currentKey = blockKeyMatch[1];
-        currentArray = [];
-        currentItem = null;
-        continue;
-      }
-
-      // Array item start "  - key: value"
-      const arrayItemMatch = line.match(/^\s+-\s+(\w+):\s*(.+)$/);
-      if (arrayItemMatch && currentArray !== null) {
-        if (currentItem && Object.keys(currentItem).length > 0) currentArray.push(currentItem);
-        let val: string = arrayItemMatch[2].trim();
-        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-          val = val.slice(1, -1);
-        }
-        currentItem = { [arrayItemMatch[1]]: val === 'true' ? true : val === 'false' ? false : val };
-        continue;
-      }
-
-      // Continuation "    key: value" inside an array item
-      const contMatch = line.match(/^\s{4,}(\w+):\s*(.+)$/);
-      if (contMatch && currentItem) {
-        let val: string = contMatch[2].trim();
-        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-          val = val.slice(1, -1);
-        }
-        currentItem[contMatch[1]] = val === 'true' ? true : val === 'false' ? false : val;
-      }
-    }
-
-    // Flush last array
-    if (currentKey && currentArray) {
-      if (currentItem && Object.keys(currentItem).length > 0) currentArray.push(currentItem);
-      meta[currentKey] = currentArray;
-    }
-
-    return { meta, body };
-  }
-
-  /**
-   * Scan the prompt directory and register all .md files as prompts.
-   * Metadata (title, description, arguments) is read from YAML frontmatter in each
-   * file. When frontmatter fields are absent, title is derived from the filename and
-   * description from the first markdown heading.
-   */
-  private async registerAllPrompts(promptDir: string): Promise<void> {
-    let files: string[];
-    try {
-      files = await fs.readdir(promptDir);
-    } catch (error) {
-      logger.warn(`Could not read prompt directory ${promptDir}: ${CommandResultFactory.normalizeError(error).message}`);
-      return;
-    }
-
-    const mdFiles = files.filter(f => f.endsWith('.md')).sort();
-
-    for (const file of mdFiles) {
-      const promptName = file.replace(/\.md$/, '');
-      const filePath = path.join(promptDir, file);
-
-      try {
-        const raw = await fs.readFile(filePath, 'utf-8');
-        const { meta, body } = PromptManager.parseFrontmatter(raw);
-
-        // Derive title from frontmatter or from filename
-        const title = (typeof meta.title === 'string' ? meta.title : null)
-          ?? promptName.replace(/[_-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-
-        // Derive description from frontmatter or from first markdown heading
-        let description = typeof meta.description === 'string' ? meta.description : null;
-        if (!description) {
-          const headingMatch = body.match(/^#\s+(.+)$/m);
-          description = headingMatch ? headingMatch[1] : `Prompt: ${promptName}`;
-        }
-
-        // Parse arguments from frontmatter array
-        let promptArgs: Prompt['arguments'] | undefined;
-        if (Array.isArray(meta.arguments)) {
-          promptArgs = (meta.arguments as Record<string, unknown>[]).map(a => ({
-            name: String(a.name ?? ''),
-            description: String(a.description ?? ''),
-            required: a.required === true || a.required === 'true',
-          }));
-        }
-
-        const prompt: Prompt = {
-          name: promptName,
-          title,
-          description,
-          ...(promptArgs && { arguments: promptArgs }),
-        };
-
-        this.prompts.set(promptName, prompt);
-        // Store the body (without frontmatter) as the content sent to clients
-        this.promptContents.set(promptName, body);
-        logger.debug(`Registered prompt: ${promptName} (${body.length} bytes)`);
-      } catch (error) {
-        logger.error(`Failed to load prompt ${promptName}: ${CommandResultFactory.normalizeError(error).message}`);
-      }
-    }
-  }
-
-  /**
-   * List all registered prompts
-   * @returns Array of registered prompts
-   */
-  listPrompts(): Prompt[] {
-    return Array.from(this.prompts.values());
-  }
-
-  /**
-   * Get a specific prompt by name
-   * @param name The name of the prompt to get
-   * @returns The prompt if found, undefined otherwise
-   */
-  getPrompt(name: string): Prompt | undefined {
-    return this.prompts.get(name);
   }
 }

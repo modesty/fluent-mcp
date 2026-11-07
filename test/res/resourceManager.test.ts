@@ -93,9 +93,27 @@ describe('ResourceManager templates', () => {
     assert.equal(logger.error.mock.calls[0].arguments[0], 'Error reading resource');
   });
 
-  it('registers no completer (W4 adds resource and prompt completion together)', () => {
-    for (const { template } of templates.registered) {
-      for (const name of template.uriTemplate.variableNames) assert.equal(template.completeCallback(name), undefined, name);
-    }
+  describe('completers', () => {
+    const complete = (scheme: string, variable: string, value: string, context?: { arguments?: Record<string, string> }) => {
+      const callback = templates.registered.find((r) => r.name === scheme)?.template.completeCallback(variable);
+      if (!callback) throw new Error(`${scheme} has no ${variable} completer`);
+      return callback(value, context);
+    };
+
+    it('completes metadataType by prefix, case-insensitively, on every template', async () => {
+      assert.deepEqual(await complete('sn-spec', 'metadataType', 'S'), ['script-include']);
+      assert.deepEqual(await complete('sn-instruct', 'metadataType', ''), TYPES);
+    });
+
+    it('offers only the types that have a snippet on the snippet template', async () => {
+      assert.deepEqual(await complete('sn-snippet', 'metadataType', ''), ['business-rule', 'table']);
+    });
+
+    it('completes snippetId from the chosen metadataType, and offers none before one is chosen', async () => {
+      assert.deepEqual(await complete('sn-snippet', 'snippetId', '', { arguments: { metadataType: 'business-rule' } }), ['0001', '0002']);
+      assert.deepEqual(await complete('sn-snippet', 'snippetId', '0002', { arguments: { metadataType: 'Business-Rule' } }), ['0002']);
+      assert.deepEqual(await complete('sn-snippet', 'snippetId', ''), []);
+      assert.deepEqual(await complete('sn-snippet', 'snippetId', '', { arguments: { metadataType: 'missing' } }), []);
+    });
   });
 });
