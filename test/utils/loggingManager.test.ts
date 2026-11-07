@@ -130,15 +130,4 @@ describe('LoggingManager', () => {
     // Assert
     assertCalledWith(logger.error, 'Error stopping MCP server', error, { status: ServerStatus.STOPPING });
   });
-
-  it('should log resource listing failed', () => {
-    // Arrange
-    const error = new Error('Test error');
-
-    // Act
-    loggingManager.logResourceListingFailed(error);
-
-    // Assert
-    assertCalledWith(logger.error, 'Error listing resources', error);
-  });
 });

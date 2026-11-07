@@ -9,7 +9,6 @@ import { ToolsManager } from '../tools/toolsManager.js';
 import { ResourceManager } from '../res/resourceManager.js';
 import { ResourceCatalog } from '../res/resourceCatalog.js';
 import { PromptManager } from '../prompts/promptManager.js';
-import { McpResourceNotFoundError, McpInternalError } from '../utils/mcpErrors.js';
 
 const SERVER_INSTRUCTIONS = [
   'Use explain_fluent_api for SDK APIs and guides, get-api-spec for metadata-type schemas,',
@@ -126,11 +125,11 @@ export class FluentMcpServer {
     );
 
     // Declaring a capability makes v2's McpServer install its own default
-    // handlers for that capability's methods. Ours are registered afterwards
-    // and replace them by method name; `resources/templates/list` is left to
-    // the SDK's default (an empty template list), which is what keeps the
-    // declared `resources` capability answerable rather than -32601.
+    // handlers for that capability's methods. Resources are served entirely by
+    // the SDK from the registered templates (resources/list, templates/list,
+    // and read); only tools/list is replaced below.
     this.toolsManager.registerOn(mcpServer);
+    this.resourceManager.registerOn(mcpServer);
     this.promptManager.registerOn(mcpServer);
     this.setupHandlers(mcpServer);
 
@@ -138,7 +137,7 @@ export class FluentMcpServer {
   }
 
   /**
-   * Set up MCP protocol handlers for tools and resources on one server instance.
+   * Set up the hand-written MCP protocol handlers on one server instance.
    */
   private setupHandlers(mcpServer: McpServer): void {
     const server = mcpServer.server;
@@ -149,51 +148,6 @@ export class FluentMcpServer {
     server.setRequestHandler('tools/list', async () => ({
       tools: this.toolsManager.getMCPTools(),
     }));
-
-    // Set up the resources/list handler
-    server.setRequestHandler('resources/list', async () => {
-      try {
-        const resources = await this.resourceManager.listResources();
-        return { resources };
-      } catch (error) {
-        loggingManager.logResourceListingFailed(error);
-        return { resources: [] };
-      }
-    });
-
-    // Set up the resources/read handler
-    server.setRequestHandler('resources/read', async (request) => {
-      const { uri } = request.params;
-
-      try {
-        logger.debug('Reading resource', { uri });
-
-        // Call ResourceManager to handle the read request
-        const result = await this.resourceManager.readResource(uri);
-
-        // Check if resource was not found (result has no contents)
-        if (!result.contents || result.contents.length === 0) {
-          throw new McpResourceNotFoundError(uri);
-        }
-
-        return result;
-      } catch (error) {
-        // Re-throw MCP errors as-is for proper error codes
-        if (error instanceof McpResourceNotFoundError) {
-          logger.warn('Resource not found', { uri });
-          throw error;
-        }
-
-        // Wrap other errors as internal errors
-        logger.error('Error reading resource',
-          CommandResultFactory.normalizeError(error),
-          { uri }
-        );
-        throw new McpInternalError(
-          `Failed to read resource: ${CommandResultFactory.normalizeError(error).message}`
-        );
-      }
-    });
 
     // Note: tools/call is dispatched by the callbacks registered via
     // registerTool() in ToolsManager, so it is deliberately not handled here.

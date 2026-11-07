@@ -275,14 +275,42 @@ describe('dual-era wire protocol', () => {
       assert.equal(res.error.code, -32602);
     });
 
-    it('answers resources/templates/list rather than Method not found', async () => {
-      // A server that declares a capability MUST answer that capability's
-      // methods, potentially with an empty result. Under sdk@1.x this returned
-      // -32601 because nothing registered the handler.
+    it('advertises the three resource templates', async () => {
       const res = await wire.modern('resources/templates/list');
 
       assert.equal(res.error, undefined);
-      assert.equal(Array.isArray(res.result.resourceTemplates), true);
+      assert.deepStrictEqual(
+        res.result.resourceTemplates.map((t: Frame) => [t.name, t.uriTemplate, t.mimeType]),
+        [
+          ['sn-spec', 'sn-spec://{metadataType}', 'text/markdown'],
+          ['sn-instruct', 'sn-instruct://{metadataType}', 'text/markdown'],
+          ['sn-snippet', 'sn-snippet://{metadataType}/{snippetId}', 'text/markdown'],
+        ]
+      );
+    });
+
+    it('lists every snippet, not only the first per type', async () => {
+      const list = await wire.modern('resources/list');
+      const uris = list.result.resources.map((r: Frame) => r.uri);
+      assert.ok(uris.includes('sn-snippet://business-rule/0001'));
+      assert.ok(uris.includes('sn-snippet://business-rule/0002'));
+      assert.equal(new Set(list.result.resources.map((r: Frame) => r.name)).size, uris.length);
+    });
+
+    it('reports a URI no template matches as -32602 with data.uri (was -32603)', async () => {
+      for (const uri of ['unknown-scheme://x', 'sn-snippet://business-rule', 'sn-snippet://business-rule/9999']) {
+        const res = await wire.modern('resources/read', { uri });
+        assert.equal(res.error?.code, -32602, uri);
+        assert.equal(res.error.data?.uri, uri);
+      }
+    });
+
+    it('declares no completions capability while prompts are hand-registered', async () => {
+      // The SDK's one completion/complete handler resolves prompt refs only from
+      // registerPrompt; advertising completions now would answer every listed
+      // prompt with "Prompt … not found". W4 adds completions with prompts.
+      const discover = await wire.modern('server/discover');
+      assert.equal(discover.result.capabilities.completions, undefined);
     });
 
     it('serves prompts/list and prompts/get', async () => {
@@ -465,6 +493,11 @@ describe('dual-era wire protocol', () => {
 
       const miss = await wire.legacy('resources/read', { uri: 'sn-spec://no-such-type' });
       assert.equal(miss.error.code, -32602);
+      const unknownScheme = await wire.legacy('resources/read', { uri: 'unknown-scheme://x' });
+      assert.equal(unknownScheme.error.code, -32602);
+
+      const templates = await wire.legacy('resources/templates/list');
+      assert.equal(templates.result.resourceTemplates.length, 3);
 
       const prompts = await wire.legacy('prompts/list');
       assert.ok(prompts.result.prompts.length > 0);

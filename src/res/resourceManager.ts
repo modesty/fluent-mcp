@@ -1,172 +1,140 @@
+import { McpServer, ResourceNotFoundError, ResourceTemplate } from '@modelcontextprotocol/server';
+import type { ReadResourceResult, Resource, Variables } from '@modelcontextprotocol/server';
 import { ResourceCatalog } from './resourceCatalog.js';
-import { ResourceType, CommandResultFactory } from '../utils/types.js';
+import { CommandResultFactory, ResourceType } from '../utils/types.js';
 import logger from '../utils/logger.js';
-import { McpResourceNotFoundError } from '../utils/mcpErrors.js';
 
-/**
- * Configuration for a resource type, capturing all per-type differences
- * for the table-driven registration, listing, and reading logic.
- */
-interface ResourceTypeConfig {
+const MIME_TYPE = 'text/markdown';
+
+/** One URI scheme of bundled `res/` content, served as one SDK resource template. */
+interface ResourceKind {
   resourceType: ResourceType;
-  /** URI scheme, e.g. 'sn-spec' */
+  /** URI scheme, also the template name, e.g. 'sn-spec' */
   scheme: string;
-  /** Function to build the title given a metadata type name */
-  titleTemplate: (type: string) => string;
-  /** Label used in "not found" / error messages */
+  uriTemplate: string;
+  /** Title of the template in `resources/templates/list` */
+  title: string;
+  /** Label used in "not found" messages */
   label: string;
-  /** Whether this type has dynamic sub-identifiers (like snippetId) */
-  hasSubId: boolean;
 }
 
 /**
- * Resource type configurations ordered to match existing listResources output:
- * specs first, then instructions, then snippets.
+ * Ordered to match the `resources/list` output: specs, then instructions, then
+ * snippets (the SDK lists templates in registration order).
  */
-const RESOURCE_TYPE_CONFIGS: ResourceTypeConfig[] = [
+const RESOURCE_KINDS: readonly ResourceKind[] = [
   {
     resourceType: ResourceType.SPEC,
     scheme: 'sn-spec',
-    titleTemplate: (type) => `${type} API Specification for Fluent (ServiceNow SDK)`,
+    uriTemplate: 'sn-spec://{metadataType}',
+    title: 'Fluent (ServiceNow SDK) API Specification',
     label: 'API specification',
-    hasSubId: false,
   },
   {
     resourceType: ResourceType.INSTRUCT,
     scheme: 'sn-instruct',
-    titleTemplate: (type) => `${type} Instructions for Fluent (ServiceNow SDK)`,
+    uriTemplate: 'sn-instruct://{metadataType}',
+    title: 'Fluent (ServiceNow SDK) Instructions',
     label: 'Instructions',
-    hasSubId: false,
   },
   {
     resourceType: ResourceType.SNIPPET,
     scheme: 'sn-snippet',
-    titleTemplate: (type) => `${type} Code Snippets for Fluent (ServiceNow SDK)`,
+    uriTemplate: 'sn-snippet://{metadataType}/{snippetId}',
+    title: 'Fluent (ServiceNow SDK) Code Snippet',
     label: 'Snippet',
-    hasSubId: true,
   },
 ];
 
+/** A simple `{var}` expansion always matches a single string. */
+const variable = (variables: Variables, name: string): string => String(variables[name] ?? '');
+
 /**
- * Provides the content behind the `sn-spec://`, `sn-instruct://`, and
- * `sn-snippet://` resource URIs.
+ * Serves the `sn-spec://`, `sn-instruct://`, and `sn-snippet://` resources as
+ * three SDK resource templates. The SDK owns `resources/list`,
+ * `resources/templates/list` and `resources/read` (including the not-found
+ * answer for a URI no template matches); this class only supplies listings and
+ * reads from the shared catalog.
  *
- * Deliberately holds no reference to the MCP server: the `resources/list` and
- * `resources/read` handlers live in `FluentMcpServer.setupHandlers()` and call
- * `listResources()` / `readResource()`. This class is a pure content provider.
+ * Mosey: no `complete` callbacks yet. Any completer installs the SDK's single
+ * `completion/complete` handler, which resolves prompt refs only from prompts
+ * registered with `registerPrompt`; while PromptManager hand-registers its
+ * handlers, every advertised prompt would complete as "not found". W4 moves
+ * prompts onto `registerPrompt` and adds both completers together.
  */
 export class ResourceManager {
   /**
-   * Create a new ResourceManager
    * @param resourceCatalog The shared index of bundled `res/` content
    */
   constructor(private readonly resourceCatalog: ResourceCatalog = new ResourceCatalog()) {}
 
+  /** Register the three resource templates on one server instance. */
+  registerOn(mcpServer: McpServer): void {
+    for (const kind of RESOURCE_KINDS) {
+      const template = new ResourceTemplate(kind.uriTemplate, {
+        list: async () => ({ resources: await this.list(kind) }),
+      });
+      mcpServer.registerResource(
+        kind.scheme,
+        template,
+        { title: kind.title, mimeType: MIME_TYPE },
+        (uri, variables) => this.read(kind, uri, variables)
+      );
+    }
+  }
 
-  /**
-   * Get all available resources for listing
-   * @returns List of resource objects
-   */
-  async listResources(): Promise<{ uri: string, name: string, title: string, mimeType: string }[]> {
-    try {
-      const metadataTypes = await this.resourceCatalog.getAvailableMetadataTypes();
-      const resources: { uri: string; name: string; title: string; mimeType: string }[] = [];
-
-      for (const config of RESOURCE_TYPE_CONFIGS) {
-        for (const type of metadataTypes) {
-          if (config.hasSubId) {
-            // For snippet types, list the first snippet
-            try {
-              const snippetIds = await this.resourceCatalog.listSnippets(type);
-              if (snippetIds.length > 0) {
-                resources.push({
-                  uri: `${config.scheme}://${type}/${snippetIds[0]}`,
-                  name: `${config.scheme}-${type}`,
-                  title: `${type} Code Snippet for Fluent (ServiceNow SDK)`,
-                  mimeType: 'text/markdown',
-                });
-              }
-            } catch (error) {
-              logger.error(`Error listing snippets for ${type}`,
-                CommandResultFactory.normalizeError(error)
-              );
-            }
-          } else {
-            resources.push({
-              uri: `${config.scheme}://${type}`,
-              name: `${config.scheme}-${type}`,
-              title: config.titleTemplate(type),
-              mimeType: 'text/markdown',
-            });
-          }
-        }
+  /** Every concrete resource of one kind, for `resources/list`. */
+  private async list(kind: ResourceKind): Promise<Resource[]> {
+    const types = await this.resourceCatalog.getAvailableMetadataTypes();
+    switch (kind.resourceType) {
+      case ResourceType.SPEC:
+        return types.map((type) => ({
+          uri: `sn-spec://${type}`,
+          name: `sn-spec-${type}`,
+          title: `${type} API Specification for Fluent (ServiceNow SDK)`,
+        }));
+      case ResourceType.INSTRUCT:
+        return types.map((type) => ({
+          uri: `sn-instruct://${type}`,
+          name: `sn-instruct-${type}`,
+          title: `${type} Instructions for Fluent (ServiceNow SDK)`,
+        }));
+      case ResourceType.SNIPPET: {
+        const perType = await Promise.all(types.map(async (type) =>
+          (await this.resourceCatalog.listSnippets(type)).map((id) => ({
+            uri: `sn-snippet://${type}/${id}`,
+            name: `sn-snippet-${type}-${id}`,
+            title: `${type} Code Snippet ${id} for Fluent (ServiceNow SDK)`,
+          }))
+        ));
+        return perType.flat();
       }
-
-      return resources;
-    } catch (error) {
-      logger.error('Error listing resources', CommandResultFactory.normalizeError(error));
-      return [];
     }
   }
 
   /**
-   * Read a resource by URI
-   * This method is called by the MCP server's resources/read handler
-   * @param uriString The resource URI to read
-   * @returns Resource contents
+   * Read one resource. A key missing from the catalog is not found (-32602); a
+   * failed file read is logged and reaches the client as -32603 (the SDK's
+   * answer for an error without a numeric code).
    */
-  async readResource(uriString: string): Promise<{ contents: Array<{ uri: string; text: string; mimeType?: string }> }> {
-    try {
-      const uri = new URL(uriString);
-      const scheme = uri.protocol.replace(':', '');
-      const metadataType = uri.host.toLowerCase();
-
-      const config = RESOURCE_TYPE_CONFIGS.find(c => c.scheme === scheme);
-      if (!config) {
-        throw new Error(`Unknown resource URI scheme: ${scheme}`);
-      }
-
-      return await this.readTypedResource(uri, metadataType, config);
-    } catch (error) {
-      logger.error('Error reading resource', CommandResultFactory.normalizeError(error));
-      throw error;
-    }
-  }
-
-  /**
-   * Read a resource given a parsed URI, metadata type, and config
-   */
-  private async readTypedResource(
-    uri: URL,
-    metadataType: string,
-    config: ResourceTypeConfig
-  ): Promise<{ contents: Array<{ uri: string; text: string; mimeType?: string }> }> {
-    // Extract sub-identifier from URI path if this type supports it
-    let subId: string | undefined;
-    if (config.hasSubId) {
-      const pathParts = uri.pathname.split('/').filter(p => p);
-      subId = pathParts.length > 0 ? pathParts[0] : undefined;
-    }
-
-    const result = await this.resourceCatalog.getResource(
-      config.resourceType,
-      metadataType,
-      subId
-    );
+  private async read(kind: ResourceKind, uri: URL, variables: Variables): Promise<ReadResourceResult> {
+    logger.debug('Reading resource', { uri: uri.href });
+    const snippetId = kind.resourceType === ResourceType.SNIPPET ? variable(variables, 'snippetId') : undefined;
+    const result = await this.resourceCatalog
+      .getResource(kind.resourceType, variable(variables, 'metadataType'), snippetId)
+      .catch((error: unknown) => {
+        logger.error('Error reading resource', CommandResultFactory.normalizeError(error), { uri: uri.href });
+        throw error;
+      });
 
     if (!result.found) {
-      throw new McpResourceNotFoundError(
+      logger.warn('Resource not found', { uri: uri.href });
+      throw new ResourceNotFoundError(
         uri.href,
-        `${config.label} not found for ${metadataType}`
+        `Resource not found: ${uri.href} - ${kind.label} not found for ${result.metadataType}`
       );
     }
 
-    return {
-      contents: [{
-        uri: uri.href,
-        text: result.content,
-        mimeType: 'text/markdown',
-      }],
-    };
+    return { contents: [{ uri: uri.href, text: result.content, mimeType: MIME_TYPE }] };
   }
 }

@@ -23,6 +23,7 @@ import path from 'node:path';
 import { ServiceNowMetadataType } from '../src/types.js';
 import { ResourceManager } from '../src/res/resourceManager.js';
 import { GetSnippetCommand } from '../src/tools/resources/resourceTools.js';
+import { registerTemplates } from './support/resourceTemplates.js';
 
 const PROJECT_ROOT = process.cwd();
 const RES_DIR = path.join(PROJECT_ROOT, 'res');
@@ -434,8 +435,8 @@ describe('SDK v4.13.6 Types - Integration Tests', () => {
     });
 
     it('all advertised ui-action snippets should provide code through both resources and tools', async () => {
-      const resources = new ResourceManager();
-      const listed = await resources.listResources();
+      const resources = registerTemplates(new ResourceManager());
+      const listed = await resources.list();
       assert.ok(listed.some((resource) => resource.uri === 'sn-snippet://ui-action/0001'));
 
       const command = new GetSnippetCommand();
@@ -446,8 +447,10 @@ describe('SDK v4.13.6 Types - Integration Tests', () => {
       assert.ok(ids.length >= 10, 'The default tool result must advertise the existing examples');
 
       for (const id of ids) {
-        const resource = await resources.readResource(`sn-snippet://ui-action/${id}`);
-        const content = resource.contents[0].text;
+        assert.ok(listed.some((r) => r.uri === `sn-snippet://ui-action/${id}`), `snippet ${id} is listed`);
+        const resource = await resources.read(`sn-snippet://ui-action/${id}`);
+        const [first] = resource.contents;
+        const content = 'text' in first ? first.text : '';
         assert.ok(content.trim().length > 0, `Advertised snippet ${id} must not be blank`);
         assert.match(code(content), /import\s+\{\s*UiAction\s*\}\s+from\s+['"]@servicenow\/sdk\/core['"]/);
         assert.match(code(content), /UiAction\s*\(/);
