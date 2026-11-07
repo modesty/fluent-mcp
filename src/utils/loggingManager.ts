@@ -112,17 +112,6 @@ export class LoggingManager {
   }
 
   /**
-   * Log resource listing failure
-   * @param error Error that occurred during resource listing
-   */
-  logResourceListingFailed(error: Error | unknown): void {
-    logger.error(
-      'Error listing resources', 
-      CommandResultFactory.normalizeError(error)
-    );
-  }
-
-  /**
    * Log prompt listing failed
    * @param error The error that occurred
    */

@@ -75,11 +75,9 @@ const ToolsManager = mock.fn(function () {
 });
 mock.module('../../src/tools/toolsManager.js', { namedExports: { ToolsManager } });
 
+const mockResourceRegisterOn = mock.fn();
 const ResourceManager = mock.fn(function () {
-  return {
-    listResources: mock.fn(async () => []),
-    readResource: mock.fn(async () => ({ contents: [] })),
-  };
+  return { registerOn: mockResourceRegisterOn };
 });
 mock.module('../../src/res/resourceManager.js', { namedExports: { ResourceManager } });
 
@@ -106,6 +104,7 @@ const allMocks: Array<{ mock: { resetCalls(): void } }> = [
   findMissingResourcePaths,
   ToolsManager,
   ResourceManager,
+  mockResourceRegisterOn,
 ];
 
 /** The factory serveStdio was handed on the most recent start(). */
@@ -175,20 +174,20 @@ describe('FluentMcpServer with Modular Design', () => {
     it('fully registers tools, prompts and resource handlers on each instance', async () => {
       await server.start();
 
-      capturedFactory()();
+      const instance = capturedFactory()();
       const methods = mockSetRequestHandler.mock.calls.map((call) => call.arguments[0]);
 
       assert.ok(methods.includes('tools/list'));
-      assert.ok(methods.includes('resources/list'));
-      assert.ok(methods.includes('resources/read'));
+      // Resources are registered as SDK templates; the SDK serves every
+      // resources/* method and completion/complete from them.
+      assertCalledTimes(mockResourceRegisterOn, 1);
+      assert.equal(mockResourceRegisterOn.mock.calls[0].arguments[0], instance);
+      assert.ok(!methods.some((method) => method.startsWith('resources/')));
       // prompts/* come from PromptManager.registerOn, which is not mocked here.
       assert.ok(methods.includes('prompts/list'));
       assert.ok(methods.includes('prompts/get'));
       // tools/call is dispatched by registerTool, never hand-registered.
       assert.ok(!methods.includes('tools/call'));
-      // resources/templates/list is deliberately left to the SDK's default so
-      // the declared `resources` capability stays answerable rather than -32601.
-      assert.ok(!methods.includes('resources/templates/list'));
     });
 
     it('stop() closes the transport handle', async () => {
