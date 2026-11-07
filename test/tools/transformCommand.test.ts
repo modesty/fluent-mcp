@@ -8,13 +8,16 @@ import { beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { hasOption } from '../support/argv.js';
 import { assertCalledTimes, assertNotCalled } from '../support/mockAssertions.js';
-import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
+import { configFixture, loggerFixture, sdkCliFixture, tempProjectDir } from '../support/fixtures.js';
 import type { CommandProcessor } from '../../src/utils/types.js';
+
+const WORKING_DIR = tempProjectDir('working-dir');
+const PROJECT_DIR = tempProjectDir('project');
 
 // Session replacement: no alias is held, so an instance pull must go through the
 // lazy auth-discovery hook the command is constructed with.
 const session = {
-  getWorkingDirectory: mock.fn((): string | undefined => '/mock/working/dir'),
+  getWorkingDirectory: mock.fn((): string | undefined => WORKING_DIR),
   setWorkingDirectory: mock.fn(),
   getAuthAlias: mock.fn((): string | undefined => undefined),
   setAuthAlias: mock.fn(),
@@ -98,38 +101,38 @@ describe('TransformCommand (SDK v4.13.6 transform)', () => {
 
   describe('modes', () => {
     it('full-application pull maps auth and runs lazy auth discovery', async () => {
-      await command.execute({ workingDirectory: '/project' });
+      await command.execute({ workingDirectory: PROJECT_DIR });
       assertCalledTimes(ensureAuth, 1);
       assert.equal(argvOf()[0], SDK_BIN);
       assert.equal(argvOf()[1], 'transform');
     });
 
     it('an explicit alias on an instance pull is forwarded without discovery', async () => {
-      await command.execute({ workingDirectory: '/project', auth: 'dev' });
+      await command.execute({ workingDirectory: PROJECT_DIR, auth: 'dev' });
       assertNotCalled(ensureAuth);
       assertContainsAll(argvOf(), ['--auth=dev']);
     });
 
     it('a from transform is offline: no auth flag and no discovery', async () => {
-      await command.execute({ workingDirectory: '/project', from: 'metadata/update' });
+      await command.execute({ workingDirectory: PROJECT_DIR, from: 'metadata/update' });
       assertNotCalled(ensureAuth);
       assertContainsAll(argvOf(), ['--from=metadata/update']);
       assert.ok(!hasOption(argvOf(), '--auth'));
     });
 
     it('table with id pulls one record from the instance', async () => {
-      await command.execute({ workingDirectory: '/project', auth: 'dev', table: 'sys_script', id: 'abc123' });
+      await command.execute({ workingDirectory: PROJECT_DIR, auth: 'dev', table: 'sys_script', id: 'abc123' });
       assertContainsAll(argvOf(), ['--table=sys_script', '--id=abc123', '--auth=dev']);
     });
 
     it('table without from still maps auth, because only --from marks the CLI run offline', async () => {
-      await command.execute({ workingDirectory: '/project', table: 'sys_script' });
+      await command.execute({ workingDirectory: PROJECT_DIR, table: 'sys_script' });
       assertCalledTimes(ensureAuth, 1);
       assertContainsAll(argvOf(), ['--table=sys_script']);
     });
 
     it('table with from narrows a local transform without auth', async () => {
-      await command.execute({ workingDirectory: '/project', from: 'metadata', table: 'sys_script,sys_script_include' });
+      await command.execute({ workingDirectory: PROJECT_DIR, from: 'metadata', table: 'sys_script,sys_script_include' });
       assertNotCalled(ensureAuth);
       assertContainsAll(argvOf(), ['--from=metadata', '--table=sys_script,sys_script_include']);
       assert.ok(!hasOption(argvOf(), '--auth'));
@@ -138,23 +141,23 @@ describe('TransformCommand (SDK v4.13.6 transform)', () => {
 
   describe('force and format flags', () => {
     it('force: true emits --force', async () => {
-      await command.execute({ workingDirectory: '/project', from: 'metadata', table: 'sys_script', force: true });
+      await command.execute({ workingDirectory: PROJECT_DIR, from: 'metadata', table: 'sys_script', force: true });
       assert.ok(argvOf().includes('--force'));
     });
 
     it('force: false emits nothing (CLI default false)', async () => {
-      await command.execute({ workingDirectory: '/project', from: 'metadata', force: false });
+      await command.execute({ workingDirectory: PROJECT_DIR, from: 'metadata', force: false });
       assert.ok(!argvOf().includes('--force'));
     });
 
     it('format: false emits the yargs negation --no-format', async () => {
-      await command.execute({ workingDirectory: '/project', from: 'metadata', format: false });
+      await command.execute({ workingDirectory: PROJECT_DIR, from: 'metadata', format: false });
       assert.ok(argvOf().includes('--no-format'));
       assert.ok(!argvOf().includes('--format'));
     });
 
     it('format omitted leaves the CLI default (true) in place', async () => {
-      await command.execute({ workingDirectory: '/project', from: 'metadata' });
+      await command.execute({ workingDirectory: PROJECT_DIR, from: 'metadata' });
       assert.equal(argvOf().some((token) => token.endsWith('format')), false);
     });
   });
@@ -167,14 +170,14 @@ describe('TransformCommand (SDK v4.13.6 transform)', () => {
       ['force without table', { from: 'metadata', force: true }, "Argument 'force' requires 'table'"],
     ] as const) {
       it(label, async () => {
-        await assertRejectsContaining(command.execute({ workingDirectory: '/project', ...args }), message);
+        await assertRejectsContaining(command.execute({ workingDirectory: PROJECT_DIR, ...args }), message);
         assertNotCalled(ensureAuth);
         assertNotCalled(mockProcessor.process);
       });
     }
 
     it('treats an empty-string from as absent, matching the flag map', async () => {
-      await command.execute({ workingDirectory: '/project', from: '', auth: 'dev' });
+      await command.execute({ workingDirectory: PROJECT_DIR, from: '', auth: 'dev' });
       assertContainsAll(argvOf(), ['--auth=dev']);
       assert.ok(!hasOption(argvOf(), '--from'));
     });

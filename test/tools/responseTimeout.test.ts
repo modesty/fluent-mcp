@@ -10,7 +10,9 @@
 import { beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { hasOption, optionValue } from '../support/argv.js';
-import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
+import { configFixture, loggerFixture, sdkCliFixture, tempProjectDir } from '../support/fixtures.js';
+
+const WORKING_DIR = tempProjectDir('working-dir');
 
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 mock.module('../../src/config.js', configFixture().mockOptions);
@@ -19,7 +21,7 @@ mock.module('../../src/utils/sdkCli.js', sdkCliFixture().mockOptions);
 // Session manager stub: a fixed working directory and no auth
 // alias (the cases here pass `auth` explicitly).
 const sessionInstance = {
-  getWorkingDirectory: mock.fn(() => '/mock/working/dir'),
+  getWorkingDirectory: mock.fn(() => WORKING_DIR),
   setWorkingDirectory: mock.fn(),
   getAuthAlias: mock.fn((): string | undefined => undefined),
   setAuthAlias: mock.fn(),
@@ -28,7 +30,7 @@ const sessionInstance = {
 };
 const SessionManager = {
   getInstance: mock.fn(() => sessionInstance),
-  getWorkingDirectory: mock.fn(() => '/mock/working/dir'),
+  getWorkingDirectory: mock.fn(() => WORKING_DIR),
   setWorkingDirectory: mock.fn(),
 };
 mock.module('../../src/utils/sessionManager.js', { namedExports: { SessionManager } });

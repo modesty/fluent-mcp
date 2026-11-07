@@ -127,8 +127,12 @@ export interface CommandProcessor {
     args: string[],
     /**
      * Absolute working directory, already resolved and validated by the command
-     * layer. There is no server-side fallback: the former `useMcpCwd` flag
-     * selected an MCP Roots lookup, which MCP 2026-07-28 removed.
+     * layer: a project directory from `resolveProjectDirectory` or an init
+     * destination from `checkInitDestination` (`src/utils/projectDirectory.ts`),
+     * or the installed package directory as a neutral cwd for commands that need
+     * no project. Processors do not check it again. There is no server-side
+     * fallback: the former `useMcpCwd` flag selected an MCP Roots lookup, which
+     * MCP 2026-07-28 removed.
      */
     customWorkingDir?: string,
     stdinInput?: string,

@@ -71,7 +71,7 @@ export class InitArgsResolver {
   static missingIntentError(): string {
     return "Cannot determine intent for init_fluent_app. Set intent to 'creation' and supply " +
       `${REQUIRED_CREATION_ARGS.join(', ')}; or set intent to 'conversion' and supply 'from' ` +
-      '(an instance sys_id or a local path to an existing application).';
+      '(an instance sys_id or the absolute path of a local scoped application directory).';
   }
 
   /**
@@ -88,8 +88,8 @@ export class InitArgsResolver {
     if (missing.length > 0) {
       throw new Error(
         `Required parameters for conversion are missing: ${missing.join(', ')}. ` +
-        "Supply 'from' as an instance sys_id (32-character hex) or a local path to an existing " +
-        "application, and 'workingDirectory' as an absolute path to an empty directory."
+        "Supply 'from' as an instance sys_id (32-character hex) or the absolute path of a local scoped " +
+        "application directory, and 'workingDirectory' as an absolute path to an empty or new directory."
       );
     }
 

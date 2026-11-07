@@ -10,14 +10,16 @@ import { beforeEach, afterEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { hasOption, optionValue } from '../support/argv.js';
 import { assertCalledWith, assertNotCalled } from '../support/mockAssertions.js';
-import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
+import { configFixture, loggerFixture, sdkCliFixture, tempProjectDir } from '../support/fixtures.js';
 import type { CommandProcessor } from '../../src/utils/types.js';
+
+const WORKING_DIR = tempProjectDir('working-dir');
 
 // Session replacement. Default the session to a resolvable auth alias so the
 // required-auth gate passes; individual tests override getAuthAlias to exercise
 // the unauthenticated path.
 const session = {
-  getWorkingDirectory: mock.fn((): string | undefined => '/mock/working/dir'),
+  getWorkingDirectory: mock.fn((): string | undefined => WORKING_DIR),
   setWorkingDirectory: mock.fn(),
   getAuthAlias: mock.fn((): string | undefined => 'session-alias'),
   setAuthAlias: mock.fn(),
@@ -54,7 +56,7 @@ function createProcessor(): MockProcessor {
 /** Restores the session defaults a prior test's per-call override may have changed. */
 function resetSession(): void {
   session.getAuthAlias.mock.mockImplementation(() => 'session-alias');
-  session.getWorkingDirectory.mock.mockImplementation(() => '/mock/working/dir');
+  session.getWorkingDirectory.mock.mockImplementation(() => WORKING_DIR);
 }
 
 describe('CicdAppCommand', () => {
@@ -99,7 +101,7 @@ describe('CicdAppCommand', () => {
         '--auth=session-alias',
         '--output=json',
       ],
-      '/mock/working/dir',
+      WORKING_DIR,
       undefined,
       command.timeoutMs,
       undefined,
@@ -261,7 +263,7 @@ describe('CicdAppCommand', () => {
     });
 
     afterEach(() => {
-      session.getWorkingDirectory.mock.mockImplementation(() => '/mock/working/dir');
+      session.getWorkingDirectory.mock.mockImplementation(() => WORKING_DIR);
     });
 
     // The CLI defaults --app-version from the cwd's package.json. Outside a Fluent
@@ -338,7 +340,7 @@ describe('CicdTestCommand', () => {
 
     assert.equal(result.success, true);
     assert.equal(mockProcessor.process.mock.calls[0].arguments[2], '/mock/project/root');
-    session.getWorkingDirectory.mock.mockImplementation(() => '/mock/working/dir');
+    session.getWorkingDirectory.mock.mockImplementation(() => WORKING_DIR);
   });
 
   it('should build testsuite run argv with both nested subcommand tokens', async () => {

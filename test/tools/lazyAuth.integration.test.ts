@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { hasOption, optionValue } from '../support/argv.js';
 import { assertCalledTimes, assertNotCalled } from '../support/mockAssertions.js';
-import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
+import { configFixture, loggerFixture, sdkCliFixture, tempProjectDir } from '../support/fixtures.js';
 import type { CommandProcessor, EnsureAuthValidated } from '../../src/utils/types.js';
+
+const PROJECT_DIR = tempProjectDir('project');
 
 // Auto-validation is the unit under observation, so it is replaced with a mock
 // whose behaviour each test supplies. Everything else is real: the commands,
@@ -83,8 +85,8 @@ describe('lazy auto-auth', () => {
     const deploy = new InstallCommand(commandProcessor, ensureAuth);
     const transform = new TransformCommand(commandProcessor, ensureAuth);
 
-    const deployCall = deploy.execute({ workingDirectory: '/project' });
-    const transformCall = transform.execute({ workingDirectory: '/project' });
+    const deployCall = deploy.execute({ workingDirectory: PROJECT_DIR });
+    const transformCall = transform.execute({ workingDirectory: PROJECT_DIR });
     await Promise.resolve();
 
     assertCalledTimes(autoValidate, 1);
@@ -107,7 +109,7 @@ describe('lazy auto-auth', () => {
 
     await deploy.execute({
       auth: 'explicit-alias',
-      workingDirectory: '/project',
+      workingDirectory: PROJECT_DIR,
     });
 
     assertNotCalled(ensureAuth);
@@ -122,7 +124,7 @@ describe('lazy auto-auth', () => {
 
     await transform.execute({
       from: '/tmp/local-update-set.xml',
-      workingDirectory: '/project',
+      workingDirectory: PROJECT_DIR,
     });
 
     assertNotCalled(ensureAuth);
@@ -140,7 +142,7 @@ describe('lazy auto-auth', () => {
       transform.execute({
         from: '/tmp/local-update-set.xml',
         auth: 'explicit-local-alias',
-        workingDirectory: '/project',
+        workingDirectory: PROJECT_DIR,
       }),
       /Arguments 'from' and 'auth' cannot be combined/
     );

@@ -4,15 +4,14 @@
  * Native runner:
  * - SessionManager is replaced by a module mock registered before InitCommand is
  *   imported, so setWorkingDirectory calls can be asserted on a shared handle.
- * - The logger and SDK CLI resolution use the shared fixtures ; resolveSdkCli()
- *   yields process.execPath plus
- *   the fixed SDK entry point the argv assertions expect.
- * - The filesystem, os.homedir and FluentAppValidator are spied on the shared
- *   builtin / class objects with the running test's mock tracker, so they are
- *   restored when each test ends (no restoreAllMocks hook is needed).
+ * - The logger and SDK CLI resolution use the shared fixtures; resolveSdkCli()
+ *   yields process.execPath plus the fixed SDK entry point the argv assertions
+ *   expect.
+ * - The filesystem is real: every destination and conversion source is a path
+ *   in a temp tree, so the destination contract (absolute, canonical, non-root,
+ *   empty or new under an existing parent) is exercised as it runs in production.
  */
-import { beforeEach, describe, it, mock } from 'node:test';
-import type { TestContext } from 'node:test';
+import { after, beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { hasOption } from '../support/argv.js';
 import { inspect } from 'node:util';
@@ -23,72 +22,10 @@ import type { CommandResult } from '../../src/utils/types.js';
 import { assertCalledTimes, assertCalledWith, assertNotCalled } from '../support/mockAssertions.js';
 import { loggerFixture, sdkCliFixture } from '../support/fixtures.js';
 
-// Create a virtual filesystem helper
-interface FluentAppInfo {
-  hasApp: boolean;
-  scopeName?: string;
-  packageName?: string;
-}
-
-class VirtualFileSystem {
-  private existingDirs: Set<string> = new Set<string>();
-  private fluentApps: Map<string, FluentAppInfo> = new Map();
-
-  reset(): void {
-    this.existingDirs.clear();
-    this.fluentApps.clear();
-  }
-
-  addExistingDirectory(path: string): void {
-    this.existingDirs.add(path);
-  }
-
-  markAsFluentApp(path: string, scopeName: string, packageName: string): void {
-    this.addExistingDirectory(path);
-    this.fluentApps.set(path, {
-      hasApp: true,
-      scopeName,
-      packageName
-    });
-  }
-
-  directoryExists(path: string): boolean {
-    return this.existingDirs.has(path);
-  }
-
-  createDirectory(path: string): void {
-    this.existingDirs.add(path);
-  }
-
-  getFluentAppInfo(path: string): FluentAppInfo {
-    return this.fluentApps.get(path) || { hasApp: false };
-  }
-
-  exists(path: string): boolean {
-    return this.existingDirs.has(path);
-  }
-
-  isDirectory(path: string): boolean {
-    return this.existingDirs.has(path);
-  }
-
-  readdir(path: string): string[] {
-    if (path === '/dir-with-package') {
-      return ['package.json'];
-    }
-    if (path === '/dir-with-config') {
-      return ['now.config.json'];
-    }
-    return [];
-  }
-}
-
-const mockFs = new VirtualFileSystem();
-
 // SessionManager mock: getInstance() always returns the same instance, so the
 // assertions read setWorkingDirectory straight from it.
 const sessionInstance = {
-  getWorkingDirectory: mock.fn(() => '/mock/working/dir'),
+  getWorkingDirectory: mock.fn(() => '/previous/project'),
   setWorkingDirectory: mock.fn((_directory: string): void => undefined),
   getAuthAlias: mock.fn((): string | undefined => undefined),
   setAuthAlias: mock.fn(),
@@ -104,15 +41,45 @@ mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 mock.module('../../src/utils/sdkCli.js', sdkCliFixture().mockOptions);
 
 const { InitCommand } = await import('../../src/tools/commands/initCommand.js');
-const { FluentAppValidator } = await import('../../src/utils/fluentAppValidator.js');
+
+const SDK_BIN = '/test/node_modules/@servicenow/sdk/bin/index.js';
+const SYS_ID = 'a1b2c3d4e5f6789012345678901234ab';
+const CREATION = {
+  appName: 'Test App',
+  packageName: 'test-app',
+  scopeName: 'x_test_scope',
+  template: 'javascript.react',
+};
+
+const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fluent-init-command-')));
+after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+let count = 0;
+/** A path under the temp tree that does not exist yet. */
+const fresh = (name: string): string => path.join(root, `${name}-${++count}`);
+/** An existing directory holding the given files. */
+function directoryWith(name: string, files: Record<string, string> = {}): string {
+  const dir = fresh(name);
+  fs.mkdirSync(dir);
+  for (const [file, content] of Object.entries(files)) fs.writeFileSync(path.join(dir, file), content);
+  return dir;
+}
+/** An existing Fluent project: a populated directory, and no conversion source. */
+const fluentProject = (name: string): string =>
+  directoryWith(name, { 'now.config.json': JSON.stringify({ scope: 'x_existing_scope', name: 'existing-package' }) });
+/** A legacy scoped application directory, as `now-sdk init --from <dir>` converts it. */
+function legacyApp(name: string, subdir = ''): string {
+  const dir = directoryWith(name);
+  fs.mkdirSync(path.join(dir, subdir), { recursive: true });
+  fs.writeFileSync(path.join(dir, subdir, `sys_app_${SYS_ID}.xml`), '<record_update/>');
+  return dir;
+}
 
 describe('InitCommand', () => {
   let initCommand: InstanceType<typeof InitCommand>;
   let processMock: ReturnType<typeof createProcessMock>;
   let mockExecutor: { process: typeof processMock };
-  let mkdirSyncSpy: { mock: { calls: ReadonlyArray<{ arguments: unknown[] }> } };
-  // What the readdirSync spy answers; a test reassigns it to change the directory listing.
-  let readdirResult: (path: string) => string[];
+  let validDir: string;
 
   /** A command processor whose process() succeeds with a canned init result. */
   function createProcessMock() {
@@ -148,69 +115,26 @@ describe('InitCommand', () => {
     );
   }
 
+  /** The command failed with `pattern`, reached no processor, and left the session alone. */
+  function assertRefused(result: CommandResult, pattern: RegExp | string): void {
+    assert.equal(result.success, false);
+    if (typeof pattern === 'string') assert.equal(result.error?.message, pattern);
+    else assert.match(result.error?.message ?? '', pattern);
+    assertNotCalled(mockExecutor.process);
+    assertNotCalled(sessionInstance.setWorkingDirectory);
+  }
+
   /** Every expected value is present, in any order. */
   const containsAll = (expected: string[]) => (sdkArgs: string[]) =>
     expected.every((value) => sdkArgs.includes(value));
 
-  beforeEach((hook) => {
-    // A beforeEach hook runs with the current test's context, so every spy
-    // installed below is restored when the test ends.
-    const t = hook as TestContext;
-
-    // Reset the shared SessionManager mock's call history
+  beforeEach(() => {
     SessionManager.getInstance.mock.resetCalls();
     for (const fn of Object.values(sessionInstance)) fn.mock.resetCalls();
 
-    // Reset the virtual filesystem
-    mockFs.reset();
-    // Setup initial filesystem state
-    mockFs.addExistingDirectory('/valid-dir');
-    mockFs.markAsFluentApp('/existing-app-dir', 'x_test_scope', 'test-package');
-
-    // Create a mock processor
+    validDir = directoryWith('valid');
     processMock = createProcessMock();
     mockExecutor = { process: processMock };
-
-    // Mock file system - must be done BEFORE creating the command
-    t.mock.method(fs, 'existsSync', (path: unknown) => {
-      return mockFs.directoryExists(String(path));
-    });
-
-    t.mock.method(fs, 'statSync', (path: unknown) => {
-      const pathStr = String(path);
-      if (!mockFs.exists(pathStr)) {
-        throw new Error(`ENOENT: no such file or directory, stat '${pathStr}'`);
-      }
-      return {
-        isDirectory: () => mockFs.isDirectory(pathStr),
-        isFile: () => !mockFs.isDirectory(pathStr),
-      };
-    });
-
-    readdirResult = (path) => mockFs.readdir(path);
-    t.mock.method(fs, 'readdirSync', (path: unknown) => readdirResult(String(path)));
-
-    mkdirSyncSpy = t.mock.method(fs, 'mkdirSync', (path: unknown) => {
-      mockFs.createDirectory(String(path));
-      return undefined;
-    });
-
-    // Mock os.homedir
-    t.mock.method(os, 'homedir', () => '/mock-home');
-
-    // Mock FluentAppValidator
-    t.mock.method(FluentAppValidator, 'checkFluentAppExists', async (directory: string) => {
-      const info = mockFs.getFluentAppInfo(directory);
-      if (info.hasApp) {
-        return {
-          hasApp: true,
-          scopeName: info.scopeName,
-          packageName: info.packageName,
-        };
-      }
-      return { hasApp: false };
-    });
-
     initCommand = new InitCommand(mockExecutor);
   });
 
@@ -252,7 +176,7 @@ describe('InitCommand', () => {
   it('should fail with an actionable error when no intent can be determined', async () => {
     // workingDirectory is required by the schema (as on tools/call); with it,
     // the intent resolver is what fails.
-    const result = await initCommand.execute({ workingDirectory: '/valid-dir' });
+    const result = await initCommand.execute({ workingDirectory: validDir });
 
     assert.equal(result.success, false);
     assert.ok(result.error?.message.includes('Cannot determine intent for init_fluent_app'));
@@ -268,7 +192,7 @@ describe('InitCommand', () => {
   it('should never issue a server-initiated request for missing input', async () => {
     // Guards the regression the 2026-07-28 migration removed: no code path may
     // reach back to the client. A bare intent with no data must fail locally.
-    const result = await initCommand.execute({ intent: 'creation', workingDirectory: '/valid-dir' });
+    const result = await initCommand.execute({ intent: 'creation', workingDirectory: validDir });
 
     assert.equal(result.success, false);
     assert.ok(result.error?.message.includes('Required parameters for creation are missing'));
@@ -276,10 +200,7 @@ describe('InitCommand', () => {
   });
 
   it('should fail with an actionable error when conversion is missing from', async () => {
-    const result = await initCommand.execute({
-      intent: 'conversion',
-      workingDirectory: '/valid-dir',
-    });
+    const result = await initCommand.execute({ intent: 'conversion', workingDirectory: validDir });
 
     assert.equal(result.success, false);
     assert.ok(result.error?.message.includes('Required parameters for conversion are missing: from'));
@@ -293,7 +214,7 @@ describe('InitCommand', () => {
       appName: 'Test App',
       packageName: null,
       scopeName: '   ',
-      workingDirectory: '/valid-dir',
+      workingDirectory: validDir,
       template: 'javascript.react',
     });
 
@@ -305,140 +226,233 @@ describe('InitCommand', () => {
   });
 
   it('should list the valid templates when creation input is incomplete', async () => {
-    const result = await initCommand.execute({ intent: 'creation', appName: 'Test App', workingDirectory: '/valid-dir' });
+    const result = await initCommand.execute({ intent: 'creation', appName: 'Test App', workingDirectory: validDir });
 
     assert.equal(result.success, false);
     assert.ok(result.error?.message.includes('typescript.vue'));
   });
 
-  it('should create directory if it does not exist', async () => {
-    const args = {
-      workingDirectory: '/non-existent-dir',
-      appName: 'Test App',
-      packageName: 'test-app',
-      scopeName: 'x_test_scope',
-      template: 'javascript.react'
-    };
-    await initCommand.execute(args);
-
-    assertCalledWith(mkdirSyncSpy, '/non-existent-dir', { recursive: true });
-    assertCalledWith(sessionInstance.setWorkingDirectory, '/non-existent-dir');
-    assert.ok(mockExecutor.process.mock.callCount() > 0);
-  });
-
-  it('should handle existing directory with no Fluent app', async () => {
-    mockFs.addExistingDirectory('/valid-dir');
-    const args = {
-      workingDirectory: '/valid-dir',
-      appName: 'Test App',
-      packageName: 'test-app',
-      scopeName: 'x_test_scope',
-      template: 'javascript.react'
-    };
-    await initCommand.execute(args);
-
-    // Should not create directory
-    assertNotCalled(mkdirSyncSpy);
-    // Should save working directory
-    assertCalledWith(sessionInstance.setWorkingDirectory, '/valid-dir');
-    // Should execute command
-    assert.ok(mockExecutor.process.mock.callCount() > 0);
-  });
-
-  it('should handle existing directory with Fluent app', async () => {
-    mockFs.markAsFluentApp('/existing-app-dir', 'x_test_scope', 'test-package');
-    const args = {
-      workingDirectory: '/existing-app-dir',
-      appName: 'Test App',
-      packageName: 'test-app',
-      scopeName: 'x_test_scope',
-      template: 'javascript.react'
-    };
-    const result = await initCommand.execute(args);
-
-    assert.equal(result.success, true);
-    assert.ok(result.output.includes('already contains'));
-    assert.ok(result.output.includes('x_test_scope'));
-    // Should save working directory
-    assertCalledWith(sessionInstance.setWorkingDirectory, '/existing-app-dir');
-    // Should not execute command
-    assertNotCalled(mockExecutor.process);
-  });
-
   it('should fail when working directory not provided', async () => {
-    const args = {
-      appName: 'Test App',
-      packageName: 'test-app',
-      scopeName: 'x_test_scope',
-      template: 'javascript.react'
-    };
-
-    const result = await initCommand.execute(args);
+    const result = await initCommand.execute({ ...CREATION });
 
     assert.equal(result.success, false);
     // The input schema requires workingDirectory, on tools/call and here alike.
     assert.ok(result.error?.message.includes("Missing required argument 'workingDirectory'"));
   });
 
-  it('should execute conversion with from parameter', async () => {
-    const args = {
-      workingDirectory: '/valid-dir',
-      from: 'a1b2c3d4e5f6789012345678901234ab', // Valid sys_id
-      auth: 'test-auth'
-    };
+  describe('destination', () => {
+    it('creates a new directory under an existing parent and saves it to the session', async () => {
+      const destination = fresh('new');
 
-    await initCommand.execute(args);
+      const result = await initCommand.execute({ ...CREATION, workingDirectory: destination });
+
+      assert.equal(result.success, true, result.error?.message);
+      assert.ok(fs.statSync(destination).isDirectory());
+      assertCalledWith(sessionInstance.setWorkingDirectory, destination);
+      assertProcessCalledWithSdkArgs(containsAll(['--appName=Test App']), destination, 'the new directory');
+    });
+
+    it('uses an existing empty directory without changing it', async () => {
+      const result = await initCommand.execute({ ...CREATION, workingDirectory: validDir });
+
+      assert.equal(result.success, true, result.error?.message);
+      assert.deepEqual(fs.readdirSync(validDir), []);
+      assertCalledWith(sessionInstance.setWorkingDirectory, validDir);
+      assert.ok(result.output.includes(`This directory (${validDir}) has been saved`));
+    });
+
+    it('hands the processor and the session the canonical path', async (t) => {
+      const link = fresh('link');
+      try {
+        fs.symlinkSync(validDir, link, 'dir');
+      } catch {
+        t.skip('symlinks need privileges here');
+        return;
+      }
+
+      await initCommand.execute({ ...CREATION, workingDirectory: `${link}${path.sep}` });
+
+      assertCalledWith(sessionInstance.setWorkingDirectory, validDir);
+      assertProcessCalledWithSdkArgs(() => true, validDir, 'the resolved directory');
+    });
+
+    it('rejects the filesystem root with the actionable message', async () => {
+      const rootDir = path.parse(root).root;
+      const result = await initCommand.execute({ ...CREATION, workingDirectory: rootDir });
+
+      assertRefused(result,
+        `workingDirectory must identify a dedicated project directory, not "${rootDir}". ` +
+        'Supply an empty absolute directory or a new absolute directory path to create.');
+    });
+
+    it('rejects a symlink to the filesystem root', async (t) => {
+      const link = fresh('root-link');
+      try {
+        fs.symlinkSync(path.parse(root).root, link, 'dir');
+      } catch {
+        t.skip('symlinks need privileges here');
+        return;
+      }
+
+      const result = await initCommand.execute({ ...CREATION, workingDirectory: link });
+
+      assertRefused(result, /must identify a dedicated project directory, not ".*" \(it resolves to/);
+    });
+
+    for (const value of ['my-app', '~/my-app', 'apps/my-app']) {
+      it(`rejects ${JSON.stringify(value)} rather than resolving it against the server`, async () => {
+        const result = await initCommand.execute({ ...CREATION, workingDirectory: value });
+
+        assertRefused(result, new RegExp(`workingDirectory must be an absolute path, not "${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`));
+      });
+    }
+
+    for (const [label, files] of [
+      ['a package.json', { 'package.json': '{}' }],
+      ['any file at all', { 'notes.txt': '' }],
+    ] as const) {
+      it(`rejects a directory holding ${label}`, async () => {
+        const dir = directoryWith('populated', files);
+
+        const result = await initCommand.execute({ ...CREATION, workingDirectory: dir });
+
+        assertRefused(result, /workingDirectory is not empty/);
+      });
+    }
+
+    it('rejects an existing Fluent project, pointing at the project tools instead', async () => {
+      const dir = fluentProject('existing-app');
+
+      const result = await initCommand.execute({ ...CREATION, workingDirectory: dir });
+
+      assertRefused(result, /workingDirectory is not empty: .*already holds a Fluent project/);
+    });
+
+    it('rejects a new directory whose parent is missing, and creates nothing', async () => {
+      const parent = fresh('missing-parent');
+
+      const result = await initCommand.execute({ ...CREATION, workingDirectory: path.join(parent, 'app') });
+
+      assertRefused(result, /The parent directory of workingDirectory does not exist/);
+      assert.equal(fs.existsSync(parent), false);
+    });
+
+    it('checks every other argument before creating the destination', async () => {
+      const destination = fresh('not-created');
+
+      const result = await initCommand.execute({ ...CREATION, scopeName: 'invalid_scope', workingDirectory: destination });
+
+      assertRefused(result, /scopeName must start with "x_" prefix/);
+      assert.equal(fs.existsSync(destination), false);
+    });
+
+    it('keeps the previous session directory when the command fails', async () => {
+      processMock.mock.mockImplementation(async () => ({
+        success: false,
+        output: '',
+        exitCode: 1,
+        error: new Error('init failed'),
+      }));
+
+      const result = await initCommand.execute({ ...CREATION, workingDirectory: validDir });
+
+      assert.equal(result.success, false);
+      assertCalledTimes(mockExecutor.process, 1);
+      assertNotCalled(sessionInstance.setWorkingDirectory);
+    });
+
+    it('checks the destination after auth, so a directory populated meanwhile is refused', async () => {
+      // Lazy auth is the one await before the destination is used. A file that
+      // appears while it runs must still be seen.
+      const ensureAuthValidated = mock.fn(async () => {
+        fs.writeFileSync(path.join(validDir, 'notes.txt'), '');
+      });
+      mockExecutor = { process: processMock };
+
+      const result = await new InitCommand(mockExecutor, ensureAuthValidated).execute({ from: SYS_ID, workingDirectory: validDir });
+
+      assertCalledTimes(ensureAuthValidated, 1);
+      assertRefused(result, /workingDirectory is not empty: .*\(contains notes\.txt\)/);
+    });
+
+    describe('on a tool-side failure', () => {
+      const failing = { success: false, output: '', exitCode: 1, error: new Error('init failed') };
+
+      it('removes the directory this call created, and keeps the original error', async () => {
+        processMock.mock.mockImplementation(async () => failing);
+        const destination = fresh('rolled-back');
+
+        const result = await initCommand.execute({ ...CREATION, workingDirectory: destination });
+
+        assert.equal(result.error?.message, 'init failed');
+        assert.equal(fs.existsSync(destination), false);
+      });
+
+      it('removes it when the processor throws, and reports that error', async () => {
+        processMock.mock.mockImplementation(async () => {
+          throw new Error('processor exploded');
+        });
+        const destination = fresh('thrown');
+
+        const result = await initCommand.execute({ ...CREATION, workingDirectory: destination });
+
+        assert.equal(result.error?.message, 'processor exploded');
+        assert.equal(fs.existsSync(destination), false);
+      });
+
+      it('never removes a directory that existed before the call', async () => {
+        processMock.mock.mockImplementation(async () => failing);
+
+        await initCommand.execute({ ...CREATION, workingDirectory: validDir });
+
+        assert.ok(fs.statSync(validDir).isDirectory());
+      });
+
+      it('leaves a created directory that now has content', async () => {
+        const destination = fresh('partial');
+        processMock.mock.mockImplementation(async () => {
+          fs.writeFileSync(path.join(destination, 'partial.json'), '{}');
+          return failing;
+        });
+
+        const result = await initCommand.execute({ ...CREATION, workingDirectory: destination });
+
+        assert.equal(result.error?.message, 'init failed');
+        assert.deepEqual(fs.readdirSync(destination), ['partial.json']);
+      });
+    });
+  });
+
+  it('should execute conversion with from parameter', async () => {
+    await initCommand.execute({ workingDirectory: validDir, from: SYS_ID, auth: 'test-auth' });
 
     assertCalledWith(
       mockExecutor.process,
       process.execPath,
-      [
-        '/test/node_modules/@servicenow/sdk/bin/index.js',
-        'init',
-        '--from=a1b2c3d4e5f6789012345678901234ab',
-        '--auth=test-auth'
-      ],
-      '/valid-dir'
+      [SDK_BIN, 'init', `--from=${SYS_ID}`, '--auth=test-auth'],
+      validDir
     );
-
-    assertCalledWith(sessionInstance.setWorkingDirectory, '/valid-dir');
+    assertCalledWith(sessionInstance.setWorkingDirectory, validDir);
   });
 
   it('should execute creation with all required parameters', async () => {
-    const args = {
-      workingDirectory: '/valid-dir',
-      appName: 'Test App',
-      packageName: 'test-app',
-      scopeName: 'x_test_scope',
-      template: 'typescript.react',
-      auth: 'test-auth'
-    };
-
-    await initCommand.execute(args);
+    await initCommand.execute({ ...CREATION, template: 'typescript.react', auth: 'test-auth', workingDirectory: validDir });
 
     // SDK v4.5.0: init no longer injects --auth for creation (only for conversion)
     assertCalledWith(
       mockExecutor.process,
       process.execPath,
-      [
-        '/test/node_modules/@servicenow/sdk/bin/index.js',
-        'init',
-        '--appName=Test App',
-        '--packageName=test-app',
-        '--scopeName=x_test_scope',
-        '--template=typescript.react',
-      ],
-      '/valid-dir'
+      [SDK_BIN, 'init', '--appName=Test App', '--packageName=test-app', '--scopeName=x_test_scope', '--template=typescript.react'],
+      validDir
     );
-
-    assertCalledWith(sessionInstance.setWorkingDirectory, '/valid-dir');
+    assertCalledWith(sessionInstance.setWorkingDirectory, validDir);
   });
 
   it('should succeed for an explicit conversion intent with complete arguments', async () => {
     const result = await initCommand.execute({
       intent: 'conversion',
-      from: 'a1b2c3d4e5f6789012345678901234ab',
-      workingDirectory: '/valid-dir',
+      from: SYS_ID,
+      workingDirectory: validDir,
       auth: 'test-auth',
     });
 
@@ -447,204 +461,161 @@ describe('InitCommand', () => {
   });
 
   it('should succeed for an explicit creation intent with complete arguments', async () => {
-    const result = await initCommand.execute({
-      intent: 'creation',
-      appName: 'Test App',
-      packageName: 'test-app',
-      scopeName: 'x_test_scope',
-      workingDirectory: '/valid-dir',
-      template: 'javascript.react',
-    });
+    const result = await initCommand.execute({ intent: 'creation', ...CREATION, workingDirectory: validDir });
 
     assert.equal(result.success, true);
     assert.ok(mockExecutor.process.mock.callCount() > 0);
   });
 
+  it('should refuse a from that is neither a sys_id nor an absolute path', async () => {
+    const result = await initCommand.execute({ workingDirectory: validDir, from: 'invalid-sys-id' });
 
-  it('should validate sys_id format for conversion', async () => {
-    const args = {
-      workingDirectory: '/valid-dir',
-      from: 'invalid-sys-id'
-    };
-
-    const result = await initCommand.execute(args);
-    assert.equal(result.success, false);
-    assert.ok(result.error?.message.includes('sys_id must be a 32-character hexadecimal string'));
+    assertRefused(result,
+      'from must be an absolute path, not "invalid-sys-id". Supply an instance sys_id (32 hexadecimal characters) ' +
+      'or the absolute path of a scoped application directory to convert.');
   });
 
   it('should validate scopeName format for creation', async () => {
-    mockFs.addExistingDirectory('/valid-dir');
+    const result = await initCommand.execute({ ...CREATION, scopeName: 'invalid_scope', workingDirectory: validDir });
 
-    const args = {
-      workingDirectory: '/valid-dir',
-      appName: 'Test App',
-      packageName: 'test-app',
-      scopeName: 'invalid_scope',
-      template: 'javascript.react'
-    };
-
-    const result = await initCommand.execute(args);
     assert.equal(result.success, false);
     assert.ok(result.error?.message.includes('scopeName must start with "x_" prefix'));
   });
 
-  it('should validate local path for conversion', async () => {
-    mockFs.markAsFluentApp('/existing-path', 'x_existing_scope', 'existing-package');
-    const ensureAuthValidated = mock.fn(async () => undefined);
-    const localConversionCommand = new InitCommand(mockExecutor, ensureAuthValidated);
-    const args = {
-      workingDirectory: '/valid-dir',
-      from: '/existing-path'
-    };
+  describe('local conversion source', () => {
+    it('passes the canonical source to the SDK without triggering auth validation', async (t) => {
+      const source = legacyApp('source');
+      const link = fresh('source-link');
+      try {
+        fs.symlinkSync(source, link, 'dir');
+      } catch {
+        t.skip('symlinks need privileges here');
+        return;
+      }
+      const ensureAuthValidated = mock.fn(async () => undefined);
 
-    await localConversionCommand.execute(args);
-    assert.ok(mockExecutor.process.mock.callCount() > 0);
-    assertNotCalled(ensureAuthValidated);
-    assertProcessCalledWithSdkArgs(
-      (sdkArgs) => !hasOption(sdkArgs, '--auth'),
-      '/valid-dir',
-      "no '--auth' argument"
-    );
-  });
+      await new InitCommand(mockExecutor, ensureAuthValidated).execute({ workingDirectory: validDir, from: `${link}${path.sep}` });
 
-  it('should recognize a bare relative local path without triggering auth validation', async () => {
-    mockFs.markAsFluentApp(path.resolve('existing-path'), 'x_existing_scope', 'existing-package');
-    const ensureAuthValidated = mock.fn(async () => undefined);
-    const localConversionCommand = new InitCommand(mockExecutor, ensureAuthValidated);
-
-    await localConversionCommand.execute({
-      workingDirectory: '/valid-dir',
-      from: 'existing-path',
+      assertNotCalled(ensureAuthValidated);
+      assertCalledWith(mockExecutor.process, process.execPath, [SDK_BIN, 'init', `--from=${source}`], validDir);
     });
 
-    assertNotCalled(ensureAuthValidated);
-    assertProcessCalledWithSdkArgs(
-      (sdkArgs) => !hasOption(sdkArgs, '--auth'),
-      '/valid-dir',
-      "no '--auth' argument"
-    );
-  });
+    it('accepts an application record in the update/ or scope/ subdirectory', async () => {
+      for (const subdir of ['update', 'scope']) {
+        const source = legacyApp(`source-${subdir}`, subdir);
+        processMock.mock.resetCalls();
 
-  it('should honor an explicit auth alias for a local conversion without lazy validation', async () => {
-    mockFs.markAsFluentApp('/existing-path', 'x_existing_scope', 'existing-package');
-    const ensureAuthValidated = mock.fn(async () => undefined);
-    const localConversionCommand = new InitCommand(mockExecutor, ensureAuthValidated);
+        const result = await initCommand.execute({ workingDirectory: directoryWith('dest'), from: source });
 
-    await localConversionCommand.execute({
-      workingDirectory: '/valid-dir',
-      from: '/existing-path',
-      auth: 'explicit-local-auth',
+        assert.equal(result.success, true, result.error?.message);
+      }
     });
 
-    assertNotCalled(ensureAuthValidated);
-    assertProcessCalledWithSdkArgs(
-      containsAll(['--auth=explicit-local-auth']),
-      '/valid-dir',
-      "'--auth explicit-local-auth'"
-    );
+    // The SDK runs in the destination, so a relative source would name a
+    // different directory there than it did here, and ~ is never expanded in argv.
+    for (const from of ['legacy', './legacy', '~/legacy']) {
+      it(`refuses the relative source ${JSON.stringify(from)}, even when it exists relative to the server`, async (t) => {
+        legacyApp('legacy');
+        fs.renameSync(path.join(root, `legacy-${count}`), path.join(root, 'legacy'));
+        t.after(() => fs.rmSync(path.join(root, 'legacy'), { recursive: true, force: true }));
+        t.mock.method(process, 'cwd', () => root);
+        const ensureAuthValidated = mock.fn(async () => undefined);
+
+        const result = await new InitCommand(mockExecutor, ensureAuthValidated).execute({ workingDirectory: validDir, from });
+
+        assertRefused(result, new RegExp(`^from must be an absolute path, not "${from.replace(/[.~/]/g, '\\$&')}"`));
+        assertNotCalled(ensureAuthValidated);
+      });
+    }
+
+    it('refuses a directory with no application record, such as a Fluent project', async () => {
+      const result = await initCommand.execute({ workingDirectory: validDir, from: fluentProject('fluent-source') });
+
+      assertRefused(result, /^from holds no application record: .*sys_app_<sys_id>\.xml/);
+    });
+
+    it('refuses a destination inside the source, and creates nothing', async () => {
+      const source = legacyApp('source');
+      const destination = path.join(source, 'converted');
+
+      const result = await initCommand.execute({ from: source, workingDirectory: destination });
+
+      assertRefused(result, /^workingDirectory must not be the conversion source or inside it: /);
+      assert.equal(fs.existsSync(destination), false);
+    });
+
+    it('accepts a destination next to the source', async () => {
+      const source = legacyApp('source');
+
+      const result = await initCommand.execute({ from: source, workingDirectory: `${source}-converted` });
+
+      assert.equal(result.success, true, result.error?.message);
+      assertCalledWith(mockExecutor.process, process.execPath, [SDK_BIN, 'init', `--from=${source}`], `${source}-converted`);
+    });
+
+    it('refuses the filesystem root as a source', async () => {
+      const result = await initCommand.execute({ workingDirectory: validDir, from: path.parse(root).root });
+
+      assertRefused(result, /^from must identify an application directory, not /);
+    });
+
+    it('honors an explicit auth alias without lazy validation', async () => {
+      const source = legacyApp('source');
+      const ensureAuthValidated = mock.fn(async () => undefined);
+
+      await new InitCommand(mockExecutor, ensureAuthValidated).execute({ workingDirectory: validDir, from: source, auth: 'explicit-local-auth' });
+
+      assertNotCalled(ensureAuthValidated);
+      assertProcessCalledWithSdkArgs(containsAll(['--auth=explicit-local-auth', `--from=${source}`]), validDir, "'--auth explicit-local-auth'");
+    });
+  });
+
+  // `init --from <sys_id>` pulls the sys_app record's application from a live
+  // instance into the cwd, so its destination follows the same rule: an
+  // absolute, empty (or new) directory.
+  describe('instance conversion destination', () => {
+    it('refuses a populated destination', async () => {
+      const result = await initCommand.execute({ from: SYS_ID, auth: 'dev', workingDirectory: directoryWith('populated', { 'notes.txt': '' }) });
+
+      assertRefused(result, /^workingDirectory is not empty: /);
+    });
+
+    for (const workingDirectory of ['converted', '~/converted']) {
+      it(`refuses the destination ${JSON.stringify(workingDirectory)}`, async () => {
+        const result = await initCommand.execute({ from: SYS_ID, auth: 'dev', workingDirectory });
+
+        assertRefused(result, /^workingDirectory must be an absolute path, not /);
+      });
+    }
+
+    it('accepts a new directory under an existing parent', async () => {
+      const destination = fresh('instance-new');
+
+      const result = await initCommand.execute({ from: SYS_ID, auth: 'dev', workingDirectory: destination });
+
+      assert.equal(result.success, true, result.error?.message);
+      assertCalledWith(mockExecutor.process, process.execPath, [SDK_BIN, 'init', `--from=${SYS_ID}`, '--auth=dev'], destination);
+    });
   });
 
   it('should lazily validate auth for sys_id conversion without an alias', async () => {
     const ensureAuthValidated = mock.fn(async () => undefined);
     const instanceConversionCommand = new InitCommand(mockExecutor, ensureAuthValidated);
 
-    await instanceConversionCommand.execute({
-      workingDirectory: '/valid-dir',
-      from: 'a1b2c3d4e5f6789012345678901234ab'
-    });
+    await instanceConversionCommand.execute({ workingDirectory: validDir, from: SYS_ID });
 
     assertCalledTimes(ensureAuthValidated, 1);
   });
 
   it('should fail validation for non-existent local path', async () => {
-    const args = {
-      workingDirectory: '/valid-dir',
-      from: '/non-existent-path'
-    };
+    const missing = fresh('missing-source');
+    const result = await initCommand.execute({ workingDirectory: validDir, from: missing });
 
-    const result = await initCommand.execute(args);
-    assert.equal(result.success, false);
-    assert.ok(result.error?.message.includes('Local path does not exist'));
-  });
-
-  it('should create working directory if it does not exist', async () => {
-    const args = {
-      workingDirectory: '/non-existent-working-dir',
-      appName: 'Test App',
-      packageName: 'test-app',
-      scopeName: 'x_test_scope',
-      template: 'javascript.react'
-    };
-
-    const result = await initCommand.execute(args);
-
-    assert.equal(result.success, true);
-    assertCalledWith(mkdirSyncSpy, '/non-existent-working-dir', { recursive: true });
-  });
-
-  it('should validate working directory is empty (no package.json)', async () => {
-    // Make readdirSync report a package.json for this directory. The spy is
-    // restored with the test, so no explicit mockRestore is needed.
-    readdirResult = (path) => {
-      if (path === '/dir-with-package') {
-        return ['package.json'];
-      }
-      return [];
-    };
-
-    mockFs.addExistingDirectory('/dir-with-package');
-
-    const args = {
-      workingDirectory: '/dir-with-package',
-      appName: 'Test App',
-      packageName: 'test-app',
-      scopeName: 'x_test_scope',
-      template: 'javascript.react'
-    };
-
-    const result = await initCommand.execute(args);
-
-    assert.equal(result.success, false);
-    assert.ok(result.error?.message.includes('Working directory must not contain package.json'));
-  });
-
-  it('should validate working directory is empty (no now.config.json)', async () => {
-    // Make readdirSync report a now.config.json for this directory
-    readdirResult = (path) => {
-      if (path === '/dir-with-config') {
-        return ['now.config.json'];
-      }
-      return [];
-    };
-
-    mockFs.addExistingDirectory('/dir-with-config');
-
-    const args = {
-      workingDirectory: '/dir-with-config',
-      appName: 'Test App',
-      packageName: 'test-app',
-      scopeName: 'x_test_scope',
-      template: 'javascript.react'
-    };
-
-    const result = await initCommand.execute(args);
-
-    assert.equal(result.success, false);
-    assert.ok(result.error?.message.includes('Working directory must not contain now.config.json'));
+    assertRefused(result, new RegExp(`^from does not exist: ${missing.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.`));
   });
 
   it('should validate template parameter', async () => {
-    mockFs.addExistingDirectory('/valid-dir');
-
-    const args = {
-      workingDirectory: '/valid-dir',
-      appName: 'Test App',
-      packageName: 'test-app',
-      scopeName: 'x_test_scope',
-      template: 'invalid-template'
-    };
-
-    const result = await initCommand.execute(args);
+    const result = await initCommand.execute({ ...CREATION, template: 'invalid-template', workingDirectory: validDir });
 
     assert.equal(result.success, false);
     assert.ok(result.error?.message.includes("Argument 'template' must be one of: base, javascript.react"));
@@ -652,37 +623,14 @@ describe('InitCommand', () => {
   });
 
   it('should determine intent from from parameter', async () => {
-    const args = {
-      workingDirectory: '/valid-dir',
-      from: 'a1b2c3d4e5f6789012345678901234ab'
-    };
+    await initCommand.execute({ workingDirectory: validDir, from: SYS_ID });
 
-    await initCommand.execute(args);
-
-    // Should execute conversion flow
-    assertProcessCalledWithSdkArgs(
-      containsAll(['--from=a1b2c3d4e5f6789012345678901234ab']),
-      '/valid-dir',
-      "'--from <sys_id>'"
-    );
+    assertProcessCalledWithSdkArgs(containsAll([`--from=${SYS_ID}`]), validDir, "'--from <sys_id>'");
   });
 
   it('should determine intent from creation parameters', async () => {
-    const args = {
-      workingDirectory: '/valid-dir',
-      appName: 'Test App',
-      packageName: 'test-app',
-      scopeName: 'x_test_scope',
-      template: 'javascript.react'
-    };
+    await initCommand.execute({ ...CREATION, workingDirectory: validDir });
 
-    await initCommand.execute(args);
-
-    // Should execute creation flow
-    assertProcessCalledWithSdkArgs(
-      containsAll(['--appName=Test App']),
-      '/valid-dir',
-      '--appName=Test App'
-    );
+    assertProcessCalledWithSdkArgs(containsAll(['--appName=Test App']), validDir, '--appName=Test App');
   });
 });

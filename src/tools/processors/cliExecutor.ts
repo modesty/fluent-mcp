@@ -1,15 +1,12 @@
-import { CommandResult, CommandResultFactory, ProcessRunOptions, ProcessRunner } from '../../utils/types.js';
-import { BaseCommandProcessor } from './baseCommandProcessor.js';
+import { CommandProcessor, CommandResult, CommandResultFactory, ProcessRunOptions, ProcessRunner } from '../../utils/types.js';
 import logger from '../../utils/logger.js';
 import { cliErrorMessage } from '../../utils/cliError.js';
 
 /**
  * Executes CLI commands via a ProcessRunner and returns results
  */
-export class CLIExecutor extends BaseCommandProcessor {
-  constructor(private processRunner: ProcessRunner) {
-    super();
-  }
+export class CLIExecutor implements CommandProcessor {
+  constructor(private processRunner: ProcessRunner) {}
 
   /**
    * Run the command through the process runner and return its result.
@@ -17,15 +14,13 @@ export class CLIExecutor extends BaseCommandProcessor {
   async process(
     command: string,
     args: string[],
-    customWorkingDir?: string,
+    cwd?: string,
     stdinInput?: string,
     timeoutMs?: number,
     signal?: AbortSignal,
     options?: ProcessRunOptions
   ): Promise<CommandResult> {
     try {
-      const cwd = this.resolveCommandWorkingDirectory(customWorkingDir);
-
       // Command invocation detail is verbose; outcomes surface via CommandResult.
       logger.debug(`Executing command: ${command} ${args.join(' ')}`, { cwd });
 
