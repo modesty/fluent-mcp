@@ -7,6 +7,7 @@
  */
 import { beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { hasOption, optionValue } from '../support/argv.js';
 import { assertCalledWith, assertNotCalled } from '../support/mockAssertions.js';
 import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
 import type { CommandProcessor } from '../../src/utils/types.js';
@@ -81,9 +82,9 @@ describe('QueryCommand', () => {
       process.execPath,
       [
         SDK_BIN, 'query', 'incident',
-        '--query', 'active=true^priority<=2',
-        '--output', 'json',
-        '--auth', 'session-alias',
+        '--query=active=true^priority<=2',
+        '--output=json',
+        '--auth=session-alias',
       ],
       '/mock/working/dir',
       undefined,
@@ -99,7 +100,7 @@ describe('QueryCommand', () => {
     await command.execute({ table: 'incident', query: 'active=true', auth: 'explicit-alias' });
 
     const argv = argvOf();
-    assertContainsAll(argv, ['--auth', 'explicit-alias']);
+    assertContainsAll(argv, ['--auth=explicit-alias']);
     assert.ok(!argv.includes('session-alias'));
   });
 
@@ -124,13 +125,13 @@ describe('QueryCommand', () => {
       'sys_user',
     ]);
     assertContainsAll(argv, [
-      '--query', 'active=true',
-      '--fields', 'name,email',
-      '--limit', '50',
-      '--offset', '10',
-      '--display-value', 'all',
+      '--query=active=true',
+      '--fields=name,email',
+      '--limit=50',
+      '--offset=10',
+      '--display-value=all',
       '--no-count',
-      '--output', 'json',
+      '--output=json',
       '--debug',
     ]);
   });
@@ -166,7 +167,7 @@ describe('QueryCommand', () => {
     const result = await command.execute({ table: 'incident', query: 'active=true', auth: 'explicit-alias' });
 
     assert.equal(result.success, true);
-    assertContainsAll(argvOf(), ['--auth', 'explicit-alias']);
+    assertContainsAll(argvOf(), ['--auth=explicit-alias']);
   });
 
   for (const query of [
@@ -181,8 +182,7 @@ describe('QueryCommand', () => {
 
       assert.equal(result.success, true);
       const argv = argvOf();
-      const queryIndex = argv.indexOf('--query');
-      assert.equal(argv[queryIndex + 1], query);
+      assert.equal(optionValue(argv, '--query'), query);
     });
   }
 
@@ -216,14 +216,29 @@ describe('QueryCommand', () => {
     );
   });
 
-  it('should reject a table name with shell metacharacters', async () => {
+  // The SDK requests `/api/now/table/${table}` unencoded, so anything but a
+  // table name would change the endpoint (or, with a leading "-", the argv).
+  for (const table of ['incident;ls', '../../api/now/v2/table/sys_user', 'incident?sysparm_limit=1', 'incident#x', 'a.b', '--auth=other-alias', '']) {
+    it(`should reject a table that is not a table name: ${JSON.stringify(table)}`, async () => {
+      const command = new QueryCommand(mockProcessor);
+      await assert.rejects(
+        command.execute({ table, query: 'active=true' }),
+        /Argument 'table' must be a table name: letters, digits, and "_"/
+      );
+      assertNotCalled(mockProcessor.process);
+    });
+  }
+
+  it('should accept ordinary table names', async () => {
     const command = new QueryCommand(mockProcessor);
-    await assert.rejects(command.execute({ table: 'incident;ls', query: 'active=true' }));
+    for (const table of ['incident', 'sys_user', 'x_acme_app_task', 'cmdb_ci_win_server']) {
+      assert.equal((await command.execute({ table, query: 'active=true', auth: 'a' })).success, true);
+    }
   });
 
   // The SDK's --select extractor accepts numeric subscripts (sdk-cli
-  // util/json-select.ts), and this tool documents `records[0].sys_id` — the base
-  // shell sanitizer rejects brackets, so the select path needs its own grammar.
+  // util/json-select.ts), and this tool documents `records[0].sys_id`: the
+  // select path has its own grammar (SELECT_PATH_DOMAIN).
   for (const select of [
     'records[0].sys_id',
     'result.records[10].opened_by.display_value',
@@ -234,7 +249,7 @@ describe('QueryCommand', () => {
       const result = await command.execute({ table: 'incident', query: 'active=true', select });
 
       assert.equal(result.success, true);
-      assert.ok(!argvOf().includes('--select'));
+      assert.ok(!hasOption(argvOf(), '--select'));
     });
   }
 

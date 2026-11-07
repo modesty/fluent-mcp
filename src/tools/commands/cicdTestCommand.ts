@@ -2,16 +2,11 @@ import { CommandArgument, CommandResult, CommandResultFactory } from '../../util
 import { ENVELOPE_RUN_OPTIONS, shapeEnvelopeResult } from '../../utils/jsonSelect.js';
 import { SessionAwareCLICommand } from './sessionAwareCommand.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
+import { cliOption } from './cliArgv.js';
 import { getProjectRootPath } from '../../config.js';
-import {
-  CLI_OUTPUT_FORMATS,
-  assertOneOf,
-  assertPositiveInteger,
-  screenFreeTextArgs,
-  screenSelectPathArg,
-} from './argValidation.js';
+import { CLI_OUTPUT_FORMATS, SELECT_PATH_DOMAIN, assertPositiveInteger } from './argValidation.js';
 
-/** Strict allowlists — a caller-supplied token never reaches argv unvalidated. */
+/** The `target`/`action` choices — a caller-supplied token never reaches argv unvalidated. */
 const TEST_TARGETS = ['testsuite', 'test'] as const;
 const TEST_ACTIONS = ['run', 'watch', 'result', 'logs'] as const;
 type TestTarget = (typeof TEST_TARGETS)[number];
@@ -24,15 +19,6 @@ const BROWSER_NAMES = ['any', 'chrome', 'firefox', 'edge', 'ie', 'safari'] as co
 const POLLED_ACTIONS: readonly TestAction[] = ['run', 'watch'];
 /** Actions that read a finished result by `resultId`. */
 const RESULT_ACTIONS: readonly TestAction[] = ['result', 'logs'];
-
-/**
- * ATF suite and test names are author-chosen labels that routinely contain
- * printable punctuation — e.g. "Incident (Regression) & Cleanup" — and a logs
- * `pattern` is a regular expression (e.g. "error|fail"). Those are harmless on
- * the shell-free execution path, so they bypass the base shell-metacharacter
- * check and are screened for control characters instead.
- */
-const FREE_TEXT_ARGS = ['testSuiteName', 'testName', 'pattern'] as const;
 
 /**
  * Command to drive ATF test execution through the ServiceNow CI/CD API
@@ -61,12 +47,14 @@ export class CicdTestCommand extends SessionAwareCLICommand {
       name: 'target',
       type: 'string',
       required: true,
+      domain: { kind: 'choices', values: TEST_TARGETS },
       description: 'What to act on: "testsuite" (an ATF test suite) or "test" (a single ATF test).',
     },
     {
       name: 'action',
       type: 'string',
       required: true,
+      domain: { kind: 'choices', values: TEST_ACTIONS },
       description: 'Operation: "run" to start, "watch" to follow a progressId from a previous run, "result" to fetch a resultId, or "logs" to fetch the captured logs of a single test result (target="test" only).',
     },
     {
@@ -121,6 +109,7 @@ export class CicdTestCommand extends SessionAwareCLICommand {
       name: 'browserName',
       type: 'string',
       required: false,
+      domain: { kind: 'choices', values: BROWSER_NAMES },
       description: `Browser to run UI-based tests in: ${BROWSER_NAMES.join(', ')}. Only with target="testsuite", action="run".`,
     },
     {
@@ -181,12 +170,14 @@ export class CicdTestCommand extends SessionAwareCLICommand {
       name: 'output',
       type: 'string',
       required: false,
+      domain: { kind: 'choices', values: CLI_OUTPUT_FORMATS },
       description: `Output format: ${CLI_OUTPUT_FORMATS.map((f) => `"${f}"`).join(' or ')}. Defaults to "json" (machine-readable envelope).`,
     },
     {
       name: 'select',
       type: 'string',
       required: false,
+      domain: SELECT_PATH_DOMAIN,
       description: 'Dot/bracket path to extract from the JSON envelope `{ ok, result, progress?, interpretedResult? }` (e.g. "interpretedResult.summary.testStatus" or "progress.status"). interpretedResult and progress are top-level keys, not under result; a waiting watch (SDK v4.14.0+) reports its outcome under progress and interpretedResult with an empty result. An unresolved path yields null. Applied by this tool to a successful (ok: true) envelope only; on a failure the full envelope is returned so the error stays visible (the CLI\'s own --select would print only null).',
     },
     {
@@ -202,23 +193,14 @@ export class CicdTestCommand extends SessionAwareCLICommand {
    * enforces, so an unusable combination is named precisely instead of failing
    * opaquely in the CLI.
    *
-   * The two name arguments and `pattern` are free text (see FREE_TEXT_ARGS) and `select` is a
-   * bracket path: the base is handed benign placeholders so its required/type
-   * checks still run, while each real value is screened by the rule that applies
-   * to it (see argValidation).
+   * The schema has already checked `target`, `action`, `browserName`, `output`
+   * and `select` against their domains.
    */
   protected validateArgs(args: Record<string, unknown>): void {
-    super.validateArgs(screenSelectPathArg(screenFreeTextArgs(args, FREE_TEXT_ARGS)));
+    super.validateArgs(args);
 
-    const target = assertOneOf(args.target, TEST_TARGETS, 'target');
-    const action = assertOneOf(args.action, TEST_ACTIONS, 'action');
-
-    if (args.browserName !== undefined) {
-      assertOneOf(args.browserName, BROWSER_NAMES, 'browserName');
-    }
-    if (args.output !== undefined) {
-      assertOneOf(args.output, CLI_OUTPUT_FORMATS, 'output');
-    }
+    const target = args.target as TestTarget;
+    const action = args.action as TestAction;
 
     if (action === 'watch' && !args.progressId) {
       throw new Error("Argument 'progressId' is required when action=\"watch\". Use the progress id returned by a previous run.");
@@ -318,34 +300,34 @@ export class CicdTestCommand extends SessionAwareCLICommand {
     const { command, baseArgs } = resolveSdkCli();
     const sdkArgs: string[] = [...baseArgs, 'cicd', target, action];
 
-    if (args.testSuiteSysId) sdkArgs.push('--test-suite-sys-id', String(args.testSuiteSysId));
-    if (args.testSuiteName) sdkArgs.push('--test-suite-name', String(args.testSuiteName));
-    if (args.testSysId) sdkArgs.push('--test-sys-id', String(args.testSysId));
-    if (args.testName) sdkArgs.push('--test-name', String(args.testName));
+    if (args.testSuiteSysId) sdkArgs.push(cliOption('--test-suite-sys-id', args.testSuiteSysId));
+    if (args.testSuiteName) sdkArgs.push(cliOption('--test-suite-name', args.testSuiteName));
+    if (args.testSysId) sdkArgs.push(cliOption('--test-sys-id', args.testSysId));
+    if (args.testName) sdkArgs.push(cliOption('--test-name', args.testName));
 
-    if (args.progressId) sdkArgs.push('--progress-id', String(args.progressId));
-    if (args.resultId) sdkArgs.push('--result-id', String(args.resultId));
+    if (args.progressId) sdkArgs.push(cliOption('--progress-id', args.progressId));
+    if (args.resultId) sdkArgs.push(cliOption('--result-id', args.resultId));
 
-    if (args.browserName) sdkArgs.push('--browser-name', String(args.browserName));
-    if (args.browserVersion) sdkArgs.push('--browser-version', String(args.browserVersion));
-    if (args.osName) sdkArgs.push('--os-name', String(args.osName));
-    if (args.osVersion) sdkArgs.push('--os-version', String(args.osVersion));
+    if (args.browserName) sdkArgs.push(cliOption('--browser-name', args.browserName));
+    if (args.browserVersion) sdkArgs.push(cliOption('--browser-version', args.browserVersion));
+    if (args.osName) sdkArgs.push(cliOption('--os-name', args.osName));
+    if (args.osVersion) sdkArgs.push(cliOption('--os-version', args.osVersion));
     if (args.runInCloud) sdkArgs.push('--run-in-cloud');
     if (args.isPerformanceRun) sdkArgs.push('--is-performance-run');
     if (args.captureNodeLogs) sdkArgs.push('--capture-node-logs');
 
-    if (args.pattern) sdkArgs.push('--pattern', String(args.pattern));
-    if (args.limit !== undefined) sdkArgs.push('--limit', String(args.limit));
+    if (args.pattern) sdkArgs.push(cliOption('--pattern', args.pattern));
+    if (args.limit !== undefined) sdkArgs.push(cliOption('--limit', args.limit));
 
     // `--wait` defaults to true in the CLI, so only the negation is meaningful.
     // `result` and `logs` are plain reads and accept neither polling flag.
     if (POLLED_ACTIONS.includes(action)) {
       if (args.wait === false) sdkArgs.push('--no-wait');
-      if (args.pollTimeout !== undefined) sdkArgs.push('--poll-timeout', String(args.pollTimeout));
+      if (args.pollTimeout !== undefined) sdkArgs.push(cliOption('--poll-timeout', args.pollTimeout));
     }
 
-    sdkArgs.push('--auth', resolvedAuth);
-    sdkArgs.push('--output', typeof args.output === 'string' ? args.output : 'json');
+    sdkArgs.push(cliOption('--auth', resolvedAuth));
+    sdkArgs.push(cliOption('--output', typeof args.output === 'string' ? args.output : 'json'));
     this.appendCommonFlags(sdkArgs, args);
 
     // These leaves resolve nothing from the current directory (unlike the app-repo

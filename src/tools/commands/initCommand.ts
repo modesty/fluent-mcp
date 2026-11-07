@@ -12,12 +12,14 @@ import { BaseCLICommand } from './baseCommand.js';
 import { FluentAppValidator } from '../../utils/fluentAppValidator.js';
 import { SessionManager } from '../../utils/sessionManager.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
+import { cliOption } from './cliArgv.js';
 import logger from '../../utils/logger.js';
 import {
   InitArgsResolver,
   InitValidator,
   ConversionInitData,
   CreationInitData,
+  VALID_TEMPLATES,
 } from './init/index.js';
 
 /**
@@ -77,6 +79,7 @@ export class InitCommand extends BaseCLICommand {
       name: 'template',
       type: 'string',
       required: false,
+      domain: { kind: 'choices', values: VALID_TEMPLATES },
       description: 'For creation only (required): Template to use for the project. Choices: "base", "javascript.basic", "javascript.react", "typescript.basic", "typescript.react", "typescript.vue". Not needed for conversion.',
     },
     {
@@ -199,7 +202,7 @@ export class InitCommand extends BaseCLICommand {
    */
   private async buildConversionArgs(data: ConversionInitData, baseArgs: string[]): Promise<string[]> {
     const sdkArgs = [...baseArgs, 'init'];
-    sdkArgs.push('--from', data.from);
+    sdkArgs.push(cliOption('--from', data.from));
 
     // A local-path conversion is entirely local and must not trigger profile
     // discovery. An exact sys_id reads from an instance and therefore needs
@@ -210,7 +213,7 @@ export class InitCommand extends BaseCLICommand {
     const hasExplicitAuth = typeof data.auth === 'string' && data.auth.trim() !== '';
     if (convertsFromInstance || hasExplicitAuth) {
       const auth = await this.getAuthAlias(data.auth);
-      if (auth) sdkArgs.push('--auth', auth);
+      if (auth) sdkArgs.push(cliOption('--auth', auth));
     }
 
     if (data.debug) sdkArgs.push('--debug');
@@ -223,14 +226,15 @@ export class InitCommand extends BaseCLICommand {
   private buildCreationArgs(data: CreationInitData, baseArgs: string[]): string[] {
     const sdkArgs = [...baseArgs, 'init'];
 
-    const appNameArg = typeof data.appName === 'string' && !/^".*"$/.test(data.appName)
-      ? `"${data.appName}"`
-      : data.appName;
-
-    sdkArgs.push('--appName', appNameArg);
-    sdkArgs.push('--packageName', data.packageName);
-    sdkArgs.push('--scopeName', data.scopeName);
-    if (data.template) sdkArgs.push('--template', data.template);
+    // CLICmdWriter shell-escapes every entry of this argv. A name the caller
+    // already wrapped in double quotes meant them as shell quoting, so they are
+    // removed here rather than kept as part of the name.
+    const appName = String(data.appName);
+    const bareAppName = /^".*"$/.test(appName) ? appName.slice(1, -1) : appName;
+    sdkArgs.push(cliOption('--appName', bareAppName));
+    sdkArgs.push(cliOption('--packageName', data.packageName));
+    sdkArgs.push(cliOption('--scopeName', data.scopeName));
+    if (data.template) sdkArgs.push(cliOption('--template', data.template));
     // SDK v4.5.0: init no longer prompts for credentials during creation,
     // auth is only needed for conversion (pulling from instance)
     if (data.debug) sdkArgs.push('--debug');
@@ -240,6 +244,9 @@ export class InitCommand extends BaseCLICommand {
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
     try {
+      // The schema checks types, the template choices, and control characters.
+      this.validateArgs(args);
+
       // Step 1: Determine user intent from the supplied arguments. There is no
       // fallback prompt — a bag that implies neither mode fails with a message
       // naming both modes and their required arguments.

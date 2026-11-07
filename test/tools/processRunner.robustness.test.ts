@@ -56,32 +56,73 @@ function hangingChildWithMarkerArgs(text: string, markerPath: string): string[] 
  * Fails instead of polling forever: rejects when `run` settles first (the child
  * exited before signalling readiness) and when `signal` aborts. Pass the test
  * context's signal: node:test aborts it on timeout, but a timeout alone does not
- * stop a pending loop, which would keep the test process alive.
+ * stop a pending loop, which would keep the test process alive. A test that
+ * mocks `setTimeout` passes a `sleep` captured from the real timers first.
  */
-async function waitForMarker(markerPath: string, run: Promise<unknown>, signal: AbortSignal): Promise<void> {
+async function waitForMarker(
+  markerPath: string,
+  run: Promise<unknown>,
+  signal: AbortSignal,
+  sleep: (ms: number) => Promise<unknown> = (ms) => delay(ms, undefined, { signal }),
+): Promise<void> {
   let settled = false;
   const markSettled = () => { settled = true; };
   run.then(markSettled, markSettled);
   while (!fs.existsSync(markerPath)) {
     if (settled) throw new Error(`child finished before creating its readiness marker ${markerPath}`);
-    await delay(10, undefined, { signal });
+    if (signal.aborted) throw signal.reason;
+    await sleep(10);
   }
 }
 
+/** A sleep on the real `setTimeout`, bound now so it still works after the test mocks timers. */
+function realSleep(): (ms: number) => Promise<void> {
+  const realSetTimeout = globalThis.setTimeout.bind(globalThis);
+  return (ms) => new Promise((resolve) => { realSetTimeout(resolve, ms); });
+}
+
 describe('NodeProcessRunner — timeout returns partial output (P0.2)', () => {
-  it('resolves (does not reject) with buffered stdout and a non-zero exit on timeout', { timeout: TEST_TIMEOUT_MS }, async () => {
+  it('resolves (does not reject) with buffered stdout and a non-zero exit on timeout', { timeout: TEST_TIMEOUT_MS }, async (t) => {
+    // The 250 ms budget must not include child startup: the timeout is a mocked
+    // timer, fired only once the child has provably written its output (a real
+    // child and readiness marker, as in the cancellation test below).
+    const sleep = realSleep();
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+
     const runner = new NodeProcessRunner();
-    const result = await runner.run(
+    const controller = new AbortController();
+    const markerDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluent-mcp-timeout-'));
+    const markerPath = path.join(markerDir, 'emitted');
+    const run = runner.run(
       process.execPath,
-      hangingChildArgs('partial-before-timeout'),
+      hangingChildWithMarkerArgs('partial-before-timeout', markerPath),
       undefined,
       undefined,
-      250 // per-call timeout
+      250, // per-call timeout, on the mocked clock
+      controller.signal
     );
+    let settled = false;
+    run.then(() => { settled = true; }, () => { settled = true; });
+
+    let result;
+    try {
+      await waitForMarker(markerPath, run, t.signal, sleep);
+      // Longer than the budget on the real clock: only the mocked timer can end the run.
+      await sleep(300);
+      assert.equal(settled, false, 'the run settled before its (mocked) timeout fired');
+      t.mock.timers.tick(250);
+      result = await run;
+    } finally {
+      // On any failure path (early exit, test timeout) stop the child and wait
+      // for it, so no process or pending work outlives the test.
+      controller.abort();
+      await run.catch(() => undefined);
+      fs.rmSync(markerDir, { recursive: true, force: true });
+    }
 
     // Partial stdout is preserved, not discarded.
     assert.ok(result.stdout.includes('partial-before-timeout'));
-    // Distinct non-zero exit code (124 = timeout convention).
+    // Distinct non-zero exit code (124 = timeout convention), not cancellation (130).
     assert.equal(result.exitCode, 124);
     // A human-readable note is appended to stderr.
     assert.match(result.stderr, /timed out after 250ms/i);

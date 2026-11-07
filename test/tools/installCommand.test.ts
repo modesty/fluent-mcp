@@ -156,7 +156,7 @@ describe('InstallCommand', () => {
       assertCalledWith(
         mockProcessor.process,
         process.execPath,
-        [SDK_BIN, 'install', '--auth', 'my-alias', '--skip-flow-activation', '--debug'],
+        [SDK_BIN, 'install', '--auth=my-alias', '--skip-flow-activation', '--debug'],
         '/mock/working/dir',
         undefined, // stdinInput
         900000,   // timeoutMs

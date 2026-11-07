@@ -9,6 +9,7 @@
  */
 import { beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { hasOption, optionValue } from '../support/argv.js';
 import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
 
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
@@ -112,9 +113,7 @@ describe('timeoutSeconds (SDK v4.13.0 --timeout)', () => {
         ];
         assert.equal(argv[0], SDK_BIN);
         assert.equal(argv[1], subcommand);
-        const flagIndex = argv.indexOf('--timeout');
-        assert.ok(flagIndex > -1);
-        assert.equal(argv[flagIndex + 1], '7200');
+        assert.equal(optionValue(argv, '--timeout'), '7200');
         assert.equal(timeoutMs, 7_260_000);
       });
 
@@ -129,7 +128,7 @@ describe('timeoutSeconds (SDK v4.13.0 --timeout)', () => {
           unknown,
           number,
         ];
-        assert.ok(!argv.includes('--timeout'));
+        assert.ok(!hasOption(argv, '--timeout'));
         assert.equal(timeoutMs, 600_000);
       });
 

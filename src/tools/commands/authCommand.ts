@@ -1,8 +1,12 @@
 import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { BaseCLICommand } from './baseCommand.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
+import { cliOption } from './cliArgv.js';
 import logger from '../../utils/logger.js';
 import { getProjectRootPath } from '../../config.js';
+
+/** `--type` choices declared by `now-sdk auth`. */
+const AUTH_TYPES = ['basic', 'oauth'] as const;
 
 /**
  * Command to prepare shell command for ServiceNow SDK authentication
@@ -22,6 +26,7 @@ export class AuthCommand extends BaseCLICommand {
       name: 'type',
       type: 'string',
       required: false,
+      domain: { kind: 'choices', values: AUTH_TYPES },
       description:
         'Type of authentication to use for new authentication credential. Choices: "basic", "oauth"',
     },
@@ -94,26 +99,21 @@ export class AuthCommand extends BaseCLICommand {
       if (!addValue.trim()) {
         return CommandResultFactory.error('When using --add, you must provide a non-empty instance name or URL');
       }
-      sdkArgs.push('--add', addValue);
+      sdkArgs.push(cliOption('--add', addValue));
 
       if (args.type) {
-        const typeValue = String(args.type);
-        const allowed = ['basic', 'oauth'];
-        if (!allowed.includes(typeValue)) {
-          return CommandResultFactory.error(`Invalid --type '${typeValue}'. Allowed values: basic, oauth`);
-        }
-        sdkArgs.push('--type', typeValue);
+        sdkArgs.push(cliOption('--type', args.type));
       }
 
       if (args.alias) {
-        sdkArgs.push('--alias', args.alias as string);
+        sdkArgs.push(cliOption('--alias', args.alias));
       }
     } else if (args.list) {
       sdkArgs.push('--list');
     } else if (args.delete) {
-      sdkArgs.push('--delete', args.delete as string);
+      sdkArgs.push(cliOption('--delete', args.delete));
     } else if (args.use) {
-      sdkArgs.push('--use', args.use as string);
+      sdkArgs.push(cliOption('--use', args.use));
     }
 
     this.appendCommonFlags(sdkArgs, args);

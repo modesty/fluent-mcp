@@ -14,6 +14,7 @@
 import { beforeEach, describe, it, mock } from 'node:test';
 import type { TestContext } from 'node:test';
 import assert from 'node:assert/strict';
+import { hasOption } from '../support/argv.js';
 import { inspect } from 'node:util';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -249,7 +250,9 @@ describe('InitCommand', () => {
   // the tools/call, and an incomplete bag must fail with an actionable message
   // rather than hang on a round trip that is no longer legal.
   it('should fail with an actionable error when no intent can be determined', async () => {
-    const result = await initCommand.execute({});
+    // workingDirectory is required by the schema (as on tools/call); with it,
+    // the intent resolver is what fails.
+    const result = await initCommand.execute({ workingDirectory: '/valid-dir' });
 
     assert.equal(result.success, false);
     assert.ok(result.error?.message.includes('Cannot determine intent for init_fluent_app'));
@@ -265,7 +268,7 @@ describe('InitCommand', () => {
   it('should never issue a server-initiated request for missing input', async () => {
     // Guards the regression the 2026-07-28 migration removed: no code path may
     // reach back to the client. A bare intent with no data must fail locally.
-    const result = await initCommand.execute({ intent: 'creation' });
+    const result = await initCommand.execute({ intent: 'creation', workingDirectory: '/valid-dir' });
 
     assert.equal(result.success, false);
     assert.ok(result.error?.message.includes('Required parameters for creation are missing'));
@@ -302,7 +305,7 @@ describe('InitCommand', () => {
   });
 
   it('should list the valid templates when creation input is incomplete', async () => {
-    const result = await initCommand.execute({ intent: 'creation', appName: 'Test App' });
+    const result = await initCommand.execute({ intent: 'creation', appName: 'Test App', workingDirectory: '/valid-dir' });
 
     assert.equal(result.success, false);
     assert.ok(result.error?.message.includes('typescript.vue'));
@@ -373,7 +376,8 @@ describe('InitCommand', () => {
     const result = await initCommand.execute(args);
 
     assert.equal(result.success, false);
-    assert.ok(result.error?.message.includes('Required parameters for creation are missing: workingDirectory'));
+    // The input schema requires workingDirectory, on tools/call and here alike.
+    assert.ok(result.error?.message.includes("Missing required argument 'workingDirectory'"));
   });
 
   it('should execute conversion with from parameter', async () => {
@@ -391,8 +395,8 @@ describe('InitCommand', () => {
       [
         '/test/node_modules/@servicenow/sdk/bin/index.js',
         'init',
-        '--from', 'a1b2c3d4e5f6789012345678901234ab',
-        '--auth', 'test-auth'
+        '--from=a1b2c3d4e5f6789012345678901234ab',
+        '--auth=test-auth'
       ],
       '/valid-dir'
     );
@@ -419,10 +423,10 @@ describe('InitCommand', () => {
       [
         '/test/node_modules/@servicenow/sdk/bin/index.js',
         'init',
-        '--appName', '"Test App"',
-        '--packageName', 'test-app',
-        '--scopeName', 'x_test_scope',
-        '--template', 'typescript.react',
+        '--appName=Test App',
+        '--packageName=test-app',
+        '--scopeName=x_test_scope',
+        '--template=typescript.react',
       ],
       '/valid-dir'
     );
@@ -497,7 +501,7 @@ describe('InitCommand', () => {
     assert.ok(mockExecutor.process.mock.callCount() > 0);
     assertNotCalled(ensureAuthValidated);
     assertProcessCalledWithSdkArgs(
-      (sdkArgs) => !sdkArgs.includes('--auth'),
+      (sdkArgs) => !hasOption(sdkArgs, '--auth'),
       '/valid-dir',
       "no '--auth' argument"
     );
@@ -515,7 +519,7 @@ describe('InitCommand', () => {
 
     assertNotCalled(ensureAuthValidated);
     assertProcessCalledWithSdkArgs(
-      (sdkArgs) => !sdkArgs.includes('--auth'),
+      (sdkArgs) => !hasOption(sdkArgs, '--auth'),
       '/valid-dir',
       "no '--auth' argument"
     );
@@ -534,7 +538,7 @@ describe('InitCommand', () => {
 
     assertNotCalled(ensureAuthValidated);
     assertProcessCalledWithSdkArgs(
-      containsAll(['--auth', 'explicit-local-auth']),
+      containsAll(['--auth=explicit-local-auth']),
       '/valid-dir',
       "'--auth explicit-local-auth'"
     );
@@ -643,7 +647,8 @@ describe('InitCommand', () => {
     const result = await initCommand.execute(args);
 
     assert.equal(result.success, false);
-    assert.ok(result.error?.message.includes('template must be one of:'));
+    assert.ok(result.error?.message.includes("Argument 'template' must be one of: base, javascript.react"));
+    assertNotCalled(mockExecutor.process);
   });
 
   it('should determine intent from from parameter', async () => {
@@ -656,7 +661,7 @@ describe('InitCommand', () => {
 
     // Should execute conversion flow
     assertProcessCalledWithSdkArgs(
-      containsAll(['--from', 'a1b2c3d4e5f6789012345678901234ab']),
+      containsAll(['--from=a1b2c3d4e5f6789012345678901234ab']),
       '/valid-dir',
       "'--from <sys_id>'"
     );
@@ -675,9 +680,9 @@ describe('InitCommand', () => {
 
     // Should execute creation flow
     assertProcessCalledWithSdkArgs(
-      containsAll(['--appName', '"Test App"']),
+      containsAll(['--appName=Test App']),
       '/valid-dir',
-      "'--appName \"Test App\"'"
+      '--appName=Test App'
     );
   });
 });

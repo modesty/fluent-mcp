@@ -14,7 +14,6 @@ import {
   CreationInitData,
   MultiValidationResult,
   ValidationResult,
-  VALID_TEMPLATES,
 } from './types.js';
 
 /**
@@ -170,13 +169,9 @@ export class InitValidator {
       }
     }
 
+    // The template's choices are part of the input schema (InitCommand.validateArgs).
     if (!data.template || data.template.trim().length === 0) {
       errors.push('template is required and cannot be empty');
-    } else {
-      // Validate template value
-      if (!VALID_TEMPLATES.includes(data.template as (typeof VALID_TEMPLATES)[number])) {
-        errors.push(`template must be one of: ${VALID_TEMPLATES.join(', ')}`);
-      }
     }
 
     return {

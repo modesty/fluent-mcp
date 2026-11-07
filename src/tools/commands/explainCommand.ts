@@ -1,7 +1,11 @@
 import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { BaseCLICommand } from './baseCommand.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
+import { assertNotOption, cliOption } from './cliArgv.js';
 import { getProjectRootPath } from '../../config.js';
+
+/** `--format` choices declared by `now-sdk explain`. */
+const EXPLAIN_FORMATS = ['pretty', 'raw'] as const;
 
 /**
  * Command to display documentation for a Fluent SDK topic.
@@ -42,6 +46,7 @@ export class ExplainCommand extends BaseCLICommand {
       name: 'format',
       type: 'string',
       required: false,
+      domain: { kind: 'choices', values: EXPLAIN_FORMATS },
       description: 'Output format: "pretty" (terminal, default) or "raw" (plain markdown).',
     },
     {
@@ -61,19 +66,13 @@ export class ExplainCommand extends BaseCLICommand {
       );
     }
 
-    if (args.format !== undefined && args.format !== 'pretty' && args.format !== 'raw') {
-      return CommandResultFactory.error(
-        `Invalid format: "${String(args.format)}". Expected "pretty" or "raw".`
-      );
-    }
-
     const { command, baseArgs } = resolveSdkCli();
     const sdkArgs = [...baseArgs, 'explain'];
     if (args.topic) {
-      sdkArgs.push(args.topic as string);
+      sdkArgs.push(assertNotOption(String(args.topic), 'topic'));
     }
 
-    if (args.format) sdkArgs.push('--format', args.format as string);
+    if (args.format) sdkArgs.push(cliOption('--format', args.format));
     if (args.list) sdkArgs.push('--list');
     if (args.peek) sdkArgs.push('--peek');
     this.appendCommonFlags(sdkArgs, args);

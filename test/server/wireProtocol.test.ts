@@ -409,6 +409,40 @@ describe('dual-era wire protocol', () => {
       assert.match(text, /bogus|unrecognized|strict/i);
     });
 
+    // Argument domains: one declaration, advertised on tools/list and enforced
+    // on tools/call, before any handler or process runs.
+    it('advertises argument domains as enum and pattern', async () => {
+      const res = await wire.modern('tools/list');
+      const props = (name: string) =>
+        res.result.tools.find((t: { name: string }) => t.name === name).inputSchema.properties;
+      assert.deepEqual(props('cicd_fluent_app').action.enum, ['install', 'publish', 'rollback']);
+      assert.deepEqual(props('explain_fluent_api').format.enum, ['pretty', 'raw']);
+      assert.equal(typeof props('query_fluent_records').select.pattern, 'string');
+      assert.equal(props('query_fluent_records').table.pattern, '^[A-Za-z0-9_]+$');
+      // Plain strings advertise no pattern: the control-character rule is enforced, not advertised.
+      assert.equal(props('cicd_fluent_app').devNotes.pattern, undefined);
+    });
+
+    it('advertises no $id or $ref in any schema (fast-uri in the SDK compiles both)', async () => {
+      const res = await wire.modern('tools/list');
+      const text = JSON.stringify(res.result.tools);
+      assert.doesNotMatch(text, /"\$id"|"\$ref"/);
+    });
+
+    for (const [label, name, args, message] of [
+      ['a value outside choices', 'cicd_fluent_app', { action: 'deploy' }, /action: Argument 'action' must be one of: install, publish, rollback\. Received: "deploy"\./],
+      ['a value outside a pattern', 'query_fluent_records', { table: '../x', query: 'a=b' }, /table: Argument 'table' must be a table name/],
+      ['a control character in plain text', 'cicd_fluent_app', { action: 'publish', scope: 'x_a', devNotes: 'a\nb' }, /devNotes: Invalid characters in argument 'devNotes': control characters are not allowed/],
+      ['a missing required argument', 'fluent_exec_script', { script: 'gs.info(1)', reason: 'r' }, /Missing required argument 'scope'/],
+    ] as const) {
+      it(`rejects ${label} on tools/call with the argument named`, async () => {
+        const res = await wire.modern('tools/call', { name, arguments: args });
+        assert.equal(res.result.isError, true);
+        assert.match(res.result.content[0].text, /^Input validation error: Invalid arguments for tool /);
+        assert.match(res.result.content[0].text, message);
+      });
+    }
+
     // ttlMs + cacheScope are required on the cacheable results (SEP-2549).
     // Everything this server returns on them is immutable for the process
     // lifetime, so a long public TTL is safe. Without hints, v2 emits the

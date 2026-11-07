@@ -10,6 +10,7 @@ import {
 import { BaseCLICommand } from './baseCommand.js';
 import { SessionManager } from '../../utils/sessionManager.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
+import { cliOption } from './cliArgv.js';
 import logger from '../../utils/logger.js';
 import { getConfig } from '../../config.js';
 
@@ -176,12 +177,9 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
     signal?: AbortSignal,
     options?: ProcessRunOptions
   ): Promise<CommandResult> {
-    // Defense-in-depth: validate/sanitize the caller's args before they become CLI
-    // tokens. The root injection defense is spawning shell-free (see processRunner);
-    // validation still rejects unexpected control characters at the command
-    // boundary. Run before auth injection so trusted session aliases aren't
-    // re-validated. Commands needing special characters (e.g. the query command's
-    // encoded operators) override validateArgs.
+    // Validate the caller's args with the command's input schema before they
+    // become CLI tokens (the same schema tools/call enforces). Run before auth
+    // injection, so a trusted session alias is not re-validated.
     this.validateArgs(args);
 
     // Auto-resolve auth from session if 'auth' is mapped but not provided
@@ -206,11 +204,11 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
       if (value !== undefined && value !== null && value !== '') {
         if (typeof flagConfig === 'string') {
           // Simple string flag with value
-          sdkArgs.push(flagConfig, String(value));
+          sdkArgs.push(cliOption(flagConfig, value));
         } else {
           // Object config with flag and hasValue
           if (flagConfig.hasValue) {
-            sdkArgs.push(flagConfig.flag, String(value));
+            sdkArgs.push(cliOption(flagConfig.flag, value));
           } else if (value) {
             // Boolean flag without value
             sdkArgs.push(flagConfig.flag);

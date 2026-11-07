@@ -13,6 +13,7 @@
  */
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { hasOption, optionValue } from '../support/argv.js';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -105,10 +106,10 @@ describe('ExecScriptCommand', () => {
       process.execPath,
       [
         SDK_BIN, 'exec', SCRIPT,
-        '--scope', 'x_acme_app',
-        '--reason', 'Count active incidents (support case 42)',
-        '--auth', 'session-alias',
-        '--output', 'json',
+        '--scope=x_acme_app',
+        '--reason=Count active incidents (support case 42)',
+        '--auth=session-alias',
+        '--output=json',
       ],
       '/mock/project/root',
       undefined,
@@ -117,8 +118,18 @@ describe('ExecScriptCommand', () => {
       ENVELOPE_RUN_OPTIONS
     );
     const argv = mockProcessor.process.mock.calls[0].arguments[1];
-    assert.equal(argv.includes('--file'), false);
+    assert.equal(hasOption(argv, '--file'), false);
     assert.equal(argv.includes('--no-record-for-rollback'), false);
+  });
+
+  it('keeps an option-shaped reason inside --reason, so rollback recording cannot be switched off', async () => {
+    const command = new ExecScriptCommand(mockProcessor);
+    const result = await command.execute({ ...BASE_ARGS, reason: '--record-for-rollback=false' });
+
+    assert.equal(result.success, true);
+    const argv = mockProcessor.process.mock.calls[0].arguments[1];
+    assert.equal(optionValue(argv, '--reason'), '--record-for-rollback=false');
+    assert.ok(!argv.some((arg) => arg.startsWith('--record-for-rollback')));
   });
 
   it('accepts global and a 32-character sys_id as scope', async () => {
@@ -145,12 +156,12 @@ describe('ExecScriptCommand', () => {
       process.execPath,
       [
         SDK_BIN, 'exec', SCRIPT,
-        '--scope', 'x_acme_app',
-        '--reason', 'Count active incidents (support case 42)',
-        '--timeout', '900000',
+        '--scope=x_acme_app',
+        '--reason=Count active incidents (support case 42)',
+        '--timeout=900000',
         '--server-logs',
-        '--auth', 'explicit-alias',
-        '--output', 'json',
+        '--auth=explicit-alias',
+        '--output=json',
         '--debug',
       ],
       '/mock/project/root',
@@ -313,7 +324,7 @@ describe('ExecScriptCommand', () => {
     it('runs a private copy via --file and echoes the path, sha256, and content that ran', async () => {
       let copied: { path: string; content: string; mode: number } | undefined;
       mockProcessor.process.mock.mockImplementation(async (_cmd, argv) => {
-        const copyPath = argv[argv.indexOf('--file') + 1];
+        const copyPath = optionValue(argv, '--file') ?? '';
         copied = { path: copyPath, content: fs.readFileSync(copyPath, 'utf-8'), mode: fs.statSync(copyPath).mode & 0o777 };
         return { success: true, output: '{"ok":true,"output":["rows: 3"]}', exitCode: 0 };
       });
@@ -323,8 +334,9 @@ describe('ExecScriptCommand', () => {
 
       assert.equal(result.success, true);
       const argv = mockProcessor.process.mock.calls[0].arguments[1];
-      assert.deepStrictEqual(argv.slice(0, 3), [SDK_BIN, 'exec', '--file']);
-      assert.deepStrictEqual(argv.slice(4), ['--scope', 'x_acme_app', '--reason', 'Backfill priority (CHG0012345)', '--auth', 'session-alias', '--output', 'json']);
+      assert.deepStrictEqual(argv.slice(0, 2), [SDK_BIN, 'exec']);
+      assert.equal(argv[2], `--file=${copied?.path}`);
+      assert.deepStrictEqual(argv.slice(3), ['--scope=x_acme_app', '--reason=Backfill priority (CHG0012345)', '--auth=session-alias', '--output=json']);
       // The CLI reads a private copy, never the project file itself.
       assert.ok(copied);
       assert.notEqual(copied.path, path.join(project, 'scripts', 'backfill.js'));
@@ -364,7 +376,7 @@ describe('ExecScriptCommand', () => {
     it('still removes the private copy and reports the content when the runner stops the child', async () => {
       let copyPath = '';
       mockProcessor.process.mock.mockImplementation(async (_cmd, argv) => {
-        copyPath = argv[argv.indexOf('--file') + 1];
+        copyPath = optionValue(argv, '--file') ?? '';
         return { success: false, output: 'partial', exitCode: 124 };
       });
       const command = new ExecScriptCommand(mockProcessor);

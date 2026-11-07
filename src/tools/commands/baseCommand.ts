@@ -1,14 +1,6 @@
+import type { z } from 'zod';
 import { CLICommand, CommandArgument, CommandProcessor, CommandResult } from '../../utils/types.js';
-
-/**
- * Dangerous shell characters that could enable command injection.
- * Rejected in string arguments as defense-in-depth (the primary protection is
- * spawning the bundled CLI shell-free; see processRunner). Includes newline, CR,
- * and tab — a newline acts as a command separator in a shell, so it must never
- * be treated as ordinary whitespace. Space is intentionally allowed: it is
- * legitimate in file paths and is inert on the shell-free spawn path.
- */
-const DANGEROUS_SHELL_PATTERN = /[;&|`$(){}[\]<>\\\n\r\t]/;
+import { assertArguments, buildInputZodSchema } from '../toolSchema.js';
 
 /**
  * Base abstract class for all CLI commands
@@ -32,82 +24,22 @@ export abstract class BaseCLICommand implements CLICommand {
     return this.commandProcessor;
   }
 
-  /**
-   * Sanitize a string argument to prevent command injection
-   * @param value The value to sanitize
-   * @param argName The argument name (for error messages)
-   * @returns The sanitized string
-   * @throws Error if the value contains dangerous characters
-   */
-  protected sanitizeStringArg(value: unknown, argName: string): string {
-    const str = String(value);
-    if (DANGEROUS_SHELL_PATTERN.test(str)) {
-      const truncated = str.length > 50 ? `${str.substring(0, 50)}...` : str;
-      throw new Error(
-        `Invalid characters in argument '${argName}': "${truncated}". ` +
-        'Shell metacharacters are not allowed for security reasons.'
-      );
-    }
-    return str;
-  }
+  private inputSchema?: z.ZodType;
 
   /**
-   * Validate and sanitize command arguments
-   * - Checks required arguments are present
-   * - Validates argument types match expected types
-   * - Sanitizes string arguments to prevent command injection
+   * Validate the arguments with the command's input schema: the same one
+   * `tools/call` enforces (required arguments, types, each argument's domain,
+   * and no control characters in plain text). A caller that reaches `execute()`
+   * directly, such as the internal `AuthCommand` run, is held to the same
+   * contract. There is no shell-metacharacter check: the executor spawns
+   * shell-free, every option is one `--flag=value` entry (`cliOption`), and the
+   * one path a shell sees shell-escapes every entry (`CLICmdWriter`).
    * @param args The arguments to validate
-   * @throws Error if validation fails
+   * @throws Error naming every argument that fails
    */
   protected validateArgs(args: Record<string, unknown>): void {
-    for (const arg of this.arguments) {
-      const value = args[arg.name];
-
-      // Check required arguments are present
-      if (arg.required && !(arg.name in args)) {
-        throw new Error(
-          `Missing required argument '${arg.name}'. ${arg.description}. ` +
-          `Expected type: ${arg.type}.`
-        );
-      }
-
-      // Skip validation for undefined optional arguments
-      if (value === undefined || value === null) {
-        continue;
-      }
-
-      // Validate type and sanitize
-      switch (arg.type) {
-        case 'string':
-          if (typeof value !== 'string') {
-            throw new Error(`Argument '${arg.name}' must be a string, got ${typeof value}`);
-          }
-          // Sanitize string arguments to prevent command injection
-          this.sanitizeStringArg(value, arg.name);
-          break;
-        case 'number':
-          if (typeof value !== 'number' || isNaN(value)) {
-            throw new Error(`Argument '${arg.name}' must be a valid number`);
-          }
-          break;
-        case 'boolean':
-          if (typeof value !== 'boolean') {
-            throw new Error(`Argument '${arg.name}' must be a boolean`);
-          }
-          break;
-        case 'array':
-          if (!Array.isArray(value)) {
-            throw new Error(`Argument '${arg.name}' must be an array`);
-          }
-          // Sanitize array elements if they are strings
-          for (const item of value) {
-            if (typeof item === 'string') {
-              this.sanitizeStringArg(item, `${arg.name}[]`);
-            }
-          }
-          break;
-      }
-    }
+    this.inputSchema ??= buildInputZodSchema(this.arguments);
+    assertArguments(this.name, this.inputSchema, args);
   }
 
   /**
