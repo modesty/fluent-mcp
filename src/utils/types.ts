@@ -93,6 +93,13 @@ export interface ProcessRunOptions {
   maxStdoutChars?: number;
 }
 
+/**
+ * The longest delay a Node timer honors (2^31 - 1 ms, about 24.8 days). Node
+ * turns a larger delay into 1 ms (with a TimeoutOverflowWarning), so a budget
+ * above it would kill a command at once instead of never.
+ */
+export const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
 /** Exit code the process runner reports when it terminates a command for exceeding its timeout. */
 export const EXIT_CODE_TIMEOUT = 124;
 
@@ -110,6 +117,7 @@ export interface ProcessRunner {
     command: string,
     args: string[],
     cwd?: string,
+    /** Written to the child's stdin whole, which is then closed; without it, stdin stays open. */
     stdinInput?: string,
     timeoutMs?: number,
     /** Abort signal from the MCP client; aborting kills the child process. */

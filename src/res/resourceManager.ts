@@ -83,13 +83,10 @@ export class ResourceManager {
     }
   }
 
-  /** Metadata types with a resource of this kind, by prefix (snippets: types that have one). */
+  /** Metadata types that have a resource of this kind, by prefix. */
   private async completeMetadataType(kind: ResourceKind, value: string): Promise<string[]> {
     const prefix = value.toLowerCase();
-    const types = (await this.resourceCatalog.getAvailableMetadataTypes()).filter((type) => type.startsWith(prefix));
-    if (kind.resourceType !== ResourceType.SNIPPET) return types;
-    const withSnippets = await Promise.all(types.map(async (type) => (await this.resourceCatalog.listSnippets(type)).length > 0));
-    return types.filter((_, i) => withSnippets[i]);
+    return (await this.resourceCatalog.listMetadataTypes(kind.resourceType)).filter((type) => type.startsWith(prefix));
   }
 
   /** Snippet ids of the already-chosen metadata type, by prefix; none until a type is chosen. */
@@ -100,7 +97,9 @@ export class ResourceManager {
 
   /** Every concrete resource of one kind, for `resources/list`. */
   private async list(kind: ResourceKind): Promise<Resource[]> {
-    const types = await this.resourceCatalog.getAvailableMetadataTypes();
+    // Each kind lists only the types that have that kind of resource: an instruct
+    // listing built from the spec types would advertise URIs that read as not found.
+    const types = await this.resourceCatalog.listMetadataTypes(kind.resourceType);
     switch (kind.resourceType) {
       case ResourceType.SPEC:
         return types.map((type) => ({

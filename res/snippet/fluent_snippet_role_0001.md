@@ -8,6 +8,6 @@ const managerRole = Role({
 
 const supervisorRole = Role({
    name: 'x_example.supervisor', // role name
-   containsRoles: [managerRole, get_sys_id('sys_user_role', 'name=itil')] // array of Record<'sys_user_role'>, this establishes a hierarchy where the sn_xxxx.supervisor role encompasses the sn_xxxx.manager and itil roles.
+   containsRoles: [managerRole, 'itil'] // (string | Role)[]: a Role object and an existing role by name, this establishes a hierarchy where the sn_xxxx.supervisor role encompasses the sn_xxxx.manager and itil roles.
 })
 ```

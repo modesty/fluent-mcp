@@ -33,7 +33,7 @@ import {
  */
 export class InitCommand extends BaseCLICommand {
   name = 'init_fluent_app';
-  description = 'Initialize a new Fluent (ServiceNow SDK) application or convert an existing scoped application. Set intent to "creation" for a new app (requires appName, packageName, scopeName, template) or "conversion" to convert from an instance sys_id or an absolute local application directory (requires from, and auth for instance conversion). The workingDirectory must be an absolute path to an empty directory, or to a new directory under an existing one. The result is a shell command that enters that directory and runs the SDK init. After init, use build_fluent_app to compile.';
+  description = 'Initialize a new Fluent (ServiceNow SDK) application or convert an existing scoped application. Set intent to "creation" for a new app (requires appName, packageName, scopeName, template) or "conversion" to convert from an instance sys_id or an absolute local application directory (requires from, and auth for instance conversion; pass packageName too, or the returned command prompts for it). Creation is not offline: the returned command reads the vendor prefix of the auth instance (explicit, else the session alias, else the CLI default profile) and contacts the npm registry. The workingDirectory must be an absolute path to an empty directory, or to a new directory under an existing one. The result is a shell command that enters that directory and runs the SDK init. After init, use build_fluent_app to compile.';
   // Creates a local project directory and sets the session working directory; for
   // conversion it also reads from an instance. Non-idempotent (a second run on a
   // populated directory is refused), and open-world for the conversion path.
@@ -64,7 +64,7 @@ export class InitCommand extends BaseCLICommand {
       name: 'packageName',
       type: 'string',
       required: false,
-      description: "For creation: The NPM package name for the application, usually it's the snake-case of appName in lowercase with company prefix.",
+      description: 'The npm package name for the project, usually the snake-case of appName in lowercase with a company prefix. Required for creation. For conversion it is optional but recommended: without it, the returned now-sdk init command stops to prompt for one.',
     },
     {
       name: 'scopeName',
@@ -77,13 +77,13 @@ export class InitCommand extends BaseCLICommand {
       type: 'string',
       required: false,
       domain: { kind: 'choices', values: VALID_TEMPLATES },
-      description: 'For creation only (required): Template to use for the project. Choices: "base", "javascript.basic", "javascript.react", "typescript.basic", "typescript.react", "typescript.vue". Not needed for conversion.',
+      description: 'For creation only (required): Template to use for the project. Choices: "base", "javascript.basic", "javascript.react", "typescript.basic", "typescript.react", "typescript.vue", "javascript.aiux" (an AIUX application with components and pages), "javascript.aiux-extension" (an AIUX extension that overlays pages onto an existing host experience; now-sdk init prompts for the host scope and route id). Not needed for conversion.',
     },
     {
       name: 'auth',
       type: 'string',
       required: false,
-      description: 'For conversion only: credential alias for authentication with instance (auto-injected from session if not provided)',
+      description: 'Credential alias of the instance now-sdk init contacts (auto-injected from session if not provided). Conversion from an instance reads the application from it. Creation reads its vendor prefix to warn when scopeName does not start with it; without an alias, the CLI uses its default profile for that.',
     },
     {
       name: 'workingDirectory',
@@ -131,6 +131,9 @@ export class InitCommand extends BaseCLICommand {
   private async buildConversionArgs(data: ConversionInitData, baseArgs: string[]): Promise<string[]> {
     const sdkArgs = [...baseArgs, 'init'];
     sdkArgs.push(cliOption('--from', data.from));
+    // Conversion asks for the npm package name when the destination has no
+    // package.json (always, for an empty or new one), so pass it when known.
+    if (data.packageName) sdkArgs.push(cliOption('--packageName', data.packageName));
 
     // A local-path conversion is entirely local and must not trigger profile
     // discovery. An exact sys_id reads from an instance and therefore needs
@@ -151,7 +154,7 @@ export class InitCommand extends BaseCLICommand {
   /**
    * Build SDK arguments for creation
    */
-  private buildCreationArgs(data: CreationInitData, baseArgs: string[]): string[] {
+  private async buildCreationArgs(data: CreationInitData, baseArgs: string[]): Promise<{ sdkArgs: string[]; auth?: string }> {
     const sdkArgs = [...baseArgs, 'init'];
 
     // CLICmdWriter shell-escapes every entry of this argv. A name the caller
@@ -163,11 +166,33 @@ export class InitCommand extends BaseCLICommand {
     sdkArgs.push(cliOption('--packageName', data.packageName));
     sdkArgs.push(cliOption('--scopeName', data.scopeName));
     if (data.template) sdkArgs.push(cliOption('--template', data.template));
-    // SDK v4.5.0: init no longer prompts for credentials during creation,
-    // auth is only needed for conversion (pulling from instance)
+    // Creation is not offline: `now-sdk init` resolves a credential either way
+    // (`--auth`, else the CLI's default profile) and reads that instance's
+    // vendor prefix to warn about a scopeName without it (sdk-cli
+    // `command/init/prompts.js` `warnIfScopePrefixMismatch`; a warning only).
+    // Omitting `--auth` therefore contacted whatever profile was the default,
+    // unrelated to the configured instance, and dropped an explicit auth. The
+    // target is the explicit alias, else the session's (lazily validated
+    // SN_INSTANCE_URL) one; with neither, the CLI default applies and the
+    // result says so.
+    const auth = await this.getAuthAlias(data.auth);
+    if (auth) sdkArgs.push(cliOption('--auth', auth));
     if (data.debug) sdkArgs.push('--debug');
 
-    return sdkArgs;
+    return { sdkArgs, auth };
+  }
+
+  /**
+   * The network use of running a creation command, which the result discloses:
+   * the instance whose vendor prefix is read, and the npm registry (the latest
+   * SDK version check and the template packages).
+   */
+  private static creationNetworkNote(auth: string | undefined): string {
+    const instance = auth
+      ? `the instance of auth profile ${auth}`
+      : "the instance of the CLI's default auth profile, if one is set (pass auth to choose the instance)";
+    return `Running this command contacts ${instance} to read its vendor prefix, and warns when scopeName does not start with it; ` +
+      'the project is created either way. It also contacts the npm registry for the latest SDK version and the template packages.';
   }
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
@@ -201,13 +226,19 @@ export class InitCommand extends BaseCLICommand {
         }
       }
 
-      // Step 3: Build the SDK command for the bundled CLI. A conversion from an
-      // instance may wait here for lazy auth, so this comes before the
+      // Step 3: Build the SDK command for the bundled CLI. A creation or a
+      // conversion from an instance may wait here for lazy auth, so this comes before the
       // destination check: nothing awaited may separate that check from its use.
       const { command, baseArgs } = resolveSdkCli();
-      const sdkArgs = intent === 'conversion'
-        ? await this.buildConversionArgs(initData as ConversionInitData, baseArgs)
-        : this.buildCreationArgs(initData as CreationInitData, baseArgs);
+      let sdkArgs: string[];
+      let networkNote: string | undefined;
+      if (intent === 'conversion') {
+        sdkArgs = await this.buildConversionArgs(initData as ConversionInitData, baseArgs);
+      } else {
+        const creation = await this.buildCreationArgs(initData as CreationInitData, baseArgs);
+        sdkArgs = creation.sdkArgs;
+        networkNote = InitCommand.creationNetworkNote(creation.auth);
+      }
 
       // Step 4: Check the destination and create it if it is new, with no
       // await in between. Nothing on disk or in the session has changed before
@@ -236,6 +267,7 @@ export class InitCommand extends BaseCLICommand {
 
       if (result.success) {
         SessionManager.getInstance().setWorkingDirectory(workingDirectory);
+        if (networkNote) result.output += `\n\n${networkNote}`;
         result.output += `\n\nThis directory (${workingDirectory}) has been saved as your working directory for future commands.`;
       }
 

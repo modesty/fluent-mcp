@@ -4,14 +4,8 @@
 ```typescript
 import { Record } from '@servicenow/sdk/core';
 
-// Open the existing form in fluent
-const existing_form = Record({
-    $id: Now.ID['existing_form'],
-    table: 'sys_ui_form',
-    data: {
-        sys_id: get_sys_id('sys_ui_form', 'name=ex_table^view=exampleview') // search for the sys_id of the form with table named `ex_table` and view `exampleview`
-    }
-})
+// Reference the existing form: look up the sys_id of the `sys_ui_form` record on the instance with `name=ex_table^view.name=exampleview`
+const existing_form = Now.ref('sys_ui_form', '<sys_id>')
 
 // Create a new section for the form
 const new_section = Record({
@@ -20,7 +14,7 @@ const new_section = Record({
     data: {
         name: 'ex_table',
         table: 'ex_table',
-        view: get_sys_id('sys_ui_view', 'name=exampleview^ORtitle=exampleview'), // find the sys_id of an existing view
+        view: Now.ref('sys_ui_view', { name: 'exampleview' }), // an existing view, referenced by its name
         caption: 'Additional details'
     }
 })
@@ -46,3 +40,4 @@ Record({
         sys_ui_section: new_section
     }
 })
+```

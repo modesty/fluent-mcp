@@ -44,14 +44,29 @@ const RES = path.join(process.cwd(), 'res');
 const assertIncludes = (text: string, expected: string): void =>
   assert.ok(text.includes(expected), `expected document to contain: ${expected}`);
 
+// Whole-token check: `atf-form` must not be satisfied by `atf-form-action` and the like.
+const assertNamesType = (text: string, type: string): void =>
+  assert.match(text, new RegExp(`(?<![\\w-])${type}(?![\\w-])`), `expected document to name the type ${type}`);
+
+/** The fenced code of a resource, without its surrounding prose. */
+const code = (content: string): string =>
+  [...content.matchAll(/```\w*\n([\s\S]*?)```/g)].map((m) => m[1]).join('\n');
+
+/** The property names of the SDK's StandardStepValues type (sdk-core app/Test.d.ts). */
+const standardStepValues = (): string[] => {
+  const dts = fs.readFileSync(
+    path.join(process.cwd(), 'node_modules', '@servicenow', 'sdk-core', 'dist', 'app', 'Test.d.ts'), 'utf-8');
+  const body = /export type StandardStepValues = \{([\s\S]*?)\n\};/.exec(dts)?.[1] ?? '';
+  return [...body.matchAll(/^\s+(\w+)\?:/gm)].map((m) => m[1]);
+};
+
 /** The 18 atf-* step sub-types, derived from the enum rather than hardcoded. */
 const SUB_TYPES = (Object.values(ServiceNowMetadataType) as string[])
   .filter((t) => t.startsWith('atf-'))
   .sort();
 
 describe('`atf` parent metadata type', () => {
-  it('is a registered metadata type', () => {
-    assert.equal(ServiceNowMetadataType.ATF, 'atf');
+  it('fronts exactly 18 atf-* step sub-types', () => {
     assert.equal(SUB_TYPES.length, 18);
   });
 
@@ -87,36 +102,32 @@ describe('`atf` parent metadata type', () => {
 
     for (const t of SUB_TYPES) {
       it(`parent spec points at ${t}`, () => {
-        assertIncludes(parentSpec, t);
+        assertNamesType(parentSpec, t);
       });
     }
 
     for (const t of SUB_TYPES) {
       it(`parent instruct points at ${t}`, () => {
-        assertIncludes(parentInstruct, t);
+        assertNamesType(parentInstruct, t);
       });
     }
 
     for (const t of SUB_TYPES) {
       it(`parent snippet points at ${t}`, () => {
-        assertIncludes(parentSnippet, t);
+        assertNamesType(parentSnippet, t);
       });
     }
 
     it('routes on to `test-suite` for grouping tests into a suite', () => {
       for (const doc of [parentSpec, parentInstruct, parentSnippet]) {
-        assertIncludes(doc, 'test-suite');
+        assertNamesType(doc, 'test-suite');
       }
     });
-  });
 
-  describe('the pointers are not dangling', () => {
-    for (const t of SUB_TYPES) {
-      it(`${t} has both a spec and an instruct file`, () => {
-        assert.equal(fs.existsSync(path.join(RES, 'spec', `fluent_spec_${t}.md`)), true);
-        assert.equal(fs.existsSync(path.join(RES, 'instruct', `fluent_instruct_${t}.md`)), true);
-      });
-    }
+    it('the whole-token check is not satisfied by a longer sub-type name (negative control)', () => {
+      assert.throws(() => assertNamesType('see `atf-form-action` only', 'atf-form'));
+      assert.doesNotThrow(() => assertNamesType('see `atf-form` here', 'atf-form'));
+    });
   });
 
   describe('the parent is the authority on shared step mechanics', () => {
@@ -128,9 +139,13 @@ describe('`atf` parent metadata type', () => {
       assert.match(parentSpec, /snake_case/);
     });
 
-    it('documents the five StandardStepValues shared by every step', () => {
-      for (const prop of ['active', 'description', 'notes', 'timeout', 'warning']) {
-        assertIncludes(parentSpec, prop);
+    it('documents the five StandardStepValues shared by every step, as step properties', () => {
+      const props = standardStepValues();
+      assert.deepEqual([...props].sort(), ['active', 'description', 'notes', 'timeout', 'warning']);
+      assertIncludes(parentSpec, 'StandardStepValues');
+      const body = code(parentSpec);
+      for (const prop of props) {
+        assert.match(body, new RegExp(`^\\s*${prop}:`, 'm'), `expected a ${prop}: property in the spec code`);
       }
     });
 

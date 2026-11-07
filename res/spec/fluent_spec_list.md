@@ -4,7 +4,7 @@
 List({
     $id: '', // string | guid, optional (DEPRECATED since v4.0.0) - unique identifier
     table: '', // string, name of the table the list is for
-    view: get_sys_id('sys_ui_view', ''), // Record<'sys_ui_view'>, The UI view (sys_ui_view) to apply to the list. Can import and use default_view, or can define a custom view using Record plugin.
+    view: default_view, // Record<'sys_ui_view'> | string, The UI view (sys_ui_view) to apply to the list. Can import and use default_view, or can define a custom view using Record plugin; a plain view name string is resolved by name at build time.
     columns: [ // array of {element, position} objects representing the columns to be displayed in the List and their order
         { 
             element: '', // string, column name of the table

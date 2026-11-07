@@ -9,14 +9,14 @@ atf.email.validateOutboundEmail({
 // Filters the Email [sys_email] table to find an email that was sent from a flow during testing.
 atf.email.validateOutboundEmailGeneratedByFlow({
   $id: Now.ID[''], // string | guid, mandatory
-  sourceFlow: get_sys_id('sys_hub_flow', ''), // sys_id | Record&lt;'sys_hub_flow'&gt;;
+  sourceFlow: Now.ref('sys_hub_flow', '<sys_id>'), // sys_id | Record&lt;'sys_hub_flow'&gt;;
   conditions: '', //string, Servicenow encoded query
 }): void;
 
 // Filters the Email [sys_email] table to find an email that was sent from a notification during testing.
 atf.email.validateOutboundEmailGeneratedByNotification({
   $id: Now.ID[''], // string | guid, mandatory
-  sourceNotification: get_sys_id('sysevent_email_action', ''), // sys_id | Record&lt;'sysevent_email_action'&gt;;
+  sourceNotification: Now.ref('sysevent_email_action', '<sys_id>'), // sys_id | Record&lt;'sysevent_email_action'&gt;;
   conditions: '', //string, Servicenow encoded query
 }): void;
 

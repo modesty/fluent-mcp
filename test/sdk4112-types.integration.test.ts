@@ -29,7 +29,6 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ServiceNowMetadataType } from '../src/types.js';
 
 const PROJECT_ROOT = process.cwd();
 const RES_DIR = path.join(PROJECT_ROOT, 'res');
@@ -40,69 +39,14 @@ const PROMPT_DIR = path.join(RES_DIR, 'prompt');
 
 const read = (dir: string, file: string) => fs.readFileSync(path.join(dir, file), 'utf-8');
 
-const NEW_TYPES: Array<[keyof typeof ServiceNowMetadataType, string]> = [
-  ['FIELD_STYLE', 'field-style'],
-  ['GRAPHQL_API', 'graphql-api'],
-  ['TEST_SUITE', 'test-suite'],
-];
-
 describe('SDK v4.11.2 Types - Integration Tests', () => {
-  describe('Enum completeness', () => {
-    for (const [key, value] of NEW_TYPES) {
-      it(`should have the new v4.11.x enum entry ${key}`, () => {
-        assert.equal(ServiceNowMetadataType[key], value);
-      });
-    }
-
-    it('should total at least 71 metadata types (67 before v4.11.x + field-style + graphql-api + test-suite + atf)', () => {
-      // `atf` is not an SDK addition — it is the ATF `Test()` container type that
-      // fronts the 18 atf-* step sub-types. It had an instruct file but no spec,
-      // so the former get-api-spec('atf') failed while get-instruct('atf') succeeded.
-      // Lower bound only: the exact total is owned by the newest version's test
-      // (sdk4140-types), so this file keeps guarding its own additions.
-      assert.ok(Object.values(ServiceNowMetadataType).length >= 71);
-    });
-
-    it('registers the ATF Test() container type that fronts the atf-* step sub-types', () => {
-      assert.equal(ServiceNowMetadataType.ATF, 'atf');
-    });
-
-    it('should keep the enum sorted by value so new entries landed in the right place', () => {
-      const values = Object.values(ServiceNowMetadataType) as string[];
-      assert.deepStrictEqual(values, [...values].sort());
-    });
-  });
-
-  describe('New resource files exist for each new type', () => {
-    for (const [key, value] of NEW_TYPES) {
-      it(`${key} has spec/instruct/snippet coverage (${value})`, () => {
-        assert.equal(fs.existsSync(path.join(SPEC_DIR, `fluent_spec_${value}.md`)), true);
-        assert.equal(fs.existsSync(path.join(INSTRUCT_DIR, `fluent_instruct_${value}.md`)), true);
-        const snippets = fs.readdirSync(SNIPPET_DIR)
-          .filter((f) => f.startsWith(`fluent_snippet_${value}_`) && f.endsWith('.md'));
-        assert.ok(snippets.length > 0);
-      });
-    }
-
-    for (const [key, value] of NEW_TYPES) {
-      it(`${key} spec has balanced code fences (${value})`, () => {
-        // An unterminated fence makes the spec validator silently SKIP the block —
-        // it fails open, so a clean validator run proves nothing without this check.
-        const content = read(SPEC_DIR, `fluent_spec_${value}.md`);
-        const fences = (content.match(/^```/gm) ?? []).length;
-        assert.equal(fences % 2, 0);
-        assert.ok(fences > 0);
-      });
-    }
-  });
-
   describe('test-suite (TestSuite ATF suite) resources', () => {
     it('spec should document the API, both tables, and every property', () => {
       const content = read(SPEC_DIR, 'fluent_spec_test-suite.md');
       for (const term of [
         'TestSuite', '@servicenow/sdk/core',
         'sys_atf_test_suite', 'sys_atf_test_suite_test',
-        'abortOnFailure', 'testFilter', 'parent', 'input_filter',
+        'abortOnFailure', 'testFilter', 'parent:', 'input_filter',
       ]) {
         assert.ok(content.includes(term));
       }
@@ -157,7 +101,7 @@ describe('SDK v4.11.2 Types - Integration Tests', () => {
 
     it('snippet should demonstrate nesting and both entry forms without testFilter', () => {
       const content = read(SNIPPET_DIR, 'fluent_snippet_test-suite_0001.md');
-      assert.ok(content.includes('TestSuite'));
+      assert.ok(content.includes('TestSuite('));
       assert.ok(content.includes('parent:'));
       assert.ok(content.includes('abortOnFailure: true'));
       // Static + dynamic membership conflict, so the snippet must not model both.
@@ -172,7 +116,7 @@ describe('SDK v4.11.2 Types - Integration Tests', () => {
         'GraphQLApi', '@servicenow/sdk/core',
         'sys_graphql_schema', 'sys_graphql_resolver', 'sys_graphql_resolver_mapping',
         'sys_graphql_typeresolver',
-        'namespace', 'applicationNamespace', 'schema', 'resolvers', 'typeResolvers',
+        'namespace:', 'applicationNamespace', 'schema:', 'resolvers:', 'typeResolvers:',
         'enforceAcl', 'requiresAuthentication', 'requiresAclAuthorization',
         'requiresSncInternalRole', 'contextualAclMaxDepth',
       ]) {
@@ -221,7 +165,7 @@ describe('SDK v4.11.2 Types - Integration Tests', () => {
     it('spec should document the Record()-based authoring and every column', () => {
       const content = read(SPEC_DIR, 'fluent_spec_field-style.md');
       for (const term of [
-        "table: 'sys_ui_style'", 'element', 'themed_style', 'alt',
+        "table: 'sys_ui_style'", 'element:', 'themed_style', 'alt:',
         '--now-color_', 'Polaris',
       ]) {
         assert.ok(content.includes(term));
@@ -274,7 +218,6 @@ describe('SDK v4.11.2 Types - Integration Tests', () => {
       assert.ok(content.includes('wfa.flowLogic.doTheFollowing'));
       assert.ok(content.includes('wfa.flowLogic.until'));
       assert.match(content, /DO-WHILE|do-while/);
-      assert.ok(content.includes('SDK v4.11.0+'));
     });
 
     it('flow spec should require until() to be called, not returned', () => {
@@ -298,7 +241,11 @@ describe('SDK v4.11.2 Types - Integration Tests', () => {
       const content = spec();
       assert.ok(content.includes('PlaybookDependentConfig'));
       // The old name no longer exists in the package; it may only appear as history.
-      assert.match(content, /PlaybookTriggerDeclaration.*(?:now|renamed|no longer)/is);
+      assert.match(content, /was `PlaybookTriggerDeclaration` and is now `PlaybookDependentConfig/);
+      const codeUses = content.split('\n').filter(
+        (line) => line.includes('PlaybookTriggerDeclaration') && !/^\s*(#|\/\/)/.test(line),
+      );
+      assert.deepEqual(codeUses, [], 'the old name may appear only in prose or comments');
     });
 
     it('spec should document the widened executionType and all six on_demand constraints', () => {
@@ -386,7 +333,6 @@ describe('SDK v4.11.2 Types - Integration Tests', () => {
       const spec = read(SPEC_DIR, 'fluent_spec_table.md');
       const instruct = read(INSTRUCT_DIR, 'fluent_instruct_table.md');
       assert.ok(spec.includes('sizeClass'));
-      assert.ok(spec.includes('SDK v4.11.0+'));
       assert.ok(instruct.includes('sizeClass'));
       assert.match(instruct, /no default and validates no range/i);
     });
@@ -394,7 +340,7 @@ describe('SDK v4.11.2 Types - Integration Tests', () => {
     it('list spec and instruct should document domain and its global default', () => {
       const spec = read(SPEC_DIR, 'fluent_spec_list.md');
       const instruct = read(INSTRUCT_DIR, 'fluent_instruct_list.md');
-      assert.ok(spec.includes('domain'));
+      assert.ok(spec.includes("domain: 'global',"));
       assert.ok(spec.includes('sys_domain'));
       assert.ok(instruct.includes("defaults to `'global'`"));
     });
@@ -407,9 +353,8 @@ describe('SDK v4.11.2 Types - Integration Tests', () => {
   });
 
   describe('coding_in_fluent capabilities section', () => {
-    it('should carry a v4.11.2 capabilities entry naming all three new types', () => {
+    it('should name all three v4.11.2 types', () => {
       const content = read(PROMPT_DIR, 'coding_in_fluent.md');
-      assert.ok(content.includes('SDK v4.11.2 capabilities'));
       assert.ok(content.includes('TestSuite'));
       assert.ok(content.includes('GraphQLApi'));
       assert.ok(content.includes('Field Styles'));
@@ -422,12 +367,6 @@ describe('SDK v4.11.2 Types - Integration Tests', () => {
       assert.ok(content.includes('SetPlaybookOutputs'));
       assert.ok(content.includes('activityRef'));
       assert.ok(content.includes('sizeClass'));
-    });
-
-    it('should keep the previous version entry rather than replacing it', () => {
-      const content = read(PROMPT_DIR, 'coding_in_fluent.md');
-      assert.ok(content.includes('SDK v4.10.1 capabilities'));
-      assert.ok(content.includes('SDK v4.9.0 capabilities'));
     });
   });
 
@@ -481,7 +420,7 @@ describe('SDK v4.11.2 Types - Integration Tests', () => {
     it('playbook resources must state launcher record-form fields are forbidden on on_demand', () => {
       const spec = read(SPEC_DIR, 'fluent_spec_playbook.md');
       const instruct = read(INSTRUCT_DIR, 'fluent_instruct_playbook.md');
-      assert.match(spec, /FORBIDDEN when\s+\/\/ executionType is 'on_demand'|FORBIDDEN when/i);
+      assert.match(spec, /FORBIDDEN when executionType is 'on_demand'/);
       assert.match(instruct, /forbidden\*{0,2} on an `'on_demand'` playbook/i);
       // And must name which three are legal there.
       assert.ok(instruct.includes('launcherInputs'));

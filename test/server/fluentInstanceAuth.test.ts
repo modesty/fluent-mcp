@@ -1,7 +1,9 @@
 /**
- * Tests for startup auto-auth behavior: profiles are only auto-added when the
- * add can complete non-interactively (basic auth with credentials). OAuth and
- * credential-less basic skip the add and emit a single not_authenticated NOTICE.
+ * Tests for lazy auto-auth validation. The server only reads the CLI's profile
+ * store (`auth --list`): a matching profile is used per call, and with none it
+ * returns the command that adds one in a terminal. The store and its default
+ * profile are global state other now-sdk runs share, so validation never adds,
+ * deletes or selects a profile (W9 review).
  */
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,17 +16,40 @@ const { logger, mockOptions: loggerOptions } = loggerFixture();
 mock.module('../../src/utils/logger.js', loggerOptions);
 
 const { autoValidateAuthIfConfigured, logAuthValidationResult } = await import('../../src/server/fluentInstanceAuth.js');
+const { SessionManager } = await import('../../src/utils/sessionManager.js');
 
+/**
+ * A ToolsManager whose listAuthProfiles answers `auth --list` with the given
+ * output and exit code. `runAuth`, the former entry point for `auth --add` and
+ * `auth --use`, is a spy that succeeds, so a validation that still wrote the
+ * profile store would be seen doing it.
+ */
 function makeToolsManager(listOutput = '', listExitCode = 0) {
-  const runAuth = mock.fn(async (args: Record<string, unknown>) => {
-    if (args.list) {
-      return { success: listExitCode === 0, output: listOutput, exitCode: listExitCode };
-    }
-    // add / use
-    return { success: true, output: '', exitCode: 0 };
-  });
-  return { runAuth, toolsManager: { runAuth } as unknown as ToolsManager };
+  const listAuthProfiles = mock.fn(async () => ({ success: listExitCode === 0, output: listOutput, exitCode: listExitCode }));
+  const runAuth = mock.fn(async () => ({ success: true, output: '', exitCode: 0 }));
+  return { listAuthProfiles, runAuth, toolsManager: { listAuthProfiles, runAuth } as unknown as ToolsManager };
 }
+
+/** `auth --list` output for the given profiles, as the CLI prints it. */
+function listing(...profiles: { alias: string; host: string; isDefault?: boolean }[]): string {
+  return ['[now-sdk] Listing all credentials: ', ...profiles.flatMap(({ alias, host, isDefault }) => [
+    isDefault ? `*[${alias}]` : `[${alias}]`,
+    `      host = ${host}`,
+    '      type = basic',
+    '      username = admin',
+    `      ${isDefault ? 'default = Yes' : 'default = No'}`,
+  ])].join('\n');
+}
+
+const BASIC_ENV = {
+  SN_INSTANCE_URL: 'https://dev12345.service-now.com',
+  SN_AUTH_TYPE: 'basic',
+  // Credentials in the environment no longer lead to an add.
+  SN_USER_NAME: 'admin',
+  SN_PASSWORD: 'secret',
+};
+
+const ADD_COMMAND = 'npx @servicenow/sdk auth --add https://dev12345.service-now.com --type basic --alias dev12345.service-now.com';
 
 describe('autoValidateAuthIfConfigured', () => {
   let restoreEnvironment: () => void;
@@ -43,16 +68,18 @@ describe('autoValidateAuthIfConfigured', () => {
 
   afterEach(() => {
     restoreEnvironment();
+    // Every result is stored on the process-wide session; do not leak it.
+    SessionManager.getInstance().clearSession();
   });
 
   it('skips entirely when SN_INSTANCE_URL is not set', async () => {
     const tm = makeToolsManager();
     const result = await autoValidateAuthIfConfigured(tm.toolsManager);
     assert.equal(result.status, 'skipped');
-    assert.equal(tm.runAuth.mock.callCount(), 0);
+    assert.equal(tm.listAuthProfiles.mock.callCount(), 0);
   });
 
-  it('does NOT auto-add for oauth when no matching profile exists', async () => {
+  it('returns the oauth add command when no profile matches', async () => {
     process.env.SN_INSTANCE_URL = 'https://dev12345.service-now.com';
     process.env.SN_AUTH_TYPE = 'oauth';
 
@@ -60,41 +87,62 @@ describe('autoValidateAuthIfConfigured', () => {
     const result = await autoValidateAuthIfConfigured(tm.toolsManager);
 
     assert.equal(result.status, 'not_authenticated');
-    assert.ok(result.actionRequired?.includes('auth --add'));
-    // Only the list call — never an add.
-    assert.equal(tm.runAuth.mock.callCount(), 1);
-    assertCalledWith(tm.runAuth, { list: true });
+    assert.equal(result.actionRequired, 'npx @servicenow/sdk auth --add https://dev12345.service-now.com --type oauth --alias dev12345.service-now.com');
+    assert.equal(tm.listAuthProfiles.mock.callCount(), 1);
   });
 
-  it('does NOT auto-add for basic when credentials are absent', async () => {
-    process.env.SN_INSTANCE_URL = 'https://dev12345.service-now.com';
-    process.env.SN_AUTH_TYPE = 'basic';
+  it('never adds a basic profile, even with SN_USER_NAME and SN_PASSWORD set', async () => {
+    Object.assign(process.env, BASIC_ENV);
 
+    // auth --add makes the new profile the CLI default. Setting the old one back
+    // was skipped when the add failed after storing the profile, and two
+    // overlapping validations restored the wrong default (W9 review).
     const tm = makeToolsManager('');
+    const result = await autoValidateAuthIfConfigured(tm.toolsManager);
+
+    assert.equal(tm.listAuthProfiles.mock.callCount(), 1);
+    assert.equal(tm.runAuth.mock.callCount(), 0);
+    assert.equal(result.status, 'not_authenticated');
+    assert.equal(result.message, 'No auth profile matches dev12345.service-now.com. The server does not add profiles; add one in a terminal with the command below.');
+    assert.equal(result.actionRequired, ADD_COMMAND);
+    assert.equal(SessionManager.getInstance().getAuthAlias(), undefined);
+    assert.deepEqual(SessionManager.getInstance().getAuthValidationResult(), result);
+  });
+
+  it('only reads the profile store when validations overlap', async () => {
+    Object.assign(process.env, BASIC_ENV);
+
+    // Separate server processes do not share the single-flight promise; with
+    // no write, overlapping validations cannot leave a different default.
+    const tm = makeToolsManager(listing({ alias: 'other', host: 'https://other.service-now.com', isDefault: true }));
+    const results = await Promise.all([1, 2, 3].map(() => autoValidateAuthIfConfigured(tm.toolsManager)));
+
+    assert.equal(tm.listAuthProfiles.mock.callCount(), 3);
+    assert.equal(tm.runAuth.mock.callCount(), 0);
+    assert.deepEqual(results.map((result) => result.status), ['not_authenticated', 'not_authenticated', 'not_authenticated']);
+  });
+
+  it('says how to keep the current CLI default when adding by hand', async () => {
+    Object.assign(process.env, BASIC_ENV);
+
+    const tm = makeToolsManager(listing({ alias: 'other', host: 'https://other.service-now.com', isDefault: true }));
+    const result = await autoValidateAuthIfConfigured(tm.toolsManager);
+
+    assert.equal(result.actionRequired, ADD_COMMAND);
+    assert.match(result.message, /auth --add makes the new profile the CLI default for every now-sdk run on this machine; run npx @servicenow\/sdk auth --use other afterwards to keep other as the default\.$/);
+  });
+
+  it('asks for another alias when the derived one belongs to a profile for another host', async () => {
+    Object.assign(process.env, BASIC_ENV);
+
+    // `auth --add` replaces a profile stored under the same alias.
+    const tm = makeToolsManager(listing({ alias: 'dev12345.service-now.com', host: 'https://elsewhere.service-now.com' }));
     const result = await autoValidateAuthIfConfigured(tm.toolsManager);
 
     assert.equal(result.status, 'not_authenticated');
-    assert.equal(tm.runAuth.mock.callCount(), 1);
-  });
-
-  it('auto-adds for basic when credentials are present', async () => {
-    process.env.SN_INSTANCE_URL = 'https://dev12345.service-now.com';
-    process.env.SN_AUTH_TYPE = 'basic';
-    process.env.SN_USER_NAME = 'admin';
-    process.env.SN_PASSWORD = 'secret';
-
-    const tm = makeToolsManager('');
-    const result = await autoValidateAuthIfConfigured(tm.toolsManager);
-
-    assert.equal(result.status, 'authenticated');
-    // list + add
-    assert.equal(tm.runAuth.mock.callCount(), 2);
-    assert.ok(
-      tm.runAuth.mock.calls.some((call) => {
-        const args = call.arguments[0];
-        return args.add === 'https://dev12345.service-now.com' && args.type === 'basic';
-      })
-    );
+    assert.match(result.message, /The alias dev12345\.service-now\.com belongs to a profile for another host, which adding under it would replace, so choose another alias\./);
+    assert.equal(result.actionRequired, 'npx @servicenow/sdk auth --add https://dev12345.service-now.com --type basic --alias <new alias>');
+    assert.equal(SessionManager.getInstance().getAuthAlias(), undefined);
   });
 
   it('uses an existing matching profile without adding', async () => {
@@ -113,10 +161,50 @@ describe('autoValidateAuthIfConfigured', () => {
 
     assert.equal(result.status, 'authenticated');
     assert.equal(result.isDefault, true);
-    assert.equal(tm.runAuth.mock.callCount(), 1); // list only
+    assert.equal(tm.listAuthProfiles.mock.callCount(), 1); // list only
   });
 
-  it('reports an unreadable credential store instead of attempting an add (SDK v4.14.0+)', async () => {
+  it('uses a matching non-default profile per call and never switches the CLI default', async () => {
+    process.env.SN_INSTANCE_URL = 'https://dev12345.service-now.com';
+    process.env.SN_AUTH_TYPE = 'oauth';
+
+    // Lazy auth used to run `auth --use`, so even check_auth_status redirected
+    // every other now-sdk run on the machine to this instance (W9 review).
+    const tm = makeToolsManager(listing(
+      { alias: 'other', host: 'https://other.service-now.com', isDefault: true },
+      { alias: 'dev12345', host: 'https://dev12345.service-now.com' },
+    ));
+    const result = await autoValidateAuthIfConfigured(tm.toolsManager);
+
+    assert.equal(tm.listAuthProfiles.mock.callCount(), 1);
+    assert.equal(result.status, 'authenticated');
+    assert.equal(result.alias, 'dev12345');
+    assert.equal(result.isDefault, false);
+    assert.equal(result.message, 'Auto-auth validated: profile dev12345 matches SN_INSTANCE_URL; it is passed per call, and the CLI default profile is unchanged');
+    // Every instance command passes the alias as --auth.
+    assert.equal(SessionManager.getInstance().getAuthAlias(), 'dev12345');
+  });
+
+  it('reports validation_error when the SDK CLI cannot be resolved', async () => {
+    process.env.SN_INSTANCE_URL = 'https://dev12345.service-now.com';
+    process.env.SN_AUTH_TYPE = 'oauth';
+
+    // listAuthProfiles -> AuthCommand.execute -> resolveSdkCli(), which throws when the
+    // bundled CLI is missing (src/utils/sdkCli.ts).
+    const cliError = 'Unable to resolve the bundled @servicenow/sdk CLI. The fluent-mcp installation is incomplete; reinstall its dependencies before running SDK commands.';
+    const listAuthProfiles = mock.fn(async () => {
+      throw new Error(cliError);
+    });
+    const result = await autoValidateAuthIfConfigured({ listAuthProfiles } as unknown as ToolsManager);
+
+    assert.equal(result.status, 'validation_error');
+    assert.equal(result.message, `Auth validation failed: ${cliError}`);
+    assert.equal(result.actionRequired, 'npx @servicenow/sdk auth --add https://dev12345.service-now.com --type oauth --alias dev12345.service-now.com');
+    assert.equal(result.host, 'dev12345.service-now.com');
+    assert.equal(listAuthProfiles.mock.callCount(), 1);
+  });
+
+  it('reports an unreadable credential store instead of no matching profile (SDK v4.14.0+)', async () => {
     process.env.SN_INSTANCE_URL = 'https://dev12345.service-now.com';
     process.env.SN_AUTH_TYPE = 'basic';
     process.env.SN_USER_NAME = 'admin';
@@ -132,8 +220,7 @@ describe('autoValidateAuthIfConfigured', () => {
     assert.equal(result.status, 'validation_error');
     assert.match(result.message, /could not list auth profiles: Stored credentials at \/home\/u\/\.now-sdk\/credentials\.enc could not be read/);
     assert.ok(result.actionRequired?.startsWith("Run 'now-sdk auth --delete all' in a terminal"));
-    // Only the list call: a basic add would fail on the same unreadable store.
-    assert.equal(tm.runAuth.mock.callCount(), 1);
+    assert.equal(tm.listAuthProfiles.mock.callCount(), 1);
   });
 
   // Store errors where `auth --delete all` is the WRONG advice (sdk-cli credential-store):
@@ -159,7 +246,7 @@ describe('autoValidateAuthIfConfigured', () => {
       assert.equal(result.status, 'validation_error');
       assert.ok(result.message.includes(cliError));
       assert.ok(!result.actionRequired?.includes('--delete all'));
-      assert.equal(tm.runAuth.mock.callCount(), 1);
+      assert.equal(tm.listAuthProfiles.mock.callCount(), 1);
     });
   }
 
@@ -173,7 +260,7 @@ describe('autoValidateAuthIfConfigured', () => {
     assert.equal(result.status, 'validation_error');
     assert.match(result.message, /could not list auth profiles: unexpected failure/);
     assert.ok(result.actionRequired?.includes('auth --add'));
-    assert.equal(tm.runAuth.mock.callCount(), 1);
+    assert.equal(tm.listAuthProfiles.mock.callCount(), 1);
   });
 
   it('ignores CLI log lines when parsing profiles (hardening)', async () => {
@@ -196,10 +283,10 @@ describe('autoValidateAuthIfConfigured', () => {
     const tm = makeToolsManager(listOutput);
     const result = await autoValidateAuthIfConfigured(tm.toolsManager);
 
-    // The matching non-default profile is switched to; the log line never became a profile.
+    // The matching non-default profile is used; the log line never became a profile.
     assert.equal(result.status, 'authenticated');
     assert.equal(result.alias, 'dev12345');
-    assertCalledWith(tm.runAuth, { use: 'dev12345' });
+    assert.equal(tm.listAuthProfiles.mock.callCount(), 1);
   });
 });
 

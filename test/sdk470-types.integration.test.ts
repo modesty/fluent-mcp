@@ -7,8 +7,6 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ServiceNowMetadataType } from '../src/types.js';
-import { VALID_TEMPLATES } from '../src/tools/commands/init/types.js';
 
 const PROJECT_ROOT = process.cwd();
 const RES_DIR = path.join(PROJECT_ROOT, 'res');
@@ -21,26 +19,12 @@ const read = (dir: string, file: string) => fs.readFileSync(path.join(dir, file)
 
 describe('SDK v4.7.0 Types - Integration Tests', () => {
 
-  describe('Enum completeness', () => {
-    it('should have the new v4.7.0 data-policy enum entry', () => {
-      assert.equal(ServiceNowMetadataType.DATA_POLICY, 'data-policy');
-    });
-  });
-
   describe('New data-policy resource files', () => {
-    it('should have spec/instruct/snippet coverage for data-policy', () => {
-      assert.equal(fs.existsSync(path.join(SPEC_DIR, 'fluent_spec_data-policy.md')), true);
-      assert.equal(fs.existsSync(path.join(INSTRUCT_DIR, 'fluent_instruct_data-policy.md')), true);
-      const snippets = fs.readdirSync(SNIPPET_DIR)
-        .filter((f) => f.startsWith('fluent_snippet_data-policy_') && f.endsWith('.md'));
-      assert.ok(snippets.length > 0);
-    });
-
     it('spec should declare the DataPolicy API signature', () => {
       const content = read(SPEC_DIR, 'fluent_spec_data-policy.md');
       for (const term of [
-        'DataPolicy(', 'sys_data_policy2', 'rules', 'mandatory', 'readOnly',
-        'conditions', 'applyToImportSets', 'applyToSOAP', 'reverseIfFalse', 'inherit',
+        'DataPolicy(', 'sys_data_policy2', 'rules:', 'mandatory:', 'readOnly:',
+        'conditions:', 'applyToImportSets', 'applyToSOAP', 'reverseIfFalse:', 'inherit:',
       ]) {
         assert.ok(content.includes(term));
       }
@@ -67,7 +51,7 @@ describe('SDK v4.7.0 Types - Integration Tests', () => {
       const content = read(SPEC_DIR, 'fluent_spec_flow.md');
       for (const term of [
         'wfa.flowLogic.tryCatch', 'wfa.flowLogic.doInParallel',
-        'wfa.flowLogic.appendToFlowVariables', 'FlowStage', 'wfa.stage', 'SDK v4.7.0',
+        'wfa.flowLogic.appendToFlowVariables', 'FlowStage', 'wfa.stage',
       ]) {
         assert.ok(content.includes(term));
       }
@@ -75,7 +59,6 @@ describe('SDK v4.7.0 Types - Integration Tests', () => {
 
     it('instruct should document v4.7.0 flow control additions', () => {
       const content = read(INSTRUCT_DIR, 'fluent_instruct_flow.md');
-      assert.ok(content.includes('SDK v4.7.0'));
       assert.ok(content.includes('tryCatch'));
       assert.ok(content.includes('doInParallel'));
       assert.ok(content.includes('appendToFlowVariables'));
@@ -144,7 +127,6 @@ describe('SDK v4.7.0 Types - Integration Tests', () => {
 
     it('instruct should document v4.7.0 dataAccess role formats and agentDescriptor', () => {
       const content = read(INSTRUCT_DIR, 'fluent_instruct_ai-agent.md');
-      assert.ok(content.includes('SDK v4.7.0'));
       assert.ok(content.includes('roleMap'));
       assert.ok(content.includes('agentDescriptor'));
     });
@@ -159,7 +141,6 @@ describe('SDK v4.7.0 Types - Integration Tests', () => {
 
     it('instruct should document the v4.7.0 role-format choice', () => {
       const content = read(INSTRUCT_DIR, 'fluent_instruct_now-assist-skill-config.md');
-      assert.ok(content.includes('SDK v4.7.0'));
       assert.ok(content.includes('roleMap'));
       assert.ok(content.includes('roleRestrictions'));
     });
@@ -179,9 +160,8 @@ describe('SDK v4.7.0 Types - Integration Tests', () => {
   });
 
   describe('Cross-cutting capabilities in coding_in_fluent prompt (v4.7.0)', () => {
-    it('should list SDK v4.7.0 capabilities including DataPolicy, $override, protectionPolicy', () => {
+    it('should list DataPolicy, $override, protectionPolicy and augments', () => {
       const content = read(PROMPT_DIR, 'coding_in_fluent.md');
-      assert.ok(content.includes('SDK v4.7.0'));
       assert.ok(content.includes('DataPolicy'));
       assert.ok(content.includes('$override'));
       assert.ok(content.includes('protectionPolicy'));
@@ -190,16 +170,9 @@ describe('SDK v4.7.0 Types - Integration Tests', () => {
   });
 
   describe('ATF Service Portal form instruct gap filled', () => {
-    it('should provide an instruct file for atf-form-sp', () => {
-      assert.equal(fs.existsSync(path.join(INSTRUCT_DIR, 'fluent_instruct_atf-form-sp.md')), true);
+    it('atf-form-sp instruct should document the atf.form_SP namespace', () => {
       const content = read(INSTRUCT_DIR, 'fluent_instruct_atf-form-sp.md');
       assert.ok(content.includes('atf.form_SP'));
-    });
-  });
-
-  describe('CLI tool updates (v4.7.0)', () => {
-    it('init should offer the new typescript.vue template', () => {
-      assert.ok(VALID_TEMPLATES.includes('typescript.vue'));
     });
   });
 });

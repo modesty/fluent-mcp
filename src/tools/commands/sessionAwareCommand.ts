@@ -11,7 +11,7 @@ import { SessionManager } from '../../utils/sessionManager.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
 import { cliOption } from './cliArgv.js';
 import logger from '../../utils/logger.js';
-import { getConfig } from '../../config.js';
+import { getConfig, getProjectRootPath } from '../../config.js';
 import { resolveProjectDirectory } from '../../utils/projectDirectory.js';
 
 export const WORKING_DIRECTORY_ARGUMENT: CommandArgument = {
@@ -107,7 +107,7 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
    * Execute a command that requires a working directory from the session
    * @param command The command to execute
    * @param args The command arguments
-   * @param stdinInput Optional stdin input for interactive commands
+   * @param stdinInput Optional input written whole to the child's stdin, which is then closed
    * @param timeoutMs Optional command-specific timeout (falls back to this.timeoutMs)
    * @param signal Optional abort signal from the MCP client (kills the child on cancel)
    * @param explicitWorkingDirectory The per-call `workingDirectory` tool argument, if supplied
@@ -208,6 +208,14 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
     // Add common flags (like --debug)
     this.appendCommonFlags(sdkArgs, args);
 
+    if (!this.requiresProject) {
+      // The CLI resolves nothing from its cwd for this command, so the installed
+      // package directory is a neutral cwd and no Fluent project is needed.
+      return this.commandProcessor.process(
+        command, sdkArgs, getProjectRootPath(), undefined, this.resolveTimeoutMs(args), signal, options
+      );
+    }
+
     return this.executeWithSessionWorkingDirectory(
       command,
       sdkArgs,
@@ -218,6 +226,13 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
       options
     );
   }
+
+  /**
+   * Whether the CLI command works in a Fluent project. A command that reads
+   * nothing from its cwd sets this to false: it declares no `workingDirectory`
+   * argument and `executeSdkCommand` spawns it in the installed package directory.
+   */
+  protected readonly requiresProject: boolean = true;
 
   /**
    * The runner timeout for one invocation. Defaults to the command's static

@@ -33,5 +33,6 @@ ScheduledScript({
   advanced: false, // boolean, optional - whether the job can run in advanced mode (default: false)
   businessCalendar: '', // string | Record<'business_calendar'>, optional - reference to business calendar for calendar-based scheduling
   protectionPolicy: '', // 'read' | 'protected', optional - protection level for this scheduled job
+  $meta: { installMethod: 'once' }, // optional: { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean } — 'first install' -> unload, 'demo' -> unload.demo, 'once' -> apply_once; useEsLatest runs the script with the latest ECMAScript version instead of the app default
 })
 ```

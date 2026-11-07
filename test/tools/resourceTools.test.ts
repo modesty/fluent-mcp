@@ -1,5 +1,6 @@
 /**
- * Unit tests for get_fluent_knowledge, the one tool over the resource catalog
+ * Unit tests for get_fluent_knowledge, the one tool over the resource catalog,
+ * and for check_auth_status's cached-result branch
  *
  * Native runner: the filesystem is stubbed on the shared node:fs object, so the
  * real ResourceCatalog reads canned directory listings and file contents. The
@@ -8,16 +9,18 @@
  * paths (/test/res/spec, /test/res/snippet, /test/res/instruct) - because the stubs key on those path
  * segments, which a staged checkout path could otherwise collide with.
  */
-import { beforeEach, describe, it, mock } from 'node:test';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import type { TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { z } from 'zod';
 import { configFixture, loggerFixture } from '../support/fixtures.js';
 
 mock.module('../../src/config.js', configFixture().mockOptions);
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 
-const { GetFluentKnowledgeCommand } = await import('../../src/tools/resources/resourceTools.js');
+const { GetFluentKnowledgeCommand, CheckAuthStatusCommand } = await import('../../src/tools/resources/resourceTools.js');
+const { SessionManager } = await import('../../src/utils/sessionManager.js');
 
 describe('Resource Tool Commands', () => {
   // Test metadata type to use throughout tests
@@ -63,10 +66,6 @@ describe('Resource Tool Commands', () => {
         return mockInstructContent;
       }
       return '';
-    });
-
-    t.mock.method(fs, 'existsSync', (path: string) => {
-      return path.includes('business-rule') || path.includes('0001');
     });
   });
 
@@ -215,5 +214,38 @@ describe('Resource Tool Commands', () => {
     it('does not resolve a path-like snippet id outside the index', async () => {
       await rejected({ kind: 'snippet', metadataType: TEST_METADATA_TYPE, snippetId: '/../../../../README' }, /Snippet '\/\.\.\/\.\.\/\.\.\/\.\.\/README' not found/);
     });
+  });
+});
+
+describe('check_auth_status', () => {
+  // SessionManager is a process-wide singleton; start and end from an empty session.
+  beforeEach(() => SessionManager.getInstance().clearSession());
+  afterEach(() => SessionManager.getInstance().clearSession());
+
+  it('returns the cached authenticated result that lazy validation stored, valid against its outputSchema', async () => {
+    const cached = {
+      status: 'authenticated' as const,
+      alias: 'dev-profile',
+      host: 'dev12345.service-now.com',
+      authType: 'oauth',
+      isDefault: true,
+      message: 'Authenticated with profile dev-profile',
+      timestamp: '2026-01-01T00:00:00.000Z',
+    };
+    // The command awaits validation before it reads the session, so a result
+    // stored by validation itself is the one returned.
+    const ensureAuthValidated = mock.fn(async () => {
+      SessionManager.getInstance().setAuthValidationResult(cached);
+    });
+    const command = new CheckAuthStatusCommand(ensureAuthValidated);
+
+    const result = await command.execute();
+
+    assert.equal(ensureAuthValidated.mock.callCount(), 1);
+    assert.equal(result.success, true);
+    assert.deepEqual(result.structuredContent, cached);
+    assert.deepEqual(JSON.parse(result.output), cached);
+    const parsed = z.object(command.outputSchema).safeParse(result.structuredContent);
+    assert.ok(parsed.success, JSON.stringify(parsed.error?.issues));
   });
 });

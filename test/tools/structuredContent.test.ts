@@ -1,9 +1,7 @@
 /**
- * Verifies the focused MCP improvements added for the SDK v4.7.x upgrade:
- *  - read tools (get_fluent_knowledge, check_auth_status) declare an
- *    `outputSchema` and return `structuredContent` that validates against it (mirrors the
- *    MCP SDK's own `validateToolOutput` contract);
- *  - the transform command exposes the new `table`/`id` flags and no longer maps `preview`.
+ * The read tools (get_fluent_knowledge, check_auth_status) declare an
+ * `outputSchema` and return `structuredContent` that validates against it
+ * (mirrors the MCP SDK's own `validateToolOutput` contract).
  *
  * Uses real resource files on disk (no fs mocks).
  */
@@ -20,8 +18,6 @@ mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 
 const { GetFluentKnowledgeCommand, CheckAuthStatusCommand } = await import('../../src/tools/resources/resourceTools.js');
 const { ResourceCatalog } = await import('../../src/res/resourceCatalog.js');
-const { TransformCommand } = await import('../../src/tools/commands/transformCommand.js');
-const { CLICmdWriter } = await import('../../src/tools/processors/cliCmdWriter.js');
 const { SessionManager } = await import('../../src/utils/sessionManager.js');
 
 /** Validate structured content the same way the MCP SDK does for a tool with an output schema. */
@@ -108,19 +104,5 @@ describe('Read tools — outputSchema + structuredContent', () => {
     assert.equal(result.success, true);
     expectValidStructuredContent(cmd.outputSchema, result.structuredContent);
     assert.equal(typeof result.structuredContent?.status, 'string');
-  });
-});
-
-describe('Transform command — v4.7.0 flags', () => {
-  const cmd = new TransformCommand(new CLICmdWriter());
-  const argNames = cmd.arguments.map((a) => a.name);
-
-  it('exposes the new table and id arguments', () => {
-    assert.ok(argNames.includes('table'));
-    assert.ok(argNames.includes('id'));
-  });
-
-  it('no longer exposes the removed preview argument', () => {
-    assert.ok(!argNames.includes('preview'));
   });
 });

@@ -7,7 +7,6 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ServiceNowMetadataType } from '../src/types.js';
 
 const PROJECT_ROOT = process.cwd();
 const RES_DIR = path.join(PROJECT_ROOT, 'res');
@@ -18,38 +17,6 @@ const PROMPT_DIR = path.join(RES_DIR, 'prompt');
 
 describe('SDK v4.6.0 Types - Integration Tests', () => {
 
-  describe('Enum completeness', () => {
-    it('should have new v4.6.0 enum entries', () => {
-      assert.equal(ServiceNowMetadataType.CUSTOM_ACTION, 'custom-action');
-      assert.equal(ServiceNowMetadataType.INBOUND_EMAIL_ACTION, 'inbound-email-action');
-      assert.equal(ServiceNowMetadataType.SP_HEADER_FOOTER, 'sp-header-footer');
-      assert.equal(ServiceNowMetadataType.SP_PAGE_ROUTE_MAP, 'sp-page-route-map');
-    });
-  });
-
-  describe('SDK v4.6.0 resource files', () => {
-    const v460Types = [
-      'custom-action',
-      'inbound-email-action',
-      'sp-header-footer',
-      'sp-page-route-map',
-    ];
-
-    it('should have spec/instruct/snippet coverage for each v4.6.0 type', () => {
-      for (const metadataType of v460Types) {
-        const specFile = path.join(SPEC_DIR, `fluent_spec_${metadataType}.md`);
-        const instructFile = path.join(INSTRUCT_DIR, `fluent_instruct_${metadataType}.md`);
-        assert.equal(fs.existsSync(specFile), true);
-        assert.equal(fs.existsSync(instructFile), true);
-
-        const snippetCandidates = fs
-          .readdirSync(SNIPPET_DIR)
-          .filter((file) => file.startsWith(`fluent_snippet_${metadataType}_`) && file.endsWith('.md'));
-        assert.ok(snippetCandidates.length > 0);
-      }
-    });
-  });
-
   describe('Custom Action resource files', () => {
     it('should have spec with Action API signature and wfa primitives', () => {
       const content = fs.readFileSync(
@@ -59,7 +26,7 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
         'Action(',
         '@servicenow/sdk/automation',
         'wfa.actionStep',
-        'inputs', 'outputs', 'access',
+        'inputs:', 'outputs:', "access: 'public'",
         'sys_hub_action_type_definition',
       ];
       for (const term of expectedTerms) {
@@ -72,7 +39,7 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
         path.join(INSTRUCT_DIR, 'fluent_instruct_custom-action.md'), 'utf-8'
       );
       assert.ok(content.includes('@servicenow/sdk/automation'));
-      assert.ok(content.includes('Action'));
+      assert.ok(content.includes('`Action()`'));
       assert.ok(content.includes('wfa.action'));
       assert.ok(content.includes('Cross-scope'));
     });
@@ -83,8 +50,8 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
       );
       assert.ok(content.includes('Action('));
       assert.ok(content.includes('wfa.actionStep'));
-      assert.ok(content.includes('inputs'));
-      assert.ok(content.includes('outputs'));
+      assert.ok(content.includes('inputs:'));
+      assert.ok(content.includes('outputs:'));
     });
 
     it('should have snippet 0002 invoking a custom action from a Flow', () => {
@@ -105,8 +72,8 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
         'InboundEmailAction(',
         '@servicenow/sdk/core',
         'sys_email_action',
-        'action', 'table', 'type', 'fieldAction', 'eventName',
-        'record_action', 'reply_email',
+        "action: 'record_action'", 'table:', "type: 'new'", 'fieldAction', 'eventName',
+        'reply_email',
       ];
       for (const term of expectedTerms) {
         assert.ok(content.includes(term));
@@ -151,7 +118,7 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
         'SPHeaderFooter(',
         '@servicenow/sdk/core',
         'sp_header_footer',
-        'static', 'htmlTemplate', 'serverScript', 'clientScript', 'customCss',
+        'static:', 'htmlTemplate', 'serverScript', 'clientScript', 'customCss',
       ];
       for (const term of expectedTerms) {
         assert.ok(content.includes(term));
@@ -163,7 +130,8 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
         path.join(INSTRUCT_DIR, 'fluent_instruct_sp-header-footer.md'), 'utf-8'
       );
       assert.ok(content.includes('SPHeaderFooter'));
-      assert.ok(content.includes('static'));
+      assert.ok(content.includes('`static: true`'));
+      assert.ok(content.includes('`static: false`'));
       assert.ok(content.includes('Now.include'));
     });
 
@@ -194,7 +162,7 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
         '@servicenow/sdk/core',
         'sp_page_route_map',
         'routeFromPage', 'routeToPage',
-        'portals', 'roles', 'order',
+        'portals:', 'roles:', 'order:',
       ];
       for (const term of expectedTerms) {
         assert.ok(content.includes(term));
@@ -234,7 +202,7 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(SPEC_DIR, 'fluent_spec_form.md'), 'utf-8'
       );
-      assert.ok(content.includes('publicly exported in SDK v4.6.0'));
+      assert.ok(content.includes("import { Form, default_view } from '@servicenow/sdk/core'"));
       assert.ok(!content.includes('not yet exported'));
     });
 
@@ -242,8 +210,8 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_form.md'), 'utf-8'
       );
-      assert.ok(content.includes('publicly supported as of SDK v4.6.0'));
-      assert.ok(content.includes('Fallback'));
+      assert.ok(content.includes('## `Form()` API (primary'));
+      assert.ok(content.includes('## Fallback: `Record`-based approach'));
     });
   });
 
@@ -253,7 +221,6 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
         path.join(SPEC_DIR, 'fluent_spec_flow.md'), 'utf-8'
       );
       assert.ok(content.includes('wfa.subflow'));
-      assert.ok(content.includes('SDK 4.6.0'));
       assert.ok(content.includes('Custom Action'));
     });
 
@@ -261,7 +228,6 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_flow.md'), 'utf-8'
       );
-      assert.ok(content.includes('SDK v4.6.0'));
       assert.ok(content.includes('Subflow'));
       assert.ok(content.includes('Custom Action'));
       assert.ok(content.includes('Cross-scope'));
@@ -275,7 +241,6 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
       );
       assert.ok(content.includes('securityAcl'));
       assert.ok(content.includes('MANDATORY'));
-      assert.ok(content.includes('SDK v4.6.0'));
       assert.ok(content.includes('Auto-generated ACL'));
     });
 
@@ -283,7 +248,6 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_ai-agent-workflow.md'), 'utf-8'
       );
-      assert.ok(content.includes('SDK v4.6.0'));
       assert.ok(content.includes('Auto-generated ACL'));
     });
   });
@@ -293,14 +257,9 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_now-assist-skill-config.md'), 'utf-8'
       );
-      assert.ok(content.includes('SDK v4.6.0'));
-      assert.ok(content.includes('auto-generated'));
-      // Standard outputs that get auto-generated when outputs array is omitted
-      assert.ok(content.includes('response'));
-      assert.ok(content.includes('provider'));
-      assert.ok(content.includes('errorcode'));
-      assert.ok(content.includes('status'));
-      assert.ok(content.includes('error'));
+      // The five standard outputs generated when the outputs array is omitted or empty
+      assert.ok(content.includes('five standard outputs are auto-generated'));
+      assert.ok(content.includes('`response`, `provider`, `errorcode`, `status`, `error`'));
     });
 
     it('instruct should document new dataType options and truncate rules', () => {
@@ -322,25 +281,22 @@ describe('SDK v4.6.0 Types - Integration Tests', () => {
       );
       assert.ok(content.includes('OverrideColumn'));
       assert.ok(content.includes('baseTable'));
-      assert.ok(content.includes('SDK v4.6.0'));
     });
 
     it('instruct should document OverrideColumn as the v4.6.0 dict-override mechanism', () => {
       const content = fs.readFileSync(
         path.join(INSTRUCT_DIR, 'fluent_instruct_table.md'), 'utf-8'
       );
-      assert.ok(content.includes('SDK v4.6.0'));
       assert.ok(content.includes('OverrideColumn'));
       assert.ok(content.includes('sys_dictionary_override'));
     });
   });
 
   describe('Updated coding_in_fluent prompt (v4.6.0)', () => {
-    it('should list SDK v4.6.0 capabilities for code generation', () => {
+    it('should list the Form, subflow, custom action, auto-ACL and override capabilities', () => {
       const content = fs.readFileSync(
         path.join(PROMPT_DIR, 'coding_in_fluent.md'), 'utf-8'
       );
-      assert.ok(content.includes('SDK v4.6.0'));
       assert.ok(content.includes('Declarative Form API'));
       assert.ok(content.includes('Subflow-of-subflow'));
       assert.ok(content.includes('Custom Actions'));

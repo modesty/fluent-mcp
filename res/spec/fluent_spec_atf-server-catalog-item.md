@@ -5,9 +5,9 @@
 atf.server.searchForCatalogItem({
     $id: Now.ID[''], // string | guid, mandatory
     searchTerm: '', // string, mandatory
-    assertItem: get_sys_id('sc_cat_item', ''), // sys_id | Record&lt;'sc_cat_item'&gt;, mandatory
-    catalog: get_sys_id('sc_catalog', ''), // sys_id | Record&lt;'sc_catalog'&gt;, optional (SDK v4.13.0+; was mandatory) — omit to search every catalog
-    category: get_sys_id('sc_category', ''), // sys_id | Record&lt;'sc_category'&gt;, optional (SDK v4.13.0+; was mandatory) — omit to search every category
+    assertItem: Now.ref('sc_cat_item', '<sys_id>'), // sys_id | Record&lt;'sc_cat_item'&gt;, mandatory
+    catalog: Now.ref('sc_catalog', '<sys_id>'), // sys_id | Record&lt;'sc_catalog'&gt;, optional (SDK v4.13.0+; was mandatory) — omit to search every catalog
+    category: Now.ref('sc_category', '<sys_id>'), // sys_id | Record&lt;'sc_category'&gt;, optional (SDK v4.13.0+; was mandatory) — omit to search every category
     searchInPortal: false, // boolean, optional, default: false
     assert: 'assert_item_present', // 'assert_item_present' | 'assert_item_not_present', optional, default: 'assert_item_present'
 }): { catalog_item_id: string; };
@@ -15,7 +15,7 @@ atf.server.searchForCatalogItem({
 // Checkout the Shopping Cart and generates a new request.
 atf.server.checkoutShoppingCart({
     $id: Now.ID[''], // string | guid, mandatory
-    requestedFor: get_sys_id('sys_user', ''), // sys_id | Record&lt;'sys_user'&gt;, mandatory
+    requestedFor: Now.ref('sys_user', '<sys_id>'), // sys_id | Record&lt;'sys_user'&gt;, mandatory
     deliveryAddress: '123 main st', // string, mandatory
     specialInstructions: 'none', // string, mandatory
     assert: 'checkout_successfull', // 'empty_cart' | 'checkout_successfull', optional, default: 'checkout_successfull'
@@ -26,7 +26,7 @@ atf.server.checkoutShoppingCart({
 // an `sc_req_item` sys_id — do not pass checkoutShoppingCart's `request_id`, which identifies an `sc_request`.
 atf.server.replayRequestItem({
     $id: Now.ID[''], // string | guid, mandatory
-    request_item: get_sys_id('sc_req_item', ''), // sys_id | Record&lt;'sc_req_item'&gt;, mandatory
+    request_item: Now.ref('sc_req_item', '<sys_id>'), // sys_id | Record&lt;'sc_req_item'&gt;, mandatory
 }): {
     table: string;
     reqItem: any;

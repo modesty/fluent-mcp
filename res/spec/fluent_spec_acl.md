@@ -12,8 +12,9 @@ const specAcl = Acl({
     field: '*', // for field-level `record` ACLs: a schema field name, a system column, or the wildcard `*` (type: keyof FullSchema<T> | SystemColumns | '*', SDK 4.8.0+ accepts custom column names)
     appliesTo: '', // ServiceNow encoded query, applicable when `type` is `record` or `pd_action` (also accepted for `ux_page`/`ux_route`); not available for the named types or `ux_data_broker`
     roles: [ // (string | Role | { role: string | Role, protectionPolicy?: '' | 'read' | 'protected' })[]
-        get_sys_id('sys_user_role', ''), // a sys_id (GUID string) of an existing role
-        'itil',                          // a non-GUID string is resolved as a role NAME at build time
+        Now.ref('sys_user_role', '<sys_id>'), // an existing role by sys_id (a plain 32-hex sys_id string works too)
+        'itil',                               // a non-GUID string is resolved as a role NAME at build time
+                                              // (not Now.ref('sys_user_role', { name }): the ACL build drops the coalesce key)
         // Per-role protection override (SDK v4.13.6+). Plain entries inherit the ACL's own `protectionPolicy`
         // (the build writes it onto every `sys_security_acl_role`); use the object form only when one role must differ.
         // `''` explicitly marks that role as NOT protected even though the ACL is (only valid here, not at ACL level).

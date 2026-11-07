@@ -2,8 +2,8 @@
  * Tests for the SDK v4.8.0 `query` command wrapper (QueryCommand).
  * Verifies metadata, argv construction (positional table + literal encoded
  * query + JSON envelope default), the `--no-exclude-reference-link` negation, the
- * required-authentication gate, and the query-specific validation that permits
- * encoded-query operators while rejecting shell-injection characters.
+ * required-authentication gate, the table-name domain, and encoded-query
+ * operators passing through as one literal argv entry.
  */
 import { beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,7 +12,9 @@ import { assertCalledWith, assertNotCalled } from '../support/mockAssertions.js'
 import { configFixture, loggerFixture, sdkCliFixture, tempProjectDir } from '../support/fixtures.js';
 import type { CommandProcessor } from '../../src/utils/types.js';
 
+// The session still has a project directory: query must not use it.
 const WORKING_DIR = tempProjectDir('working-dir');
+const PACKAGE_ROOT = '/mock/package/root';
 
 // Session replacement. Default the session to a resolvable auth alias so the
 // required-auth gate passes; individual tests override getAuthAlias to exercise
@@ -27,7 +29,9 @@ const session = {
 };
 
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
-mock.module('../../src/config.js', configFixture().mockOptions);
+const config = configFixture();
+config.getProjectRootPath.mock.mockImplementation(() => PACKAGE_ROOT);
+mock.module('../../src/config.js', config.mockOptions);
 mock.module('../../src/utils/sdkCli.js', sdkCliFixture().mockOptions);
 mock.module('../../src/utils/sessionManager.js', {
   namedExports: { SessionManager: { getInstance: () => session } },
@@ -88,7 +92,7 @@ describe('QueryCommand', () => {
         '--output=json',
         '--auth=session-alias',
       ],
-      WORKING_DIR,
+      PACKAGE_ROOT,
       undefined,
       60000,
       undefined,
@@ -101,9 +105,29 @@ describe('QueryCommand', () => {
 
     await command.execute({ table: 'incident', query: 'active=true', auth: 'explicit-alias' });
 
-    const argv = argvOf();
-    assertContainsAll(argv, ['--auth=explicit-alias']);
-    assert.ok(!argv.includes('session-alias'));
+    const authEntries = argvOf().filter((entry) => entry.startsWith('--auth'));
+    assert.deepStrictEqual(authEntries, ['--auth=explicit-alias']);
+  });
+
+  it('should run in the installed package directory, with no Fluent project configured', async () => {
+    session.getWorkingDirectory.mock.mockImplementation(() => undefined);
+    const command = new QueryCommand(mockProcessor);
+
+    const result = await command.execute({ table: 'sys_app', query: 'scope=x_acme_app' });
+
+    assert.equal(result.success, true);
+    assert.equal(mockProcessor.process.mock.calls[0].arguments[2], PACKAGE_ROOT);
+  });
+
+  it('should not accept workingDirectory: the CLI reads nothing from its cwd', async () => {
+    const command = new QueryCommand(mockProcessor);
+    assert.ok(!command.arguments.some((a) => a.name === 'workingDirectory'));
+
+    await assert.rejects(
+      command.execute({ table: 'sys_app', query: 'active=true', workingDirectory: WORKING_DIR }),
+      /Unrecognized key: "workingDirectory"/
+    );
+    assertNotCalled(mockProcessor.process);
   });
 
   it('should map optional flags and append --debug', async () => {

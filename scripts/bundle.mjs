@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -10,63 +10,99 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const PUBLIC_REGISTRY = 'https://registry.npmjs.org';
 
 /**
- * npm registry tarball URLs end with `<name>/-/<file>.tgz`, where `<name>` may
- * be scoped. A mirror registry records its own host *and* repository path prefix
- * (e.g. `https://<mirror>/repository/npm-all/<name>/-/<file>.tgz`), so npm's own
- * `replace-registry-host` config is not enough: it swaps the host and leaves the
- * prefix behind, producing a 404 against the public registry.
+ * The environment for the staged npm install, without any inherited registry
+ * setting. npm reads `npm_config_*` (any case) above every config file, so an
+ * inherited `npm_config_registry` or `npm_config_@scope:registry` would win over
+ * the bundle's own config. Other npm settings (a proxy, a CA file) are kept.
+ * @param env The inherited environment
+ * @returns A copy without registry keys
  */
-const REGISTRY_TARBALL_TAIL = /\/((?:@[^/]+\/)?[^/]+\/-\/[^/]+\.tgz)$/;
+function withoutInheritedRegistries(env) {
+  return Object.fromEntries(Object.entries(env).filter(([key]) => !/^npm_config_(?:.*:)?registry$/i.test(key)));
+}
 
 /**
- * Rewrite every `resolved` tarball URL in a parsed lockfile to the public
- * registry, in place.
- *
- * A lockfile records whichever registry produced it, so a contributor behind a
- * private mirror commits mirror URLs. `npm ci` replays those URLs verbatim, and
- * npm classifies a `resolved` host that disagrees with the configured registry
- * as a `remote` fetch — which it refuses (`EALLOWREMOTE`). Normalizing the
- * staged copy makes the bundle reproducible from any contributor's lockfile
- * without touching the committed one. Only the location changes: the `integrity`
- * hashes are left untouched, so npm still verifies every tarball's contents.
- *
- * @param node A lockfile value to walk (the parsed lockfile, or any nested part).
- * @param unresolvable Collects `resolved` values that are not registry tarballs.
- * @returns The number of URLs rewritten.
+ * Fail unless every package in the generated lockfile was fetched from the
+ * public registry: the proof the install used it, whatever config npm found.
+ * @param lockfilePath The package-lock.json the staged install wrote
  */
-function normalizeLockfileRegistry(node, unresolvable) {
-  let rewritten = 0;
-
-  if (Array.isArray(node)) {
-    for (const item of node) rewritten += normalizeLockfileRegistry(item, unresolvable);
-    return rewritten;
+async function assertResolvedFromPublicRegistry(lockfilePath) {
+  const { packages } = JSON.parse(await readFile(lockfilePath, 'utf8'));
+  const elsewhere = Object.entries(packages)
+    .filter(([, entry]) => entry.resolved && !entry.resolved.startsWith(`${PUBLIC_REGISTRY}/`))
+    .map(([name, entry]) => `${name} (${entry.resolved})`);
+  if (elsewhere.length > 0) {
+    throw new Error(`${elsewhere.length} bundled packages were not resolved from ${PUBLIC_REGISTRY}: ${elsewhere.slice(0, 5).join(', ')}`);
   }
-  if (node === null || typeof node !== 'object') return rewritten;
+}
 
-  for (const [key, value] of Object.entries(node)) {
-    if (key !== 'resolved' || typeof value !== 'string') {
-      rewritten += normalizeLockfileRegistry(value, unresolvable);
-      continue;
-    }
-    if (value.startsWith(`${PUBLIC_REGISTRY}/`)) continue;
+/**
+ * Why the staged install resolves fresh instead of replaying package-lock.json:
+ *
+ * `npm ci --omit=dev` keeps the lockfile's tree *placement*, and that tree was
+ * built with our devDependencies in it. `@servicenow/isomorphic-rollup` (an SDK
+ * dependency) calls `require('rollup')` at runtime but declares `rollup` only as a
+ * devDependency of its own. In the dev tree our own devDependency `rollup` holds
+ * the root slot, so the SDK's pinned copy stays nested under
+ * `@servicenow/sdk-repack`, and once our devDependencies are omitted nothing at the
+ * root satisfies that require. The bundled SDK then failed every build and query
+ * with "Cannot find module 'rollup'".
+ *
+ * A consumer of the npm package never sees our devDependencies or our lockfile, so
+ * npm hoists the SDK's `rollup` to the root there. The bundle now gets that same
+ * resolution: a package.json without devDependencies, installed from the public
+ * registry with no lockfile. The lockfile that install writes ships in the bundle
+ * as the record of exactly what it contains. The trade-off is that transitive
+ * versions are those of the day the bundle is built, as for an npm install.
+ */
 
-    const tail = value.match(REGISTRY_TARBALL_TAIL);
-    if (!tail) {
-      // A git/file/arbitrary-URL dependency cannot be served by the public
-      // registry at all; report it rather than emit a URL npm will reject.
-      unresolvable.push(value);
-      continue;
-    }
-    node[key] = `${PUBLIC_REGISTRY}/${tail[1]}`;
-    rewritten += 1;
+/**
+ * `mcpb pack` drops every file matching its EXCLUDE_PATTERNS
+ * (`@anthropic-ai/mcpb` `dist/node/files.js`), among them `*.d.ts` and
+ * `package-lock.json`. The SDK's declarations are not build artifacts here: a
+ * Fluent build type-checks against them (`Now` is a global declared in
+ * `@servicenow/sdk-core`), so without them the bundled SDK fails every build with
+ * TS2708 "Cannot use namespace 'Now' as a value". The lockfile is the dependency
+ * record promised above. `.mcpbignore` patterns are added after the defaults and
+ * honor gitignore `!` negation; `.mcpbignore` itself never ships.
+ */
+const MCPB_IGNORE = [
+  '!node_modules/@servicenow/**/*.d.ts',
+  '!/package-lock.json',
+];
+
+/**
+ * Build a tiny Fluent project with the SDK of an extracted bundle, the way a
+ * bundle user's first build_fluent_app runs it. The fixture has no SDK of its
+ * own, only a link to the bundle's node_modules, so a project that installs its
+ * own SDK cannot mask a file the archive lacks. A missing runtime module or
+ * declaration anywhere on the build path (both above) fails here.
+ * @param bundle A directory holding the unpacked .mcpb archive
+ */
+async function assertBundledSdkBuilds(bundle) {
+  const fixture = await mkdtemp(path.join(os.tmpdir(), 'fluent-mcpb-guard-'));
+  try {
+    await writeFile(path.join(fixture, 'package.json'), `${JSON.stringify({ name: 'mcpb-guard', version: '0.0.1' }, null, 2)}\n`);
+    await writeFile(path.join(fixture, 'now.config.json'), `${JSON.stringify({ scope: 'x_mcpb_guard', scopeId: '0'.repeat(32), name: 'MCPB guard' }, null, 2)}\n`);
+    await mkdir(path.join(fixture, 'src', 'fluent'), { recursive: true });
+    await writeFile(
+      path.join(fixture, 'src', 'fluent', 'guard.now.ts'),
+      "import { Role } from '@servicenow/sdk/core'\n\nRole({ $id: Now.ID['guard_role'], name: 'x_mcpb_guard.user' })\n"
+    );
+    await symlink(path.join(bundle, 'node_modules'), path.join(fixture, 'node_modules'), 'junction');
+    const cli = path.join(bundle, 'node_modules', '@servicenow', 'sdk', 'bin', 'index.js');
+    console.log('Building a fixture project with the bundled SDK...');
+    execFileSync(process.execPath, [cli, 'build'], { cwd: fixture, stdio: 'inherit', env: { ...process.env, NO_TELEMETRY: '1' } });
+  } finally {
+    await rm(fixture, { recursive: true, force: true });
   }
-
-  return rewritten;
 }
 
 const packageJson = JSON.parse(await readFile(path.join(projectRoot, 'package.json'), 'utf8'));
 const outputPath = path.join(projectRoot, `${packageJson.name.replace(/^@[^/]+\//, '')}-${packageJson.version}.mcpb`);
 const stagePath = await mkdtemp(path.join(os.tmpdir(), 'fluent-mcpb-'));
+const unpackPath = await mkdtemp(path.join(os.tmpdir(), 'fluent-mcpb-unpacked-'));
+const npmConfigPath = await mkdtemp(path.join(os.tmpdir(), 'fluent-mcpb-npmrc-'));
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const require = createRequire(import.meta.url);
 const mcpbPackageRoot = path.resolve(path.dirname(require.resolve('@anthropic-ai/mcpb')), '..');
@@ -74,35 +110,32 @@ const mcpbCli = path.join(mcpbPackageRoot, 'dist', 'cli', 'cli.js');
 
 try {
   await cp(path.join(projectRoot, 'manifest.json'), path.join(stagePath, 'manifest.json'));
-  await cp(path.join(projectRoot, 'package.json'), path.join(stagePath, 'package.json'));
-  const lockfile = JSON.parse(await readFile(path.join(projectRoot, 'package-lock.json'), 'utf8'));
-  const unresolvable = [];
-  const rewritten = normalizeLockfileRegistry(lockfile, unresolvable);
-  if (unresolvable.length > 0) {
-    throw new Error(
-      `package-lock.json contains ${unresolvable.length} dependency source(s) the public npm registry cannot serve, ` +
-      `so the bundle cannot be built reproducibly:\n  ${unresolvable.join('\n  ')}`
-    );
-  }
-  if (rewritten > 0) {
-    console.log(`Normalized ${rewritten} lockfile tarball URL(s) to ${PUBLIC_REGISTRY} for the staged install.`);
-  }
-  await writeFile(path.join(stagePath, 'package-lock.json'), `${JSON.stringify(lockfile, null, 2)}\n`);
+  // Production dependencies only: see the note at the top of this file.
+  const stagedPackageJson = Object.fromEntries(Object.entries(packageJson).filter(([key]) => key !== 'devDependencies'));
+  await writeFile(path.join(stagePath, 'package.json'), `${JSON.stringify(stagedPackageJson, null, 2)}\n`);
   await cp(path.join(projectRoot, 'dist'), path.join(stagePath, 'dist'), { recursive: true });
   await cp(path.join(projectRoot, 'res'), path.join(stagePath, 'res'), { recursive: true });
   await cp(path.join(projectRoot, 'license.txt'), path.join(stagePath, 'license.txt'));
-  const npmUserConfig = path.join(stagePath, '.bundle-npmrc');
+  // The user and global npmrc are replaced (a scoped registry in either would
+  // redirect that scope), and the registry is also passed on the command line,
+  // which outranks the environment. Neither file lives in the staging directory.
+  const npmUserConfig = path.join(npmConfigPath, 'user-npmrc');
+  const npmGlobalConfig = path.join(npmConfigPath, 'global-npmrc');
+  await writeFile(npmUserConfig, `registry=${PUBLIC_REGISTRY}/\n`);
+  await writeFile(npmGlobalConfig, '');
   // shell:true passes argv through cmd.exe; preserve temp paths containing spaces.
-  const npmUserConfigArg = process.platform === 'win32' ? `"${npmUserConfig}"` : npmUserConfig;
-  await writeFile(npmUserConfig, 'registry=https://registry.npmjs.org\n');
+  const shellPath = (file) => (process.platform === 'win32' ? `"${file}"` : file);
 
-  console.log('Installing production dependencies in the bundle staging directory...');
+  console.log(`Installing production dependencies from ${PUBLIC_REGISTRY} in the bundle staging directory...`);
   execFileSync(npmCommand, [
-    'ci',
+    'install',
     '--omit=dev',
     '--ignore-scripts',
+    `--registry=${PUBLIC_REGISTRY}/`,
     '--userconfig',
-    npmUserConfigArg,
+    shellPath(npmUserConfig),
+    '--globalconfig',
+    shellPath(npmGlobalConfig),
     '--no-audit',
     '--no-fund',
   ], {
@@ -113,22 +146,38 @@ try {
     shell: process.platform === 'win32',
     stdio: 'inherit',
     env: {
-      ...process.env,
+      ...withoutInheritedRegistries(process.env),
       npm_config_allow_scripts: '',
       npm_config_ignore_scripts: 'true',
       npm_config_local_prefix: stagePath,
       npm_config_userconfig: npmUserConfig,
+      npm_config_globalconfig: npmGlobalConfig,
     },
   });
+  await assertResolvedFromPublicRegistry(path.join(stagePath, 'package-lock.json'));
 
-  // This config is only needed for npm ci; do not ship it in the MCPB archive.
-  await rm(npmUserConfig, { force: true });
+  await writeFile(path.join(stagePath, '.mcpbignore'), `${MCPB_IGNORE.join('\n')}\n`);
 
   console.log(`Packing ${outputPath}...`);
   execFileSync(process.execPath, [mcpbCli, 'pack', stagePath, outputPath], {
     cwd: projectRoot,
     stdio: 'inherit',
   });
+
+  // Check what ships, not what was staged: the archive is the staging directory
+  // after MCPB's exclusions. A failed check removes the bundle.
+  try {
+    execFileSync(process.execPath, [mcpbCli, 'unpack', outputPath, unpackPath], { cwd: projectRoot, stdio: 'inherit' });
+    await access(path.join(unpackPath, 'package-lock.json')).catch(() => {
+      throw new Error('The bundle does not contain package-lock.json.');
+    });
+    await assertBundledSdkBuilds(unpackPath);
+  } catch (error) {
+    await rm(outputPath, { force: true });
+    throw error;
+  }
 } finally {
   await rm(stagePath, { recursive: true, force: true });
+  await rm(unpackPath, { recursive: true, force: true });
+  await rm(npmConfigPath, { recursive: true, force: true });
 }

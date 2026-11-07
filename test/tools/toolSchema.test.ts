@@ -100,7 +100,6 @@ describe('Tool input schema — advertised (tools/list) and enforced (tools/call
       'fluent_transform',
       'init_fluent_app',
       'pack_fluent_app',
-      'query_fluent_records',
     ]);
 
     for (const command of commands) {

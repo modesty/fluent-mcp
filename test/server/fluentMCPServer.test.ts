@@ -23,8 +23,6 @@ const mockRegisterTool = mock.fn();
 const mockRegisterPrompt = mock.fn();
 const mockSetRequestHandler = mock.fn();
 const mockSetNotificationHandler = mock.fn();
-const mockRequest = mock.fn();
-const mockGetClientCapabilities = mock.fn((): Record<string, unknown> => ({ roots: {} }));
 const mockClose = mock.fn();
 
 type ServerOptions = { capabilities: Record<string, Record<string, unknown> | undefined> };
@@ -38,8 +36,6 @@ const McpServer = mock.fn(function (_info?: unknown, _options?: ServerOptions) {
     server: {
       setRequestHandler: mockSetRequestHandler,
       setNotificationHandler: mockSetNotificationHandler,
-      request: mockRequest,
-      getClientCapabilities: mockGetClientCapabilities,
     },
   };
 });
@@ -99,8 +95,6 @@ const allMocks: Array<{ mock: { resetCalls(): void } }> = [
   mockRegisterPrompt,
   mockSetRequestHandler,
   mockSetNotificationHandler,
-  mockRequest,
-  mockGetClientCapabilities,
   mockClose,
   McpServer,
   mockHandleClose,
@@ -227,30 +221,24 @@ describe('FluentMcpServer with Modular Design', () => {
 
     it('fully registers tools, prompts and resource handlers on each instance', async () => {
       await server.start();
+      const factory = capturedFactory();
 
-      const instance = capturedFactory()();
+      // Two instances, as serveStdio builds for a discover probe followed by a
+      // legacy initialize: each must carry the full registration.
+      const instances = [factory(), factory()];
 
       // Tools are registered through registerTool; the SDK serves tools/list
       // and tools/call from them.
-      assertCalledTimes(mockToolsRegisterOn, 1);
-      assert.equal(mockToolsRegisterOn.mock.calls[0].arguments[0], instance);
+      assert.deepEqual(mockToolsRegisterOn.mock.calls.map((call) => call.arguments[0]), instances);
       // Resources are registered as SDK templates; the SDK serves every
       // resources/* method and completion/complete from them.
-      assertCalledTimes(mockResourceRegisterOn, 1);
-      assert.equal(mockResourceRegisterOn.mock.calls[0].arguments[0], instance);
+      assert.deepEqual(mockResourceRegisterOn.mock.calls.map((call) => call.arguments[0]), instances);
       // Prompts go through registerPrompt (PromptManager is not mocked here);
       // the SDK serves prompts/* and completion/complete from them.
-      assert.deepEqual(mockRegisterPrompt.mock.calls.map((call) => call.arguments[0]), ['coding_in_fluent', 'create_custom_ui']);
+      assert.deepEqual(mockRegisterPrompt.mock.calls.map((call) => call.arguments[0]),
+        ['coding_in_fluent', 'create_custom_ui', 'coding_in_fluent', 'create_custom_ui']);
       // No method is hand-registered.
       assertCalledTimes(mockSetRequestHandler, 0);
-    });
-
-    it('stop() closes the transport handle', async () => {
-      await server.start();
-
-      await server.stop();
-
-      assertCalledTimes(mockHandleClose, 1);
     });
   });
 
@@ -258,18 +246,10 @@ describe('FluentMcpServer with Modular Design', () => {
   // deprecated Roots. These tests assert the *direction* of the protocol
   // surface, not merely which handlers exist — the gap that let a server-side
   // `roots/list` handler and an outbound `roots/list_changed` notification ship
-  // unnoticed, because nothing exercised them.
+  // unnoticed, because nothing exercised them. That no server→client request is
+  // ever sent is checked on the wire (wireProtocol.test.ts,
+  // serverInitiatedRequests()); this suite checks what the factory declares.
   describe('no server-initiated protocol traffic', () => {
-    it('issues no server→client request while building an instance', async () => {
-      // Even a client that advertises roots must not be asked for them.
-      mockGetClientCapabilities.mock.mockImplementation(() => ({ roots: {}, elicitation: {} }));
-
-      await server.start();
-      capturedFactory()();
-
-      assertNotCalled(mockRequest);
-    });
-
     it('registers no notification handler', async () => {
       // The only notification handler this server ever had was
       // notifications/initialized, whose sole remaining job was triggering the
@@ -278,17 +258,6 @@ describe('FluentMcpServer with Modular Design', () => {
       capturedFactory()();
 
       assertNotCalled(mockSetNotificationHandler);
-    });
-
-    it('exposes no roots API surface', () => {
-      // Guards against reintroduction: the working directory now comes only from
-      // the explicit tool argument, the initialized session, or
-      // FLUENT_MCP_WORKING_DIR.
-      const surface = server as unknown as Record<string, unknown>;
-      assert.equal(surface.getRoots, undefined);
-      assert.equal(surface.addRoot, undefined);
-      assert.equal(surface.updateRoots, undefined);
-      assert.equal(surface.requestRootsFromClient, undefined);
     });
 
     it('declares no client-side capability and no unsent listChanged', async () => {

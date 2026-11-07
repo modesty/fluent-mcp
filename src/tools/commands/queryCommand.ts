@@ -1,6 +1,6 @@
 import { ArgumentDomain, CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { ENVELOPE_RUN_OPTIONS, shapeEnvelopeResult } from '../../utils/jsonSelect.js';
-import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
+import { SessionAwareCLICommand } from './sessionAwareCommand.js';
 import { SELECT_PATH_DOMAIN } from './argValidation.js';
 import { cliOption } from './cliArgv.js';
 
@@ -29,11 +29,13 @@ const DISPLAY_VALUES = ['true', 'false', 'all'] as const;
  */
 export class QueryCommand extends SessionAwareCLICommand {
   name = 'query_fluent_records';
-  description = 'Run a read-only query against a ServiceNow table via the Table REST API (SDK v4.8.0+). Returns matching records as a JSON envelope. Requires instance authentication (auto-injected from session, or pass auth explicitly). Provide table and an encoded query (e.g. "active=true^priority<=2").';
+  description = 'Run a read-only query against a ServiceNow table via the Table REST API (SDK v4.8.0+). Returns matching records as a JSON envelope. Requires instance authentication (auto-injected from session, or pass auth explicitly). Provide table and an encoded query (e.g. "active=true^priority<=2"). No Fluent project required.';
   annotations = { readOnlyHint: true, openWorldHint: true };
   timeoutMs = 60_000;
+  // `now-sdk query` reads nothing from its cwd (no now.config.json, no package.json),
+  // so it runs without a Fluent project, like cicd_fluent_test.
+  protected readonly requiresProject = false;
   arguments: CommandArgument[] = [
-    WORKING_DIRECTORY_ARGUMENT,
     {
       name: 'table',
       type: 'string',

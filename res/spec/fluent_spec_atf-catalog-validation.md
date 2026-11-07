@@ -11,19 +11,19 @@ atf.catalog.validatePriceAndRecurringPrice({
 // Validates variable values on the Catalog Item, Record Producer pages or a page containing a variable editor. can be used only in-between atf.catalog.openCatalogItem step and atf.catalog.orderCatalogItem step
 atf.catalog.validateVariableValue({
     $id: Now.ID[''], // string | guid, mandatory
-    catalogItem: get_sys_id('sc_cat_item', ''), // sys_id | Record&lt;'sc_cat_item'&gt;
-    catalogConditions: "IO:get_sys_id('item_option_new', '')=value" // string of variable sys_ids and the value to validate. If multiple, each has 'IO:' before and joined with ^, example: "IO:get_sys_id('item_option_new', '')=true^IO:get_sys_id('item_option_new', '')LIKEnone"
+    catalogItem: Now.ref('sc_cat_item', '<sys_id>'), // sys_id | Record&lt;'sc_cat_item'&gt;
+    catalogConditions: "IO:<item_option_new sys_id>=value" // string of variable sys_ids and the value to validate. If multiple, each has 'IO:' before and joined with ^, example: "IO:<item_option_new sys_id>=true^IO:<item_option_new sys_id>LIKEnone"
 }): void;
 
 // Validates states of the desired variables.
 atf.catalog.variableStateValidation({ // each of the following props are mandatory
     $id: Now.ID[''], // string | guid, mandatory
-    catalogItem: get_sys_id('sc_cat_item', ''), // sys_id | Record&lt;'sc_cat_item'&gt;
-    visible: [get_sys_id('item_option_new', '')], // array of sys_id | Record&lt;'item_option_new'&gt;
-    notVisible: [get_sys_id('item_option_new', '')], // array of sys_id | Record&lt;'item_option_new'&gt;
-    readOnly: [get_sys_id('item_option_new', '')], // array of sys_id | Record&lt;'item_option_new'&gt;
-    notReadOnly: [get_sys_id('item_option_new', '')], // array of sys_id | Record&lt;'item_option_new'&gt;
-    mandatory: [get_sys_id('item_option_new', '')], // array of sys_id | Record&lt;'item_option_new'&gt;
-    notMandatory: [get_sys_id('item_option_new', '')], // array of sys_id | Record&lt;'item_option_new'&gt;
+    catalogItem: Now.ref('sc_cat_item', '<sys_id>'), // sys_id | Record&lt;'sc_cat_item'&gt;
+    visible: [Now.ref('item_option_new', '<sys_id>')], // array of sys_id | Record&lt;'item_option_new'&gt;
+    notVisible: [Now.ref('item_option_new', '<sys_id>')], // array of sys_id | Record&lt;'item_option_new'&gt;
+    readOnly: [Now.ref('item_option_new', '<sys_id>')], // array of sys_id | Record&lt;'item_option_new'&gt;
+    notReadOnly: [Now.ref('item_option_new', '<sys_id>')], // array of sys_id | Record&lt;'item_option_new'&gt;
+    mandatory: [Now.ref('item_option_new', '<sys_id>')], // array of sys_id | Record&lt;'item_option_new'&gt;
+    notMandatory: [Now.ref('item_option_new', '<sys_id>')], // array of sys_id | Record&lt;'item_option_new'&gt;
 }): void;
 ```

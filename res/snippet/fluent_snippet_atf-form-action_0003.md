@@ -11,7 +11,7 @@ Test({
 }, (atf) => {
     atf.server.impersonate({
         $id: Now.ID['0001'], 
-        user: 'cae9ddbedbd313001d47765f369619bd', // function get_sys_id has two parameters: table name and encoded query string
+        user: 'cae9ddbedbd313001d47765f369619bd', // sys_id | Record<'sys_user'>: the user's sys_id, looked up on the instance
     })
     atf.form.openExistingRecord({
         $id: Now.ID['0002'],

@@ -58,6 +58,33 @@ const { FluentMcpServer } = await import('../../src/server/fluentMCPServer.js');
 
 const MODERN_VERSION = '2026-07-28';
 const LEGACY_VERSION = '2025-11-25';
+
+/** Every tool the server registers, in the name order tools/list serves them. */
+const EXPECTED_TOOLS = [
+  'build_fluent_app',
+  'check_auth_status',
+  'cicd_fluent_app',
+  'cicd_fluent_test',
+  'clean_fluent_app',
+  'deploy_fluent_app',
+  'download_fluent_app',
+  'download_fluent_dependencies',
+  'explain_fluent_api',
+  'fluent_exec_script',
+  'fluent_transform',
+  'get_fluent_knowledge',
+  'init_fluent_app',
+  'pack_fluent_app',
+  'query_fluent_records',
+  'sdk_info',
+];
+
+/** The three resource templates, as [name, uriTemplate, mimeType]. */
+const EXPECTED_TEMPLATES = [
+  ['sn-spec', 'sn-spec://{metadataType}', 'text/markdown'],
+  ['sn-instruct', 'sn-instruct://{metadataType}', 'text/markdown'],
+  ['sn-snippet', 'sn-snippet://{metadataType}/{snippetId}', 'text/markdown'],
+];
 const PROTOCOL_VERSION_KEY = 'io.modelcontextprotocol/protocolVersion';
 const CLIENT_CAPABILITIES_KEY = 'io.modelcontextprotocol/clientCapabilities';
 const CLIENT_INFO_KEY = 'io.modelcontextprotocol/clientInfo';
@@ -214,6 +241,23 @@ async function readPidIfPresent(pidPath: string): Promise<number | undefined> {
 
 type Send = (method: string, params?: Record<string, unknown>) => Promise<Frame>;
 
+/** resources/read of one resource per template returns that file's content verbatim. */
+async function assertResourceReads(send: Send): Promise<void> {
+  for (const [uri, file] of [
+    ['sn-spec://business-rule', 'spec/fluent_spec_business-rule.md'],
+    ['sn-instruct://business-rule', 'instruct/fluent_instruct_business-rule.md'],
+    ['sn-snippet://business-rule/0002', 'snippet/fluent_snippet_business-rule_0002.md'],
+  ]) {
+    const res = await send('resources/read', { uri });
+    assert.equal(res.error, undefined, uri);
+    assert.deepStrictEqual(
+      res.result.contents,
+      [{ uri, mimeType: 'text/markdown', text: await readFile(path.join(projectRoot, 'res', file), 'utf8') }],
+      uri
+    );
+  }
+}
+
 /** completion/complete on every advertised prompt argument and template variable. */
 async function assertCompletions(send: Send): Promise<void> {
   const complete = async (ref: Frame, name: string, value: string, context?: Frame) => {
@@ -321,11 +365,7 @@ describe('dual-era wire protocol', () => {
     it('serves tools/list with the full tool set in deterministic name order', async () => {
       const res = await wire.modern('tools/list');
 
-      const names = res.result.tools.map((t: Frame) => t.name);
-      assert.ok(names.length > 10);
-      assert.deepStrictEqual(names, [...names].sort());
-      assert.ok(names.includes('init_fluent_app'));
-      assert.ok(names.includes('get_fluent_knowledge'));
+      assert.deepStrictEqual(res.result.tools.map((t: Frame) => t.name), EXPECTED_TOOLS);
     });
 
     it('advertises one knowledge tool with kind and metadataType enums, and none of the tools it replaced', async () => {
@@ -350,13 +390,11 @@ describe('dual-era wire protocol', () => {
       assert.equal(res.result.resultType, 'complete');
     });
 
-    it('serves resources/list and resources/read', async () => {
+    it('serves resources/list and resources/read for every template', async () => {
       const list = await wire.modern('resources/list');
       assert.ok(list.result.resources.length > 100);
 
-      const read = await wire.modern('resources/read', { uri: 'sn-spec://business-rule' });
-      assert.ok(read.result.contents[0].text.length > 100);
-      assert.equal(read.result.contents[0].mimeType, 'text/markdown');
+      await assertResourceReads((method, params) => wire.modern(method, params));
     });
 
     it('reports a missing resource as -32602, not -32002', async () => {
@@ -370,11 +408,7 @@ describe('dual-era wire protocol', () => {
       assert.equal(res.error, undefined);
       assert.deepStrictEqual(
         res.result.resourceTemplates.map((t: Frame) => [t.name, t.uriTemplate, t.mimeType]),
-        [
-          ['sn-spec', 'sn-spec://{metadataType}', 'text/markdown'],
-          ['sn-instruct', 'sn-instruct://{metadataType}', 'text/markdown'],
-          ['sn-snippet', 'sn-snippet://{metadataType}/{snippetId}', 'text/markdown'],
-        ]
+        EXPECTED_TEMPLATES
       );
     });
 
@@ -421,8 +455,10 @@ describe('dual-era wire protocol', () => {
       });
 
       // Enforced by the strict Zod object shared with the advertised schema.
-      const text = JSON.stringify(res);
-      assert.match(text, /bogus|unrecognized|strict/i);
+      assert.equal(res.error, undefined);
+      assert.equal(res.result.isError, true);
+      assert.match(res.result.content[0].text, /^Input validation error: Invalid arguments for tool get_fluent_knowledge: /);
+      assert.match(res.result.content[0].text, /bogusArgument/);
     });
 
     // Argument domains: one declaration, advertised on tools/list and enforced
@@ -565,9 +601,9 @@ describe('dual-era wire protocol', () => {
       const res = await wire.legacyInitialize();
 
       const caps = res.result.capabilities;
-      assert.ok(!caps.tools?.listChanged);
-      assert.ok(!caps.prompts?.listChanged);
-      assert.ok(!caps.resources?.listChanged);
+      assert.equal(caps.tools?.listChanged, false);
+      assert.equal(caps.prompts?.listChanged, false);
+      assert.equal(caps.resources?.listChanged, false);
     });
 
     it('emits no cache fields on 2025-era results', async () => {
@@ -586,9 +622,7 @@ describe('dual-era wire protocol', () => {
       await wire.notify('notifications/initialized');
 
       const res = await wire.legacy('tools/list');
-      const names = res.result.tools.map((t: Frame) => t.name);
-      assert.ok(names.includes('init_fluent_app'));
-      assert.deepStrictEqual(names, [...names].sort());
+      assert.deepStrictEqual(res.result.tools.map((t: Frame) => t.name), EXPECTED_TOOLS);
 
       const modernWire = await WireClient.connect();
       try {
@@ -610,6 +644,7 @@ describe('dual-era wire protocol', () => {
 
       const list = await wire.legacy('resources/list');
       assert.ok(list.result.resources.length > 100);
+      await assertResourceReads((method, params) => wire.legacy(method, params));
 
       const miss = await wire.legacy('resources/read', { uri: 'sn-spec://no-such-type' });
       assert.equal(miss.error.code, -32602);
@@ -617,7 +652,10 @@ describe('dual-era wire protocol', () => {
       assert.equal(unknownScheme.error.code, -32602);
 
       const templates = await wire.legacy('resources/templates/list');
-      assert.equal(templates.result.resourceTemplates.length, 3);
+      assert.deepStrictEqual(
+        templates.result.resourceTemplates.map((t: Frame) => [t.name, t.uriTemplate, t.mimeType]),
+        EXPECTED_TEMPLATES
+      );
 
       const prompts = await wire.legacy('prompts/list');
       assert.ok(prompts.result.prompts.length > 0);

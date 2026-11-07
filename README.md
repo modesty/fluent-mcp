@@ -48,22 +48,22 @@ Add `@modesty/fluent-mcp` to your MCP client configuration:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `FLUENT_MCP_WORKING_DIR` | Fallback absolute path to your Fluent project | — |
-| `SN_INSTANCE_URL` | ServiceNow instance URL for automatic auth profile lookup | — |
+| `SN_INSTANCE_URL` | ServiceNow instance URL for automatic auth profile lookup. A matching profile is passed per call and never made your CLI default; the server never adds, deletes or selects a profile | — |
 | `SN_AUTH_TYPE` | `oauth` or `basic` | `oauth` |
-| `SN_USER_NAME` / `SN_PASSWORD` | Basic auth credentials for non-interactive profile creation | — |
-| `FLUENT_MCP_LOG_LEVEL` | Minimum stderr log level (`debug`, `info`, `notice`, `warning`, `error`) | `info` |
-| `FLUENT_MCP_COMMAND_TIMEOUT_MS` | Operator override for CLI command timeout (ms) | Per-tool |
+| `FLUENT_MCP_LOG_LEVEL` | Minimum stderr log level (`debug`, `info`, `notice`, `warning` or `warn`, `error`; case-insensitive, an unknown value falls back to `info` with a warning) | `info` |
+| `FLUENT_MCP_COMMAND_TIMEOUT_MS` | Operator override for CLI command timeout, in ms, digits only, at most `2147483647` (`1e6`, `1.5`, `300000ms` or a longer value are ignored) | Per-tool |
 | `NO_TELEMETRY` | Set to `1` to disable `@servicenow/sdk` CLI telemetry | — |
 | `SN_SDK_CREDENTIALS_DIR` | Directory of the SDK's encrypted profile store `credentials.enc` (SDK v4.14.0+; an empty value is treated as unset) | `~/.now-sdk` |
 
-> **Authentication Tip:** To register an instance profile manually, run:
+> **Authentication Tip:** The server only reads your auth profiles. To register an instance profile, run in a terminal:
 > `npx @servicenow/sdk auth --add <instance-url> --type <basic|oauth> --alias <alias>`
+> `auth --add` makes the new profile your CLI default; run `npx @servicenow/sdk auth --use <previous alias>` afterwards to keep the old one.
 > Since `@servicenow/sdk` 4.14.0, profiles are stored encrypted in `credentials.enc` with only the key in the OS keychain. The first auth lookup migrates existing keychain profiles silently; afterwards, profiles added with an older `now-sdk` are not visible to this server. If the store cannot be decrypted, `check_auth_status` reports it, and you must run `now-sdk auth --delete all` in a terminal and add the profile again. Do not reset for any other store error: a file written by a newer `now-sdk` needs that newer SDK, and a keyring write failure needs the OS keyring unlocked.
 > For headless CI/CD pipelines, set `SN_SDK_NODE_ENV=SN_SDK_CI_INSTALL` along with `SN_SDK_INSTANCE_URL` and `SN_SDK_USER`/`SN_SDK_USER_PWD` or `SN_SDK_OAUTH_CLIENT_ID`/`SN_SDK_OAUTH_CLIENT_SECRET`.
 
 ### MCPB Bundle (Optional)
 
-Run `npm run bundle` to build a self-contained `fluent-mcp-<version>.mcpb` archive with `dist/`, `res/`, and production dependencies for MCPB-compatible desktop hosts.
+Run `npm run bundle` to build a self-contained `fluent-mcp-<version>.mcpb` archive with `dist/`, `res/`, and production dependencies for MCPB-compatible desktop hosts. The dependencies are resolved fresh from the public npm registry, the same way an npm install of the package resolves them; an inherited registry setting, scoped ones included, is overridden, and the bundle fails if any package in its lockfile came from elsewhere, MCPB drops `*.d.ts` and `package-lock.json` by default, so the script re-includes the SDK's declarations, which a Fluent build type-checks against, and the lockfile. After packing it unpacks the archive and fails, deleting the bundle, unless the lockfile is there and the bundled SDK can build a fixture project that has no SDK of its own.
 
 ---
 
@@ -110,7 +110,7 @@ This repository ships standalone AI agent skills under [`skills/`](./skills) pac
 | `download_fluent_app` | Download application metadata from an instance | `workingDirectory`, `directory`, `source`, `incremental`, `timeoutSeconds`, `auth`, `debug` |
 | `clean_fluent_app` | Clean build output directory | `workingDirectory`, `source`, `debug` |
 | `pack_fluent_app` | Zip built application into an installable artifact | `workingDirectory`, `source`, `debug` |
-| `query_fluent_records` | Read-only Table REST query against an instance (returns JSON envelope) | `workingDirectory`, `table`, `query`, `fields`, `limit`, `offset`, `displayValue`, `select`, `timeout`, `auth` |
+| `query_fluent_records` | Read-only Table REST query against an instance (returns JSON envelope); needs no Fluent project | `table`, `query`, `fields`, `limit`, `offset`, `displayValue`, `select`, `timeout`, `auth` |
 | `cicd_fluent_app` | Install, publish, or rollback an app via the `sn_cicd` API | `workingDirectory`, `action` (`install`\|`publish`\|`rollback`), `scope`\|`appSysId`, `appVersion`, `wait`, `pollTimeout`, `output`, `select` |
 | `cicd_fluent_test` | Run, watch, or fetch results/logs for ATF test suites and tests via `sn_cicd` | `target` (`testsuite`\|`test`), `action` (`run`\|`watch`\|`result`\|`logs`), `testSuiteSysId`\|`testSuiteName`, `testSysId`\|`testName`, `progressId`, `resultId`, `pattern`, `limit`, `wait`, `output`, `select` |
 | `fluent_exec_script` | Run a server-side script on the instance like Scripts - Background (`now-sdk exec`; admin role, destructive — approve every run; a timeout does not stop the script) | `script`\|`file` (a `.js` file inside the project, ≤ 64 KB; run from a private copy and echoed with its SHA-256), `workingDirectory`, `scope`, `reason`, `timeoutMs`, `serverLogs`, `select`, `auth` |

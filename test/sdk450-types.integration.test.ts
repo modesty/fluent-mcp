@@ -6,7 +6,6 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ServiceNowMetadataType } from '../src/types.js';
 
 // Use process.cwd() as project root (the repository root under npm run)
 const PROJECT_ROOT = process.cwd();
@@ -17,38 +16,6 @@ const SNIPPET_DIR = path.join(RES_DIR, 'snippet');
 
 describe('SDK v4.5.0 Types - Integration Tests', () => {
 
-  describe('Enum completeness', () => {
-    it('should have new v4.5.0 enum entries', () => {
-      assert.equal(ServiceNowMetadataType.INSTANCE_SCAN, 'instance-scan');
-      assert.equal(ServiceNowMetadataType.NOW_ASSIST_SKILL_CONFIG, 'now-assist-skill-config');
-      assert.equal(ServiceNowMetadataType.AI_AGENT, 'ai-agent');
-      assert.equal(ServiceNowMetadataType.AI_AGENT_WORKFLOW, 'ai-agent-workflow');
-    });
-  });
-
-  describe('SDK v4.5.0 resource files', () => {
-    const v450Types = [
-      'instance-scan',
-      'now-assist-skill-config',
-      'ai-agent',
-      'ai-agent-workflow',
-    ];
-
-    it('should have spec/instruct/snippet coverage for each v4.5.0 type', () => {
-      for (const metadataType of v450Types) {
-        const specFile = path.join(SPEC_DIR, `fluent_spec_${metadataType}.md`);
-        const instructFile = path.join(INSTRUCT_DIR, `fluent_instruct_${metadataType}.md`);
-        assert.equal(fs.existsSync(specFile), true);
-        assert.equal(fs.existsSync(instructFile), true);
-
-        const snippetCandidates = fs
-          .readdirSync(SNIPPET_DIR)
-          .filter((file) => file.startsWith(`fluent_snippet_${metadataType}_`) && file.endsWith('.md'));
-        assert.ok(snippetCandidates.length > 0);
-      }
-    });
-  });
-
   describe('Instance Scan resource files', () => {
     it('should have spec with all four check type API signatures', () => {
       const content = fs.readFileSync(
@@ -56,8 +23,7 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
       );
       const expectedTerms = [
         'LinterCheck(', 'ScriptOnlyCheck(', 'ColumnTypeCheck(', 'TableCheck(',
-        '$id', 'name', 'category', 'active',
-        'columnType', 'conditions', 'priority', 'shortDescription',
+        'category:', 'columnType:', 'conditions', 'priority:', 'shortDescription:',
       ];
       for (const term of expectedTerms) {
         assert.ok(content.includes(term));
@@ -82,8 +48,8 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
         path.join(SNIPPET_DIR, 'fluent_snippet_instance-scan_0001.md'), 'utf-8'
       );
       assert.ok(content.includes('LinterCheck('));
-      assert.ok(content.includes('script'));
-      assert.ok(content.includes('priority'));
+      assert.ok(content.includes('script:'));
+      assert.ok(content.includes('priority:'));
     });
 
     it('should have snippet 0002 with ScriptOnlyCheck example', () => {
@@ -91,7 +57,7 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
         path.join(SNIPPET_DIR, 'fluent_snippet_instance-scan_0002.md'), 'utf-8'
       );
       assert.ok(content.includes('ScriptOnlyCheck('));
-      assert.ok(content.includes('script'));
+      assert.ok(content.includes('script:'));
     });
 
     it('should have snippet 0003 with ColumnTypeCheck and TableCheck', () => {
@@ -110,11 +76,9 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
         path.join(SPEC_DIR, 'fluent_spec_now-assist-skill-config.md'), 'utf-8'
       );
       assert.ok(content.includes('NowAssistSkillConfig('));
-      assert.ok(content.includes('$id'));
-      assert.ok(content.includes('name'));
       assert.ok(content.includes('securityControls'));
-      assert.ok(content.includes('inputs'));
-      assert.ok(content.includes('outputs'));
+      assert.ok(content.includes('inputs:'));
+      assert.ok(content.includes('outputs:'));
     });
 
     it('should have instruct with guidance', () => {
@@ -132,9 +96,8 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
         path.join(SPEC_DIR, 'fluent_spec_ai-agent.md'), 'utf-8'
       );
       assert.ok(content.includes('AiAgent('));
-      assert.ok(content.includes('$id'));
       assert.ok(content.includes('agentRole'));
-      assert.ok(content.includes('tools'));
+      assert.ok(content.includes('tools:'));
     });
 
     it('should have instruct with guidance', () => {
@@ -153,7 +116,6 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
         path.join(SPEC_DIR, 'fluent_spec_ai-agent-workflow.md'), 'utf-8'
       );
       assert.ok(content.includes('AiAgenticWorkflow('));
-      assert.ok(content.includes('$id'));
       assert.ok(content.includes('executionMode'));
       assert.ok(content.includes('triggerConfig'));
     });
@@ -187,10 +149,11 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
       assert.ok(content.includes('SPMenu'));
     });
 
-    it('should have new snippets for SPPage, SPTheme, and SPMenu', () => {
-      assert.equal(fs.existsSync(path.join(SNIPPET_DIR, 'fluent_snippet_service-portal_0016.md')), true);
-      assert.equal(fs.existsSync(path.join(SNIPPET_DIR, 'fluent_snippet_service-portal_0017.md')), true);
-      assert.equal(fs.existsSync(path.join(SNIPPET_DIR, 'fluent_snippet_service-portal_0018.md')), true);
+    it('should have snippets that call SPPage, SPTheme, and SPMenu', () => {
+      for (const [id, call] of [['0016', 'SPPage('], ['0017', 'SPTheme('], ['0018', 'SPMenu(']]) {
+        const content = fs.readFileSync(path.join(SNIPPET_DIR, `fluent_snippet_service-portal_${id}.md`), 'utf-8');
+        assert.ok(content.includes(call), `snippet ${id} should call ${call}`);
+      }
     });
   });
 
@@ -219,7 +182,7 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
       const content = fs.readFileSync(
         path.join(SPEC_DIR, 'fluent_spec_flow.md'), 'utf-8'
       );
-      assert.ok(content.includes("default: 'system' since SDK v4.5.0"));
+      assert.match(content, /runAs: 'system',.*default: 'system'/);
     });
 
     it('should document auto-publish and skip-flow-activation in instruct', () => {
@@ -228,7 +191,7 @@ describe('SDK v4.5.0 Types - Integration Tests', () => {
       );
       assert.ok(content.includes('auto-published'));
       assert.ok(content.includes('--skip-flow-activation'));
-      assert.ok(content.includes("since SDK v4.5.0"));
+      assert.match(content, /`runAs` defaults to `'system'`/);
     });
   });
 });

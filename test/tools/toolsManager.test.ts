@@ -1,23 +1,25 @@
 /**
  * Tests for ToolsManager
  *
- * Note: Resource tool tests are in fluentMCPServer.resources.test.ts
- * This file only tests the ToolsManager-specific functionality
+ * Covers registration, the tools/call handler (argument passing, abort
+ * signal, thrown errors, progress notifications) and result formatting. The
+ * resource tools themselves are tested in resourceTools.test.ts.
  *
  * Native runner: collaborators are replaced with module mocks registered before
  * ToolsManager is imported. Constructor mocks use `function` implementations so
  * they can be called with `new`. The MCP SDK needs no mock here because
  * ToolsManager imports only types from it (erased at compile time).
  */
-import { beforeEach, describe, it, mock } from 'node:test';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { isDeepStrictEqual } from 'node:util';
 import { z } from 'zod';
 import { assertCalledWith } from '../support/mockAssertions.js';
 import { loggerFixture } from '../support/fixtures.js';
 
-// The logger fixture keeps the run quiet.
-mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
+// The logger fixture keeps the run quiet; its handle lets a test read what was logged.
+const { logger: mockedLogger, mockOptions: loggerOptions } = loggerFixture();
+mock.module('../../src/utils/logger.js', loggerOptions);
 
 // Mock command tools (split into individual modules)
 mock.module('../../src/tools/processors/processRunner.js', {
@@ -29,15 +31,17 @@ mock.module('../../src/tools/processors/cliExecutor.js', {
 mock.module('../../src/tools/processors/cliCmdWriter.js', {
   namedExports: { CLICmdWriter: mock.fn() },
 });
+// The CLI commands a ToolsManager built from now on registers. Empty by
+// default; the tools/call suite adds one command per test.
+const factoryCommands: unknown[] = [];
 mock.module('../../src/tools/registry/commandFactory.js', {
   namedExports: {
     CommandFactory: {
-      createCommands: mock.fn(() => []),
+      createCommands: mock.fn(() => [...factoryCommands]),
     },
   },
 });
 
-const mockGetCommand = mock.fn();
 mock.module('../../src/tools/registry/commandRegistry.js', {
   namedExports: {
     // Stores what is registered, so getAllCommands() reflects reality: since the
@@ -50,7 +54,6 @@ mock.module('../../src/tools/registry/commandRegistry.js', {
           commands.push(command);
         }),
         getAllCommands: mock.fn(() => commands),
-        getCommand: mockGetCommand,
       };
     }),
   },
@@ -117,10 +120,6 @@ describe('ToolsManager', () => {
     toolsManager.registerOn(mockMcpServer as never);
   });
 
-  it('should initialize and register tools', () => {
-    assert.notEqual(toolsManager, undefined);
-  });
-
   it('registers onto each server instance the factory produces', () => {
     // A second instance must receive the full tool set, because serveStdio can
     // discard a probe instance and ask the factory again.
@@ -169,6 +168,8 @@ describe('ToolsManager', () => {
       },
     };
     await handler({}, ctx);
+    // check_auth_status is not long-running, so the progress token is ignored.
+    assert.equal(ctx.mcpReq.notify.mock.callCount(), 0);
 
     const command = lastCheckAuthCommand();
     // First arg is the tool args ({}), second is the (absent) abort signal — never
@@ -231,5 +232,110 @@ describe('ToolsManager', () => {
     const silent = toolsManager.formatResult({ success: false, output: 'null', exitCode: 1 });
     assert.ok(!silent.includes('Unknown error'));
     assert.equal(silent, 'Error (exit 1): the command reported no error message\n\nOutput:\nnull');
+  });
+});
+
+describe('ToolsManager tools/call handler', () => {
+  type Execute = (args: Record<string, unknown>, signal?: AbortSignal) => Promise<unknown>;
+  type Notify = (notification: { method: string; params: Record<string, unknown> }) => Promise<void>;
+
+  afterEach(() => {
+    factoryCommands.length = 0;
+  });
+
+  /** Registers one CLI command and returns its tools/call handler. */
+  function handlerFor(command: { name: string; timeoutMs?: number; execute: Execute }): ToolHandler {
+    factoryCommands.push({ description: `${command.name} description`, arguments: [], ...command });
+    const server = createServerStub();
+    new ToolsManager().registerOn(server as never);
+    const registration = server.registerTool.mock.calls.find((call) => call.arguments[0] === command.name);
+    assert.ok(registration, `${command.name} was not registered`);
+    return registration.arguments[2];
+  }
+
+  function context(notify: Notify) {
+    return { mcpReq: { signal: undefined, _meta: { progressToken: 'tok-1' }, notify: mock.fn(notify) } };
+  }
+
+  /** The progress messages sent so far, in order. */
+  function progressMessages(ctx: ReturnType<typeof context>): unknown[] {
+    return ctx.mcpReq.notify.mock.calls.map((call) => {
+      const { method, params } = call.arguments[0];
+      assert.equal(method, 'notifications/progress');
+      assert.equal(params.progressToken, 'tok-1');
+      return params.message;
+    });
+  }
+
+  it('returns an isError result with the message when execute() throws', async () => {
+    const handler = handlerFor({ name: 'failing_cmd', execute: async () => { throw new Error('spawn exploded'); } });
+
+    const result = await handler({}, context(async () => undefined));
+
+    assert.deepEqual(result, { content: [{ type: 'text', text: 'Error: spawn exploded' }], isError: true });
+  });
+
+  it('sends an initial notice, heartbeats and a final notice for a long-running command', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    let finish!: (result: unknown) => void;
+    const handler = handlerFor({
+      name: 'long_cmd',
+      timeoutMs: 30_000,
+      execute: () => new Promise((resolve) => { finish = resolve; }),
+    });
+    const ctx = context(async () => undefined);
+
+    const call = handler({}, ctx);
+    assert.deepEqual(progressMessages(ctx), ['Running long_cmd…']);
+
+    t.mock.timers.tick(3_000);
+    assert.deepEqual(progressMessages(ctx), ['Running long_cmd…', 'Still running long_cmd…']);
+
+    finish({ success: true, output: 'done' });
+    await call;
+    assert.deepEqual(progressMessages(ctx), ['Running long_cmd…', 'Still running long_cmd…', 'Finished long_cmd']);
+    assert.deepEqual(ctx.mcpReq.notify.mock.calls.map((c) => c.arguments[0].params.progress), [1, 2, 3]);
+
+    // The heartbeat stops with the command.
+    t.mock.timers.tick(30_000);
+    assert.equal(ctx.mcpReq.notify.mock.callCount(), 3);
+  });
+
+  it('clears the heartbeat when execute() throws', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    const handler = handlerFor({ name: 'long_cmd', timeoutMs: 60_000, execute: async () => { throw new Error('boom'); } });
+    const ctx = context(async () => undefined);
+
+    const result = await handler({}, ctx);
+
+    assert.equal((result as { isError: boolean }).isError, true);
+    assert.deepEqual(progressMessages(ctx), ['Running long_cmd…', 'Finished long_cmd']);
+    t.mock.timers.tick(30_000);
+    assert.equal(ctx.mcpReq.notify.mock.callCount(), 2);
+  });
+
+  it('swallows a rejected progress notification', async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    mockedLogger.debug.mock.resetCalls();
+    const handler = handlerFor({ name: 'long_cmd', timeoutMs: 30_000, execute: async () => ({ success: true, output: 'ok' }) });
+    const ctx = context(async () => { throw new Error('transport closed'); });
+
+    const result = await handler({}, ctx);
+    // Let the notify rejections reach their catch handlers.
+    await new Promise((resolve) => setImmediate(resolve));
+
+    assert.deepEqual(result, { content: [{ type: 'text', text: 'ok' }], isError: false });
+    assert.equal(ctx.mcpReq.notify.mock.callCount(), 2);
+    const logged = mockedLogger.debug.mock.calls.map((call) => String(call.arguments[0]));
+    assert.equal(logged.filter((line) => line.startsWith("Progress notification failed for 'long_cmd'")).length, 2);
+  });
+
+  it('sends no progress for a command below the long-running threshold', async () => {
+    const handler = handlerFor({ name: 'short_cmd', timeoutMs: 29_999, execute: async () => ({ success: true, output: 'ok' }) });
+    const ctx = context(async () => undefined);
+
+    await handler({}, ctx);
+
+    assert.equal(ctx.mcpReq.notify.mock.callCount(), 0);
   });
 });

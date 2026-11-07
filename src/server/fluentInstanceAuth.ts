@@ -42,20 +42,22 @@ export function logAuthValidationResult(result: AuthValidationResult): void {
  *
  * Environment variables:
  * - SN_INSTANCE_URL: ServiceNow instance URL (required for auto-auth)
- * - SN_AUTH_TYPE: Authentication type ('basic' or 'oauth', defaults to 'oauth')
- * - SN_USER_NAME / SN_USERNAME: Username for basic auth
- * - SN_PASSWORD: Password for basic auth
+ * - SN_AUTH_TYPE: Authentication type ('basic' or 'oauth', defaults to 'oauth'),
+ *   used in the command that adds a profile by hand
  *
  * Rules:
  * 1. If SN_INSTANCE_URL is not set -> return skipped status
- * 2. List existing auth profiles via the bundled SDK CLI (`auth --list`)
- *    - If a profile's host matches SN_INSTANCE_URL -> use that profile
- *    - Store the auth alias in session for use by all SDK commands
- * 3. If no matching profile found -> add a profile only when it can complete
- *    non-interactively (basic auth with SN_USER_NAME/SN_USERNAME + SN_PASSWORD).
- *    OAuth and credential-less basic are not auto-added during lazy validation; instead a
- *    single not_authenticated NOTICE is emitted with the manual command.
- *    - If add succeeds, store the auth alias in session
+ * 2. List the stored auth profiles via the bundled SDK CLI (`auth --list`).
+ *    The server only reads the profile store.
+ *    - If a profile's host matches SN_INSTANCE_URL -> store its alias in the
+ *      session; every instance command passes it per call (`--auth`), so the
+ *      CLI's default profile is never switched
+ * 3. If no profile matches -> not_authenticated with the command that adds one
+ *    in a terminal. The server never adds a profile: `auth --add` makes it the
+ *    CLI default for every now-sdk run on the machine, and setting the previous
+ *    default back cannot be made safe. A failure after the write skips the
+ *    restore, and validations that overlap in separate server processes
+ *    restore the wrong default (W9 review).
  *
  * @returns AuthValidationResult with structured auth status for client notification
  */
@@ -83,25 +85,13 @@ export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): 
   // Extract hostname for display (no credentials)
   const host = extractHostname(instUrl);
 
-  // Check if credentials are configured (don't log actual values)
-  const username = process.env.SN_USER_NAME?.trim() || process.env.SN_USERNAME?.trim();
-  const password = process.env.SN_PASSWORD;
-  if (authType === 'basic') {
-    logger.debug('Basic auth credential check', {
-      hasUsername: !!username,
-      hasPassword: !!password
-    });
-  }
-
   try {
-    // Validate existing auth profiles using the registered AuthCommand via ToolsManager
-    const listRes = await toolsManager.runAuth({ list: true });
+    const listRes = await toolsManager.listAuthProfiles();
     if (listRes.exitCode !== 0) {
       // `auth --list` exits 0 even with no profiles ("No credentials found"), so a
       // non-zero exit means the profile store itself could not be read — e.g. the
       // SDK v4.14.0+ encrypted store (credentials.enc) cannot be decrypted. Report
-      // that instead of treating it as "no matching profile" and attempting an add
-      // that would fail on the same read.
+      // that instead of treating it as "no matching profile".
       const failure = describeAuthListFailure(listRes.output);
       logger.warn('Auto-auth failed: could not list auth profiles', { error: failure });
       return createResult({
@@ -120,61 +110,27 @@ export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): 
 
     const matched = profiles.find((p) => urlsEqual(p.host, instUrl));
     if (matched) {
-      // Found a matching profile - store the alias in session
+      // Found a matching profile: store its alias in the session. Every
+      // instance command passes it per call (`--auth`), so the CLI's default
+      // profile, which other `now-sdk` runs on this machine use, is never
+      // switched here: even a status check used to redirect them (W9 review).
       sessionManager.setAuthAlias(matched.alias);
-
-      if (matched.defaultYes) {
-        logger.debug('Auto-auth validated: default profile matches SN_INSTANCE_URL');
-        return createResult({
-          status: 'authenticated',
-          alias: matched.alias,
-          host,
-          authType: matched.type || authType,
-          isDefault: true,
-          message: 'Auto-auth validated: default profile matches SN_INSTANCE_URL',
-          timestamp,
-        });
-      }
-
-      // Found matching host but not default, switch default
-      const useAlias = matched.alias;
-      const useRes = await toolsManager.runAuth({ use: useAlias });
-      if (useRes.exitCode === 0) {
-        logger.debug('Auto-auth updated: switched default profile');
-        return createResult({
-          status: 'authenticated',
-          alias: useAlias,
-          host,
-          authType: matched.type || authType,
-          isDefault: true,
-          message: 'Auto-auth validated: switched to matching profile',
-          timestamp,
-        });
-      } else {
-        // Profile exists but couldn't switch - still consider authenticated
-        logger.warn('Auto-auth warning: failed to switch default profile');
-        return createResult({
-          status: 'authenticated',
-          alias: useAlias,
-          host,
-          authType: matched.type || authType,
-          isDefault: false,
-          message: 'Profile found but could not set as default. Commands may need explicit --auth flag.',
-          timestamp,
-        });
-      }
+      logger.debug('Auto-auth validated: matching profile found', { alias: matched.alias, isDefault: matched.defaultYes });
+      return createResult({
+        status: 'authenticated',
+        alias: matched.alias,
+        host,
+        authType: matched.type || authType,
+        isDefault: matched.defaultYes,
+        message: matched.defaultYes
+          ? 'Auto-auth validated: default profile matches SN_INSTANCE_URL'
+          : `Auto-auth validated: profile ${matched.alias} matches SN_INSTANCE_URL; it is passed per call, and the CLI default profile is unchanged`,
+        timestamp,
+      });
     }
 
-    // Not found -> attempt to add auth profile automatically
-    return await attemptAddAuthProfile(
-      toolsManager,
-      sessionManager,
-      createResult,
-      instUrl,
-      authType,
-      host,
-      timestamp
-    );
+    logger.debug('No auth profile matches SN_INSTANCE_URL; a profile must be added by hand', { host, authType });
+    return createResult(manualSetupResult({ instUrl, authType, host, timestamp, profiles }));
   } catch (error) {
     const alias = deriveAliasFromInstance(instUrl);
     const authCommand = buildAuthCommand(instUrl, authType, alias);
@@ -193,117 +149,54 @@ export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): 
   }
 }
 
-/**
- * Attempt to add a new auth profile automatically
- * Extracted to reduce nesting in the main function
- */
-async function attemptAddAuthProfile(
-  toolsManager: ToolsManager,
-  sessionManager: SessionManager,
-  createResult: (result: AuthValidationResult) => AuthValidationResult,
-  instUrl: string,
-  authType: string,
-  host: string,
-  timestamp: string
-): Promise<AuthValidationResult> {
-  const alias = deriveAliasFromInstance(instUrl);
-  const authCommand = buildAuthCommand(instUrl, authType, alias);
+/** One profile from `now-sdk auth --list`. */
+interface AuthProfile {
+  alias: string;
+  host?: string;
+  type?: string;
+  username?: string;
+  defaultYes: boolean;
+}
 
-  // Only auto-add when it can complete non-interactively. Adding otherwise
-  // guarantees a failed/blocked spawn during lazy validation (basic prompts for creds;
-  // oauth opens a browser), whose noise we want to avoid.
-  if (!canAutoAdd(authType)) {
-    const setupHint = getAuthSetupHint(authType);
-    logger.notice(`No matching auth profile for ${host}; manual authentication required`, {
-      authType,
-    });
-    return createResult({
-      status: 'not_authenticated',
-      host,
-      authType,
-      message: `No matching auth profile found. ${setupHint}`,
-      actionRequired: authCommand,
-      timestamp,
-    });
-  }
-
-  logger.debug('No matching auth profile found, attempting to add automatically', {
-    instUrl,
-    authType,
-    alias,
-  });
-
-  try {
-    // Attempt to add authentication profile
-    // For basic auth: relies on SN_USER_NAME/SN_USERNAME and SN_PASSWORD env vars
-    // For OAuth: will open browser for authentication
-    const addRes = await toolsManager.runAuth({
-      add: instUrl,
-      type: authType,
-      alias,
-    });
-
-    if (addRes.exitCode === 0) {
-      // Auth add succeeded - store the alias in session
-      sessionManager.setAuthAlias(alias);
-      logger.debug('Auto-auth succeeded: added new profile', { alias, authType });
-
-      return createResult({
-        status: 'authenticated',
-        alias,
-        host,
-        authType,
-        isDefault: true,
-        message: `Auto-auth succeeded: added new ${authType} profile for ${host}`,
-        timestamp,
-      });
-    }
-
-    // Auth add failed - return instructions for manual setup.
-    // Keep the WARNING concise; full CLI output stays at DEBUG via the runner.
-    const setupHint = getAuthSetupHint(authType);
-
-    logger.warn('Auto-auth could not add profile', {
-      exitCode: addRes.exitCode,
-    });
-
-    return createResult({
-      status: 'not_authenticated',
-      host,
-      authType,
-      message: `Auto-auth failed to add profile. ${setupHint}`,
-      actionRequired: authCommand,
-      timestamp,
-    });
-  } catch (addError) {
-    // Error during auth add attempt - return instructions for manual setup
-    const errorMessage = CommandResultFactory.normalizeError(addError).message;
-    const setupHint = getAuthSetupHint(authType);
-
-    logger.warn('Auto-auth error during profile add', { error: errorMessage });
-
-    return createResult({
-      status: 'not_authenticated',
-      host,
-      authType,
-      message: `Auto-auth error: ${errorMessage}. ${setupHint}`,
-      actionRequired: authCommand,
-      timestamp,
-    });
-  }
+/** What the validation that found no matching profile knows. */
+interface ManualSetupContext {
+  instUrl: string;
+  authType: string;
+  host: string;
+  timestamp: string;
+  /** The profiles `auth --list` returned, none of which matches `instUrl`. */
+  profiles: AuthProfile[];
 }
 
 /**
- * Whether a profile can be added non-interactively during lazy validation.
- * - basic: requires SN_USER_NAME/SN_USERNAME + SN_PASSWORD (piped to the CLI).
- * - oauth: never — it requires a browser/interactive flow not suitable for
- *   an unattended MCP command.
+ * The not_authenticated result when no stored profile matches SN_INSTANCE_URL:
+ * the command that adds one in a terminal, and what that command does to the
+ * user's other profiles.
  */
-function canAutoAdd(authType: string): boolean {
-  if (authType !== 'basic') return false;
-  const username = process.env.SN_USER_NAME?.trim() || process.env.SN_USERNAME?.trim();
-  const password = process.env.SN_PASSWORD;
-  return !!username && !!password;
+function manualSetupResult({ instUrl, authType, host, timestamp, profiles }: ManualSetupContext): AuthValidationResult {
+  const derivedAlias = deriveAliasFromInstance(instUrl);
+  // `auth --add` replaces a profile stored under the same alias. A profile with
+  // the derived alias names another host here (a matching one would have been
+  // used), so the command asks for another alias instead of replacing it.
+  const aliasTaken = profiles.some((profile) => profile.alias === derivedAlias);
+  const previousDefault = profiles.find((profile) => profile.defaultYes)?.alias;
+
+  const message = [
+    `No auth profile matches ${host}. The server does not add profiles; add one in a terminal with the command below.`,
+    aliasTaken &&
+      `The alias ${derivedAlias} belongs to a profile for another host, which adding under it would replace, so choose another alias.`,
+    previousDefault &&
+      `auth --add makes the new profile the CLI default for every now-sdk run on this machine; run npx @servicenow/sdk auth --use ${previousDefault} afterwards to keep ${previousDefault} as the default.`,
+  ].filter(Boolean).join(' ');
+
+  return {
+    status: 'not_authenticated',
+    host,
+    authType,
+    message,
+    actionRequired: buildAuthCommand(instUrl, authType, aliasTaken ? '<new alias>' : derivedAlias),
+    timestamp,
+  };
 }
 
 /**
@@ -311,15 +204,6 @@ function canAutoAdd(authType: string): boolean {
  */
 function buildAuthCommand(instUrl: string, authType: string, alias: string): string {
   return `npx @servicenow/sdk auth --add ${instUrl} --type ${authType} --alias ${alias}`;
-}
-
-/**
- * Get setup hint message based on auth type
- */
-function getAuthSetupHint(authType: string): string {
-  return authType === 'basic'
-    ? 'For basic auth, ensure SN_USER_NAME and SN_PASSWORD environment variables are set.'
-    : 'For OAuth, a browser window will open for authentication.';
 }
 
 /**
@@ -377,12 +261,12 @@ function isCredentialStoreFailure(message: string): boolean {
 }
 
 /** Parse `now-sdk auth --list` stdout into profiles */
-function parseAuthListOutput(stdout: string): { alias: string; host?: string; type?: string; username?: string; defaultYes: boolean }[] {
-  const profiles: { alias: string; host?: string; type?: string; username?: string; defaultYes: boolean }[] = [];
+function parseAuthListOutput(stdout: string): AuthProfile[] {
+  const profiles: AuthProfile[] = [];
   if (!stdout) return profiles;
 
   const lines = stdout.split(/\r?\n/);
-  let current: { alias: string; host?: string; type?: string; username?: string; defaultYes: boolean } | null = null;
+  let current: AuthProfile | null = null;
 
   for (const raw of lines) {
     const line = raw.trimEnd();

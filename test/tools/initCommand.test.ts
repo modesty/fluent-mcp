@@ -18,6 +18,7 @@ import { inspect } from 'node:util';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import type { CommandResult } from '../../src/utils/types.js';
 import { assertCalledTimes, assertCalledWith, assertNotCalled } from '../support/mockAssertions.js';
 import { loggerFixture, sdkCliFixture } from '../support/fixtures.js';
@@ -41,6 +42,7 @@ mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 mock.module('../../src/utils/sdkCli.js', sdkCliFixture().mockOptions);
 
 const { InitCommand } = await import('../../src/tools/commands/initCommand.js');
+const { VALID_TEMPLATES } = await import('../../src/tools/commands/init/index.js');
 
 const SDK_BIN = '/test/node_modules/@servicenow/sdk/bin/index.js';
 const SYS_ID = 'a1b2c3d4e5f6789012345678901234ab';
@@ -131,6 +133,8 @@ describe('InitCommand', () => {
   beforeEach(() => {
     SessionManager.getInstance.mock.resetCalls();
     for (const fn of Object.values(sessionInstance)) fn.mock.resetCalls();
+    // An alias one test sets must not reach the next.
+    sessionInstance.getAuthAlias.mock.mockImplementation(() => undefined);
 
     validDir = directoryWith('valid');
     processMock = createProcessMock();
@@ -186,16 +190,6 @@ describe('InitCommand', () => {
     assert.ok(result.error?.message.includes('appName'));
     assert.ok(result.error?.message.includes('from'));
     // Never reaches the SDK
-    assertNotCalled(mockExecutor.process);
-  });
-
-  it('should never issue a server-initiated request for missing input', async () => {
-    // Guards the regression the 2026-07-28 migration removed: no code path may
-    // reach back to the client. A bare intent with no data must fail locally.
-    const result = await initCommand.execute({ intent: 'creation', workingDirectory: validDir });
-
-    assert.equal(result.success, false);
-    assert.ok(result.error?.message.includes('Required parameters for creation are missing'));
     assertNotCalled(mockExecutor.process);
   });
 
@@ -435,17 +429,65 @@ describe('InitCommand', () => {
     assertCalledWith(sessionInstance.setWorkingDirectory, validDir);
   });
 
-  it('should execute creation with all required parameters', async () => {
-    await initCommand.execute({ ...CREATION, template: 'typescript.react', auth: 'test-auth', workingDirectory: validDir });
+  it('should execute creation with all required parameters, honoring an explicit auth', async () => {
+    const ensureAuthValidated = mock.fn(async () => undefined);
+    const result = await new InitCommand(mockExecutor, ensureAuthValidated)
+      .execute({ ...CREATION, template: 'typescript.react', auth: 'test-auth', workingDirectory: validDir });
 
-    // SDK v4.5.0: init no longer injects --auth for creation (only for conversion)
+    // Creation reads the vendor prefix of the --auth instance (or, without it,
+    // of the CLI default profile), so an explicit alias is passed, not dropped.
     assertCalledWith(
       mockExecutor.process,
       process.execPath,
-      [SDK_BIN, 'init', '--appName=Test App', '--packageName=test-app', '--scopeName=x_test_scope', '--template=typescript.react'],
+      [SDK_BIN, 'init', '--appName=Test App', '--packageName=test-app', '--scopeName=x_test_scope', '--template=typescript.react', '--auth=test-auth'],
       validDir
     );
+    assertNotCalled(ensureAuthValidated);
     assertCalledWith(sessionInstance.setWorkingDirectory, validDir);
+    assert.ok(result.output.includes(
+      'Running this command contacts the instance of auth profile test-auth to read its vendor prefix, and warns when scopeName does not start with it; ' +
+      'the project is created either way. It also contacts the npm registry for the latest SDK version and the template packages.'
+    ), result.output);
+  });
+
+  describe('creation targeting (now-sdk init is not offline)', () => {
+    it('targets the session alias when no auth is given', async () => {
+      sessionInstance.getAuthAlias.mock.mockImplementation(() => 'session-auth');
+      const ensureAuthValidated = mock.fn(async () => undefined);
+
+      const result = await new InitCommand(mockExecutor, ensureAuthValidated).execute({ ...CREATION, workingDirectory: validDir });
+
+      assertProcessCalledWithSdkArgs(containsAll(['--auth=session-auth']), validDir, "'--auth=session-auth'");
+      assertNotCalled(ensureAuthValidated);
+      assert.ok(result.output.includes('contacts the instance of auth profile session-auth'), result.output);
+    });
+
+    it('validates the configured instance lazily, and uses the alias it finds', async () => {
+      const ensureAuthValidated = mock.fn(async () => {
+        sessionInstance.getAuthAlias.mock.mockImplementation(() => 'validated-auth');
+      });
+
+      await new InitCommand(mockExecutor, ensureAuthValidated).execute({ ...CREATION, workingDirectory: validDir });
+
+      assertCalledTimes(ensureAuthValidated, 1);
+      assertProcessCalledWithSdkArgs(containsAll(['--auth=validated-auth']), validDir, "'--auth=validated-auth'");
+    });
+
+    it('passes no --auth without any alias, and says the CLI default profile is contacted', async () => {
+      const result = await initCommand.execute({ ...CREATION, workingDirectory: validDir });
+
+      const sdkArgs = processMock.mock.calls[0].arguments[1];
+      assert.ok(!hasOption(sdkArgs, '--auth'), `unexpected --auth: ${inspect(sdkArgs)}`);
+      assert.ok(result.output.includes(
+        "contacts the instance of the CLI's default auth profile, if one is set (pass auth to choose the instance)"
+      ), result.output);
+    });
+
+    it('adds no network note to a conversion', async () => {
+      const result = await initCommand.execute({ from: SYS_ID, auth: 'dev', workingDirectory: validDir });
+
+      assert.ok(!result.output.includes('Running this command contacts'), result.output);
+    });
   });
 
   it('should succeed for an explicit conversion intent with complete arguments', async () => {
@@ -475,11 +517,51 @@ describe('InitCommand', () => {
       'or the absolute path of a scoped application directory to convert.');
   });
 
-  it('should validate scopeName format for creation', async () => {
-    const result = await initCommand.execute({ ...CREATION, scopeName: 'invalid_scope', workingDirectory: validDir });
+  for (const [scopeName, message] of [
+    ['x_nineteen_chars_xx', /scopeName cannot be longer than 18 characters/],
+    ['x_my scope', /scopeName cannot contain spaces/],
+  ] as const) {
+    it(`should refuse the creation scopeName ${JSON.stringify(scopeName)}`, async () => {
+      const result = await initCommand.execute({ ...CREATION, scopeName, workingDirectory: validDir });
 
-    assert.equal(result.success, false);
-    assert.ok(result.error?.message.includes('scopeName must start with "x_" prefix'));
+      assertRefused(result, message);
+      assertNotCalled(mockExecutor.process);
+    });
+  }
+
+  it('should accept a scopeName of exactly 18 characters', async () => {
+    const result = await initCommand.execute({ ...CREATION, scopeName: 'x_eighteen_chars_x', workingDirectory: validDir });
+
+    assert.equal(result.success, true);
+  });
+
+  it('should offer exactly the templates the bundled now-sdk init accepts', () => {
+    // The CLI's own --template choices, read from the bundled CLI's help, not from a copy.
+    // sdkCli.js is mocked in this file; tests run from the repository root.
+    const cli = path.resolve('node_modules/@servicenow/sdk/bin/index.js');
+    const help = execFileSync(process.execPath, [cli, 'init', '--help'], { encoding: 'utf8' });
+    const choices = help.match(/\[choices: ([^\]]+)\]/)?.[1];
+    assert.ok(choices, `no --template choices in:\n${help}`);
+    const cliTemplates = [...choices.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+    assert.deepEqual([...VALID_TEMPLATES].sort(), cliTemplates.sort());
+  });
+
+  it('should pass packageName to a conversion, so the command does not stop to prompt for it', async () => {
+    await initCommand.execute({ workingDirectory: validDir, from: SYS_ID, auth: 'test-auth', packageName: 'converted-app' });
+
+    assertCalledWith(
+      mockExecutor.process,
+      process.execPath,
+      [SDK_BIN, 'init', `--from=${SYS_ID}`, '--packageName=converted-app', '--auth=test-auth'],
+      validDir
+    );
+  });
+
+  it('should infer conversion, not creation, when from and packageName are both given', async () => {
+    const result = await initCommand.execute({ workingDirectory: validDir, from: SYS_ID, auth: 'test-auth', packageName: 'converted-app' });
+
+    assert.equal(result.success, true);
+    assert.ok(!mockExecutor.process.mock.calls[0].arguments[1].some((entry: string) => entry.startsWith('--appName')));
   });
 
   describe('local conversion source', () => {

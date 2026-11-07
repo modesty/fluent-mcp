@@ -96,6 +96,7 @@ export class InitArgsResolver {
     return {
       from: args.from as string,
       workingDirectory: args.workingDirectory as string,
+      packageName: InitArgsResolver.isNonEmptyString(args.packageName) ? args.packageName : undefined,
       auth: args.auth as string,
       debug: args.debug as boolean,
     };
@@ -135,7 +136,7 @@ export class InitArgsResolver {
    * empty string carries the same meaning for these arguments. Both count as
    * absent so the missing-argument message stays accurate.
    */
-  private static isNonEmptyString(value: unknown): boolean {
+  private static isNonEmptyString(value: unknown): value is string {
     return typeof value === 'string' && value.trim() !== '';
   }
 }

@@ -64,7 +64,7 @@ atf.list.clickListUIAction({
   table: 'incident', // TableName, mandatory
   relatedList: 'task.parent', // Record&lt;'sys_relationship'&gt; | string, mandatory
   relatedListTable: 'task', // TableName, mandatory
-  listAction: get_sys_id('sys_ui_action', ''), // string | Record&lt;'sys_ui_action'&gt;, mandatory - the UI Action on the CHILD table
+  listAction: Now.ref('sys_ui_action', '<sys_id>'), // string | Record&lt;'sys_ui_action'&gt;, mandatory - the UI Action on the CHILD table
   actionType: 'list_banner_button', // 'list_banner_button' | 'list_bottom_button' | 'list_context_menu' | 'list_choice' | 'list_link', mandatory
   applyTo: '', // '' | 'single_record' | 'all_records', optional (default '')
   recordId: filterResult.first_record, // string | Record&lt;relatedListTable&gt;, optional - required when applyTo is 'single_record'

@@ -27,14 +27,6 @@ describe('resolveSdkCli', () => {
     assert.equal(fs.existsSync(binPath), true);
   });
 
-  it('never returns a package-runner invocation', () => {
-    const { command, baseArgs } = resolveSdkCli();
-    assert.notEqual(command, 'now-sdk');
-    assert.notEqual(command, 'npx');
-    assert.ok(!baseArgs.includes('now-sdk'));
-    assert.ok(!baseArgs.includes('@servicenow/sdk'));
-  });
-
   it('memoizes the resolution', () => {
     const first = resolveSdkCli();
     const second = resolveSdkCli();

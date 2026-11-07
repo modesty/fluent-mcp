@@ -293,7 +293,7 @@ describe('ExecScriptCommand', () => {
       });
     }
 
-    it('accepts ordinary script punctuation the base sanitizer would reject', async () => {
+    it('accepts ordinary script punctuation (shell metacharacters are inert on the shell-free path)', async () => {
       const command = new ExecScriptCommand(mockProcessor);
       const script = "var a = [1, 2]; if (a.length > 1 && a[0] !== 2) { gs.info(`ok: ${a.join('|')}`); }\r\n\tgs.info('$done');";
       const result = await command.execute({ ...BASE_ARGS, script, reason: 'Probe (punctuation) & quotes "ok" | pipes; semicolons' });

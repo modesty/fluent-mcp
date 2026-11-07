@@ -1,7 +1,7 @@
 # Instructions for Fluent Acl (Access Control List) API
 Always reference the Acl API specifications for more details.
 1. when `type` is `record`, provide the `table` and `field` properties, `appliesTo` is only applicable to `record` type ACL too but optional and `name` is not applicable.
-2. `roles` property is an array whose entries are a role name string (a non-GUID string is resolved by role name at build time, e.g. `'itil'`), a sys_id, or a Role object. If using a new role, use the Role object. If using an existing role, its name is enough; `get_sys_id('sys_user_role', 'name=ex_role')` also works - no `label` field for roles.
+2. `roles` property is an array whose entries are a role name string (a non-GUID string is resolved by role name at build time, e.g. `'itil'`), a sys_id, or a Role object. If using a new role, use the Role object. If using an existing role, its name is enough (or its sys_id). Do not wrap the name in `Now.ref('sys_user_role', { name: 'ex_role' })`: the ACL build writes that entry as a fresh random sys_id without the name key, so it never resolves.
 3. The `script` property is optional and should only be used for advanced ACLs where the condition cannot be expressed using just the `roles` and `condition` fields.
 4. a `named ACL` can be created by providing a value for the `$id` , `type` and `name` properties.
 5. For ACL updates, do not modify the `script` property unless explicitly specified.

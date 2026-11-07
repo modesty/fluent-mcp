@@ -3,14 +3,14 @@
 // Sets variable values on the current Catalog Item or Record Producer page or a form containing variable editor
 atf.catalog.setVariableValue({
     $id: Now.ID[''], // string | guid, mandatory
-    catalogItem: get_sys_id('sc_cat_item', ''), // sys_id | Record&lt;'sc_cat_item'&gt;
-    variableValues: "IO:get_sys_id('item_option_new', '')=value" // string of variable sys_ids and the value to set them to. If multiple, each has 'IO:' before and joined with ^, example: "IO:get_sys_id('item_option_new', '')=true^IO:get_sys_id('item_option_new', '')=none"
+    catalogItem: Now.ref('sc_cat_item', '<sys_id>'), // sys_id | Record&lt;'sc_cat_item'&gt;
+    variableValues: "IO:<item_option_new sys_id>=value" // string of variable sys_ids and the value to set them to. If multiple, each has 'IO:' before and joined with ^, example: "IO:<item_option_new sys_id>=true^IO:<item_option_new sys_id>=none"
 }): void;
 
 // Opens a Record Producer for a catalog item
 atf.catalog.openRecordProducer({
     $id: Now.ID[''], // string | guid, mandatory
-    catalogItem: get_sys_id('sc_cat_item_producer', '') // sys_id | Record&lt;'sc_cat_item_producer'&gt;;
+    catalogItem: Now.ref('sc_cat_item_producer', '<sys_id>') // sys_id | Record&lt;'sc_cat_item_producer'&gt;;
 }): void;
 
 // Submit currently opened Record Producer after a call to atf.catalog.openRecordProducer, no other API calls are allowed after this

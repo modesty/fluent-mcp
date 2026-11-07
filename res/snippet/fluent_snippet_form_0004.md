@@ -4,14 +4,8 @@
 ```typescript
 import { Record } from '@servicenow/sdk/core';
 
-// Open the existing section in fluent
-const existing_section = Record({
-    $id: Now.ID['existing_section'],
-    table: 'sys_ui_section',
-    data: {
-        sys_id: get_sys_id('sys_ui_section', 'name=ex_table^caption=Additional details') // search for the sys_id of the section with table named `ex_table` and caption `Additional details`
-    }
-})
+// Reference the existing section: look up the sys_id of the `sys_ui_section` record on the instance with `name=ex_table^caption=Additional details`
+const existing_section = Now.ref('sys_ui_section', '<sys_id>')
 
 // Add a new field to this section
 Record({
