@@ -77,12 +77,16 @@ mock.module('../../src/tools/toolsManager.js', { namedExports: { ToolsManager } 
 
 const ResourceManager = mock.fn(function () {
   return {
-    initialize: mock.fn(async () => undefined),
     listResources: mock.fn(async () => []),
     readResource: mock.fn(async () => ({ contents: [] })),
   };
 });
 mock.module('../../src/res/resourceManager.js', { namedExports: { ResourceManager } });
+
+const ResourceCatalog = mock.fn(function () {
+  return { load: mock.fn(async () => ({ types: [], spec: new Map(), instruct: new Map(), snippets: new Map() })) };
+});
+mock.module('../../src/res/resourceCatalog.js', { namedExports: { ResourceCatalog } });
 
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 

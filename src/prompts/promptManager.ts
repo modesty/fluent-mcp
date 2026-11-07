@@ -4,7 +4,7 @@ import path from 'node:path';
 import { getProjectRootPath } from '../config.js';
 import logger from '../utils/logger.js';
 import { CommandResultFactory, ResourceType } from '../utils/types.js';
-import { ResourceLoader } from '../utils/resourceLoader.js';
+import { ResourceCatalog } from '../res/resourceCatalog.js';
 import { ServiceNowMetadataType } from '../types.js';
 import loggingManager from '../utils/loggingManager.js';
 
@@ -15,7 +15,6 @@ import loggingManager from '../utils/loggingManager.js';
 export class PromptManager {
   private prompts: Map<string, Prompt> = new Map();
   private promptContents: Map<string, string> = new Map();
-  private resourceLoader: ResourceLoader;
 
   /** Single source of truth for the supported metadata types (see src/types.ts). */
   private static readonly ALL_METADATA_TYPES: string[] = Object.values(ServiceNowMetadataType);
@@ -27,9 +26,7 @@ export class PromptManager {
    * attached per MCP server instance by `registerOn()`, because the stdio entry
    * may build more than one instance per connection (see ToolsManager).
    */
-  constructor() {
-    this.resourceLoader = new ResourceLoader();
-  }
+  constructor(private readonly resourceCatalog: ResourceCatalog = new ResourceCatalog()) {}
 
   /**
    * Initialize prompts by scanning the res/prompt/ directory and loading all .md files
@@ -178,7 +175,7 @@ export class PromptManager {
 
     let summary = '';
     try {
-      const instruct = await this.resourceLoader.getResource(ResourceType.INSTRUCT, type);
+      const instruct = await this.resourceCatalog.getResource(ResourceType.INSTRUCT, type);
       if (instruct.found) {
         summary = PromptManager.summarizeInstruct(instruct.content);
       }

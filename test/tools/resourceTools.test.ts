@@ -2,7 +2,7 @@
  * Unit tests for resource tool commands
  *
  * Native runner: the filesystem is stubbed on the shared node:fs object, so the
- * real ResourceLoader reads canned directory listings and file contents. The
+ * real ResourceCatalog reads canned directory listings and file contents. The
  * stubs are installed with the running test's mock tracker and restored when
  * the test ends. Configuration uses configFixture() with its default resource
  * paths (/test/res/spec, /test/res/snippet, /test/res/instruct) - because the stubs key on those path
@@ -20,7 +20,7 @@ mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 const { GetApiSpecCommand, GetSnippetCommand, GetInstructCommand } = await import(
   '../../src/tools/resources/resourceTools.js'
 );
-const { ResourceLoader } = await import('../../src/utils/resourceLoader.js');
+const { ResourceCatalog } = await import('../../src/res/resourceCatalog.js');
 
 describe('Resource Tool Commands', () => {
   // Test metadata type to use throughout tests
@@ -51,6 +51,8 @@ describe('Resource Tool Commands', () => {
           'fluent_snippet_business-rule_0002.md',
           'fluent_snippet_business-rule_0003.md',
         ];
+      } else if (path.includes('spec')) {
+        return mockTypes.map((type) => `fluent_spec_${type}.md`);
       }
       return [];
     });
@@ -103,8 +105,8 @@ describe('Resource Tool Commands', () => {
     });
 
     it('should list available metadata types when no argument provided', async (t) => {
-      // Mock ResourceLoader to return our mock types
-      t.mock.method(ResourceLoader.prototype, 'getAvailableMetadataTypes', async () => mockTypes);
+      // Mock the catalog to return our mock types
+      t.mock.method(ResourceCatalog.prototype, 'getAvailableMetadataTypes', async () => mockTypes);
 
       // Execute the command without arguments - should list available types
       const result = await command.execute({});
@@ -168,6 +170,29 @@ describe('Resource Tool Commands', () => {
       assert.equal(result.exitCode, 0);
       assert.equal(result.success, true);
       assert.ok(result.output.includes(mockSnippetContent));
+    });
+
+    it('reports an unknown snippet id with the ids that exist, never another snippet', async () => {
+      const result = await command.execute({ metadataType: TEST_METADATA_TYPE, id: '9999' });
+
+      assert.equal(result.success, false);
+      assert.match(result.output, /Snippet '9999' not found for metadata type 'business-rule'/);
+      assert.match(result.output, /Available snippet ids: 0001, 0002, 0003\./);
+      assert.ok(!result.output.includes(mockSnippetContent));
+    });
+
+    it('does not resolve a path-like id or metadata type outside the index', async () => {
+      for (const args of [
+        { metadataType: TEST_METADATA_TYPE, id: '/../../../../README' },
+        { metadataType: 'x/../../../README' },
+      ]) {
+        const result = await command.execute(args);
+        assert.equal(result.success, false, JSON.stringify(args));
+        assert.ok(!result.output.includes(mockSnippetContent));
+      }
+      const spec = await new GetApiSpecCommand().execute({ metadataType: 'x/../../../README' });
+      assert.equal(spec.success, false);
+      assert.match(spec.output, /No spec resource found/);
     });
 
     it('should handle no snippets found for non-existent metadata type', async () => {

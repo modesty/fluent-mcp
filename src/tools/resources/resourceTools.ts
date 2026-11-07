@@ -3,7 +3,7 @@
  * and checking authentication status
  */
 import { z } from 'zod';
-import { ResourceLoader } from '../../utils/resourceLoader.js';
+import { ResourceCatalog } from '../../res/resourceCatalog.js';
 import {
   CLICommand,
   CommandArgument,
@@ -38,11 +38,7 @@ export abstract class BaseResourceCommand implements CLICommand {
   abstract resourceType: ResourceType;
   outputSchema = RESOURCE_OUTPUT_SCHEMA;
 
-  protected resourceLoader: ResourceLoader;
-
-  constructor() {
-    this.resourceLoader = new ResourceLoader();
-  }
+  constructor(protected readonly resourceCatalog: ResourceCatalog = new ResourceCatalog()) {}
 
   /**
    * Resource commands don't use command processors
@@ -100,7 +96,7 @@ export abstract class BaseResourceCommand implements CLICommand {
     const metadataType = args.metadataType as string;
     const id = args.id as string | undefined;
 
-    const result = await this.resourceLoader.getResource(this.resourceType, metadataType, id);
+    const result = await this.resourceCatalog.getResource(this.resourceType, metadataType, id);
 
     if (!result.found) {
       return CommandResultFactory.error(
@@ -160,7 +156,7 @@ export class GetApiSpecCommand extends BaseResourceCommand {
     // If no metadataType provided, list all available types
     if (!metadataType) {
       try {
-        const metadataTypes = await this.resourceLoader.getAvailableMetadataTypes();
+        const metadataTypes = await this.resourceCatalog.getAvailableMetadataTypes();
 
         if (metadataTypes.length === 0) {
           return CommandResultFactory.error('No metadata types found.');
@@ -208,13 +204,21 @@ export class GetSnippetCommand extends BaseResourceCommand {
     const metadataType = args.metadataType as string;
     const id = args.id as string | undefined;
 
-    // If ID is provided, use base implementation
+    const snippetIds = await this.resourceCatalog.listSnippets(metadataType);
+
+    // An explicit id is served exactly or reported missing with the ids that
+    // do exist; it is never silently replaced by another snippet.
     if (id) {
+      if (snippetIds.length > 0 && !snippetIds.includes(id)) {
+        return CommandResultFactory.error(
+          `Snippet '${id}' not found for metadata type '${metadataType}'. ` +
+          `Available snippet ids: ${snippetIds.join(', ')}.`
+        );
+      }
       return super.doExecute(args);
     }
 
-    // If no ID provided, list available snippets and return the first one
-    const snippetIds = await this.resourceLoader.listSnippets(metadataType);
+    // No id: return the first snippet and advertise the others
 
     if (snippetIds.length === 0) {
       return CommandResultFactory.error(
@@ -224,7 +228,7 @@ export class GetSnippetCommand extends BaseResourceCommand {
     }
 
     // Get the first snippet
-    const result = await this.resourceLoader.getResource(
+    const result = await this.resourceCatalog.getResource(
       this.resourceType,
       metadataType,
       snippetIds[0]

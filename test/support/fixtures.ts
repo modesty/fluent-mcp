@@ -10,7 +10,7 @@
  *
  *   const config = configFixture({ name: 'x' });
  *   mock.module('../../src/config.js', config.mockOptions);
- *   const { ResourceLoader } = await import('../../src/utils/resourceLoader.js');
+ *   const { ResourceCatalog } = await import('../../src/res/resourceCatalog.js');
  */
 import { mock } from 'node:test';
 import type { TestContext } from 'node:test';

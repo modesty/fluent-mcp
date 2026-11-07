@@ -382,7 +382,7 @@ SN_INSTANCE_URL=https://company.service-now.com SN_AUTH_TYPE=oauth npm run inspe
 **Solutions:**
 1. Verify resource files exist in `res/` directory
 2. Check file naming follows convention
-3. Ensure `ResourceLoader` initialized correctly
+3. Ensure `ResourceCatalog` loaded the `res/` directories (startup fails fast if one is missing)
 4. Look for initialization errors in **Console**
 
 ### Issue: Environment variables not working

@@ -1,15 +1,14 @@
 /**
  * Tests for ResourceManager
  *
- * Native runner: the ResourceLoader module is replaced before ResourceManager is
- * imported. The loader constructor mock uses a `function` implementation so it
- * can be called with `new`, and every instance shares the same method mocks.
+ * A fake catalog is injected through the constructor; every test shares the
+ * same method mocks.
  */
 import { beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { loggerFixture } from '../support/fixtures.js';
 
-// Mock the ResourceLoader with controlled behavior
+// A fake catalog injected into ResourceManager (no module mock needed).
 const getAvailableMetadataTypes = mock.fn(async () => [
   'business-rule',
   'script-action',
@@ -32,20 +31,7 @@ const getResource = mock.fn(
 
 const listSnippets = mock.fn(async (_metadataType: string) => ['0001', '0002', '0003']);
 
-const ResourceLoader = mock.fn(function () {
-  return { getAvailableMetadataTypes, getResource, listSnippets };
-});
-
-mock.module('../../src/utils/resourceLoader.js', {
-  namedExports: {
-    ResourceLoader,
-    ResourceType: {
-      SPEC: 'spec',
-      SNIPPET: 'snippet',
-      INSTRUCT: 'instruct',
-    },
-  },
-});
+const fakeCatalog = { getAvailableMetadataTypes, getResource, listSnippets };
 
 // The logger fixture keeps the run quiet.
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
@@ -56,27 +42,26 @@ describe('ResourceManager', () => {
   let resourceManager: InstanceType<typeof ResourceManager>;
 
   beforeEach(() => {
-    for (const fn of [getAvailableMetadataTypes, getResource, listSnippets, ResourceLoader]) {
+    for (const fn of [getAvailableMetadataTypes, getResource, listSnippets]) {
       fn.mock.resetCalls();
     }
-    resourceManager = new ResourceManager();
+    resourceManager = new ResourceManager(fakeCatalog as never);
   });
 
-  it('should initialize and load metadata types', async () => {
-    await resourceManager.initialize();
-    assert.deepStrictEqual(resourceManager.getMetadataTypes(), [
-      'business-rule',
-      'script-action',
-      'script-include',
-      'service-portal',
-      'table',
-      'ui-action',
-      'ui-page',
+  it('lists one spec per catalog metadata type, in catalog order', async () => {
+    const specs = (await resourceManager.listResources()).filter((r) => r.uri.startsWith('sn-spec://'));
+    assert.deepStrictEqual(specs.map((r) => r.uri), [
+      'sn-spec://business-rule',
+      'sn-spec://script-action',
+      'sn-spec://script-include',
+      'sn-spec://service-portal',
+      'sn-spec://table',
+      'sn-spec://ui-action',
+      'sn-spec://ui-page',
     ]);
   });
 
   it('should list resources correctly', async () => {
-    await resourceManager.initialize();
     const resources = await resourceManager.listResources();
 
     // Should have 7 metadata types * (1 spec + 1 instruct + 1 snippet) = 21 resources
@@ -108,8 +93,7 @@ describe('ResourceManager', () => {
   });
 
   it('should classify a missing resource instead of returning success text', async () => {
-    // resourceManager.getResourceLoader().getResource is the shared getResource mock,
-    // so queueing the next result on it controls what readResource sees.
+    // The injected catalog's getResource is the shared mock, so queueing the next result on it controls what readResource sees.
     getResource.mock.mockImplementationOnce(async () => ({
       content: '',
       found: false,

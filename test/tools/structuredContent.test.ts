@@ -14,7 +14,7 @@ import { loggerFixture } from '../support/fixtures.js';
 
 // Config is deliberately NOT mocked: the real getConfig() resolves resourcePaths
 // from the module location, which under the native runner is the staged package
-// root holding a copy of the real res/ tree. The ResourceLoader therefore reads
+// root holding a copy of the real res/ tree. The ResourceCatalog therefore reads
 // the actual resource files this test is verifying. Only logging is silenced.
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 
