@@ -7,12 +7,15 @@ export abstract class BaseCommandProcessor implements CommandProcessor {
   /**
    * Guard the working directory a command resolved.
    *
-   * The command layer owns directory selection (see
-   * `SessionAwareCLICommand.getWorkingDirectory`) and hands down an
-   * already-validated absolute path, so this is a last-line guard rather than a
-   * resolution step. There is deliberately no fallback: not `process.cwd()`, not
-   * the installed-package directory, and — since MCP 2026-07-28 removed
-   * server-initiated requests — no MCP Roots lookup either.
+   * The command layer owns directory selection and hands down the path, so this
+   * is a last-line guard rather than a resolution step. There is deliberately
+   * no fallback: not `process.cwd()`, not the installed-package directory, and,
+   * since MCP 2026-07-28 removed server-initiated requests, no MCP Roots lookup.
+   *
+   * It is kept beside `SessionAwareCLICommand.validateWorkingDirectory()`
+   * (stricter, and naming the source) because not every path comes through
+   * there: `init_fluent_app` resolves its own directory, and every spawn and
+   * every written command passes through this one chokepoint.
    * @throws Error if the directory is the system root
    */
   protected resolveCommandWorkingDirectory(customWorkingDir?: string): string | undefined {

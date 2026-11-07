@@ -1,9 +1,7 @@
 import { serveStdio, StdioServerHandle } from '@modelcontextprotocol/server/stdio';
 import { McpServer, Transport } from '@modelcontextprotocol/server';
 import { getConfig, findMissingResourcePaths } from '../config.js';
-import { ServerStatus } from '../types.js';
 import { CommandResultFactory } from '../utils/types.js';
-import loggingManager from '../utils/loggingManager.js';
 import logger from '../utils/logger.js';
 import { ToolsManager } from '../tools/toolsManager.js';
 import { ResourceManager } from '../res/resourceManager.js';
@@ -64,8 +62,8 @@ export class FluentMcpServer {
   private resourceManager: ResourceManager;
   private promptManager: PromptManager;
   private config: ReturnType<typeof getConfig>;
-  private status: ServerStatus = ServerStatus.STOPPED;
   private resourceCatalog: ResourceCatalog;
+  /** The running stdio entry. Present exactly while the server is running. */
   private handle?: StdioServerHandle;
 
   /**
@@ -151,14 +149,13 @@ export class FluentMcpServer {
    *   eras can be exercised over the real entry point rather than through mocks.
    */
   async start(transport?: Transport): Promise<void> {
-    if (this.status === ServerStatus.RUNNING) {
-      loggingManager.logServerAlreadyRunning();
+    if (this.handle) {
+      logger.info('MCP server is already running');
       return;
     }
 
     try {
-      this.status = ServerStatus.INITIALIZING;
-      loggingManager.logServerStarting();
+      logger.info('Starting MCP server...', { name: this.config.name, version: this.config.version });
 
       // Fail fast on a broken install before accepting connections: the resource
       // directories ship with the package (package.json "files": ["dist","res"]),
@@ -189,11 +186,9 @@ export class FluentMcpServer {
         ...(transport && { transport }),
       });
 
-      this.status = ServerStatus.RUNNING;
-      loggingManager.logServerStarted();
+      logger.info('MCP server initialized and connected via stdio');
     } catch (error) {
-      this.status = ServerStatus.STOPPED;
-      loggingManager.logServerStartFailed(error, this.status);
+      logger.error('Failed to start MCP server', CommandResultFactory.normalizeError(error));
       throw error;
     }
   }
@@ -202,32 +197,23 @@ export class FluentMcpServer {
    * Stop the MCP server
    */
   async stop(): Promise<void> {
-    if (this.status !== ServerStatus.RUNNING) {
-      loggingManager.logServerNotRunning(this.status);
+    const handle = this.handle;
+    if (!handle) {
+      logger.info('MCP server is not running');
       return;
     }
 
+    // Cleared before closing, so a failed close still leaves the server
+    // stopped and a later start() begins afresh.
+    this.handle = undefined;
     try {
-      this.status = ServerStatus.STOPPING;
-      loggingManager.logServerStopping();
-
+      logger.info('Stopping MCP server...');
       // Closes the pinned instance (if any) and the underlying transport.
-      await this.handle?.close();
-      this.handle = undefined;
-
-      this.status = ServerStatus.STOPPED;
-      loggingManager.logServerStopped();
+      await handle.close();
+      logger.info('MCP server stopped');
     } catch (error) {
-      loggingManager.logServerStopFailed(error, this.status);
-      this.status = ServerStatus.STOPPED;
+      logger.error('Error stopping MCP server', CommandResultFactory.normalizeError(error));
       throw error;
     }
-  }
-
-  /**
-   * Get the current status of the server
-   */
-  getStatus(): ServerStatus {
-    return this.status;
   }
 }

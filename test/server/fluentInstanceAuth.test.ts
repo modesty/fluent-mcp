@@ -9,10 +9,11 @@ import { assertCalledWith } from '../support/mockAssertions.js';
 import { loggerFixture, withEnvironment } from '../support/fixtures.js';
 import type { ToolsManager } from '../../src/tools/toolsManager.js';
 
-// The logger fixture keeps the run quiet.
-mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
+// The logger fixture keeps the run quiet, and records what the result logger writes.
+const { logger, mockOptions: loggerOptions } = loggerFixture();
+mock.module('../../src/utils/logger.js', loggerOptions);
 
-const { autoValidateAuthIfConfigured } = await import('../../src/server/fluentInstanceAuth.js');
+const { autoValidateAuthIfConfigured, logAuthValidationResult } = await import('../../src/server/fluentInstanceAuth.js');
 
 function makeToolsManager(listOutput = '', listExitCode = 0) {
   const runAuth = mock.fn(async (args: Record<string, unknown>) => {
@@ -199,5 +200,53 @@ describe('autoValidateAuthIfConfigured', () => {
     assert.equal(result.status, 'authenticated');
     assert.equal(result.alias, 'dev12345');
     assertCalledWith(tm.runAuth, { use: 'dev12345' });
+  });
+});
+
+describe('logAuthValidationResult', () => {
+  beforeEach(() => {
+    for (const level of Object.values(logger)) level.mock.resetCalls();
+  });
+
+  const statusSeverity = [
+    ['authenticated', 'info'],
+    ['skipped', 'debug'],
+    ['not_authenticated', 'notice'],
+    ['validation_error', 'warn'],
+  ] as const;
+
+  for (const [status, method] of statusSeverity) {
+    it(`logs ${status} at ${method} severity`, () => {
+      logAuthValidationResult({
+        status,
+        message: `Auth status: ${status}`,
+        timestamp: '2026-07-29T00:00:00.000Z',
+        alias: 'dev',
+        host: 'dev.example.com',
+        authType: 'oauth',
+        actionRequired: 'now-sdk auth --add https://dev.example.com',
+      });
+
+      assertCalledWith(logger[method], `Auth status: ${status}`, {
+        status,
+        timestamp: '2026-07-29T00:00:00.000Z',
+        alias: 'dev',
+        host: 'dev.example.com',
+        authType: 'oauth',
+        actionRequired: 'now-sdk auth --add https://dev.example.com',
+      });
+    });
+  }
+
+  it('logs only the allow-listed fields', () => {
+    const result = {
+      status: 'authenticated' as const,
+      message: 'ok',
+      timestamp: '2026-07-29T00:00:00.000Z',
+      password: 'secret',
+    };
+    logAuthValidationResult(result);
+
+    assertCalledWith(logger.info, 'ok', { status: 'authenticated', timestamp: '2026-07-29T00:00:00.000Z' });
   });
 });

@@ -12,7 +12,7 @@
  */
 import { beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { assertCalledTimes, assertNotCalled } from '../support/mockAssertions.js';
+import { assertCalledTimes, assertCalledWith, assertNotCalled } from '../support/mockAssertions.js';
 import { configFixture, loggerFixture } from '../support/fixtures.js';
 
 type ServerFactory = () => unknown;
@@ -89,10 +89,10 @@ const ResourceCatalog = mock.fn(function () {
 });
 mock.module('../../src/res/resourceCatalog.js', { namedExports: { ResourceCatalog } });
 
-mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
+const { logger, mockOptions: loggerOptions } = loggerFixture();
+mock.module('../../src/utils/logger.js', loggerOptions);
 
 const { FluentMcpServer } = await import('../../src/server/fluentMCPServer.js');
-const { ServerStatus } = await import('../../src/types.js');
 
 const allMocks: Array<{ mock: { resetCalls(): void } }> = [
   mockRegisterTool,
@@ -124,6 +124,7 @@ describe('FluentMcpServer with Modular Design', () => {
 
   beforeEach(() => {
     for (const fn of allMocks) fn.mock.resetCalls();
+    for (const level of Object.values(logger)) level.mock.resetCalls();
     server = new FluentMcpServer();
   });
 
@@ -138,7 +139,55 @@ describe('FluentMcpServer with Modular Design', () => {
     findMissingResourcePaths.mock.mockImplementationOnce(() => ['/mock/path/to/spec']);
 
     await assert.rejects(server.start(), /Missing required resource directories/);
-    assert.equal(server.getStatus(), ServerStatus.STOPPED);
+    assertNotCalled(serveStdio);
+    assert.ok(logger.error.mock.calls.some(({ arguments: args }) => args[0] === 'Failed to start MCP server'));
+
+    // Nothing is left running, so the next start() serves.
+    await server.start();
+    assertCalledTimes(serveStdio, 1);
+  });
+
+  describe('lifecycle', () => {
+    it('a second start() is a no-op while running', async () => {
+      await server.start();
+      await server.start();
+
+      assertCalledTimes(serveStdio, 1);
+      assertCalledWith(logger.info, 'MCP server is already running');
+    });
+
+    it('stop() before start() is a no-op', async () => {
+      await server.stop();
+
+      assertNotCalled(mockHandleClose);
+      assertCalledWith(logger.info, 'MCP server is not running');
+    });
+
+    it('stop() closes the handle once; the server can then start again', async () => {
+      await server.start();
+      await server.stop();
+      await server.stop();
+
+      assertCalledTimes(mockHandleClose, 1);
+      assertCalledWith(logger.info, 'MCP server stopped');
+      assertCalledWith(logger.info, 'MCP server is not running');
+
+      await server.start();
+      assertCalledTimes(serveStdio, 2);
+    });
+
+    it('a failed close still leaves the server stopped', async () => {
+      await server.start();
+      mockHandleClose.mock.mockImplementationOnce(async () => {
+        throw new Error('close failed');
+      });
+
+      await assert.rejects(server.stop(), /close failed/);
+      assert.ok(logger.error.mock.calls.some(({ arguments: args }) => args[0] === 'Error stopping MCP server'));
+
+      await server.start();
+      assertCalledTimes(serveStdio, 2);
+    });
   });
 
   // serveStdio owns the transport and the era decision; the server's only job is
@@ -201,8 +250,7 @@ describe('FluentMcpServer with Modular Design', () => {
 
       await server.stop();
 
-      assert.ok(mockHandleClose.mock.callCount() > 0);
-      assert.equal(server.getStatus(), ServerStatus.STOPPED);
+      assertCalledTimes(mockHandleClose, 1);
     });
   });
 

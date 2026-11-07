@@ -10,10 +10,6 @@ export class CommandRegistry {
     this.commands.set(command.name, command);
   }
 
-  getCommand(name: string): CLICommand | undefined {
-    return this.commands.get(name);
-  }
-
   /**
    * Every command, in name order. The SDK lists tools in registration order,
    * so this order is the order of `tools/list`.

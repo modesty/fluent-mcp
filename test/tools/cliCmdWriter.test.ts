@@ -26,7 +26,7 @@ function commandPart(output: string, cwd: string): string {
 
 describe('CLICmdWriter', () => {
   it('leaves plain entries unquoted', async () => {
-    const result = await new CLICmdWriter().execute('/usr/bin/node', ['/sdk/bin/index.js', 'init', '--scopeName=x_my_app'], root);
+    const result = await new CLICmdWriter().process('/usr/bin/node', ['/sdk/bin/index.js', 'init', '--scopeName=x_my_app'], root);
     assert.equal(commandPart(result.output, root), '/usr/bin/node /sdk/bin/index.js init --scopeName=x_my_app');
   });
 
@@ -36,7 +36,7 @@ describe('CLICmdWriter', () => {
       'init', '--appName=My App', '--from=a;b', `--x=$(touch ${sentinel})`, `--y=\`touch ${sentinel}\``,
       '--z=$HOME', `--q="double" 'single'`, '--g=*', '--e=', 'a|b&c', '--n=line\tend',
     ];
-    const result = await new CLICmdWriter().execute('/path with space/node', argv, root);
+    const result = await new CLICmdWriter().process('/path with space/node', argv, root);
 
     assert.deepEqual(shellSplit(commandPart(result.output, root)), ['/path with space/node', ...argv]);
     assert.equal(fs.existsSync(sentinel), false);

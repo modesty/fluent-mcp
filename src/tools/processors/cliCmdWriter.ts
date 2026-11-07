@@ -14,41 +14,10 @@ import { shellQuote } from '../../utils/shellQuote.js';
  */
 export class CLICmdWriter extends BaseCommandProcessor {
   /**
-   * Process a command by generating its text representation without executing it
-   * Implements the CommandProcessor interface
+   * Return the shell text of the command, without running it. The writer
+   * spawns nothing, so it takes no stdin, timeout, signal or run options.
    */
-  async process(
-    command: string,
-    args: string[],
-    customWorkingDir?: string,
-    _stdinInput?: string, // Not used by writer, but kept for interface compatibility
-    _timeoutMs?: number,  // Not used by writer, but kept for interface compatibility
-    _signal?: AbortSignal // Not used by writer (no child process to cancel)
-  ): Promise<CommandResult> {
-    return this.execute(command, args, customWorkingDir);
-  }
-
-  /**
-   * For compatibility with the CLIExecutor interface - allows this class
-   * to be used as a drop-in replacement in tests and existing code
-   */
-  async execute(
-    command: string,
-    args: string[],
-    customWorkingDir?: string,
-    _stdinInput?: string // Not used by writer, but kept for interface compatibility
-  ): Promise<CommandResult> {
-    return this.getCommandText(command, args, customWorkingDir);
-  }
-
-  /**
-   * Returns the text representation of a CLI command without executing it
-   */
-  private getCommandText(
-    command: string,
-    args: string[],
-    customWorkingDir?: string
-  ): CommandResult {
+  async process(command: string, args: string[], customWorkingDir?: string): Promise<CommandResult> {
     try {
       const cwd = this.resolveCommandWorkingDirectory(customWorkingDir);
 

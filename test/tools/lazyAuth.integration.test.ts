@@ -10,7 +10,7 @@ import type { CommandProcessor, EnsureAuthValidated } from '../../src/utils/type
 // ToolsManager's single-flight memo, and the SessionManager singleton.
 const autoValidate = mock.fn<(owner?: unknown) => Promise<unknown>>();
 mock.module('../../src/server/fluentInstanceAuth.js', {
-  namedExports: { autoValidateAuthIfConfigured: autoValidate },
+  namedExports: { autoValidateAuthIfConfigured: autoValidate, logAuthValidationResult: mock.fn() },
 });
 
 // Logging is silenced and SDK CLI resolution is pinned for this suite.

@@ -13,7 +13,6 @@ function command(name: string): CLICommand {
       success: true,
       output: '',
     }),
-    getCommandProcessor: () => undefined,
   };
 }
 

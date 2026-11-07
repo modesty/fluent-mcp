@@ -3,16 +3,6 @@
  */
 
 /**
- * Server status enum
- */
-export enum ServerStatus {
-  STOPPED = 'stopped',
-  INITIALIZING = 'initializing',
-  RUNNING = 'running',
-  STOPPING = 'stopping',
-}
-
-/**
  * Authentication validation status
  */
 export type AuthStatus = 'authenticated' | 'not_authenticated' | 'validation_error' | 'skipped';
