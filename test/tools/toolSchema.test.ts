@@ -1,29 +1,35 @@
 /**
- * H2 regression guard: the tool INPUT schema advertised on `tools/list`
- * (CommandRegistry.toMCPTools) must share its canonical contract with the
- * schema enforced on `tools/call` (the Zod shape ToolsManager passes to
- * registerTool).
+ * H2 regression guard: the tool INPUT schema advertised on `tools/list` must
+ * share its canonical contract with the schema enforced on `tools/call` (the Zod
+ * object ToolsManager passes to registerTool).
  *
- * Both are now derived from a single source of truth — src/tools/toolSchema.ts —
- * so this test locks in that they can never drift again: same property set, same
- * required set, matching types, and consistent optional/nullable handling.
+ * The SDK serves both from that one object. The advertised list here is read
+ * from a real McpServer that a real ToolsManager registered onto
+ * (test/support/listTools.ts), so this locks in what clients actually receive:
+ * the JSON Schema of the enforced object, the declared output schema and
+ * annotations, nothing else, and the same property set, required set and types
+ * as the declarations.
  *
  * Native runner: the logger mock is registered before the command modules are
  * imported, so they are loaded with dynamic import() below the registration.
  */
 import { describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { z } from 'zod';
 import { loggerFixture } from '../support/fixtures.js';
+import { listTools } from '../support/listTools.js';
 import type { CLICommand, CommandArgument, CommandProcessor } from '../../src/utils/types.js';
 
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 
 const { CommandFactory } = await import('../../src/tools/registry/commandFactory.js');
-const { CommandRegistry } = await import('../../src/tools/registry/commandRegistry.js');
-const { CheckAuthStatusCommand } = await import('../../src/tools/resources/resourceTools.js');
-const { buildInputZodShape, buildInputZodSchema, buildInputJsonSchema } = await import(
-  '../../src/tools/toolSchema.js'
-);
+const { ToolsManager } = await import('../../src/tools/toolsManager.js');
+const { ResourceCatalog } = await import('../../src/res/resourceCatalog.js');
+const { CheckAuthStatusCommand, GetFluentKnowledgeCommand } = await import('../../src/tools/resources/resourceTools.js');
+const { buildInputZodShape, buildInputZodSchema } = await import('../../src/tools/toolSchema.js');
+
+/** The JSON Schema of the enforced input object. */
+const inputJsonSchema = (args: CommandArgument[]) => z.toJSONSchema(buildInputZodSchema(args));
 
 const mockProcessor = { process: mock.fn() } as unknown as CommandProcessor;
 
@@ -58,19 +64,28 @@ interface AdvertisedProperty {
   anyOf?: unknown;
 }
 
+const advertised = await listTools(new ToolsManager(new ResourceCatalog()));
+
 describe('Tool input schema — advertised (tools/list) and enforced (tools/call)', () => {
+  const catalog = new ResourceCatalog();
   const commands: CLICommand[] = [
     ...CommandFactory.createCommands(mockProcessor, mockProcessor),
+    new GetFluentKnowledgeCommand(catalog),
     new CheckAuthStatusCommand(),
   ];
 
-  const registry = new CommandRegistry();
-  commands.forEach((c) => registry.register(c));
-  const advertised = registry.toMCPTools();
   const byName = new Map(advertised.map((t) => [t.name, t]));
 
-  it('advertises every registered command', () => {
-    assert.equal(advertised.length, commands.length);
+  it('advertises every registered command, in name order', () => {
+    const names = advertised.map((t) => t.name);
+    assert.deepStrictEqual(names, commands.map((c) => c.name).sort());
+  });
+
+  it('advertises only the name, description, schemas and annotations: no title that repeats the name', () => {
+    const allowed = new Set(['name', 'description', 'inputSchema', 'outputSchema', 'annotations']);
+    for (const tool of advertised) {
+      assert.deepStrictEqual(Object.keys(tool).filter((key) => !allowed.has(key)), [], tool.name);
+    }
   });
 
   it('advertises explicit workingDirectory only on Fluent project commands', () => {
@@ -111,8 +126,16 @@ describe('Tool input schema — advertised (tools/list) and enforced (tools/call
       const argNames = command.arguments.map((a) => a.name);
       const requiredNames = command.arguments.filter((a) => a.required).map((a) => a.name);
 
-      it('advertised schema is derived from the shared builder (no hand-built drift)', () => {
-        assert.deepStrictEqual(inputSchema, buildInputJsonSchema(command.arguments));
+      it('advertised input schema is the JSON Schema of the enforced object', () => {
+        assert.deepStrictEqual(inputSchema, inputJsonSchema(command.arguments));
+      });
+
+      it('advertises the declared output schema and annotations as they are', () => {
+        assert.deepStrictEqual(
+          tool.outputSchema,
+          command.outputSchema && z.toJSONSchema(z.object(command.outputSchema))
+        );
+        assert.deepStrictEqual(tool.annotations, command.annotations);
       });
 
       it('advertises an object schema with exactly the declared properties', () => {
@@ -216,14 +239,14 @@ describe('argument domains compiled into the schema', () => {
     const choices = arg({ domain: { kind: 'choices', values: ['a', 'b'] } });
     assert.equal(parse(choices, 'a'), 'ok');
     assert.equal(parse(choices, 'c'), "Argument 'x' must be one of: a, b. Received: \"c\".");
-    assert.deepEqual((buildInputJsonSchema([choices]).properties as Record<string, { enum?: string[] }>).x.enum, ['a', 'b']);
+    assert.deepEqual((inputJsonSchema([choices]).properties as Record<string, { enum?: string[] }>).x.enum, ['a', 'b']);
   });
 
   it('pattern: enforced, advertised with the same source, named in the message', () => {
     const pattern = arg({ domain: { kind: 'pattern', regex: /^[a-z]+$/, expected: 'lowercase letters' } });
     assert.equal(parse(pattern, 'abc'), 'ok');
     assert.equal(parse(pattern, 'aBc'), "Argument 'x' must be lowercase letters. Received: \"aBc\".");
-    assert.equal((buildInputJsonSchema([pattern]).properties as Record<string, { pattern?: string }>).x.pattern, '^[a-z]+$');
+    assert.equal((inputJsonSchema([pattern]).properties as Record<string, { pattern?: string }>).x.pattern, '^[a-z]+$');
   });
 
   it('a missing or null required value names the argument, its purpose and type', () => {

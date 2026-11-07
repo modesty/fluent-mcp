@@ -72,13 +72,9 @@ config.getProjectRootPath.mock.mockImplementation(() => process.cwd());
 mock.module('../../src/config.js', config.mockOptions);
 const { findMissingResourcePaths } = config;
 
+const mockToolsRegisterOn = mock.fn();
 const ToolsManager = mock.fn(function () {
-  return {
-    getMCPTools: mock.fn(() => [
-      { name: 'mock-tool', description: 'A mock tool', inputSchema: { type: 'object' } },
-    ]),
-    registerOn: mock.fn(),
-  };
+  return { registerOn: mockToolsRegisterOn };
 });
 mock.module('../../src/tools/toolsManager.js', { namedExports: { ToolsManager } });
 
@@ -111,6 +107,7 @@ const allMocks: Array<{ mock: { resetCalls(): void } }> = [
   serveStdio,
   findMissingResourcePaths,
   ToolsManager,
+  mockToolsRegisterOn,
   ResourceManager,
   mockResourceRegisterOn,
 ];
@@ -183,20 +180,20 @@ describe('FluentMcpServer with Modular Design', () => {
       await server.start();
 
       const instance = capturedFactory()();
-      const methods = mockSetRequestHandler.mock.calls.map((call) => call.arguments[0]);
 
-      assert.ok(methods.includes('tools/list'));
+      // Tools are registered through registerTool; the SDK serves tools/list
+      // and tools/call from them.
+      assertCalledTimes(mockToolsRegisterOn, 1);
+      assert.equal(mockToolsRegisterOn.mock.calls[0].arguments[0], instance);
       // Resources are registered as SDK templates; the SDK serves every
       // resources/* method and completion/complete from them.
       assertCalledTimes(mockResourceRegisterOn, 1);
       assert.equal(mockResourceRegisterOn.mock.calls[0].arguments[0], instance);
-      assert.ok(!methods.some((method) => method.startsWith('resources/')));
       // Prompts go through registerPrompt (PromptManager is not mocked here);
       // the SDK serves prompts/* and completion/complete from them.
       assert.deepEqual(mockRegisterPrompt.mock.calls.map((call) => call.arguments[0]), ['coding_in_fluent', 'create_custom_ui']);
-      assert.ok(!methods.some((method) => method.startsWith('prompts/')));
-      // tools/call is dispatched by registerTool, never hand-registered.
-      assert.ok(!methods.includes('tools/call'));
+      // No method is hand-registered.
+      assertCalledTimes(mockSetRequestHandler, 0);
     });
 
     it('stop() closes the transport handle', async () => {

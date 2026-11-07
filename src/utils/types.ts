@@ -171,7 +171,6 @@ export interface CommandMetadata {
   annotations?: CommandAnnotations;
   /** Command-specific timeout in milliseconds. Overrides the default process timeout. */
   timeoutMs?: number;
-  _meta?: { [key: string]: unknown };
   /**
    * Optional MCP output schema (a Zod raw shape). When set, the tool advertises
    * an `outputSchema` and its successful results must include `structuredContent`

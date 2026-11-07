@@ -18,14 +18,14 @@ function command(name: string): CLICommand {
 }
 
 describe('CommandRegistry', () => {
-  it('advertises tools in deterministic name order', () => {
+  it('returns commands in deterministic name order, which is the tools/list order', () => {
     const registry = new CommandRegistry();
     registry.register(command('z_last'));
     registry.register(command('a_first'));
     registry.register(command('middle'));
 
     assert.deepStrictEqual(
-      registry.toMCPTools().map((tool) => tool.name),
+      registry.getAllCommands().map((command) => command.name),
       ['a_first', 'middle', 'z_last']
     );
   });
