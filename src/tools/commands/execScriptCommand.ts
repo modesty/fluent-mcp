@@ -7,8 +7,11 @@ import { ENVELOPE_RUN_OPTIONS, shapeEnvelopeResult } from '../../utils/jsonSelec
 import { parseCliEnvelope } from '../../utils/cliEnvelope.js';
 import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
+import { cliOption } from './cliArgv.js';
 import { getProjectRootPath } from '../../config.js';
-import { assertNoControlCharacters, assertPositiveInteger, screenFreeTextArgs, screenSelectPathArg } from './argValidation.js';
+import { SELECT_PATH_DOMAIN, assertPositiveInteger } from './argValidation.js';
+import type { ArgumentDomain } from '../../utils/types.js';
+import { CONTROL_CHARACTERS_EXCEPT_LINE_FORMATTING } from '../toolSchema.js';
 
 /** `now-sdk exec --timeout` default, in milliseconds (SDK v4.14.0 `exec/index.js` DEFAULT_TIMEOUT_MS). */
 const CLI_DEFAULT_TIMEOUT_MS = 300_000;
@@ -37,17 +40,12 @@ const MAX_FILE_BYTES = 64 * 1024;
  * sys_id. The CLI resolves the value against the instance and fails on an
  * unknown one instead of falling back to global.
  */
-const SCOPE_PATTERN = /^(?:[a-z][a-z0-9_]*|[0-9a-f]{32})$/;
-
-/**
- * Script text: newlines, carriage returns and tabs are ordinary source
- * formatting; every other control character is rejected.
- */
-// eslint-disable-next-line no-control-regex -- control characters are intentionally rejected
-const SCRIPT_CONTROL_CHARACTER_PATTERN = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/;
-
-/** `reason` is single-line prose; the CLI appends it to the script as a `// now-sdk exec:` comment. */
-const FREE_TEXT_ARGS = ['reason'] as const;
+const SCOPE_DOMAIN: ArgumentDomain = {
+  kind: 'pattern',
+  regex: /^(?:[a-z][a-z0-9_]*|[0-9a-f]{32})$/,
+  expected: '"global", an application scope name (lowercase letters, digits, and "_", e.g. "x_acme_app"), ' +
+    'or a 32-character application sys_id',
+};
 
 /** A script file resolved inside the project, as it will be run. */
 interface ScriptFile {
@@ -108,6 +106,7 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
       name: 'script',
       type: 'string',
       required: false,
+      domain: { kind: 'multilineText' },
       description: `Server-side JavaScript to run inline (Glide APIs such as GlideRecord and gs are available); at most ${MAX_SCRIPT_LENGTH} characters, and it must not begin with "-". Provide exactly one of script or file.`,
     },
     {
@@ -124,6 +123,7 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
       name: 'scope',
       type: 'string',
       required: true,
+      domain: SCOPE_DOMAIN,
       description: 'Scope to run the script in: "global", an application scope name (e.g. "x_acme_app"), or a 32-character application sys_id. Must be installed on the instance; an unknown scope is an error, never a silent fallback to global.',
     },
     {
@@ -148,6 +148,7 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
       name: 'select',
       type: 'string',
       required: false,
+      domain: SELECT_PATH_DOMAIN,
       description: 'Dot/bracket path to extract from the envelope (e.g. "output[0]" or "executionHistoryId"). An unresolved path yields null rather than an error. Applied by this tool to a successful (ok: true) run only; a failed run returns the full envelope, so it always shows whether the script ran.',
     },
     {
@@ -165,11 +166,12 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
   ];
 
   /**
-   * Validate the script, scope, reason, and timeout. The script and reason are
-   * free text that the base shell-metacharacter check would reject (quotes,
-   * parentheses, `;`, `|`), and `select` is a bracket path, so the base is handed
-   * placeholders for its required/type checks while each real value is screened
-   * by the rule that applies to it. Safe because the runner spawns shell-free.
+   * Validate what the schema cannot express: exactly one of script or file, the
+   * file extension, the script's length and first character, a non-empty reason,
+   * and the timeout bound. The schema has already checked `scope` and `select`
+   * against their domains, the script for control characters other than line
+   * formatting, and `reason` and `file` for any control character (a newline in
+   * `reason` would end the `// now-sdk exec:` comment the CLI writes it into).
    */
   protected validateArgs(args: Record<string, unknown>): void {
     const hasScript = args.script !== undefined && args.script !== null;
@@ -181,32 +183,24 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
       throw new Error("Argument 'workingDirectory' is only used with 'file', to locate the project that contains it.");
     }
 
-    // The script and file path bypass the base shell-metacharacter check (a path may
-    // contain spaces or parentheses); each is screened by its own rule below.
-    super.validateArgs(screenSelectPathArg(screenFreeTextArgs(
-      { ...args, ...(hasScript && { script: 'placeholder' }), ...(hasFile && { file: 'placeholder' }) },
-      FREE_TEXT_ARGS
-    )));
+    super.validateArgs(args);
 
     if (hasFile) {
-      const file = assertNoControlCharacters(args.file, 'file');
+      const file = args.file as string;
       if (path.extname(file).toLowerCase() !== '.js') {
         throw new Error(`Argument 'file' must be a .js file. Received: "${file}".`);
       }
     } else {
-      this.validateScriptText(args.script);
+      this.validateScriptText(args.script as string);
     }
 
-    this.validateScopeReasonTimeout(args);
+    this.validateReasonTimeout(args);
   }
 
-  /** The inline script: non-empty, no stray control characters, bounded, not parseable as a CLI option. */
-  private validateScriptText(script: unknown): void {
-    if (typeof script !== 'string' || script.trim() === '') {
+  /** The inline script: non-empty, bounded, not parseable as a CLI option. */
+  private validateScriptText(script: string): void {
+    if (script.trim() === '') {
       throw new Error("Argument 'script' must be a non-empty server-side script.");
-    }
-    if (SCRIPT_CONTROL_CHARACTER_PATTERN.test(script)) {
-      throw new Error("Invalid characters in argument 'script': control characters other than newline, carriage return, and tab are not allowed.");
     }
     if (script.length > MAX_SCRIPT_LENGTH) {
       throw new Error(
@@ -220,17 +214,8 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
     }
   }
 
-  private validateScopeReasonTimeout(args: Record<string, unknown>): void {
-    const scope = args.scope;
-    if (typeof scope !== 'string' || !SCOPE_PATTERN.test(scope)) {
-      throw new Error(
-        "Argument 'scope' must be \"global\", an application scope name (lowercase letters, digits, and \"_\", e.g. \"x_acme_app\"), " +
-        `or a 32-character application sys_id. Received: "${String(scope)}".`
-      );
-    }
-
-    const reason = assertNoControlCharacters(args.reason, 'reason');
-    if (reason.trim() === '') {
+  private validateReasonTimeout(args: Record<string, unknown>): void {
+    if ((args.reason as string).trim() === '') {
       throw new Error("Argument 'reason' must not be empty. State why the script is being run.");
     }
 
@@ -281,7 +266,7 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
     if (content.trim() === '') {
       throw new Error(`Script file is empty: ${realFile}`);
     }
-    if (SCRIPT_CONTROL_CHARACTER_PATTERN.test(content)) {
+    if (CONTROL_CHARACTERS_EXCEPT_LINE_FORMATTING.test(content)) {
       throw new Error('Script file contains control characters other than newline, carriage return, and tab.');
     }
     return {
@@ -330,7 +315,7 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
     const tempDir = scriptFile ? fs.mkdtempSync(path.join(os.tmpdir(), 'fluent-exec-')) : undefined;
     try {
       const scriptSource = scriptFile && tempDir
-        ? ['--file', this.writePrivateCopy(tempDir, scriptFile.content)]
+        ? [cliOption('--file', this.writePrivateCopy(tempDir, scriptFile.content))]
         // Inline: one literal argv entry on the shell-free runner. Passing a script
         // positionally (or by file) keeps the CLI from waiting on the runner's open stdin.
         : [String(args.script)];
@@ -359,16 +344,16 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
       ...baseArgs,
       'exec',
       ...scriptSource,
-      '--scope', String(args.scope),
-      '--reason', String(args.reason),
+      cliOption('--scope', args.scope),
+      cliOption('--reason', args.reason),
     ];
     if (args.timeoutMs !== undefined && args.timeoutMs !== null) {
-      sdkArgs.push('--timeout', String(args.timeoutMs));
+      sdkArgs.push(cliOption('--timeout', args.timeoutMs));
     }
     if (args.serverLogs) sdkArgs.push('--server-logs');
-    sdkArgs.push('--auth', resolvedAuth);
+    sdkArgs.push(cliOption('--auth', resolvedAuth));
     // `select` is applied here, not forwarded as --select (see jsonSelect).
-    sdkArgs.push('--output', 'json');
+    sdkArgs.push(cliOption('--output', 'json'));
     this.appendCommonFlags(sdkArgs, args);
 
     // With an explicit --scope the CLI reads nothing from the current directory,

@@ -176,18 +176,25 @@ describe('SDK Command Tools', () => {
   it('SdkInfoCommand should reject -lm flag (no longer supported)', async () => {
     const sdkInfoCommand = sdkInfo();
 
-    const result = await sdkInfoCommand.execute({ flag: '-lm' });
-    assert.equal(result.success, false);
-    assert.ok(result.error?.message.includes('Invalid flag'));
+    await assert.rejects(
+      sdkInfoCommand.execute({ flag: '-lm' }),
+      /Argument 'flag' must be one of: -v, --version, -h, --help\. Received: "-lm"/
+    );
   });
 
   it('SdkInfoCommand should handle invalid flags', async () => {
     const sdkInfoCommand = sdkInfo();
 
-    const result = await sdkInfoCommand.execute({ flag: '--invalid' });
-    assert.equal(result.success, false);
-    assert.notEqual(result.error, undefined);
-    assert.ok(result.error?.message.includes('Invalid flag'));
+    await assert.rejects(sdkInfoCommand.execute({ flag: '--invalid' }), /Argument 'flag' must be one of/);
+  });
+
+  it('SdkInfoCommand should reject a help command that begins with "-"', async () => {
+    const sdkInfoCommand = sdkInfo();
+
+    await assert.rejects(
+      sdkInfoCommand.execute({ flag: '--help', command: '--debug' }),
+      /Argument 'command' must be a command name: letters, digits, "_" and "-", not beginning with "-"\. Received: "--debug"/
+    );
   });
 
   it('SdkInfoCommand should handle missing required flag parameter', async () => {

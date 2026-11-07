@@ -1,10 +1,16 @@
 import { CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { BaseCommandProcessor } from './baseCommandProcessor.js';
 import logger from '../../utils/logger.js';
+import { shellQuote } from '../../utils/shellQuote.js';
 
 /**
  * Generates command text without executing — used for interactive commands
- * that should be run manually (e.g., InitCommand, DependenciesCommand)
+ * that should be run manually (e.g., InitCommand, DependenciesCommand).
+ *
+ * This is the one place a shell sees the argv: a person runs the text. Every
+ * entry is therefore shell-escaped here (POSIX, `shellQuote`), after the
+ * command has encoded it for yargs (`cliOption`), so the shell hands the CLI
+ * exactly the argv the command built. Commands never quote for the shell.
  */
 export class CLICmdWriter extends BaseCommandProcessor {
   /**
@@ -46,9 +52,7 @@ export class CLICmdWriter extends BaseCommandProcessor {
     try {
       const cwd = this.resolveCommandWorkingDirectory(customWorkingDir);
 
-      // Format the command string
-      const argsText = args.join(' ');
-      const commandText = `${command} ${argsText}`;
+      const commandText = [command, ...args].map(shellQuote).join(' ');
 
       // Add working directory context if available
       const cwdInfo = cwd ? `(in directory: ${cwd})` : '';

@@ -3,13 +3,32 @@
  */
 import type { ZodRawShape } from 'zod';
 
+/**
+ * The values a string argument accepts beyond its type. Compiled into the tool's
+ * input schema (`src/tools/toolSchema.ts`), so it is enforced on `tools/call`,
+ * advertised on `tools/list` (`enum` / `pattern`), and applied by the same
+ * schema to direct `execute()` callers. A string argument without a domain is
+ * any text without control characters.
+ *  - `choices`: one of a closed set of values (the CLI's own declared choices)
+ *  - `pattern`: an anchored (`^…$`), flag-free grammar, so the advertised JSON
+ *    Schema pattern means exactly what is enforced; `expected` completes the
+ *    error sentence "Argument 'x' must be <expected>."
+ *  - `multilineText`: text that may also contain newline, carriage return and
+ *    tab (source code); every other control character is still rejected
+ */
+export type ArgumentDomain =
+  | { kind: 'choices'; values: readonly [string, ...string[]] }
+  | { kind: 'pattern'; regex: RegExp; expected: string }
+  | { kind: 'multilineText' };
+
 // Domain Models
 export interface CommandArgument {
   name: string;
   type: 'string' | 'number' | 'boolean' | 'array';
   required: boolean;
   description: string;
-  defaultValue?: unknown;
+  /** For a string argument: the values it accepts beyond being a string. */
+  domain?: ArgumentDomain;
 }
 
 /**

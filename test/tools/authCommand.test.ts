@@ -67,7 +67,7 @@ describe('AuthCommand', () => {
     assert.equal(mockCmdWriter.process.mock.callCount(), 1);
     const [command, argv, cwd, stdinInput, timeoutMs, signal] = mockCmdWriter.process.mock.calls[0].arguments;
     assert.equal(command, process.execPath);
-    assertContainsAll(argv, [SDK_BIN, 'auth', '--add', 'foo', '--type', 'basic', '--alias', 'bar']);
+    assertContainsAll(argv, [SDK_BIN, 'auth', '--add=foo', '--type=basic', '--alias=bar']);
     assert.equal(cwd, PROJECT_ROOT);
     assert.equal(stdinInput, undefined); // credentials not set in env
     assert.equal(timeoutMs, undefined);
@@ -110,8 +110,10 @@ describe('AuthCommand', () => {
   });
 
   it('should validate --type choices', async () => {
-    const result = await authCommand.execute({ add: 'foo', type: 'invalid' });
-    assert.equal(result.success, false);
-    assert.ok((result.error as Error).message.includes('Invalid --type'));
+    // The internal AuthCommand is held to the same schema as tools/call.
+    await assert.rejects(
+      authCommand.execute({ add: 'foo', type: 'invalid' }),
+      /Argument 'type' must be one of: basic, oauth\. Received: "invalid"/
+    );
   });
 });

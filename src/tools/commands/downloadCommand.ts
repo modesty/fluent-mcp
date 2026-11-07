@@ -1,5 +1,6 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
 import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
+import { assertNotOption } from './cliArgv.js';
 import {
   RESPONSE_TIMEOUT_ARGUMENT,
   runnerTimeoutForResponseTimeout,
@@ -57,6 +58,7 @@ export class DownloadCommand extends SessionAwareCLICommand {
 
   protected validateArgs(args: Record<string, unknown>): void {
     super.validateArgs(args);
+    if (typeof args.directory === 'string') assertNotOption(args.directory, 'directory');
     validateResponseTimeout(args);
   }
 

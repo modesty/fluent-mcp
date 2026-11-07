@@ -2,27 +2,16 @@ import { CommandArgument, CommandResult, CommandResultFactory } from '../../util
 import { ENVELOPE_RUN_OPTIONS, shapeEnvelopeResult } from '../../utils/jsonSelect.js';
 import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
+import { cliOption } from './cliArgv.js';
 import { getProjectRootPath } from '../../config.js';
-import {
-  CLI_OUTPUT_FORMATS,
-  assertOneOf,
-  screenFreeTextArgs,
-  screenSelectPathArg,
-} from './argValidation.js';
+import { CLI_OUTPUT_FORMATS, SELECT_PATH_DOMAIN } from './argValidation.js';
 
 /**
- * App-repo actions exposed by `now-sdk cicd`. Kept as a strict allowlist so a
- * caller-supplied action can never reach argv unvalidated.
+ * App-repo actions exposed by `now-sdk cicd`: the `action` argument's choices,
+ * so a caller-supplied action can never reach argv unvalidated.
  */
 const APP_ACTIONS = ['install', 'publish', 'rollback'] as const;
 type AppAction = (typeof APP_ACTIONS)[number];
-
-/**
- * Release notes routinely contain printable punctuation the base
- * shell-metacharacter check rejects (parentheses, commas, semicolons), which is
- * inert on the shell-free execution path.
- */
-const FREE_TEXT_ARGS = ['devNotes'] as const;
 
 /**
  * Command to drive ServiceNow app-repo CI/CD operations against an instance
@@ -50,6 +39,7 @@ export class CicdAppCommand extends SessionAwareCLICommand {
       name: 'action',
       type: 'string',
       required: true,
+      domain: { kind: 'choices', values: APP_ACTIONS },
       description: 'App-repo operation to run: "install", "publish", or "rollback".',
     },
     {
@@ -110,12 +100,14 @@ export class CicdAppCommand extends SessionAwareCLICommand {
       name: 'output',
       type: 'string',
       required: false,
+      domain: { kind: 'choices', values: CLI_OUTPUT_FORMATS },
       description: `Output format: ${CLI_OUTPUT_FORMATS.map((f) => `"${f}"`).join(' or ')}. Defaults to "json" (machine-readable envelope).`,
     },
     {
       name: 'select',
       type: 'string',
       required: false,
+      domain: SELECT_PATH_DOMAIN,
       description: 'Dot/bracket path to extract from the JSON envelope `{ ok, result, progress?, interpretedResult? }` (e.g. "result.links.progress.id" or "progress.status"). An unresolved path yields null. Applied by this tool to a successful (ok: true) envelope only; on a failure the full envelope is returned so the error stays visible (the CLI\'s own --select would print only null).',
     },
     {
@@ -129,22 +121,13 @@ export class CicdAppCommand extends SessionAwareCLICommand {
   /**
    * Validate the action token and the per-action argument legality that the CLI
    * enforces, so a caller gets a message naming the exact problem rather than an
-   * opaque CLI failure.
-   *
-   * `devNotes` (prose) and `select` (a bracket path) both carry characters the
-   * base shell-metacharacter check rejects but that are harmless on the
-   * shell-free execution path, so the base is handed benign placeholders —
-   * preserving its required/type checks — while each real value is screened by
-   * the rule that applies to it (see argValidation).
+   * opaque CLI failure. The schema has already checked `action`, `output` and
+   * `select` against their domains.
    */
   protected validateArgs(args: Record<string, unknown>): void {
-    super.validateArgs(screenSelectPathArg(screenFreeTextArgs(args, FREE_TEXT_ARGS)));
+    super.validateArgs(args);
 
-    const action = assertOneOf(args.action, APP_ACTIONS, 'action');
-
-    if (args.output !== undefined) {
-      assertOneOf(args.output, CLI_OUTPUT_FORMATS, 'output');
-    }
+    const action = args.action as AppAction;
 
     if (args.scope && args.appSysId) {
       throw new Error(
@@ -226,21 +209,21 @@ export class CicdAppCommand extends SessionAwareCLICommand {
     const { command, baseArgs } = resolveSdkCli();
     const sdkArgs: string[] = [...baseArgs, 'cicd', action];
 
-    if (args.scope) sdkArgs.push('--scope', String(args.scope));
-    if (args.appSysId) sdkArgs.push('--app-sys-id', String(args.appSysId));
-    if (args.appVersion) sdkArgs.push('--app-version', String(args.appVersion));
-    if (args.baseAppVersion) sdkArgs.push('--base-app-version', String(args.baseAppVersion));
+    if (args.scope) sdkArgs.push(cliOption('--scope', args.scope));
+    if (args.appSysId) sdkArgs.push(cliOption('--app-sys-id', args.appSysId));
+    if (args.appVersion) sdkArgs.push(cliOption('--app-version', args.appVersion));
+    if (args.baseAppVersion) sdkArgs.push(cliOption('--base-app-version', args.baseAppVersion));
     if (args.autoUpgradeBaseApp) sdkArgs.push('--auto-upgrade-base-app');
 
-    if (args.devNotes) sdkArgs.push('--dev-notes', String(args.devNotes));
+    if (args.devNotes) sdkArgs.push(cliOption('--dev-notes', args.devNotes));
 
     // `--wait` defaults to true in the CLI, so only the negation is meaningful.
     // The flag-mapping helper drops `false` values, hence the explicit push.
     if (args.wait === false) sdkArgs.push('--no-wait');
-    if (args.pollTimeout !== undefined) sdkArgs.push('--poll-timeout', String(args.pollTimeout));
+    if (args.pollTimeout !== undefined) sdkArgs.push(cliOption('--poll-timeout', args.pollTimeout));
 
-    sdkArgs.push('--auth', resolvedAuth);
-    sdkArgs.push('--output', typeof args.output === 'string' ? args.output : 'json');
+    sdkArgs.push(cliOption('--auth', resolvedAuth));
+    sdkArgs.push(cliOption('--output', typeof args.output === 'string' ? args.output : 'json'));
     this.appendCommonFlags(sdkArgs, args);
 
     // App-repo work is instance-side. When no project is configured the installed

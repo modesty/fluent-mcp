@@ -8,6 +8,7 @@
  */
 import { beforeEach, afterEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { hasOption, optionValue } from '../support/argv.js';
 import { assertCalledWith, assertNotCalled } from '../support/mockAssertions.js';
 import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
 import type { CommandProcessor } from '../../src/utils/types.js';
@@ -93,10 +94,10 @@ describe('CicdAppCommand', () => {
       process.execPath,
       [
         SDK_BIN, 'cicd', 'install',
-        '--app-sys-id', 'abc123',
-        '--app-version', '1.0.0',
-        '--auth', 'session-alias',
-        '--output', 'json',
+        '--app-sys-id=abc123',
+        '--app-version=1.0.0',
+        '--auth=session-alias',
+        '--output=json',
       ],
       '/mock/working/dir',
       undefined,
@@ -120,7 +121,7 @@ describe('CicdAppCommand', () => {
     const command = new CicdAppCommand(mockProcessor);
 
     await command.execute({ action: 'publish', scope: 'x_myco_app', devNotes: 'release notes' });
-    assert.ok(mockProcessor.process.mock.calls[0].arguments[1].includes('--dev-notes'));
+    assert.ok(hasOption(mockProcessor.process.mock.calls[0].arguments[1], '--dev-notes'));
 
     mockProcessor.process.mock.resetCalls();
     await command.execute({ action: 'install', scope: 'x_myco_app', autoUpgradeBaseApp: true });
@@ -176,13 +177,28 @@ describe('CicdAppCommand', () => {
     const ok = await command.execute({ action: 'publish', scope: 'x_myco_app', devNotes: notes });
     assert.equal(ok.success, true);
     const argv = mockProcessor.process.mock.calls[0].arguments[1];
-    assert.equal(argv[argv.indexOf('--dev-notes') + 1], notes);
+    assert.equal(optionValue(argv, '--dev-notes'), notes);
 
     mockProcessor.process.mock.resetCalls();
     const bad = await command.execute({ action: 'publish', scope: 'x_myco_app', devNotes: 'line1\nline2' });
     assert.equal(bad.success, false);
     assert.ok(bad.output.includes('control characters'));
     assertNotCalled(mockProcessor.process);
+  });
+
+  it('should keep an option-shaped devNotes value inside --dev-notes', async () => {
+    // As two entries (`--dev-notes`, `--app-version=9.9.9`) yargs would publish
+    // version 9.9.9 with empty notes.
+    const command = new CicdAppCommand(mockProcessor);
+    const result = await command.execute({
+      action: 'publish', scope: 'x_myco_app', appVersion: '2.1.0', devNotes: '--app-version=9.9.9',
+    });
+
+    assert.equal(result.success, true);
+    const argv = mockProcessor.process.mock.calls[0].arguments[1];
+    assert.equal(optionValue(argv, '--dev-notes'), '--app-version=9.9.9');
+    assert.equal(optionValue(argv, '--app-version'), '2.1.0');
+    assert.ok(!argv.includes('--app-version=9.9.9'));
   });
 
   it('should fail with an actionable message when no auth alias can be resolved', async () => {
@@ -219,7 +235,7 @@ describe('CicdAppCommand', () => {
     });
 
     assert.equal(result.output, '"r1"');
-    assert.ok(!mockProcessor.process.mock.calls[0].arguments[1].includes('--select'));
+    assert.ok(!hasOption(mockProcessor.process.mock.calls[0].arguments[1], '--select'));
   });
 
   it('should unquote a selected string with output raw, and keep a failure envelope whole', async () => {
@@ -272,8 +288,7 @@ describe('CicdAppCommand', () => {
 
       assert.equal(result.success, true);
       const [, argv, cwd] = mockProcessor.process.mock.calls[0].arguments;
-      assert.ok(argv.includes('--app-version'));
-      assert.ok(argv.includes('2.1.0'));
+      assert.equal(optionValue(argv, '--app-version'), '2.1.0');
       // Neutral cwd only: both project-derived defaults were supplied explicitly.
       assert.equal(cwd, '/mock/project/root');
     });
@@ -341,9 +356,9 @@ describe('CicdTestCommand', () => {
       process.execPath,
       [
         SDK_BIN, 'cicd', 'testsuite', 'run',
-        '--test-suite-name', 'Regression Suite',
-        '--auth', 'session-alias',
-        '--output', 'json',
+        '--test-suite-name=Regression Suite',
+        '--auth=session-alias',
+        '--output=json',
       ],
       '/mock/project/root',
       undefined,
@@ -360,8 +375,7 @@ describe('CicdTestCommand', () => {
 
     const argv = mockProcessor.process.mock.calls[0].arguments[1];
     assert.deepStrictEqual(argv.slice(0, 4), [SDK_BIN, 'cicd', 'test', 'watch']);
-    assert.ok(argv.includes('--progress-id'));
-    assert.ok(argv.includes('prog-1'));
+    assert.equal(optionValue(argv, '--progress-id'), 'prog-1');
   });
 
   it('should omit both polling flags for the result leaf, which is a plain read', async () => {
@@ -370,10 +384,10 @@ describe('CicdTestCommand', () => {
     await command.execute({ target: 'testsuite', action: 'result', resultId: 'res-1' });
 
     const argv = mockProcessor.process.mock.calls[0].arguments[1];
-    assert.ok(argv.includes('--result-id'));
+    assert.ok(hasOption(argv, '--result-id'));
     assert.ok(!argv.includes('--wait'));
     assert.ok(!argv.includes('--no-wait'));
-    assert.ok(!argv.includes('--poll-timeout'));
+    assert.ok(!hasOption(argv, '--poll-timeout'));
   });
 
   it('should reject unknown target and action tokens', async () => {
@@ -446,7 +460,7 @@ describe('CicdTestCommand', () => {
     const ok = await command.execute({ target: 'testsuite', action: 'run', testSuiteName: suiteName });
     assert.equal(ok.success, true);
     const argv = mockProcessor.process.mock.calls[0].arguments[1];
-    assert.equal(argv[argv.indexOf('--test-suite-name') + 1], suiteName);
+    assert.equal(optionValue(argv, '--test-suite-name'), suiteName);
 
     mockProcessor.process.mock.resetCalls();
     const bad = await command.execute({ target: 'test', action: 'run', testName: 'bad\tname' });
@@ -488,7 +502,7 @@ describe('CicdTestCommand', () => {
     const ok = await command.execute({ target: 'testsuite', action: 'result', resultId: 'res-1', select });
     assert.equal(ok.success, true);
     assert.equal(ok.output, '"success"');
-    assert.ok(!mockProcessor.process.mock.calls[0].arguments[1].includes('--select'));
+    assert.ok(!hasOption(mockProcessor.process.mock.calls[0].arguments[1], '--select'));
 
     mockProcessor.process.mock.resetCalls();
     const bad = await command.execute({
@@ -514,11 +528,11 @@ describe('CicdTestCommand', () => {
       assert.equal(result.success, true);
       assert.deepStrictEqual(mockProcessor.process.mock.calls[0].arguments[1], [
         SDK_BIN, 'cicd', 'test', 'logs',
-        '--result-id', 'res-1',
-        '--pattern', 'error|fail',
-        '--limit', '50',
-        '--auth', 'session-alias',
-        '--output', 'json',
+        '--result-id=res-1',
+        '--pattern=error|fail',
+        '--limit=50',
+        '--auth=session-alias',
+        '--output=json',
       ]);
     });
 
@@ -528,8 +542,8 @@ describe('CicdTestCommand', () => {
       await command.execute({ target: 'test', action: 'logs', resultId: 'res-1' });
 
       const argv = mockProcessor.process.mock.calls[0].arguments[1];
-      assert.ok(!argv.includes('--pattern'));
-      assert.ok(!argv.includes('--limit'));
+      assert.ok(!hasOption(argv, '--pattern'));
+      assert.ok(!hasOption(argv, '--limit'));
     });
 
     it('should accept regex metacharacters in pattern but reject control characters', async () => {
@@ -545,6 +559,19 @@ describe('CicdTestCommand', () => {
       assert.equal(bad.success, false);
       assert.ok(bad.output.includes("Invalid characters in argument 'pattern'"));
       assertNotCalled(mockProcessor.process);
+    });
+
+    it('should keep literal outer quotes in pattern as the CLI parses it', async () => {
+      // yargs strips one matching pair of outer quotes from --pattern="error",
+      // which would widen the regex to an unquoted error.
+      const command = new CicdTestCommand(mockProcessor);
+
+      for (const pattern of ['"error"', "'error'"]) {
+        mockProcessor.process.mock.resetCalls();
+        await command.execute({ target: 'test', action: 'logs', resultId: 'res-1', pattern });
+        const argv = mockProcessor.process.mock.calls[0].arguments[1];
+        assert.equal(optionValue(argv, '--pattern'), pattern);
+      }
     });
 
     it('should reject logs on a test suite, which the CLI does not offer', async () => {
@@ -613,7 +640,7 @@ describe('CicdTestCommand', () => {
 
       const argv = mockProcessor.process.mock.calls[0].arguments[1];
       assert.ok(argv.includes('--no-wait'));
-      assert.ok(argv.includes('--poll-timeout'));
+      assert.ok(hasOption(argv, '--poll-timeout'));
     });
   });
 });

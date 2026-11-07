@@ -4,12 +4,17 @@
  * paths (download `directory`, transform `from`):
  *   - CORRECTNESS: paths containing spaces survive as a SINGLE argv token
  *     (previously broken by the shell splitting on whitespace);
- *   - SAFETY: the defense-in-depth validation added to executeSdkCommand rejects
- *     unexpected shell metacharacters and control characters (newline/CR/tab)
- *     at the command boundary.
+ *   - SAFETY: shell metacharacters are inert. They reach the CLI as literal
+ *     argv data, proven here through the real NodeProcessRunner (no shell runs,
+ *     a `$(touch …)` sentinel is never created). Control characters (newline,
+ *     CR, tab) are still rejected, by the input schema.
  */
-import { beforeEach, describe, it, mock } from 'node:test';
+import { after, beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { hasOption, optionValue } from '../support/argv.js';
 import { assertNotCalled } from '../support/mockAssertions.js';
 import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
 import type { CommandProcessor } from '../../src/utils/types.js';
@@ -34,6 +39,7 @@ mock.module('../../src/utils/sessionManager.js', {
 
 const { DownloadCommand } = await import('../../src/tools/commands/downloadCommand.js');
 const { TransformCommand } = await import('../../src/tools/commands/transformCommand.js');
+const { NodeProcessRunner } = await import('../../src/tools/processors/processRunner.js');
 
 const SDK_BIN = '/test/node_modules/@servicenow/sdk/bin/index.js';
 
@@ -62,6 +68,21 @@ describe('Shell-free arg handling for free-string paths (H1)', () => {
       ]);
     });
 
+    it('download rejects a positional directory that begins with "-"', async () => {
+      const command = new DownloadCommand(mockProcessor);
+
+      await assert.rejects(command.execute({ directory: '--incremental' }), /Argument 'directory' must not begin with "-"/);
+      assertNotCalled(mockProcessor.process);
+    });
+
+    it('transform keeps a dash-leading from-path inside --from', async () => {
+      const command = new TransformCommand(mockProcessor);
+      const result = await command.execute({ from: '-metadata' });
+
+      assert.equal(result.success, true);
+      assert.equal(optionValue(mockProcessor.process.mock.calls[0].arguments[1], '--from'), '-metadata');
+    });
+
     it('transform passes a from-path with spaces as a single argv entry', async () => {
       const command = new TransformCommand(mockProcessor);
       const result = await command.execute({ from: 'my file.xml' });
@@ -69,34 +90,44 @@ describe('Shell-free arg handling for free-string paths (H1)', () => {
       assert.equal(result.success, true);
       const argv = mockProcessor.process.mock.calls[0].arguments[1];
       // Stricter than the original arrayContaining: the path follows --from as ONE token.
-      assert.ok(argv.includes('--from'));
-      assert.equal(argv[argv.indexOf('--from') + 1], 'my file.xml');
+      assert.ok(hasOption(argv, '--from'));
+      assert.equal(optionValue(argv, '--from'), 'my file.xml');
     });
   });
 
-  describe('safety — metacharacters and control chars rejected', () => {
-    it('rejects a download directory with a command separator', async () => {
-      const command = new DownloadCommand(mockProcessor);
-      await assert.rejects(command.execute({ directory: 'evil; rm -rf /' }), /Invalid characters/);
-      assertNotCalled(mockProcessor.process);
+  describe('safety — metacharacters are literal argv data; control characters are rejected', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fluent-shell-free-'));
+    after(() => fs.rmSync(root, { recursive: true, force: true }));
+    const sentinel = path.join(root, 'ran');
+    const hostile = ['evil; rm -rf /', `x$(touch ${sentinel})`, `\`touch ${sentinel}\``, 'a | cat', 'a && b', '$HOME', '*', 'a>b<c', '{a,b}', '[x]', 'back\\slash'];
+
+    it('passes each metacharacter value to the command as one argv entry', async () => {
+      for (const directory of hostile) {
+        mockProcessor.process.mock.resetCalls();
+        const result = await new DownloadCommand(mockProcessor).execute({ directory });
+        assert.equal(result.success, true, directory);
+        assert.deepStrictEqual(mockProcessor.process.mock.calls[0].arguments[1], [SDK_BIN, 'download', directory]);
+
+        mockProcessor.process.mock.resetCalls();
+        await new TransformCommand(mockProcessor).execute({ from: directory });
+        assert.equal(optionValue(mockProcessor.process.mock.calls[0].arguments[1], '--from'), directory);
+      }
     });
 
-    it('rejects a transform from-path with command substitution', async () => {
-      const command = new TransformCommand(mockProcessor);
-      await assert.rejects(command.execute({ from: 'x$(whoami)' }), /Invalid characters/);
-      assertNotCalled(mockProcessor.process);
+    it('the real process runner spawns without a shell: the child receives the values verbatim and nothing runs', async () => {
+      const printArgv = 'process.stdout.write(JSON.stringify(process.argv.slice(1)))';
+      const result = await new NodeProcessRunner().run(process.execPath, ['-e', printArgv, '--', ...hostile]);
+      assert.equal(result.exitCode, 0, result.stderr);
+      assert.deepStrictEqual(JSON.parse(result.stdout), hostile);
+      assert.equal(fs.existsSync(sentinel), false);
     });
 
-    it('rejects a transform from-path containing a newline (command separator)', async () => {
-      const command = new TransformCommand(mockProcessor);
-      await assert.rejects(command.execute({ from: 'a\nrm -rf /' }), /Invalid characters/);
-      assertNotCalled(mockProcessor.process);
-    });
-
-    it('rejects a download directory containing a pipe', async () => {
-      const command = new DownloadCommand(mockProcessor);
-      await assert.rejects(command.execute({ directory: 'a | cat' }), /Invalid characters/);
-      assertNotCalled(mockProcessor.process);
-    });
+    for (const [label, value] of [['a newline', 'a\nrm -rf /'], ['a carriage return', 'a\rb'], ['a tab', 'a\tb'], ['a NUL', 'a\u0000b']]) {
+      it(`rejects ${label} in a path (control characters are never valid)`, async () => {
+        await assert.rejects(new TransformCommand(mockProcessor).execute({ from: value }), /Invalid characters in argument 'from': control characters are not allowed/);
+        await assert.rejects(new DownloadCommand(mockProcessor).execute({ directory: value }), /Invalid characters in argument 'directory'/);
+        assertNotCalled(mockProcessor.process);
+      });
+    }
   });
 });

@@ -1,7 +1,20 @@
-import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
+import { ArgumentDomain, CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { BaseCLICommand } from './baseCommand.js';
 import { getProjectRootPath } from '../../config.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
+
+/** The SDK flags this tool runs: version and help. */
+const SDK_INFO_FLAGS = ['-v', '--version', '-h', '--help'] as const;
+
+/**
+ * A `now-sdk` command name to get help for. It must not begin with "-", or the
+ * CLI would read it as an option.
+ */
+const SDK_COMMAND_NAME_DOMAIN: ArgumentDomain = {
+  kind: 'pattern',
+  regex: /^[a-zA-Z0-9_][a-zA-Z0-9_-]*$/,
+  expected: 'a command name: letters, digits, "_" and "-", not beginning with "-"',
+};
 
 /**
  * ServiceNow SDK information command that accepts SDK flags
@@ -19,12 +32,14 @@ export class SdkInfoCommand extends BaseCLICommand {
       name: 'flag',
       type: 'string',
       required: true,
+      domain: { kind: 'choices', values: SDK_INFO_FLAGS },
       description: 'SDK flag to execute: -v/--version (SDK version), -h/--help (SDK help)',
     },
     {
       name: 'command',
       type: 'string',
       required: false,
+      domain: SDK_COMMAND_NAME_DOMAIN,
       description: 'Specific command to get help for (only used with -h/--help flag)',
     },
   ];
@@ -44,33 +59,17 @@ export class SdkInfoCommand extends BaseCLICommand {
   }
 
   async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
-    // Validate base args (type checking and shell injection protection)
+    // The schema checks the flag's choices and the command name's grammar.
     this.validateArgs(args);
 
     const flag = args.flag as string;
     const command = args.command as string | undefined;
 
-    // Strict flag validation - must exactly match allowed patterns
-    const validFlagPattern = /^(-v|--version|-h|--help)$/;
-    if (!validFlagPattern.test(flag)) {
-      return CommandResultFactory.error(
-        `Invalid flag '${flag}'. Valid flags: -v/--version, -h/--help`
-      );
-    }
-
-    // Additional validation for the optional command argument
     if (command !== undefined) {
-      // Command should only be used with help flag
+      // A command name is help for that command, so it needs the help flag.
       if (flag !== '-h' && flag !== '--help') {
         return CommandResultFactory.error(
           'The \'command\' argument is only valid with -h/--help flag'
-        );
-      }
-      // Validate command contains only safe characters (alphanumeric, hyphen, underscore)
-      const safeCommandPattern = /^[a-zA-Z0-9_-]+$/;
-      if (!safeCommandPattern.test(command)) {
-        return CommandResultFactory.error(
-          `Invalid command name '${command}'. Command must contain only alphanumeric characters, hyphens, and underscores.`
         );
       }
     }

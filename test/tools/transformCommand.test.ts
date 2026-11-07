@@ -6,6 +6,7 @@
  */
 import { beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { hasOption } from '../support/argv.js';
 import { assertCalledTimes, assertNotCalled } from '../support/mockAssertions.js';
 import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
 import type { CommandProcessor } from '../../src/utils/types.js';
@@ -106,32 +107,32 @@ describe('TransformCommand (SDK v4.13.6 transform)', () => {
     it('an explicit alias on an instance pull is forwarded without discovery', async () => {
       await command.execute({ workingDirectory: '/project', auth: 'dev' });
       assertNotCalled(ensureAuth);
-      assertContainsAll(argvOf(), ['--auth', 'dev']);
+      assertContainsAll(argvOf(), ['--auth=dev']);
     });
 
     it('a from transform is offline: no auth flag and no discovery', async () => {
       await command.execute({ workingDirectory: '/project', from: 'metadata/update' });
       assertNotCalled(ensureAuth);
-      assertContainsAll(argvOf(), ['--from', 'metadata/update']);
-      assert.ok(!argvOf().includes('--auth'));
+      assertContainsAll(argvOf(), ['--from=metadata/update']);
+      assert.ok(!hasOption(argvOf(), '--auth'));
     });
 
     it('table with id pulls one record from the instance', async () => {
       await command.execute({ workingDirectory: '/project', auth: 'dev', table: 'sys_script', id: 'abc123' });
-      assertContainsAll(argvOf(), ['--table', 'sys_script', '--id', 'abc123', '--auth', 'dev']);
+      assertContainsAll(argvOf(), ['--table=sys_script', '--id=abc123', '--auth=dev']);
     });
 
     it('table without from still maps auth, because only --from marks the CLI run offline', async () => {
       await command.execute({ workingDirectory: '/project', table: 'sys_script' });
       assertCalledTimes(ensureAuth, 1);
-      assertContainsAll(argvOf(), ['--table', 'sys_script']);
+      assertContainsAll(argvOf(), ['--table=sys_script']);
     });
 
     it('table with from narrows a local transform without auth', async () => {
       await command.execute({ workingDirectory: '/project', from: 'metadata', table: 'sys_script,sys_script_include' });
       assertNotCalled(ensureAuth);
-      assertContainsAll(argvOf(), ['--from', 'metadata', '--table', 'sys_script,sys_script_include']);
-      assert.ok(!argvOf().includes('--auth'));
+      assertContainsAll(argvOf(), ['--from=metadata', '--table=sys_script,sys_script_include']);
+      assert.ok(!hasOption(argvOf(), '--auth'));
     });
   });
 
@@ -174,8 +175,8 @@ describe('TransformCommand (SDK v4.13.6 transform)', () => {
 
     it('treats an empty-string from as absent, matching the flag map', async () => {
       await command.execute({ workingDirectory: '/project', from: '', auth: 'dev' });
-      assertContainsAll(argvOf(), ['--auth', 'dev']);
-      assert.ok(!argvOf().includes('--from'));
+      assertContainsAll(argvOf(), ['--auth=dev']);
+      assert.ok(!hasOption(argvOf(), '--from'));
     });
   });
 });

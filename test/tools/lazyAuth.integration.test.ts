@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { hasOption, optionValue } from '../support/argv.js';
 import { assertCalledTimes, assertNotCalled } from '../support/mockAssertions.js';
 import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
 import type { CommandProcessor, EnsureAuthValidated } from '../../src/utils/types.js';
@@ -95,8 +96,7 @@ describe('lazy auto-auth', () => {
     assertCalledTimes(commandProcessor.process, 2);
     for (const call of commandProcessor.process.mock.calls) {
       const argv = call.arguments[1];
-      assert.ok(argv.includes('--auth'));
-      assert.ok(argv.includes('validated-alias'));
+      assert.equal(optionValue(argv, '--auth'), 'validated-alias');
     }
   });
 
@@ -112,8 +112,7 @@ describe('lazy auto-auth', () => {
 
     assertNotCalled(ensureAuth);
     const argv = commandProcessor.process.mock.calls[0].arguments[1];
-    assert.ok(argv.includes('--auth'));
-    assert.ok(argv.includes('explicit-alias'));
+    assert.equal(optionValue(argv, '--auth'), 'explicit-alias');
   });
 
   it('does not validate auth for a local transform', async () => {
@@ -127,7 +126,7 @@ describe('lazy auto-auth', () => {
     });
 
     assertNotCalled(ensureAuth);
-    assert.ok(!commandProcessor.process.mock.calls[0].arguments[1].includes('--auth'));
+    assert.ok(!hasOption(commandProcessor.process.mock.calls[0].arguments[1], '--auth'));
   });
 
   it('rejects an explicit auth alias on a local transform without validating or spawning', async () => {

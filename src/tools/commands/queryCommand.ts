@@ -1,7 +1,23 @@
-import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
+import { ArgumentDomain, CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { ENVELOPE_RUN_OPTIONS, shapeEnvelopeResult } from '../../utils/jsonSelect.js';
 import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
-import { assertNoControlCharacters, screenSelectPathArg } from './argValidation.js';
+import { SELECT_PATH_DOMAIN } from './argValidation.js';
+import { cliOption } from './cliArgv.js';
+
+/**
+ * A table name: letters, digits and "_". The SDK builds the request path as
+ * `/api/now/table/${table}` without encoding (`sdk-api` `connector.js`), so a
+ * "/", "?", "#" or "." would point the read-only query at another endpoint; a
+ * leading "-" would also be read as a CLI option.
+ */
+const TABLE_NAME_DOMAIN: ArgumentDomain = {
+  kind: 'pattern',
+  regex: /^[A-Za-z0-9_]+$/,
+  expected: 'a table name: letters, digits, and "_" (e.g. "incident", "sys_user")',
+};
+
+/** `--display-value` choices declared by `now-sdk query`. */
+const DISPLAY_VALUES = ['true', 'false', 'all'] as const;
 
 /**
  * Command to run a read-only Table REST API query against a ServiceNow instance
@@ -22,6 +38,7 @@ export class QueryCommand extends SessionAwareCLICommand {
       name: 'table',
       type: 'string',
       required: true,
+      domain: TABLE_NAME_DOMAIN,
       description: 'ServiceNow table name to query (e.g. incident, sys_user)',
     },
     {
@@ -52,6 +69,7 @@ export class QueryCommand extends SessionAwareCLICommand {
       name: 'displayValue',
       type: 'string',
       required: false,
+      domain: { kind: 'choices', values: DISPLAY_VALUES },
       description: 'Return display values (sysparm_display_value): "true", "false", or "all" for both. Default "false".',
     },
     {
@@ -94,6 +112,7 @@ export class QueryCommand extends SessionAwareCLICommand {
       name: 'select',
       type: 'string',
       required: false,
+      domain: SELECT_PATH_DOMAIN,
       description: 'Dot/bracket path to extract from the output (SDK v4.10.0+), e.g. "records[0].sys_id". An unresolved path yields null rather than an error. Applied by this tool to a successful (ok: true) envelope only; on a failure the full envelope is returned so the error stays visible (the CLI\'s own --select would print only null).',
     },
     {
@@ -111,30 +130,16 @@ export class QueryCommand extends SessionAwareCLICommand {
   ];
 
   /**
-   * Validate query arguments. Reuses the base type checks and conservative
-   * string validation for simple identifier fields, then applies query-specific
-   * validation that permits printable encoded-query operators and punctuation.
-   *
-   * The base check sanitizes every string arg against the shell-metacharacter
-   * pattern, which would reject printable operators (`<`, `>`, `&`, and others)
-   * that are legitimate query data on the shell-free execution path — and the
-   * brackets in a `select` path such as `records[0].sys_id`. We hand the base
-   * benign placeholders for both (preserving its required/type checks) and screen
-   * each real value by the rule that applies to it (see argValidation).
+   * Validate query arguments. The schema checks types, `displayValue` and
+   * `select` against their domains, and every string (the encoded query
+   * included) for control characters; printable operators such as `<`, `>`,
+   * `^` and `&` are query data, passed as one literal argv entry. The table
+   * name's grammar is also a schema domain. What remains is a non-empty query.
    */
   protected validateArgs(args: Record<string, unknown>): void {
-    const query = args.query;
-    if (typeof query !== 'string' || query.trim() === '') {
+    super.validateArgs(args);
+    if ((args.query as string).trim() === '') {
       throw new Error("Missing required argument 'query'. It must be a non-empty encoded query string.");
-    }
-
-    super.validateArgs(screenSelectPathArg({ ...args, query: 'placeholder' }));
-
-    assertNoControlCharacters(query, 'query');
-
-    const displayValue = args.displayValue;
-    if (displayValue !== undefined && !['true', 'false', 'all'].includes(String(displayValue))) {
-      throw new Error("Argument 'displayValue' must be one of: \"true\", \"false\", \"all\"");
     }
   }
 
@@ -154,7 +159,7 @@ export class QueryCommand extends SessionAwareCLICommand {
       );
     }
 
-    const table = this.sanitizeStringArg(args.table, 'table');
+    const table = args.table as string;
 
     // The encoded query is a literal argv entry. Do not add shell quotes: with
     // shell=false they would reach now-sdk as data and change query semantics.
@@ -165,15 +170,17 @@ export class QueryCommand extends SessionAwareCLICommand {
     // `--exclude-reference-link` defaults to true in the CLI; the only meaningful
     // override is to INCLUDE reference links, which yargs expresses as the
     // `--no-` negation. Inject it explicitly (flag order is irrelevant to yargs).
-    const prefixFlags: string[] = [table, '--query', queryToken];
+    // `--output=json` is fixed (the envelope is always parsed), so it is a CLI
+    // token, not an argument: executeSdkCommand validates only declared arguments.
+    const prefixFlags: string[] = [table, cliOption('--query', queryToken), '--output=json'];
     if (args.excludeReferenceLink === false) {
       prefixFlags.push('--no-exclude-reference-link');
     }
 
-    // Default to a machine-readable JSON envelope; inject the resolved auth alias.
-    // `query` stays RAW in the args map (for re-validation); the flag is emitted
-    // via prefixFlags above, so it is intentionally absent from the flag mapping.
-    const mappedArgs = { ...args, auth: resolvedAuth, output: args.output ?? 'json' };
+    // Inject the resolved auth alias. `query` stays RAW in the args map (for
+    // re-validation); the flag is emitted via prefixFlags above, so it is
+    // intentionally absent from the flag mapping.
+    const mappedArgs = { ...args, auth: resolvedAuth };
 
     // `select` is applied here, not forwarded as --select; stdout is captured
     // whole so the envelope parses (see jsonSelect).
@@ -188,7 +195,6 @@ export class QueryCommand extends SessionAwareCLICommand {
         view: '--view',
         queryCategory: '--query-category',
         timeout: '--timeout',
-        output: '--output',
         auth: '--auth',
         noCount: { flag: '--no-count', hasValue: false },
         queryNoDomain: { flag: '--query-no-domain', hasValue: false },

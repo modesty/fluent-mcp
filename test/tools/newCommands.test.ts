@@ -125,7 +125,7 @@ describe('New SDK Commands', () => {
       assertCalledWith(
         mockProcessor.process,
         process.execPath,
-        [SDK_BIN, 'download', 'my-app', '--source', './src', '--incremental', '--debug'],
+        [SDK_BIN, 'download', 'my-app', '--source=./src', '--incremental', '--debug'],
         '/mock/working/dir',
         undefined, // stdinInput
         600000,   // timeoutMs
@@ -189,7 +189,7 @@ describe('New SDK Commands', () => {
       assertCalledWith(
         mockProcessor.process,
         process.execPath,
-        [SDK_BIN, 'clean', '--source', 'src', '--debug'],
+        [SDK_BIN, 'clean', '--source=src', '--debug'],
         '/mock/working/dir',
         undefined, // stdinInput
         15000,    // timeoutMs
@@ -253,7 +253,7 @@ describe('New SDK Commands', () => {
       assertCalledWith(
         mockProcessor.process,
         process.execPath,
-        [SDK_BIN, 'pack', '--source', './build', '--debug'],
+        [SDK_BIN, 'pack', '--source=./build', '--debug'],
         '/mock/working/dir',
         undefined, // stdinInput
         30000,    // timeoutMs
@@ -319,25 +319,23 @@ describe('New SDK Commands', () => {
       );
     });
 
-    it('should never forward --source, which the explain CLI does not declare', async () => {
+    it('should reject a topic that begins with "-" (it would switch on --list)', async () => {
       const command = new ExplainCommand(mockProcessor);
 
-      const result = await command.execute({
-        topic: 'Acl',
-        source: './src',
-        debug: true,
-      });
+      await assert.rejects(command.execute({ topic: '--list' }), /Argument 'topic' must not begin with "-"/);
+      assertNotCalled(mockProcessor.process);
+    });
 
-      assert.equal(result.success, true);
-      assertCalledWith(
-        mockProcessor.process,
-        process.execPath,
-        [SDK_BIN, 'explain', 'Acl', '--debug'],
-        '/mock/project/root',
-        undefined,
-        15000,
-        undefined
+    it('should reject the removed source argument, as tools/call does, and never forward --source', async () => {
+      // The explain CLI has never declared --source. Direct callers are held to
+      // the same strict input schema as tools/call, so the key is rejected.
+      const command = new ExplainCommand(mockProcessor);
+
+      await assert.rejects(
+        command.execute({ topic: 'Acl', source: './src', debug: true }),
+        /Invalid arguments for tool explain_fluent_api: Unrecognized key: "source"/
       );
+      assertNotCalled(mockProcessor.process);
     });
 
     it('should pass --list when list=true (no topic required)', async () => {
@@ -387,7 +385,7 @@ describe('New SDK Commands', () => {
       assertCalledWith(
         mockProcessor.process,
         process.execPath,
-        [SDK_BIN, 'explain', 'BusinessRule', '--format', 'raw', '--peek'],
+        [SDK_BIN, 'explain', 'BusinessRule', '--format=raw', '--peek'],
         '/mock/project/root',
         undefined,
         15000,
@@ -408,10 +406,10 @@ describe('New SDK Commands', () => {
     it('should reject invalid format value', async () => {
       const command = new ExplainCommand(mockProcessor);
 
-      const result = await command.execute({ topic: 'BusinessRule', format: 'json' });
-
-      assert.equal(result.success, false);
-      assert.ok(result.output.includes('Invalid format'));
+      await assert.rejects(
+        command.execute({ topic: 'BusinessRule', format: 'json' }),
+        /Argument 'format' must be one of: pretty, raw\. Received: "json"/
+      );
       assertNotCalled(mockProcessor.process);
     });
   });
