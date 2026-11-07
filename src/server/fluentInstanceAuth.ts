@@ -6,6 +6,38 @@ import { AuthValidationResult } from '../types.js';
 import { cliErrorMessage } from '../utils/cliError.js';
 
 /**
+ * Log an auth validation result to stderr at the severity its status carries.
+ * Only the allow-listed fields are included, so credentials can never leak
+ * through an auth result.
+ */
+export function logAuthValidationResult(result: AuthValidationResult): void {
+  const context: Record<string, unknown> = {
+    status: result.status,
+    timestamp: result.timestamp,
+  };
+  if (result.alias) context.alias = result.alias;
+  if (result.host) context.host = result.host;
+  if (result.authType) context.authType = result.authType;
+  if (result.isDefault !== undefined) context.isDefault = result.isDefault;
+  if (result.actionRequired) context.actionRequired = result.actionRequired;
+
+  switch (result.status) {
+    case 'authenticated':
+      logger.info(result.message, context);
+      break;
+    case 'skipped':
+      logger.debug(result.message, context);
+      break;
+    case 'not_authenticated':
+      logger.notice(result.message, context);
+      break;
+    case 'validation_error':
+      logger.warn(result.message, context);
+      break;
+  }
+}
+
+/**
  * Perform auto-authentication validation if environment is configured
  *
  * Environment variables:

@@ -11,8 +11,6 @@ export interface SessionData {
   authAlias?: string;
   /** The result of authentication validation */
   authValidationResult?: AuthValidationResult;
-  /** Any other session data that might be needed in the future */
-  [key: string]: unknown;
 }
 
 /**

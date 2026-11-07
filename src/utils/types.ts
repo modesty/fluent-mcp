@@ -179,13 +179,8 @@ export interface CommandMetadata {
   outputSchema?: ZodRawShape;
 }
 
-export interface CLICommand extends CommandExecutor, CommandMetadata {
-  /**
-   * Get the command processor used by this command
-   * @returns The command processor instance, or undefined for commands that don't use a processor
-   */
-  getCommandProcessor(): CommandProcessor | undefined;
-}
+/** A command registered as an MCP tool: its declaration plus how it runs. */
+export type CLICommand = CommandExecutor & CommandMetadata;
 
 /**
  * Factory for creating consistent CommandResult objects

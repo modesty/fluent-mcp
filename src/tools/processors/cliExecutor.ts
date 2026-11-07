@@ -12,22 +12,9 @@ export class CLIExecutor extends BaseCommandProcessor {
   }
 
   /**
-   * Process a command by executing it and returning the result
-   * Implements the CommandProcessor interface
+   * Run the command through the process runner and return its result.
    */
   async process(
-    command: string,
-    args: string[],
-    customWorkingDir?: string,
-    stdinInput?: string,
-    timeoutMs?: number,
-    signal?: AbortSignal,
-    options?: ProcessRunOptions
-  ): Promise<CommandResult> {
-    return this.execute(command, args, customWorkingDir, stdinInput, timeoutMs, signal, options);
-  }
-
-  async execute(
     command: string,
     args: string[],
     customWorkingDir?: string,

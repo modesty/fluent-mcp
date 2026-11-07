@@ -16,14 +16,6 @@ export abstract class BaseCLICommand implements CLICommand {
 
   abstract execute(args: Record<string, unknown>): Promise<CommandResult>;
 
-  /**
-   * Get the command processor used by this command
-   * @returns The command processor instance
-   */
-  getCommandProcessor(): CommandProcessor {
-    return this.commandProcessor;
-  }
-
   private inputSchema?: z.ZodType;
 
   /**

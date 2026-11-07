@@ -86,11 +86,6 @@ export class GetFluentKnowledgeCommand implements CLICommand {
 
   constructor(private readonly resourceCatalog: ResourceCatalog = new ResourceCatalog()) {}
 
-  /** Reads the catalog itself; no command processor. */
-  getCommandProcessor(): undefined {
-    return undefined;
-  }
-
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
     try {
       this.inputSchema ??= buildInputZodSchema(this.arguments);
@@ -200,13 +195,6 @@ export class CheckAuthStatusCommand implements CLICommand {
   constructor(
     private readonly ensureAuthValidated: EnsureAuthValidated = async () => {}
   ) {}
-
-  /**
-   * This command doesn't use a command processor
-   */
-  getCommandProcessor(): undefined {
-    return undefined;
-  }
 
   /**
    * Execute the command to check auth status
