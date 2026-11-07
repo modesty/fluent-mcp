@@ -36,7 +36,7 @@ const applicationSubMenu = Record({
         active: true,
         hint: 'Sub Menu under system security',
         linkType: 'ASSESSMENT',
-        assessment: 'get_sys_id("asmt_metric_type", "Basic Flow")',
+        assessment: Now.ref('asmt_metric_type', '<sys_id>'), // sys_id of the existing `Basic Flow` assessment metric type, looked up on the instance
     },
 })
 ```

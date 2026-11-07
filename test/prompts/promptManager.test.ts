@@ -13,9 +13,12 @@
  */
 import { describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { loggerFixture } from '../support/fixtures.js';
 
-mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
+const { logger, mockOptions: loggerOptions } = loggerFixture();
+mock.module('../../src/utils/logger.js', loggerOptions);
 
 const { PromptManager, parsePromptFile, completeMetadataList } = await import('../../src/prompts/promptManager.js');
 const { ServiceNowMetadataType } = await import('../../src/types.js');
@@ -91,6 +94,29 @@ describe('PromptManager registration', () => {
     assert.ok(!bare.includes('supported metadata types (call'));
     assert.equal((await prompts.get('coding_in_fluent')).messages[0].content.text, bare);
     assert.equal((await prompts.get('coding_in_fluent', { metadata_list: '' })).messages[0].content.text, bare);
+  });
+
+  it('skips a malformed prompt file, logging it, and still loads the others', async (t) => {
+    // The prompt directory is stubbed on the shared node:fs promises object,
+    // which is the one src/prompts/promptManager.ts imports.
+    const files: Record<string, string> = {
+      'a_good.md': '---\ntitle: "Good"\ndescription: "A well-formed prompt"\n---\nGood body',
+      'b_no_description.md': '---\ntitle: "Broken"\n---\nBody',
+      'c_no_front_matter.md': '# Just a body',
+    };
+    t.mock.method(fs.promises, 'readdir', (async () => ['README.txt', ...Object.keys(files)]) as never);
+    const readFile = t.mock.method(fs.promises, 'readFile', (async (file: string) => files[path.basename(file)]) as never);
+    logger.error.mock.resetCalls();
+
+    const { registered } = await loadPrompts();
+
+    assert.deepEqual(registered.map((p) => [p.name, p.config.title]), [['a_good', 'Good']]);
+    // Only .md files are read; each malformed one is reported by name.
+    assert.equal(readFile.mock.callCount(), 3);
+    assert.deepEqual(logger.error.mock.calls.map((call) => String(call.arguments[0])), [
+      'Failed to load prompt b_no_description: Prompt b_no_description: front matter needs a title and a description',
+      'Failed to load prompt c_no_front_matter: Prompt c_no_front_matter: missing front matter',
+    ]);
   });
 
   it('returns the body unchanged for a prompt without arguments', async () => {

@@ -23,7 +23,7 @@ Acl({
   operation: 'delete',
   type: 'record',
   table: 'task',
-  roles: [get_sys_id('sys_user_role', 'name=admin'), managerRole],
+  roles: ['admin', managerRole], // an existing role by name (resolved by name at build time) and a Role object
   condition: 'priority=2^active=true',
   script: `function executeRule() {
     // Check if the record is new

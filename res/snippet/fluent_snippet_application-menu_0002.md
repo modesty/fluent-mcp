@@ -36,7 +36,7 @@ const applicationSubMenu = Record({
         active: true,
         hint: 'Sub menu under Application Security',
         linkType: 'MAP',
-        mapPage: 'get_sys_id("cmn_map_page", "Critical incidents")',
+        mapPage: Now.ref('cmn_map_page', '<sys_id>'), // sys_id of the existing `Critical incidents` map page, looked up on the instance
         overrideMenuRoles: false,
         requireConfirmation: false,
         uncancelable: false

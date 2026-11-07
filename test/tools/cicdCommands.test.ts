@@ -88,7 +88,7 @@ describe('CicdAppCommand', () => {
   it('should build install argv with the subcommand token, JSON envelope, and session auth', async () => {
     const command = new CicdAppCommand(mockProcessor);
 
-    const result = await command.execute({ action: 'install', appSysId: 'abc123', appVersion: '1.0.0' });
+    const result = await command.execute({ action: 'install', appSysId: '0123456789abcdef0123456789abcdef', appVersion: '1.0.0' });
 
     assert.equal(result.success, true);
     assertCalledWith(
@@ -96,7 +96,7 @@ describe('CicdAppCommand', () => {
       process.execPath,
       [
         SDK_BIN, 'cicd', 'install',
-        '--app-sys-id=abc123',
+        '--app-sys-id=0123456789abcdef0123456789abcdef',
         '--app-version=1.0.0',
         '--auth=session-alias',
         '--output=json',
@@ -140,10 +140,20 @@ describe('CicdAppCommand', () => {
     assertNotCalled(mockProcessor.process);
   });
 
+  it('should reject an appSysId that is not a sys_id before any process runs', async () => {
+    const command = new CicdAppCommand(mockProcessor);
+
+    const result = await command.execute({ action: 'install', appSysId: '../x_myco_app', appVersion: '1.0.0' });
+
+    assert.equal(result.success, false);
+    assert.match(result.output, /appSysId: Argument 'appSysId' must be a sys_id: 32 hexadecimal characters/);
+    assertNotCalled(mockProcessor.process);
+  });
+
   it('should reject scope and appSysId together', async () => {
     const command = new CicdAppCommand(mockProcessor);
 
-    const result = await command.execute({ action: 'install', scope: 'x_myco_app', appSysId: 'abc123' });
+    const result = await command.execute({ action: 'install', scope: 'x_myco_app', appSysId: '0123456789abcdef0123456789abcdef' });
 
     assert.equal(result.success, false);
     assert.ok(result.output.includes('mutually exclusive'));
@@ -153,7 +163,7 @@ describe('CicdAppCommand', () => {
   it('should require appVersion for rollback', async () => {
     const command = new CicdAppCommand(mockProcessor);
 
-    const result = await command.execute({ action: 'rollback', appSysId: 'abc123' });
+    const result = await command.execute({ action: 'rollback', appSysId: '0123456789abcdef0123456789abcdef' });
 
     assert.equal(result.success, false);
     assert.ok(result.output.includes("'appVersion' is required"));
@@ -173,8 +183,8 @@ describe('CicdAppCommand', () => {
   it('should accept punctuation in devNotes but reject control characters', async () => {
     const command = new CicdAppCommand(mockProcessor);
 
-    // Release notes routinely contain punctuation the base shell-metacharacter
-    // check rejects; it is inert on the shell-free path and must pass through.
+    // Release notes routinely contain shell punctuation; it is inert on the
+    // shell-free path and must pass through.
     const notes = 'Fixes (SN-123); adds retry & backoff';
     const ok = await command.execute({ action: 'publish', scope: 'x_myco_app', devNotes: notes });
     assert.equal(ok.success, true);
@@ -207,7 +217,7 @@ describe('CicdAppCommand', () => {
     session.getAuthAlias.mock.mockImplementation(() => undefined);
     const command = new CicdAppCommand(mockProcessor);
 
-    const result = await command.execute({ action: 'install', appSysId: 'abc123' });
+    const result = await command.execute({ action: 'install', appSysId: '0123456789abcdef0123456789abcdef' });
 
     assert.equal(result.success, false);
     assert.ok(result.output.includes('now-sdk auth --add'));
@@ -217,7 +227,7 @@ describe('CicdAppCommand', () => {
   it('should reject an output format the CLI does not declare', async () => {
     const command = new CicdAppCommand(mockProcessor);
 
-    const result = await command.execute({ action: 'install', appSysId: 'abc123', output: 'yaml' });
+    const result = await command.execute({ action: 'install', appSysId: '0123456789abcdef0123456789abcdef', output: 'yaml' });
 
     assert.equal(result.success, false);
     assert.ok(result.output.includes('json, raw'));
@@ -233,7 +243,7 @@ describe('CicdAppCommand', () => {
     const command = new CicdAppCommand(mockProcessor);
 
     const result = await command.execute({
-      action: 'install', appSysId: 'abc123', select: 'result.links.results[0].id',
+      action: 'install', appSysId: '0123456789abcdef0123456789abcdef', select: 'result.links.results[0].id',
     });
 
     assert.equal(result.output, '"r1"');
@@ -245,14 +255,14 @@ describe('CicdAppCommand', () => {
       success: true, output: '{"ok":true,"result":{"links":{"progress":{"id":"p1"}}}}', exitCode: 0,
     }));
     const raw = await new CicdAppCommand(mockProcessor).execute({
-      action: 'install', appSysId: 'abc123', output: 'raw', select: 'result.links.progress.id',
+      action: 'install', appSysId: '0123456789abcdef0123456789abcdef', output: 'raw', select: 'result.links.progress.id',
     });
     assert.equal(raw.output, 'p1');
 
     const failure = '{"ok":false,"error":{"message":"Forbidden"}}';
     mockProcessor.process.mock.mockImplementation(async () => ({ success: false, output: failure, exitCode: 1 }));
     const failed = await new CicdAppCommand(mockProcessor).execute({
-      action: 'install', appSysId: 'abc123', select: 'result.links.progress.id',
+      action: 'install', appSysId: '0123456789abcdef0123456789abcdef', select: 'result.links.progress.id',
     });
     assert.equal(failed.output, failure);
   });
@@ -336,7 +346,7 @@ describe('CicdTestCommand', () => {
 
     assert.equal(command.arguments.some((a) => a.name === 'workingDirectory'), false);
 
-    const result = await command.execute({ target: 'test', action: 'result', resultId: 'res-1' });
+    const result = await command.execute({ target: 'test', action: 'result', resultId: 'feedfacefeedfacefeedfacefeedface' });
 
     assert.equal(result.success, true);
     assert.equal(mockProcessor.process.mock.calls[0].arguments[2], '/mock/project/root');
@@ -373,17 +383,17 @@ describe('CicdTestCommand', () => {
   it('should build test watch argv from a progressId', async () => {
     const command = new CicdTestCommand(mockProcessor);
 
-    await command.execute({ target: 'test', action: 'watch', progressId: 'prog-1' });
+    await command.execute({ target: 'test', action: 'watch', progressId: 'cafebabecafebabecafebabecafebabe' });
 
     const argv = mockProcessor.process.mock.calls[0].arguments[1];
     assert.deepStrictEqual(argv.slice(0, 4), [SDK_BIN, 'cicd', 'test', 'watch']);
-    assert.equal(optionValue(argv, '--progress-id'), 'prog-1');
+    assert.equal(optionValue(argv, '--progress-id'), 'cafebabecafebabecafebabecafebabe');
   });
 
   it('should omit both polling flags for the result leaf, which is a plain read', async () => {
     const command = new CicdTestCommand(mockProcessor);
 
-    await command.execute({ target: 'testsuite', action: 'result', resultId: 'res-1' });
+    await command.execute({ target: 'testsuite', action: 'result', resultId: 'feedfacefeedfacefeedfacefeedface' });
 
     const argv = mockProcessor.process.mock.calls[0].arguments[1];
     assert.ok(hasOption(argv, '--result-id'));
@@ -414,7 +424,7 @@ describe('CicdTestCommand', () => {
     assert.ok(missing.output.includes("either 'testSuiteSysId' or 'testSuiteName'"));
 
     const both = await command.execute({
-      target: 'test', action: 'run', testSysId: 'a', testName: 'b',
+      target: 'test', action: 'run', testSysId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', testName: 'b',
     });
     assert.equal(both.success, false);
     assert.ok(both.output.includes('mutually exclusive'));
@@ -430,6 +440,70 @@ describe('CicdTestCommand', () => {
     const result = await command.execute({ target: 'test', action: 'result' });
     assert.equal(result.success, false);
     assert.ok(result.output.includes("'resultId' is required"));
+  });
+
+  describe('identifier domains (the SDK interpolates progressId and resultId into the request path)', () => {
+    // The live finding: with this resultId the CLI fetched
+    // api/sn_cicd/testsuite/results/../../../now/table/sys_user and returned user records.
+    const TRAVERSAL = '../../../now/table/sys_user';
+    for (const [name, args] of [
+      ['resultId', { target: 'testsuite', action: 'result' }],
+      ['resultId', { target: 'test', action: 'logs' }],
+      ['progressId', { target: 'testsuite', action: 'watch' }],
+      ['testSuiteSysId', { target: 'testsuite', action: 'run' }],
+      ['testSysId', { target: 'test', action: 'run' }],
+    ] as const) {
+      for (const value of [TRAVERSAL, 'res-1', `${'a'.repeat(32)}/logs`, 'a'.repeat(31)]) {
+        it(`rejects ${name} ${JSON.stringify(value)} on ${args.target} ${args.action} before any process runs`, async () => {
+          const command = new CicdTestCommand(mockProcessor);
+          const result = await command.execute({ auth: 'dev', ...args, [name]: value });
+          assert.equal(result.success, false);
+          assert.match(result.output, new RegExp(`${name}: Argument '${name}' must be a sys_id: 32 hexadecimal characters`));
+          assertNotCalled(mockProcessor.process);
+        });
+      }
+    }
+
+    it('accepts an upper-case sys_id', async () => {
+      const command = new CicdTestCommand(mockProcessor);
+      const result = await command.execute({ target: 'test', action: 'result', resultId: 'FEEDFACEFEEDFACEFEEDFACEFEEDFACE' });
+      assert.equal(result.success, true);
+      assert.equal(optionValue(mockProcessor.process.mock.calls[0].arguments[1], '--result-id'), 'FEEDFACEFEEDFACEFEEDFACEFEEDFACE');
+    });
+  });
+
+  describe('argument combinations the CLI would reject or ignore', () => {
+    const SUITE = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+    const TEST = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const RESULT = 'feedfacefeedfacefeedfacefeedface';
+    const PROGRESS = 'cafebabecafebabecafebabecafebabe';
+    for (const [label, args, message] of [
+      ['suite sys_id and name together', { target: 'testsuite', action: 'run', testSuiteSysId: SUITE, testSuiteName: 'S' },
+        "'testSuiteSysId' and 'testSuiteName' are mutually exclusive"],
+      ['a test run with no id', { target: 'test', action: 'run' }, "Provide either 'testSysId' or 'testName'"],
+      ['captureNodeLogs on a suite', { target: 'testsuite', action: 'run', testSuiteSysId: SUITE, captureNodeLogs: true },
+        "'captureNodeLogs' is only valid with target=\"test\""],
+      ['a run-only name on result', { target: 'testsuite', action: 'result', resultId: RESULT, testSuiteName: 'S' },
+        "'testSuiteName' is only valid with action=\"run\""],
+      ['runInCloud on watch', { target: 'test', action: 'watch', progressId: PROGRESS, runInCloud: true },
+        "'runInCloud' is only valid with action=\"run\""],
+      ['a test id on result', { target: 'test', action: 'result', resultId: RESULT, testSysId: TEST },
+        "'testSysId' is only valid with action=\"run\""],
+      ['progressId outside watch', { target: 'test', action: 'result', resultId: RESULT, progressId: PROGRESS },
+        "'progressId' is only valid with action=\"watch\""],
+      ['resultId on run', { target: 'test', action: 'run', testSysId: TEST, resultId: RESULT },
+        "'resultId' is only valid with action=\"result\" or action=\"logs\""],
+      ['resultId on watch', { target: 'test', action: 'watch', progressId: PROGRESS, resultId: RESULT },
+        "'resultId' is only valid with action=\"result\" or action=\"logs\""],
+    ] as const) {
+      it(`rejects ${label}`, async () => {
+        const command = new CicdTestCommand(mockProcessor);
+        const result = await command.execute(args);
+        assert.equal(result.success, false);
+        assert.ok(result.output.includes(message), result.output);
+        assertNotCalled(mockProcessor.process);
+      });
+    }
   });
 
   it('should reject suite-only arguments on a single test', async () => {
@@ -475,7 +549,7 @@ describe('CicdTestCommand', () => {
     session.getAuthAlias.mock.mockImplementation(() => undefined);
     const command = new CicdTestCommand(mockProcessor);
 
-    const result = await command.execute({ target: 'testsuite', action: 'result', resultId: 'res-1' });
+    const result = await command.execute({ target: 'testsuite', action: 'result', resultId: 'feedfacefeedfacefeedfacefeedface' });
 
     assert.equal(result.success, false);
     assert.ok(result.output.includes('now-sdk auth --add'));
@@ -486,7 +560,7 @@ describe('CicdTestCommand', () => {
     const command = new CicdTestCommand(mockProcessor);
 
     const result = await command.execute({
-      target: 'test', action: 'result', resultId: 'res-1', output: 'table',
+      target: 'test', action: 'result', resultId: 'feedfacefeedfacefeedfacefeedface', output: 'table',
     });
 
     assert.equal(result.success, false);
@@ -501,14 +575,14 @@ describe('CicdTestCommand', () => {
     const command = new CicdTestCommand(mockProcessor);
 
     const select = 'result.rollup_results[0].status';
-    const ok = await command.execute({ target: 'testsuite', action: 'result', resultId: 'res-1', select });
+    const ok = await command.execute({ target: 'testsuite', action: 'result', resultId: 'feedfacefeedfacefeedfacefeedface', select });
     assert.equal(ok.success, true);
     assert.equal(ok.output, '"success"');
     assert.ok(!hasOption(mockProcessor.process.mock.calls[0].arguments[1], '--select'));
 
     mockProcessor.process.mock.resetCalls();
     const bad = await command.execute({
-      target: 'testsuite', action: 'result', resultId: 'res-1', select: 'result.*.status',
+      target: 'testsuite', action: 'result', resultId: 'feedfacefeedfacefeedfacefeedface', select: 'result.*.status',
     });
     assert.equal(bad.success, false);
     assert.ok(bad.output.includes("Argument 'select' must be a dot/bracket path"));
@@ -524,13 +598,13 @@ describe('CicdTestCommand', () => {
       const command = new CicdTestCommand(mockProcessor);
 
       const result = await command.execute({
-        target: 'test', action: 'logs', resultId: 'res-1', pattern: 'error|fail', limit: 50,
+        target: 'test', action: 'logs', resultId: 'feedfacefeedfacefeedfacefeedface', pattern: 'error|fail', limit: 50,
       });
 
       assert.equal(result.success, true);
       assert.deepStrictEqual(mockProcessor.process.mock.calls[0].arguments[1], [
         SDK_BIN, 'cicd', 'test', 'logs',
-        '--result-id=res-1',
+        '--result-id=feedfacefeedfacefeedfacefeedface',
         '--pattern=error|fail',
         '--limit=50',
         '--auth=session-alias',
@@ -541,7 +615,7 @@ describe('CicdTestCommand', () => {
     it('should let the CLI default the limit and send no pattern when both are omitted', async () => {
       const command = new CicdTestCommand(mockProcessor);
 
-      await command.execute({ target: 'test', action: 'logs', resultId: 'res-1' });
+      await command.execute({ target: 'test', action: 'logs', resultId: 'feedfacefeedfacefeedfacefeedface' });
 
       const argv = mockProcessor.process.mock.calls[0].arguments[1];
       assert.ok(!hasOption(argv, '--pattern'));
@@ -552,12 +626,12 @@ describe('CicdTestCommand', () => {
       const command = new CicdTestCommand(mockProcessor);
 
       const ok = await command.execute({
-        target: 'test', action: 'logs', resultId: 'res-1', pattern: '^(Step|Assert)\\s+[0-9]+ failed$',
+        target: 'test', action: 'logs', resultId: 'feedfacefeedfacefeedfacefeedface', pattern: '^(Step|Assert)\\s+[0-9]+ failed$',
       });
       assert.equal(ok.success, true);
 
       mockProcessor.process.mock.resetCalls();
-      const bad = await command.execute({ target: 'test', action: 'logs', resultId: 'res-1', pattern: 'error\nfail' });
+      const bad = await command.execute({ target: 'test', action: 'logs', resultId: 'feedfacefeedfacefeedfacefeedface', pattern: 'error\nfail' });
       assert.equal(bad.success, false);
       assert.ok(bad.output.includes("Invalid characters in argument 'pattern'"));
       assertNotCalled(mockProcessor.process);
@@ -570,7 +644,7 @@ describe('CicdTestCommand', () => {
 
       for (const pattern of ['"error"', "'error'"]) {
         mockProcessor.process.mock.resetCalls();
-        await command.execute({ target: 'test', action: 'logs', resultId: 'res-1', pattern });
+        await command.execute({ target: 'test', action: 'logs', resultId: 'feedfacefeedfacefeedfacefeedface', pattern });
         const argv = mockProcessor.process.mock.calls[0].arguments[1];
         assert.equal(optionValue(argv, '--pattern'), pattern);
       }
@@ -579,7 +653,7 @@ describe('CicdTestCommand', () => {
     it('should reject logs on a test suite, which the CLI does not offer', async () => {
       const command = new CicdTestCommand(mockProcessor);
 
-      const result = await command.execute({ target: 'testsuite', action: 'logs', resultId: 'res-1' });
+      const result = await command.execute({ target: 'testsuite', action: 'logs', resultId: 'feedfacefeedfacefeedfacefeedface' });
 
       assert.equal(result.success, false);
       assert.ok(result.output.includes('action="logs" is only available with target="test"'));
@@ -602,7 +676,7 @@ describe('CicdTestCommand', () => {
       it(`should reject polling arguments on logs (${label})`, async () => {
         const command = new CicdTestCommand(mockProcessor);
 
-        const result = await command.execute({ target: 'test', action: 'logs', resultId: 'res-1', ...extra });
+        const result = await command.execute({ target: 'test', action: 'logs', resultId: 'feedfacefeedfacefeedfacefeedface', ...extra });
 
         assert.equal(result.success, false);
         assert.ok(result.output.includes('not accepted when action="logs"'));
@@ -617,7 +691,7 @@ describe('CicdTestCommand', () => {
       it(`should reject ${name} outside the logs action`, async () => {
         const command = new CicdTestCommand(mockProcessor);
 
-        const result = await command.execute({ target: 'test', action: 'result', resultId: 'res-1', [name]: value });
+        const result = await command.execute({ target: 'test', action: 'result', resultId: 'feedfacefeedfacefeedfacefeedface', [name]: value });
 
         assert.equal(result.success, false);
         assert.ok(result.output.includes(`Argument '${name}' is only valid with action="logs"`));
@@ -628,21 +702,27 @@ describe('CicdTestCommand', () => {
       it(`should reject a non-positive-integer limit (${limit})`, async () => {
         const command = new CicdTestCommand(mockProcessor);
 
-        const result = await command.execute({ target: 'test', action: 'logs', resultId: 'res-1', limit });
+        const result = await command.execute({ target: 'test', action: 'logs', resultId: 'feedfacefeedfacefeedfacefeedface', limit });
 
         assert.equal(result.success, false);
         assert.ok(result.output.includes("Argument 'limit' must be a positive integer"));
       });
     }
 
-    it('should still send polling flags for run and watch only', async () => {
-      const command = new CicdTestCommand(mockProcessor);
+    for (const [action, extra] of [
+      ['run', { testSysId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }],
+      ['watch', { progressId: 'cafebabecafebabecafebabecafebabe' }],
+    ] as const) {
+      it(`should still send polling flags for ${action}`, async () => {
+        const command = new CicdTestCommand(mockProcessor);
 
-      await command.execute({ target: 'test', action: 'watch', progressId: 'p-1', wait: false, pollTimeout: 1000 });
+        const result = await command.execute({ target: 'test', action, ...extra, wait: false, pollTimeout: 1000 });
 
-      const argv = mockProcessor.process.mock.calls[0].arguments[1];
-      assert.ok(argv.includes('--no-wait'));
-      assert.ok(hasOption(argv, '--poll-timeout'));
-    });
+        assert.equal(result.success, true);
+        const argv = mockProcessor.process.mock.calls[0].arguments[1];
+        assert.ok(argv.includes('--no-wait'));
+        assert.equal(optionValue(argv, '--poll-timeout'), '1000');
+      });
+    }
   });
 });

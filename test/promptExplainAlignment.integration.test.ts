@@ -226,4 +226,16 @@ describe('create_custom_ui — explain alignment (SDK v4.13.6)', () => {
     assertIncludes(content, 'Audio, video, and WASM files aren\'t supported');
     assertIncludes(content, 'Output paths must be deterministic');
   });
+
+  it('separates supported React guidance from Vue template availability', () => {
+    assertIncludes(content, 'Current UI Page guidance mandates React');
+    assertIncludes(content, 'template availability is a technical capability');
+    assertIncludes(content, 'use React for new UI Pages');
+    assertExcludes(content, 'sole non-React option');
+  });
+
+  it('requires query-string routing and rejects hash routing', () => {
+    assertIncludes(content, 'URLSearchParams');
+    assertIncludes(content, 'NEVER use hash-based routing');
+  });
 });

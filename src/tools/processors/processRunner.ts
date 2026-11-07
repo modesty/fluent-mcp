@@ -1,5 +1,5 @@
 import { spawn, SpawnOptionsWithoutStdio } from 'node:child_process';
-import { EXIT_CODE_CANCELLED, EXIT_CODE_TIMEOUT, ProcessResult, ProcessRunOptions, ProcessRunner } from '../../utils/types.js';
+import { EXIT_CODE_CANCELLED, EXIT_CODE_TIMEOUT, MAX_TIMER_DELAY_MS, ProcessResult, ProcessRunOptions, ProcessRunner } from '../../utils/types.js';
 import { BoundedBuffer, DEFAULT_MAX_OUTPUT_CHARS } from '../../utils/boundedOutput.js';
 import { getConfig } from '../../config.js';
 import logger from '../../utils/logger.js';
@@ -12,18 +12,12 @@ import logger from '../../utils/logger.js';
  */
 const FALLBACK_PROCESS_TIMEOUT_MS = 30_000;
 
-/** Delay before checking for prompts after stdout data (allows buffering) */
-const STDIN_PROMPT_CHECK_DELAY_MS = 50;
-
-/** Delay before closing stdin after all input lines written */
-const STDIN_CLOSE_DELAY_MS = 200;
-
 /**
  * Spawns child processes to execute CLI commands.
  *
  * Responsibilities:
  * - shell-free execution (injection defense — see H1),
- * - interactive stdin prompt detection with secure credential handling,
+ * - non-interactive stdin: input is written whole and stdin closed at spawn,
  * - a timeout that terminates the child and resolves with the buffered *partial*
  *   output (rather than discarding it) plus a non-zero exit code (P0.2),
  * - propagation of an external abort signal so an MCP client can cancel a
@@ -55,10 +49,14 @@ export class NodeProcessRunner implements ProcessRunner {
 
   /**
    * Resolve the effective timeout for a call. Operator override wins over the
-   * per-call value, which wins over the configured default.
+   * per-call value, which wins over the configured default. A budget a timer
+   * cannot hold is capped at `MAX_TIMER_DELAY_MS`: budgets are derived from
+   * caller values (exec `timeoutMs` up to 2^31 - 1 plus 60 s of headroom,
+   * download/transform `timeoutSeconds` × 1000), and Node fires an oversized
+   * timer after 1 ms, which killed such a command at once.
    */
   private resolveTimeout(timeoutMs?: number): number {
-    return this.overrideTimeoutMs ?? timeoutMs ?? this.defaultTimeoutMs;
+    return Math.min(this.overrideTimeoutMs ?? timeoutMs ?? this.defaultTimeoutMs, MAX_TIMER_DELAY_MS);
   }
 
   async run(
@@ -144,68 +142,23 @@ export class NodeProcessRunner implements ProcessRunner {
         }
       }
 
-      // Log if stdin input is provided (actual writing happens in response to prompts)
-      if (stdinInput && child.stdin) {
-        logger.debug('Stdin input provided, will write in response to detected prompts');
+      // Input is written whole and stdin is closed at once, for a CLI that
+      // reads stdin to EOF. (No command passes input since the server stopped
+      // adding auth profiles; W9 review.) The runner never answers prompts: it used to write the next input line whenever
+      // stdout ended in "? <text>", so any child diagnostic of that shape
+      // received a credential (W9 review). Without input, stdin stays open.
+      if (stdinInput !== undefined && child.stdin) {
+        // A child that exits before reading makes the write fail with EPIPE;
+        // its exit code reports the failure, so the stream error is only logged.
+        child.stdin.on('error', (error: Error) => logger.debug(`stdin write failed: ${error.message}`));
+        child.stdin.end(stdinInput);
       }
-
-      // For interactive input, track state and detect prompts
-      const stdinState = {
-        lines: stdinInput?.split('\n').filter(line => line.length > 0) || [],
-        lineIndex: 0,
-        pendingStdout: '',
-        inputComplete: false
-      };
-
-      // Function to check for prompts and write next input line
-      const writeNextLineIfPrompted = () => {
-        if (stdinState.inputComplete || stdinState.lineIndex >= stdinState.lines.length) {
-          return;
-        }
-        if (!child.stdin || child.stdin.destroyed) {
-          return;
-        }
-
-        // Detect inquirer-style prompts (start with "?") or other input requests
-        // Match: "? Question text" - inquirer prompts start with question mark
-        const hasPrompt = /\?\s+[^\n]+$/.test(stdinState.pendingStdout);
-
-        if (hasPrompt) {
-          const line = stdinState.lines[stdinState.lineIndex];
-          logger.debug(`Prompt detected, writing stdin line ${stdinState.lineIndex + 1}/${stdinState.lines.length}`);
-          child.stdin.write(line + '\n');
-          // Security: Clear the credential line from memory after writing
-          stdinState.lines[stdinState.lineIndex] = '';
-          stdinState.lineIndex++;
-          stdinState.pendingStdout = ''; // Reset to wait for next prompt
-
-          // If all lines written, close stdin after a small delay
-          if (stdinState.lineIndex >= stdinState.lines.length) {
-            stdinState.inputComplete = true;
-            // Security: Clear all stdin lines from memory
-            stdinState.lines.length = 0;
-            setTimeout(() => {
-              if (child.stdin && !child.stdin.destroyed) {
-                logger.debug('Closing stdin after writing all lines');
-                child.stdin.end();
-              }
-            }, STDIN_CLOSE_DELAY_MS);
-          }
-        }
-      };
 
       child.stdout?.on('data', (data: Buffer) => {
         const text = data.toString();
         stdout.append(text);
         // Log real-time output for debugging
         logger.debug(`[STDOUT] ${text.trim()}`);
-
-        // Accumulate stdout for prompt detection if we have stdin to write
-        if (stdinInput && !stdinState.inputComplete) {
-          stdinState.pendingStdout += text;
-          // Check for prompts after a tiny delay to allow buffering
-          setTimeout(writeNextLineIfPrompted, STDIN_PROMPT_CHECK_DELAY_MS);
-        }
       });
 
       child.stderr?.on('data', (data: Buffer) => {

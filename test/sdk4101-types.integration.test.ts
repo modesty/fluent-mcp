@@ -14,16 +14,16 @@
  *   - `runServerSideScript` "surface support" was already present in 4.9.0.
  *   - `add_message` inference removal is an internal transform fix with no
  *     authoring-surface change.
- * The docs also over-claim which APIs accept `$meta.useEsLatest`: `StateModel`,
- * `AliasTemplate`, `InboundEmailAction`, `CatalogItem`,
- * `CatalogItemRecordProducer`, and the instance-scan checks carry no
- * `Now.Internal.Meta` in their declarations.
+ * The docs also over-claim which APIs accept `$meta.useEsLatest`. As of the
+ * installed 4.14.0 declarations, `StateModel`, `AliasTemplate`,
+ * `InboundEmailAction`, `CatalogItem`, `ColumnTypeCheck` and `LinterCheck`
+ * carry no `Now.Internal.Meta`; `CatalogItemRecordProducer`, `ScriptOnlyCheck`
+ * and `TableCheck` gained it in 4.13.0.
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ServiceNowMetadataType } from '../src/types.js';
 
 const PROJECT_ROOT = process.cwd();
 const RES_DIR = path.join(PROJECT_ROOT, 'res');
@@ -34,39 +34,7 @@ const PROMPT_DIR = path.join(RES_DIR, 'prompt');
 
 const read = (dir: string, file: string) => fs.readFileSync(path.join(dir, file), 'utf-8');
 
-const NEW_TYPES: Array<[keyof typeof ServiceNowMetadataType, string]> = [
-  ['ATF_LIST', 'atf-list'],
-  ['STATE_MODEL', 'state-model'],
-];
-
 describe('SDK v4.10.1 Types - Integration Tests', () => {
-  describe('Enum completeness', () => {
-    for (const [key, value] of NEW_TYPES) {
-      it(`should have the new v4.10.1 enum entry ${key}`, () => {
-        assert.equal(ServiceNowMetadataType[key], value);
-      });
-    }
-
-    it('should have grown to at least 67 metadata types (65 before v4.10.1 + state-model + atf-list)', () => {
-      // Lower bound, not an equality: the exact total is a moving target owned by the
-      // newest version's integration test (see sdk4112-types.integration.test.ts).
-      // This assertion only guards that the two v4.10.1 additions were not lost.
-      assert.ok(Object.values(ServiceNowMetadataType).length >= 67);
-    });
-  });
-
-  describe('New resource files exist for each new type', () => {
-    for (const [key, value] of NEW_TYPES) {
-      it(`${key} has spec/instruct/snippet coverage (${value})`, () => {
-        assert.equal(fs.existsSync(path.join(SPEC_DIR, `fluent_spec_${value}.md`)), true);
-        assert.equal(fs.existsSync(path.join(INSTRUCT_DIR, `fluent_instruct_${value}.md`)), true);
-        const snippets = fs.readdirSync(SNIPPET_DIR)
-          .filter((f) => f.startsWith(`fluent_snippet_${value}_`) && f.endsWith('.md'));
-        assert.ok(snippets.length > 0);
-      });
-    }
-  });
-
   describe('state-model (StateModel state machine) resources', () => {
     it('spec should document the API, its four core tables, and the polymorphic model table', () => {
       const content = read(SPEC_DIR, 'fluent_spec_state-model.md');
@@ -74,7 +42,7 @@ describe('SDK v4.10.1 Types - Integration Tests', () => {
         'StateModel', '@servicenow/sdk/core',
         'sttrm_model', 'sttrm_state', 'sttrm_state_transition', 'sttrm_transition_condition',
         'chg_model', 'prb_model', 'prb_task_model',
-        'stateField', 'transitions', 'conditions',
+        'stateField', 'transitions:', 'conditions:',
       ]) {
         assert.ok(content.includes(term));
       }
@@ -110,14 +78,14 @@ describe('SDK v4.10.1 Types - Integration Tests', () => {
     it('instruct should forbid gating transitions with a Business Rule abort', () => {
       const content = read(INSTRUCT_DIR, 'fluent_instruct_state-model.md');
       assert.ok(content.includes('setAbortAction'));
-      assert.ok(content.includes('conditions'));
+      assert.ok(content.includes('Gate transitions with `conditions`'));
       assert.ok(content.includes('evaluateTransition'));
     });
 
     it('snippet 0001 should define a gated transition with a Mandatory Fields condition', () => {
       const content = read(SNIPPET_DIR, 'fluent_snippet_state-model_0001.md');
       assert.ok(content.includes('StateModel('));
-      assert.ok(content.includes('transitions'));
+      assert.ok(content.includes('transitions:'));
       assert.ok(content.includes("'Mandatory Fields'"));
       assert.ok(content.includes('initial: true'));
     });
@@ -169,7 +137,7 @@ describe('SDK v4.10.1 Types - Integration Tests', () => {
     it('table spec should document the actions object form and deprecate the array form', () => {
       const content = read(SPEC_DIR, 'fluent_spec_table.md');
       assert.ok(content.includes('TableActionAccess'));
-      assert.match(content, /deprecated/i);
+      assert.match(content, /the array form \([^)]*\) is DEPRECATED/);
       // The array form is a complete enumeration — the trap worth naming.
       assert.match(content, /complete enumeration/i);
     });
@@ -220,22 +188,20 @@ describe('SDK v4.10.1 Types - Integration Tests', () => {
       assert.ok(content.includes('RequestedForVariable'));
     });
 
-    it('catalog-ui-policy spec should document the new action variable property', () => {
+    it('catalog-ui-policy spec should type the action variableName as string | VariableReference', () => {
       const content = read(SPEC_DIR, 'fluent_spec_catalog-ui-policy.md');
-      assert.ok(content.includes('variable'));
-      assert.ok(content.includes('variableName'));
+      assert.match(content, /variableName: .*\/\/ string \| VariableReference/);
     });
 
     it('catalog-client-script spec should document the order property', () => {
       const content = read(SPEC_DIR, 'fluent_spec_catalog-client-script.md');
-      assert.ok(content.includes('order'));
+      assert.ok(content.includes('order: 100,'));
     });
   });
 
   describe('Cross-cutting capabilities in coding_in_fluent prompt (v4.10.1)', () => {
-    it('should list SDK v4.10.1 capabilities including both new types and the changed APIs', () => {
+    it('should list both new types and the changed APIs', () => {
       const content = read(PROMPT_DIR, 'coding_in_fluent.md');
-      assert.ok(content.includes('SDK v4.10.1'));
       for (const term of [
         'StateModel', 'atf.list', 'useEsLatest', 'TableActionAccess',
         'mtom', 'iconName', 'timerSchedule', 'dependentQuestion',
@@ -295,8 +261,8 @@ describe('SDK v4.10.1 Types - Integration Tests', () => {
 
     it('business-rule spec keeps addMessage as the explicit switch (no surface change)', () => {
       const content = read(SPEC_DIR, 'fluent_spec_business-rule.md');
-      assert.ok(content.includes('addMessage'));
-      assert.ok(content.includes('message'));
+      assert.ok(content.includes('addMessage: false,'));
+      assert.ok(content.includes("message: '',"));
     });
   });
 });

@@ -4,7 +4,7 @@ import { SessionAwareCLICommand } from './sessionAwareCommand.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
 import { cliOption } from './cliArgv.js';
 import { getProjectRootPath } from '../../config.js';
-import { CLI_OUTPUT_FORMATS, SELECT_PATH_DOMAIN, assertPositiveInteger } from './argValidation.js';
+import { CLI_OUTPUT_FORMATS, SELECT_PATH_DOMAIN, SYS_ID_DOMAIN, assertPositiveInteger } from './argValidation.js';
 
 /** The `target`/`action` choices — a caller-supplied token never reaches argv unvalidated. */
 const TEST_TARGETS = ['testsuite', 'test'] as const;
@@ -61,6 +61,7 @@ export class CicdTestCommand extends SessionAwareCLICommand {
       name: 'testSuiteSysId',
       type: 'string',
       required: false,
+      domain: SYS_ID_DOMAIN,
       description: 'sys_id of the test suite to run. Mutually exclusive with testSuiteName. Use with target="testsuite", action="run".',
     },
     {
@@ -73,6 +74,7 @@ export class CicdTestCommand extends SessionAwareCLICommand {
       name: 'testSysId',
       type: 'string',
       required: false,
+      domain: SYS_ID_DOMAIN,
       description: 'sys_id of the ATF test (sys_atf_test) to run. Mutually exclusive with testName. Use with target="test", action="run".',
     },
     {
@@ -85,12 +87,14 @@ export class CicdTestCommand extends SessionAwareCLICommand {
       name: 'progressId',
       type: 'string',
       required: false,
+      domain: SYS_ID_DOMAIN,
       description: 'Progress id returned by a previous run. REQUIRED when action="watch".',
     },
     {
       name: 'resultId',
       type: 'string',
       required: false,
+      domain: SYS_ID_DOMAIN,
       description: 'Result sys_id to fetch. REQUIRED when action="result" or action="logs". For a suite this is the links.results.id from run; for a test it is the resultId from watch. action="logs" needs a single-test result (sys_atf_test_result), never a suite result.',
     },
     {

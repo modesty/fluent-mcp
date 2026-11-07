@@ -86,7 +86,7 @@ function setupScaffold() {
   // that the validator will catch.
   const fluentGlobals = [
     // Fluent runtime
-    'Now', 'TemplateValue', 'Duration', 'Time', 'default_view', 'get_sys_id',
+    'Now', 'TemplateValue', 'Duration', 'Time', 'default_view',
     'get_column_name', 'wfa', 'trigger', 'action', 'actionStep', '_params', 'params',
     // SDK API surface (top-level constructors and namespaces)
     'Acl', 'AiAgent', 'AiAgenticWorkflow', 'Alias', 'AliasTemplate',

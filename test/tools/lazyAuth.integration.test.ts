@@ -66,8 +66,11 @@ describe('lazy auto-auth', () => {
 
   it('shares one in-flight validation across concurrent auth-requiring commands', async () => {
     let finishValidation!: () => void;
+    let markValidationStarted!: () => void;
+    const validationStarted = new Promise<void>((resolve) => { markValidationStarted = resolve; });
     autoValidate.mock.mockImplementation(
       () => new Promise((resolve) => {
+        markValidationStarted();
         finishValidation = () => {
           SessionManager.getInstance().setAuthAlias('validated-alias');
           resolve({
@@ -80,14 +83,24 @@ describe('lazy auto-auth', () => {
     );
 
     const toolsManager = manager();
-    const ensureAuth = ensureAuthOf(toolsManager);
+    const sharedEnsureAuth = ensureAuthOf(toolsManager);
+    // Each command's request for validation is counted, so the test waits for
+    // both to be in flight instead of guessing with microtask ordering.
+    let requests = 0;
+    let markBothRequested!: () => void;
+    const bothRequested = new Promise<void>((resolve) => { markBothRequested = resolve; });
+    const ensureAuth: EnsureAuthValidated = () => {
+      const pending = sharedEnsureAuth();
+      if (++requests === 2) markBothRequested();
+      return pending;
+    };
     const commandProcessor = processor();
     const deploy = new InstallCommand(commandProcessor, ensureAuth);
     const transform = new TransformCommand(commandProcessor, ensureAuth);
 
     const deployCall = deploy.execute({ workingDirectory: PROJECT_DIR });
     const transformCall = transform.execute({ workingDirectory: PROJECT_DIR });
-    await Promise.resolve();
+    await Promise.all([validationStarted, bothRequested]);
 
     assertCalledTimes(autoValidate, 1);
     assertNotCalled(commandProcessor.process);

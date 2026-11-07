@@ -11,18 +11,22 @@ import { ResourceNotFoundError } from '@modelcontextprotocol/server';
 import { loggerFixture } from '../support/fixtures.js';
 import { registerTemplates } from '../support/resourceTemplates.js';
 
+// Every type has a spec; script-include has no instruct, and only two types have snippets,
+// so each kind's listing must come from that kind's own index.
 const TYPES = ['business-rule', 'script-include', 'table'];
+const INSTRUCTS = ['business-rule', 'table'];
 const SNIPPETS: Record<string, string[]> = { 'business-rule': ['0001', '0002'], table: ['0001'] };
+const BY_KIND: Record<string, string[]> = { spec: TYPES, instruct: INSTRUCTS, snippet: Object.keys(SNIPPETS) };
 
-const getAvailableMetadataTypes = mock.fn(async () => [...TYPES]);
+const listMetadataTypes = mock.fn(async (kind: string) => [...BY_KIND[kind]]);
 const listSnippets = mock.fn(async (type: string) => [...(SNIPPETS[type.toLowerCase()] ?? [])]);
 const getResource = mock.fn(async (resourceType: string, metadataType: string, id?: string) => {
   const type = metadataType.toLowerCase();
-  const found = TYPES.includes(type) && (resourceType !== 'snippet' || (SNIPPETS[type] ?? []).includes(id ?? ''));
+  const found = BY_KIND[resourceType].includes(type) && (resourceType !== 'snippet' || (SNIPPETS[type] ?? []).includes(id ?? ''));
   return { content: found ? `${resourceType}:${type}:${id ?? ''}` : '', path: '', metadataType: type, resourceType, found };
 });
 
-const fakeCatalog = { getAvailableMetadataTypes, getResource, listSnippets };
+const fakeCatalog = { listMetadataTypes, getResource, listSnippets };
 
 const { logger, mockOptions: loggerMock } = loggerFixture();
 mock.module('../../src/utils/logger.js', loggerMock);
@@ -33,7 +37,7 @@ describe('ResourceManager templates', () => {
   let templates: ReturnType<typeof registerTemplates>;
 
   beforeEach(() => {
-    for (const fn of [getAvailableMetadataTypes, getResource, listSnippets, logger.error]) fn.mock.resetCalls();
+    for (const fn of [listMetadataTypes, getResource, listSnippets, logger.error]) fn.mock.resetCalls();
     templates = registerTemplates(new ResourceManager(fakeCatalog as never));
   });
 
@@ -52,7 +56,8 @@ describe('ResourceManager templates', () => {
     const resources = await templates.list();
     assert.deepEqual(resources.map((r) => r.uri), [
       'sn-spec://business-rule', 'sn-spec://script-include', 'sn-spec://table',
-      'sn-instruct://business-rule', 'sn-instruct://script-include', 'sn-instruct://table',
+      // No sn-instruct://script-include: listing it would advertise a URI that reads as not found.
+      'sn-instruct://business-rule', 'sn-instruct://table',
       'sn-snippet://business-rule/0001', 'sn-snippet://business-rule/0002', 'sn-snippet://table/0001',
     ]);
     for (const resource of resources) {
@@ -74,7 +79,7 @@ describe('ResourceManager templates', () => {
   });
 
   it('reports a catalog miss as the SDK not-found error (-32602, data.uri)', async () => {
-    for (const uri of ['sn-spec://missing', 'sn-instruct://missing', 'sn-snippet://table/9999', 'sn-spec://x%2F..%2FREADME']) {
+    for (const uri of ['sn-spec://missing', 'sn-instruct://missing', 'sn-instruct://script-include', 'sn-snippet://table/9999', 'sn-spec://x%2F..%2FREADME']) {
       await assert.rejects(templates.read(uri), (error: unknown) => {
         if (!(error instanceof ResourceNotFoundError)) throw new Error(`${uri}: expected ResourceNotFoundError`);
         assert.equal(error.code, -32602);
@@ -102,7 +107,12 @@ describe('ResourceManager templates', () => {
 
     it('completes metadataType by prefix, case-insensitively, on every template', async () => {
       assert.deepEqual(await complete('sn-spec', 'metadataType', 'S'), ['script-include']);
-      assert.deepEqual(await complete('sn-instruct', 'metadataType', ''), TYPES);
+      assert.deepEqual(await complete('sn-spec', 'metadataType', ''), TYPES);
+    });
+
+    it('offers only the types that have an instruct on the instruct template', async () => {
+      assert.deepEqual(await complete('sn-instruct', 'metadataType', ''), INSTRUCTS);
+      assert.deepEqual(await complete('sn-instruct', 'metadataType', 's'), []);
     });
 
     it('offers only the types that have a snippet on the snippet template', async () => {

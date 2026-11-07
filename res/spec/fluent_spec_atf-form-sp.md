@@ -41,7 +41,7 @@ atf.form_SP.fieldStateValidation({ // all props are mandatory
 atf.form_SP.uiActionVisibilityValidation({ // all props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
   table: '', // table name
-  uiAction: get_sys_id('sys_ui_action', ''), // sys_id | Record<'sys_ui_action'>
+  uiAction: Now.ref('sys_ui_action', '<sys_id>'), // sys_id | Record<'sys_ui_action'>
   isVisible: true, // boolean
 }): void;
 
@@ -62,7 +62,7 @@ atf.form_SP.submitForm({ // all props are mandatory
 atf.form_SP.clickUIAction({
   $id: Now.ID[''], // string | guid, mandatory
   table: '', // table name, mandatory
-  uiAction: get_sys_id('sys_ui_action', ''), // sys_id | Record<'sys_ui_action'>, mandatory
+  uiAction: Now.ref('sys_ui_action', '<sys_id>'), // sys_id | Record<'sys_ui_action'>, mandatory
   assert: 'form_submitted_to_server', // optional as of SDK v4.13.0 (was mandatory; no SDK default — omitted is written empty): 'form_submitted_to_server' | 'form_submission_canceled_in_browser' (only these two values)
 }): { table: string; record_id: string }; // output keys are snake_case
 // NOTE: only the Service Portal step relaxed `assert`; the standard-UI atf.form.clickUIAction still REQUIRES it.

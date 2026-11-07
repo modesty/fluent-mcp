@@ -21,6 +21,21 @@ export const SELECT_PATH_DOMAIN: ArgumentDomain = {
 };
 
 /**
+ * A ServiceNow record sys_id: exactly 32 hexadecimal characters. The SDK
+ * interpolates the CI/CD `progressId` and `resultId` into the request path
+ * unencoded (`api/sn_cicd/progress/${id}`, `api/sn_cicd/tests/test/results/${id}`),
+ * so without this domain `../../../now/table/sys_user` turned a result read into a
+ * GET of an arbitrary Table API path (verified on a live instance). The ids sent as
+ * query parameters carry it too: each names one record, and anything else is a
+ * mistake the instance would only report as "not found".
+ */
+export const SYS_ID_DOMAIN: ArgumentDomain = {
+  kind: 'pattern',
+  regex: /^[0-9a-fA-F]{32}$/,
+  expected: 'a sys_id: 32 hexadecimal characters',
+};
+
+/**
  * Assert that a numeric argument is a positive integer. The schema only proves
  * the value is a number; counts and durations the CLI forwards to an HTTP client
  * (a page limit, a seconds-based idle timeout) must also be whole and greater

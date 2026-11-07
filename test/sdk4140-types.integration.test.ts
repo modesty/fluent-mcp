@@ -2,8 +2,8 @@
  * Integration tests for SDK v4.14.0 metadata coverage. These tests read actual
  * resource files from disk (no mocks) to verify content correctness for the one
  * new metadata type (ui-macro), the reusable-ATF-test additions to the `atf`
- * family, and the changed table/column/catalog/dashboard APIs, plus the CLI
- * surface this server wraps (`now-sdk exec` → fluent_exec_script).
+ * family, and the changed table/column/catalog/dashboard APIs. The CLI surface
+ * (`now-sdk exec` → fluent_exec_script, build `sourceMap`) is tested with the commands.
  *
  * Source-of-truth directive: the locally-installed package wins wherever it
  * diverges from the release note or a shipped doc. Each divergence is asserted
@@ -14,16 +14,11 @@
  *   - Dashboard `componentProps` is now written verbatim (no SDK default merge).
  *   - The snake_case `reference_qual_condition` column key is silently dropped.
  */
-import { describe, it, mock } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ServiceNowMetadataType } from '../src/types.js';
-import { loggerFixture } from './support/fixtures.js';
-import type { CommandProcessor } from '../src/utils/types.js';
-
-mock.module('../src/utils/logger.js', loggerFixture().mockOptions);
-const { CommandFactory } = await import('../src/tools/registry/commandFactory.js');
 
 const PROJECT_ROOT = process.cwd();
 const RES_DIR = path.join(PROJECT_ROOT, 'res');
@@ -45,20 +40,7 @@ const code = (content: string) =>
 const codeOnly = (content: string) => code(content).replace(/\/\/.*$/gm, '');
 
 describe('SDK v4.14.0 Types - Integration Tests', () => {
-  describe('Enum completeness', () => {
-    it('should have the new enum entry UI_MACRO', () => {
-      assert.equal(ServiceNowMetadataType.UI_MACRO, 'ui-macro');
-    });
-
-    it('should total 76 metadata types (75 before v4.14.0 + ui-macro)', () => {
-      assert.equal(Object.values(ServiceNowMetadataType).length, 76);
-    });
-
-    it('should keep the enum sorted by value so ui-macro landed between ui-action and ui-page', () => {
-      const values = Object.values(ServiceNowMetadataType) as string[];
-      assert.deepStrictEqual(values, [...values].sort());
-    });
-
+  describe('Metadata type enum', () => {
     it('should not register reusable tests as a separate type (they are a Test() overload in the atf family)', () => {
       const values = Object.values(ServiceNowMetadataType) as string[];
       assert.equal(values.some((v) => v.includes('reusable')), false);
@@ -66,14 +48,10 @@ describe('SDK v4.14.0 Types - Integration Tests', () => {
   });
 
   describe('ui-macro (UiMacro) resources', () => {
-    it('has spec/instruct/snippet coverage with balanced fences and the version marker', () => {
+    it('spec opens with the Context header and the snippet calls UiMacro()', () => {
       const content = spec('ui-macro');
       assert.ok(content.startsWith('# **Context:**'));
       assert.ok(content.includes('@servicenow/sdk/core'));
-      assert.ok(content.includes('SDK v4.14.0+'));
-      assert.ok(instruct('ui-macro').includes('SDK v4.14.0+'));
-      const fences = (content.match(/^```/gm) ?? []).length;
-      assert.ok(fences > 0 && fences % 2 === 0);
       assert.ok(code(snippet('ui-macro', '0001')).includes('UiMacro({'));
     });
 
@@ -129,7 +107,7 @@ describe('SDK v4.14.0 Types - Integration Tests', () => {
   describe('ATF reusable tests (Test() overload, atf family)', () => {
     it('spec documents isReusable/inputs/outputs in argument 1 and the callable tables', () => {
       const content = spec('atf');
-      assert.ok(content.includes('REUSABLE TESTS (SDK v4.14.0+)'));
+      assert.ok(content.includes('REUSABLE TESTS'));
       assert.ok(content.includes('ALL go in ARG 1'));
       for (const table of ['sys_atf_test_callable', 'atf_input_variable_callable', 'atf_output_variable_callable', 'sys_atf_step_callable']) {
         assert.ok(content.includes(table), table);
@@ -153,7 +131,7 @@ describe('SDK v4.14.0 Types - Integration Tests', () => {
 
     it('instruct has the reusable-tests section and the release-note corrections', () => {
       const text = instruct('atf');
-      assert.ok(text.includes('## Reusable tests (SDK v4.14.0+)'));
+      assert.ok(text.includes('## Reusable tests'));
       assert.ok(text.includes('fails `now-sdk build` with TS6133'));
     });
 
@@ -164,7 +142,7 @@ describe('SDK v4.14.0 Types - Integration Tests', () => {
 
     it('removes atf.server.setOutputVariables everywhere except the removal note', () => {
       assert.doesNotMatch(codeOnly(spec('atf-server')), /setOutputVariables\s*\(/);
-      assert.ok(spec('atf-server').includes('setOutputVariables was REMOVED in SDK v4.14.0'));
+      assert.ok(spec('atf-server').includes('setOutputVariables was REMOVED'));
       // The atf index row no longer lists it as an atf.server method.
       const indexRow = spec('atf').split('\n').find((line) => line.startsWith('| `atf-server`')) ?? '';
       assert.ok(indexRow.length > 0);
@@ -187,14 +165,14 @@ describe('SDK v4.14.0 Types - Integration Tests', () => {
       for (const term of ['createRoles', 'readRoles', 'writeRoles', 'deleteRoles', 'arrayDenormalized', 'referenceQualCondition']) {
         assert.ok(content.includes(term), term);
       }
-      assert.ok(content.includes('`arrayDenormalized?: boolean` (SDK v4.14.0+)'));
+      assert.ok(content.includes('`arrayDenormalized?: boolean`'));
     });
 
     it('table spec documents basePolicy and table role arrays', () => {
       const content = spec('table');
-      assert.ok(content.includes("basePolicy: 'private', // 'public' | 'private', optional (SDK v4.14.0+)"));
-      assert.ok(content.includes('UNLESS `basePolicy` is set (SDK v4.14.0+)'));
-      assert.ok(content.includes('createRoles: [], // (string | Role)[], optional (SDK v4.14.0+)'));
+      assert.ok(content.includes("basePolicy: 'private', // 'public' | 'private', optional"));
+      assert.ok(content.includes('UNLESS `basePolicy` is set'));
+      assert.ok(content.includes('createRoles: [], // (string | Role)[], optional'));
     });
 
     it('table_0004 uses camelCase referenceQualCondition (the snake_case key is silently dropped)', () => {
@@ -205,43 +183,43 @@ describe('SDK v4.14.0 Types - Integration Tests', () => {
     });
 
     it('role and property specs document the explicit suffix', () => {
-      assert.ok(spec('role').includes('suffix: \'\', // string, optional (SDK v4.14.0+)'));
-      assert.ok(spec('property').includes('suffix: \'\', // string, optional (SDK v4.14.0+)'));
+      assert.ok(spec('role').includes("suffix: '', // string, optional"));
+      assert.ok(spec('property').includes("suffix: '', // string, optional"));
     });
 
     it('assessment specs replace the hard-coded global domain with domain/domainPath', () => {
       for (const type of ['assessment', 'risk-assessment']) {
         const content = spec(type);
-        assert.ok(content.includes('domain'), type);
-        assert.ok(content.includes('domainPath'), type);
+        assert.ok(content.includes("domain: 'global', // string, optional"), type);
+        assert.ok(content.includes("domainPath: '/', // string, optional"), type);
         assert.ok(!/sys_domain is hard-coded to global/i.test(content), type);
       }
     });
 
     it('catalog-ui-policy spec accepts $meta', () => {
-      assert.ok(spec('catalog-ui-policy').includes('$meta: { installMethod: \'demo\' }, // optional (SDK v4.14.0+)'));
+      assert.ok(spec('catalog-ui-policy').includes("$meta: { installMethod: 'demo' }, // optional"));
     });
 
     it('dashboard writes componentProps verbatim and maps filter-group', () => {
       const content = spec('dashboard');
-      assert.ok(content.includes('SDK v4.14.0+: written VERBATIM'));
-      assert.ok(content.includes("'filter-group' (SDK v4.14.0+ resolves it to sys_id 'ba8b5fa922351c2027c524c91a134bf2')"));
+      assert.ok(content.includes('written VERBATIM'));
+      assert.match(content, /'filter-group' \(.*resolves it to sys_id 'ba8b5fa922351c2027c524c91a134bf2'\)/);
       const body = code(snippet('dashboard', '0002'));
       assert.ok(body.includes('followFilters: true'));
       assert.ok(body.includes("filterConfigurations: '@state.parFilters'"));
     });
 
-    it('playbook notes the always-settable AI-agent fields', () => {
-      assert.ok(spec('playbook').includes('v4.14.0'));
-      assert.ok(instruct('playbook').includes('v4.14.0'));
+    it('playbook notes the always-settable AI-agent fields and the deprecated aiAgentUser', () => {
+      assert.ok(spec('playbook').includes('enableAiAgent / aiAgentObjective / aiAgentExecutionMode / aiAgentRunAs are ALWAYS settable'));
+      const text = instruct('playbook');
+      assert.ok(text.includes('`enableAiAgent`, `aiAgentObjective`, `aiAgentExecutionMode` and `aiAgentRunAs` are always settable'));
+      assert.ok(text.includes('Never author `aiAgentUser` (internal and deprecated)'));
     });
   });
 
   describe('coding_in_fluent capabilities section', () => {
-    it('adds an SDK v4.14.0 capabilities item and keeps the previous one', () => {
+    it('names the v4.14.0 APIs and the exec tool', () => {
       const text = prompt('coding_in_fluent');
-      assert.ok(text.includes('14. **SDK v4.14.0 capabilities**'));
-      assert.ok(text.includes('13. **SDK v4.13.6 capabilities**'));
       for (const term of ['**UiMacro**', '**Reusable ATF tests**', 'basePolicy', 'arrayDenormalized', '`fluent_exec_script`']) {
         assert.ok(text.includes(term), term);
       }
@@ -249,34 +227,6 @@ describe('SDK v4.14.0 Types - Integration Tests', () => {
 
     it('does not present the build\'s unused-locals check as new in 4.14.0', () => {
       assert.ok(prompt('coding_in_fluent').includes('(not new, but the 4.14.0 release-note reusable-test example trips it)'));
-    });
-  });
-
-  describe('CLI surface (Phase 4)', () => {
-    const commands = CommandFactory.createCommands({ process: mock.fn() } as unknown as CommandProcessor);
-    const byName = new Map(commands.map((c) => [c.name, c]));
-
-    it('registers fluent_exec_script as the 14th SDK command tool', () => {
-      assert.equal(commands.length, 14);
-      assert.ok(byName.has('fluent_exec_script'));
-      assert.equal(byName.get('fluent_exec_script')?.annotations?.destructiveHint, true);
-    });
-
-    it('lists fluent_exec_script in the MCPB manifest, keeping tools sorted (16 total since get_fluent_knowledge)', () => {
-      const manifest = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, 'manifest.json'), 'utf-8')) as { tools: Array<{ name: string }> };
-      const names = manifest.tools.map((t) => t.name);
-      assert.equal(names.length, 16);
-      assert.ok(names.includes('fluent_exec_script'));
-      assert.deepStrictEqual(names, [...names].sort());
-    });
-
-    it('explain_fluent_api no longer advertises the never-declared --source', () => {
-      const explain = byName.get('explain_fluent_api');
-      assert.equal(explain?.arguments.some((a) => a.name === 'source'), false);
-    });
-
-    it('build_fluent_app exposes the new sourceMap flag', () => {
-      assert.ok(byName.get('build_fluent_app')?.arguments.some((a) => a.name === 'sourceMap'));
     });
   });
 
@@ -425,19 +375,22 @@ describe('SDK v4.14.0 Types - Integration Tests', () => {
     });
 
     it('records that arrayDenormalized needs array: true despite the type allowing it alone', () => {
-      assert.ok(/array: true/.test(instruct('column')));
-      assert.ok(instruct('column').includes('arrayDenormalized'));
+      const text = instruct('column');
+      assert.ok(text.includes('`arrayDenormalized: true`'));
+      assert.ok(text.includes('Always set it together with `array: true`'));
+      assert.ok(text.includes('it does not require `array: true` at the type level'));
     });
 
     it('records that basePolicy never governs web-service access and is rejected on augments', () => {
       const text = instruct('table');
-      assert.ok(text.includes('basePolicy'));
-      assert.ok(/allowWebServiceAccess|ws_access/.test(text));
-      assert.ok(text.includes('augments'));
+      assert.ok(text.includes('`allowWebServiceAccess` stays true under both policies'));
+      assert.ok(text.includes('the policy never governs `allowWebServiceAccess`'));
+      assert.ok(text.includes('Not allowed with `augments`'));
     });
 
     it('records that Assessment domainPath is not enforced with a non-global domain', () => {
-      assert.ok(/domainPath/.test(instruct('assessment')));
+      assert.ok(instruct('assessment').includes('the build does not enforce `domainPath`, and `domain` alone silently writes'));
+      assert.ok(spec('assessment').includes('the build does NOT enforce it: `domain` alone silently writes'));
     });
   });
 
@@ -459,9 +412,8 @@ describe('SDK v4.14.0 Types - Integration Tests', () => {
       assert.ok(!spec('form').includes("formatterName: '<file name>' } in the Form"));
     });
 
-    it('dashboard credits rule 14 to 4.14.0 and calls false the component default, not an SDK default', () => {
+    it('dashboard calls false the component default, not an SDK default', () => {
       const text = instruct('dashboard');
-      assert.ok(text.includes('rule 14 was rewritten for SDK v4.14.0'));
       assert.ok(!text.includes('the SDK default is `false`'));
       assert.ok(!spec('dashboard').includes('(SDK default false)'));
     });

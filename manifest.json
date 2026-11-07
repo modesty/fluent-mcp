@@ -45,7 +45,7 @@
     { "name": "get_fluent_knowledge", "description": "Read a Fluent metadata API specification, authoring guide, or code snippet." },
     { "name": "init_fluent_app", "description": "Initialize or convert a Fluent application." },
     { "name": "pack_fluent_app", "description": "Package a built Fluent application." },
-    { "name": "query_fluent_records", "description": "Run a read-only ServiceNow Table REST query." },
+    { "name": "query_fluent_records", "description": "Run a read-only ServiceNow Table REST query (no Fluent project needed)." },
     { "name": "sdk_info", "description": "Read ServiceNow Fluent SDK version or help." }
   ],
   "keywords": ["mcp", "servicenow", "fluent", "sdk"],

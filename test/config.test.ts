@@ -104,4 +104,25 @@ describe('Config Module', () => {
 
     assert.deepEqual(missing, [packageJson]);
   });
+
+  it('getConfig takes FLUENT_MCP_WORKING_DIR trimmed, and ignores an unset or whitespace-only value', () => {
+    // The value is passed through as is (no existence or absolute-path check
+    // here); resolveProjectDirectory validates it when a command runs.
+    for (const [value, expected] of [
+      ['  /work/my-app  ', '/work/my-app'],
+      ['relative/app', 'relative/app'],
+      ['   ', undefined],
+      ['', undefined],
+      [undefined, undefined],
+    ] as const) {
+      const restore = withEnvironment({ FLUENT_MCP_WORKING_DIR: value });
+      try {
+        const config = getConfig();
+        assert.equal(config.workingDirectory, expected, JSON.stringify(value));
+        if (expected === undefined) assert.ok(!('workingDirectory' in config), JSON.stringify(value));
+      } finally {
+        restore();
+      }
+    }
+  });
 });

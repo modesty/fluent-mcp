@@ -4,7 +4,7 @@ import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwa
 import { resolveSdkCli } from '../../utils/sdkCli.js';
 import { cliOption } from './cliArgv.js';
 import { getProjectRootPath } from '../../config.js';
-import { CLI_OUTPUT_FORMATS, SELECT_PATH_DOMAIN } from './argValidation.js';
+import { CLI_OUTPUT_FORMATS, SELECT_PATH_DOMAIN, SYS_ID_DOMAIN } from './argValidation.js';
 
 /**
  * App-repo actions exposed by `now-sdk cicd`: the `action` argument's choices,
@@ -52,6 +52,7 @@ export class CicdAppCommand extends SessionAwareCLICommand {
       name: 'appSysId',
       type: 'string',
       required: false,
+      domain: SYS_ID_DOMAIN,
       description: 'sys_id of the application (sys_app). Mutually exclusive with scope. Defaults to the scopeId in now.config.json when run inside a Fluent project.',
     },
     {

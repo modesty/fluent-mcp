@@ -71,8 +71,6 @@ const WHITELIST = new Set([
     'item_option_new', 'item_option_new_set',
     'sc_cat_item', 'sc_cat_item_producer',
     'incident', 'task',
-    // Fluent build-time helpers (resolved at compile, not exported in types)
-    'get_sys_id',
     // ServiceNow business_calendar built-in names
     'Year', 'Quarter', 'Month', 'Week',
     // ServicePortal legacy property names that current instructs intentionally

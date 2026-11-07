@@ -8,7 +8,7 @@ ScheduledScript({
 	active: true,
 	conditional: false,
 	frequency: 'business_calendar_start',
-	businessCalendar: get_sys_id('business_calendar', 'calendar_name=Quarter^ORlabel=Quarter'),
+	businessCalendar: Now.ref('business_calendar', '<sys_id>'), // sys_id of the Quarter calendar, looked up on the instance with `calendar_name=Quarter^ORlabel=Quarter`
 	script: `// Log the message that the job has started
 gs.log("started scheduled job five", "ScheduledJobFive");
 

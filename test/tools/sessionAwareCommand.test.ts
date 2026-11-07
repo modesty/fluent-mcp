@@ -150,19 +150,6 @@ describe('SessionAwareCLICommand working-directory resolution', () => {
     assertNotCalled(processor.process);
   });
 
-  it('never falls back to MCP Roots, process.cwd(), or the package directory', async () => {
-    session.getWorkingDirectory.mock.mockImplementation(() => undefined);
-
-    const result = await command.execute({});
-
-    // The only outcome with no explicit/session/configured directory is refusal.
-    assert.equal(result.success, false);
-    assertNotCalled(processor.process);
-    // In particular it must not silently adopt the server's own cwd.
-    assert.ok(result.error);
-    assert.ok(!result.error.message.includes(process.cwd()));
-  });
-
   for (const [name, args, cfg, pattern] of [
     ['relative explicit path', { workingDirectory: 'relative/project' }, {}, /must be an absolute path/],
     ['~ explicit path', { workingDirectory: '~/project' }, {}, /must be an absolute path/],

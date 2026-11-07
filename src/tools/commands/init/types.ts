@@ -8,6 +8,8 @@
 export interface ConversionInitData {
   from: string;
   workingDirectory: string;
+  /** npm package name for the converted project; without it `now-sdk init` prompts for one. */
+  packageName?: string;
   auth?: string;
   debug?: boolean;
 }
@@ -48,4 +50,6 @@ export const VALID_TEMPLATES = [
   'typescript.react',
   'javascript.basic',
   'typescript.vue',
+  'javascript.aiux',
+  'javascript.aiux-extension',
 ] as const;

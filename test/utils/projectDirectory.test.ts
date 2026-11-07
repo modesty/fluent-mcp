@@ -3,19 +3,25 @@
  * path in a temp tree, so realpath, symlinks and directory listings behave as
  * they do in production.
  */
-import { after, describe, it } from 'node:test';
+import { after, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {
+import { loggerFixture } from '../support/fixtures.js';
+
+// The logger is replaced so a developer's FLUENT_MCP_LOG_LEVEL cannot change
+// what the run prints. It must be registered before the module is imported.
+mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
+
+const {
   checkInitDestination,
   createInitDestination,
   isWithinDirectory,
   removeCreatedDestination,
   resolveExistingDirectory,
   resolveProjectDirectory,
-} from '../../src/utils/projectDirectory.js';
+} = await import('../../src/utils/projectDirectory.js');
 
 const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fluent-project-dir-')));
 after(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -97,6 +103,21 @@ describe('resolveProjectDirectory', () => {
     const file = fresh('file');
     fs.writeFileSync(file, '');
     assert.throws(() => resolveProjectDirectory(file, 'src'), /src is not a directory/);
+  });
+
+  // POSIX realpath reports a path through a file as ENOTDIR; Windows may map it to ENOENT.
+  it('reports a path that cannot be resolved for another reason than ENOENT, keeping the cause',
+    { skip: process.platform === 'win32' && 'ENOTDIR is a POSIX realpath result' }, () => {
+    // A path through a regular file fails realpath with ENOTDIR, not ENOENT, so
+    // it is reported as unresolvable rather than as missing.
+    const file = fresh('file');
+    fs.writeFileSync(file, '');
+    const throughFile = path.join(file, 'sub');
+    assert.throws(() => resolveProjectDirectory(throughFile, 'src'), (error: Error) => {
+      assert.match(error.message, new RegExp(`^src cannot be resolved: ${escape(throughFile)} \\(.*ENOTDIR.*\\)\\. Supply the absolute path of a Fluent project directory\\.$`));
+      assert.equal((error.cause as NodeJS.ErrnoException).code, 'ENOTDIR');
+      return true;
+    });
   });
 });
 

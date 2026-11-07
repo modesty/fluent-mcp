@@ -32,20 +32,15 @@ class MockProcessRunner extends NodeProcessRunner {
   async run(_command: string, args: string[] = [], _cwd?: string, _stdinInput?: string): Promise<ProcessResult> {
     // Return different mocked responses based on args
     if (args.includes('--version') || args.includes('-v')) {
+      // `now-sdk --version` prints the bare version (verified on SDK 4.14.0).
       return {
-        stdout: 'ServiceNow SDK v3.0.2',
+        stdout: '4.14.0',
         stderr: '',
         exitCode: 0
       };
     } else if (args.includes('--help') || args.includes('-h')) {
       return {
         stdout: 'ServiceNow SDK Help information',
-        stderr: '',
-        exitCode: 0
-      };
-    } else if (args.includes('--debug') || args.includes('-d')) {
-      return {
-        stdout: 'Debug logs for ServiceNow SDK',
         stderr: '',
         exitCode: 0
       };
@@ -78,33 +73,9 @@ describe('SDK Command Tools', () => {
 
     const result = await sdkInfoCommand.execute({ flag: '-v' });
     assert.equal(result.success, true);
-
-    // Basic presence check
-    assert.ok(result.output.includes('ServiceNow SDK v'));
-
-    // Extract version using regex and validate semantic versioning format
-    const versionRegex = /ServiceNow SDK v(\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)/;
-    const match = result.output.match(versionRegex);
-
-    // Verify version string was found and extracted
-    assert.notEqual(match, null);
-    assert.notEqual(match, undefined);
-
-    // Extract the version without the prefix
-    const versionString = match ? match[1] : '';
-
-    // Validate the format of the extracted version using semantic versioning regex
-    const semverRegex = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
-    assert.match(versionString, semverRegex);
-
-    // Validate version components are valid numbers
-    const versionParts = versionString.split('.');
-    assert.ok(Number(versionParts[0]) >= 0); // Major
-    assert.ok(Number(versionParts[1]) >= 0); // Minor
-
-    // For patch, we need to handle potential pre-release/build metadata
-    const patchPart = versionParts[2].split(/[-+]/)[0]; // Extract patch number before any pre-release/build metadata
-    assert.ok(Number(patchPart) >= 0); // Patch
+    // The bare version has no "ServiceNow SDK v" prefix to extract from, so the
+    // command presents it as is.
+    assert.equal(result.output, 'ServiceNow SDK Version Information:\n\n4.14.0');
   });
 
   it('SdkInfoCommand should execute correctly with -h flag (general help)', async () => {
@@ -180,12 +151,6 @@ describe('SDK Command Tools', () => {
       sdkInfoCommand.execute({ flag: '-lm' }),
       /Argument 'flag' must be one of: -v, --version, -h, --help\. Received: "-lm"/
     );
-  });
-
-  it('SdkInfoCommand should handle invalid flags', async () => {
-    const sdkInfoCommand = sdkInfo();
-
-    await assert.rejects(sdkInfoCommand.execute({ flag: '--invalid' }), /Argument 'flag' must be one of/);
   });
 
   it('SdkInfoCommand should reject a help command that begins with "-"', async () => {

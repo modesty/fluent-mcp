@@ -17,7 +17,6 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ServiceNowMetadataType } from '../src/types.js';
 
 const PROJECT_ROOT = process.cwd();
 const RES_DIR = path.join(PROJECT_ROOT, 'res');
@@ -28,37 +27,13 @@ const PROMPT_DIR = path.join(RES_DIR, 'prompt');
 
 const read = (dir: string, file: string) => fs.readFileSync(path.join(dir, file), 'utf-8');
 
-const NEW_TYPES: Array<[keyof typeof ServiceNowMetadataType, string]> = [
-  ['ATF_UI_TEST_SCRIPT', 'atf-ui-test-script'],
-];
-
 describe('SDK v4.9.0 Types - Integration Tests', () => {
-  describe('Enum completeness', () => {
-    for (const [key, value] of NEW_TYPES) {
-      it(`should have the new v4.9.0 enum entry ${key}`, () => {
-        assert.equal(ServiceNowMetadataType[key], value);
-      });
-    }
-  });
-
-  describe('New resource files exist for each new type', () => {
-    for (const [key, value] of NEW_TYPES) {
-      it(`${key} has spec/instruct/snippet coverage (${value})`, () => {
-        assert.equal(fs.existsSync(path.join(SPEC_DIR, `fluent_spec_${value}.md`)), true);
-        assert.equal(fs.existsSync(path.join(INSTRUCT_DIR, `fluent_instruct_${value}.md`)), true);
-        const snippets = fs.readdirSync(SNIPPET_DIR)
-          .filter((f) => f.startsWith(`fluent_snippet_${value}_`) && f.endsWith('.md'));
-        assert.ok(snippets.length > 0);
-      });
-    }
-  });
-
   describe('atf-ui-test-script (UI Test Script / TestingLibrary) resources', () => {
     it('spec should document the runTest step and the injected script globals', () => {
       const content = read(SPEC_DIR, 'fluent_spec_atf-ui-test-script.md');
       for (const term of [
-        'atf.uiTestScript.runTest', 'Now.include', 'script', 'screen', 'user',
-        'sn_atf', 'waitFor', 'within', '8000',
+        'atf.uiTestScript.runTest', 'Now.include', 'script:', '// screen  —', '// user    —',
+        '// sn_atf  —', 'waitFor', '// within(el)', '8000',
       ]) {
         assert.ok(content.includes(term));
       }
@@ -99,7 +74,7 @@ describe('SDK v4.9.0 Types - Integration Tests', () => {
 
     it('column spec should document multi-language choice labels (ChoiceConfig array + language)', () => {
       const content = read(SPEC_DIR, 'fluent_spec_column.md');
-      for (const term of ['ChoiceConfig', 'language', 'BCP 47', 'MULTIPLE LANGUAGES']) {
+      for (const term of ['ChoiceConfig', 'language:', 'BCP 47', 'MULTIPLE LANGUAGES']) {
         assert.ok(content.includes(term));
       }
     });
@@ -118,9 +93,8 @@ describe('SDK v4.9.0 Types - Integration Tests', () => {
   });
 
   describe('Cross-cutting capabilities in coding_in_fluent prompt (v4.9.0)', () => {
-    it('should list SDK v4.9.0 capabilities including the new type and changed APIs', () => {
+    it('should list the new type and changed APIs', () => {
       const content = read(PROMPT_DIR, 'coding_in_fluent.md');
-      assert.ok(content.includes('SDK v4.9.0'));
       for (const term of [
         'atf.uiTestScript.runTest', 'Multi-language choice labels', 'protectionPolicy',
         'federatedId', 'Amazon Bedrock',

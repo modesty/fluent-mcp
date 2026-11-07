@@ -245,13 +245,12 @@ export class ToolsManager {
   }
 
   /**
-   * Execute the AuthCommand using the shared executor (not the writer)
-   * Used internally for lazy auto-auth validation.
-   * Note: AuthCommand is not exposed to MCP clients - authentication is managed
-   * via environment variables (SN_INSTANCE_URL, SN_AUTH_TYPE) and the auth alias
-   * is stored in session for use by all SDK commands.
+   * List the CLI's stored auth profiles (`now-sdk auth --list`) with the shared
+   * executor, for lazy auth validation. Read-only: the server never adds,
+   * deletes or selects a profile (see `AuthCommand`). Not exposed to MCP
+   * clients; the matching alias is stored in the session for all SDK commands.
    */
-  async runAuth(args: Record<string, unknown>): Promise<CommandResult> {
-    return new AuthCommand(this.cliExecutor).execute(args);
+  async listAuthProfiles(): Promise<CommandResult> {
+    return new AuthCommand(this.cliExecutor).execute();
   }
 }

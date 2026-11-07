@@ -144,6 +144,34 @@ describe('NodeProcessRunner — timeout returns partial output (P0.2)', () => {
     assert.equal(result.exitCode, 124);
     assert.ok(Date.now() - start < 5_000); // proves the override, not the 10-min value, applied
   });
+
+  // Node fires a timer longer than 2^31 - 1 ms after 1 ms. Exec's budget is its
+  // timeoutMs (up to 2^31 - 1) plus 60 s, and download/transform multiply
+  // timeoutSeconds by 1000, so such a call used to be killed at once (exit 124).
+  for (const [label, options, perCall] of [
+    ['a per-call budget', {}, 2_147_483_647 + 60_000],
+    ['an operator override', { overrideTimeoutMs: 2_147_483_648 }, undefined],
+    ['a configured default', { defaultTimeoutMs: 2 ** 40 }, undefined],
+  ] as const) {
+    it(`lets a command finish under ${label} longer than a Node timer can wait`, { timeout: TEST_TIMEOUT_MS }, async (t) => {
+      const warnings: string[] = [];
+      const onWarning = (warning: Error) => { warnings.push(warning.name); };
+      process.on('warning', onWarning);
+      t.after(() => { process.off('warning', onWarning); });
+      const runner = new NodeProcessRunner(options);
+
+      const result = await runner.run(
+        process.execPath,
+        ['-e', "setTimeout(() => process.stdout.write('done'), 300)"],
+        undefined,
+        undefined,
+        perCall
+      );
+
+      assert.deepEqual({ exitCode: result.exitCode, stdout: result.stdout }, { exitCode: 0, stdout: 'done' });
+      assert.ok(!warnings.includes('TimeoutOverflowWarning'));
+    });
+  }
 });
 
 describe('NodeProcessRunner — client cancellation kills the child (P0.3)', () => {

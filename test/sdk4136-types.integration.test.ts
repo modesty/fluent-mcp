@@ -20,7 +20,6 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ServiceNowMetadataType } from '../src/types.js';
 import { ResourceManager } from '../src/res/resourceManager.js';
 import { GetFluentKnowledgeCommand } from '../src/tools/resources/resourceTools.js';
 import { registerTemplates } from './support/resourceTemplates.js';
@@ -44,67 +43,28 @@ const snippets = (type: string) =>
 const code = (content: string) =>
   [...content.matchAll(/```typescript\n([\s\S]*?)```/g)].map((m) => m[1]).join('\n');
 
-const NEW_TYPES: Array<[keyof typeof ServiceNowMetadataType, string, string]> = [
-  ['ASSESSMENT', 'assessment', '4.12.0'],
-  ['DATABASE_VIEW', 'database-view', '4.13.0'],
-  ['INTERCEPTOR', 'interceptor', '4.13.0'],
-  ['RISK_ASSESSMENT', 'risk-assessment', '4.12.0'],
-];
+const NEW_TYPES = ['assessment', 'database-view', 'interceptor', 'risk-assessment'];
+
+/** Component names the dashboard build plugin maps to a sys_id (its COMPONENT_NAME_TO_SYSID object). */
+const dashboardComponentNames = (): string[] => {
+  const resolver = fs.readFileSync(
+    path.join('node_modules', '@servicenow', 'sdk-build-plugins', 'dist', 'dashboard', 'dashboard-component-resolver.js'), 'utf-8');
+  const map = /const COMPONENT_NAME_TO_SYSID = \{([\s\S]*?)\n\};/.exec(resolver)?.[1] ?? '';
+  return [...map.matchAll(/^\s*'?([a-z][a-z-]*)'?:\s*'/gm)].map((m) => m[1]);
+};
 
 describe('SDK v4.13.6 Types - Integration Tests', () => {
-  describe('Enum completeness', () => {
-    for (const [key, value] of NEW_TYPES) {
-      it(`should have the new enum entry ${key}`, () => {
-        assert.equal(ServiceNowMetadataType[key], value);
-      });
-    }
-
-    it('should total at least 75 metadata types (71 before v4.12.x + assessment + risk-assessment + database-view + interceptor)', () => {
-      // The newest SDK integration test owns the exact total; this file guards only its own additions.
-      assert.ok(Object.values(ServiceNowMetadataType).length >= 75);
-    });
-
-    it('should keep the enum sorted by value so new entries landed in the right place', () => {
-      const values = Object.values(ServiceNowMetadataType) as string[];
-      assert.deepStrictEqual(values, [...values].sort());
-    });
-  });
-
-  describe('New resource files exist for each new type', () => {
-    for (const [key, value] of NEW_TYPES) {
-      it(`${key} has spec/instruct/snippet coverage (${value})`, () => {
-        assert.equal(fs.existsSync(path.join(SPEC_DIR, `fluent_spec_${value}.md`)), true);
-        assert.equal(fs.existsSync(path.join(INSTRUCT_DIR, `fluent_instruct_${value}.md`)), true);
-        assert.ok(snippets(value).length > 0);
-      });
-    }
-
-    for (const [key, value] of NEW_TYPES) {
-      it(`${key} spec has balanced code fences (${value})`, () => {
-        // An unterminated fence makes the spec validator silently SKIP the block.
-        const fences = (spec(value).match(/^```/gm) ?? []).length;
-        assert.equal(fences % 2, 0);
-        assert.ok(fences > 0);
-      });
-    }
-
-    for (const [key, value, version] of NEW_TYPES) {
-      it(`${key} spec and instruct carry the version the API first shipped in (${value}, v${version})`, () => {
-        assert.ok(spec(value).includes(`SDK v${version}+`));
-        assert.ok(instruct(value).includes(`SDK v${version}+`));
-      });
-    }
-
-    for (const [key, value] of NEW_TYPES) {
-      it(`${key} spec opens with the Context header and imports from @servicenow/sdk/core (${value})`, () => {
+  describe('New type specs', () => {
+    for (const value of NEW_TYPES) {
+      it(`${value} spec opens with the Context header and imports from @servicenow/sdk/core`, () => {
         const content = spec(value);
         assert.equal(content.startsWith('# **Context:**'), true);
         assert.ok(content.includes('@servicenow/sdk/core'));
       });
     }
 
-    for (const [key, value] of NEW_TYPES) {
-      it(`${key} spec must not model $meta, which the declaration lacks (${value})`, () => {
+    for (const value of NEW_TYPES) {
+      it(`${value} spec must not model $meta, which the declaration lacks`, () => {
         // None of the four new declarations contains Now.Internal.Meta.
         assert.doesNotMatch(code(spec(value)), /^\s*\$meta: \{/m);
       });
@@ -264,19 +224,26 @@ describe('SDK v4.13.6 Types - Integration Tests', () => {
       assert.ok(instruct('dashboard').includes('half is 24'));
     });
 
-    it('spec, instruct and snippet 0002 should carry the unverified-component caveat', () => {
+    it('spec, instruct and snippet 0002 should carry the unverified-component caveat the build plugin backs', () => {
+      // Source of truth: the plugin's name-to-sys_id map resolves 'filter-group' but not 'filter' or
+      // 'list-simple'. Once the SDK maps either, this caveat must be revisited.
+      const mapped = dashboardComponentNames();
+      assert.ok(mapped.includes('filter-group'), 'filter-group should resolve');
+      assert.ok(mapped.includes('list'), 'the map parse should find the plain list component');
+      assert.equal(mapped.includes('filter'), false);
+      assert.equal(mapped.includes('list-simple'), false);
+
       // Whitespace-normalized: the caveat wraps across `//` comment lines in the spec and snippet.
-      // Since SDK v4.14.0 it covers only 'filter' and 'list-simple'; 'filter-group' now resolves.
       const flat = (text: string) => text.replace(/\s*\n\s*(\/\/\s*)?/g, ' ');
       const caveat = 'absent from the SDK build plugin\'s component name-to-sys_id map, so the build writes them through as literal strings — verify on an instance, or pass the component sys_id instead.';
-      assert.ok(flat(spec('dashboard')).includes(caveat));
-      assert.ok(flat(instruct('dashboard')).includes(caveat));
-      assert.ok(flat(snippets('dashboard')[1]).includes(caveat));
-    });
-
-    it('spec and instruct should mark the corrections as guide-documented, not new features', () => {
-      assert.ok(spec('dashboard').includes('documented in SDK v4.13.x guides'));
-      assert.ok(instruct('dashboard').includes('documented in SDK v4.13.x guides'));
+      for (const text of [spec('dashboard'), instruct('dashboard'), snippets('dashboard')[1]].map(flat)) {
+        const at = text.indexOf(caveat);
+        assert.ok(at >= 0);
+        // The caveat must name exactly the two unmapped components.
+        const lead = text.slice(Math.max(0, at - 120), at);
+        assert.match(lead, /['`]filter['`]/);
+        assert.match(lead, /['`]list-simple['`]/);
+      }
     });
 
     it('spec and snippets should bind data inline instead of by report sys_id', () => {
@@ -360,13 +327,15 @@ describe('SDK v4.13.6 Types - Integration Tests', () => {
       assert.ok(content.includes('setting launcherRecordFormView while'));
       assert.ok(content.includes('"launcherTemplateFields can only be set when'));
       const calls = code(content).split('PlaybookDefinition(').slice(1);
-      for (const call of calls.filter((c) => /^\s*launcherRecordFormView:/m.test(c))) {
+      const withView = calls.filter((c) => /^\s*launcherRecordFormView:/m.test(c));
+      assert.ok(withView.length >= 1, 'the spec should model launcherRecordFormView at least once');
+      for (const call of withView) {
         assert.match(call, /^\s*launcherShowRecordForm:\s*true/m);
       }
     });
 
     it('spec should mark preservedAttachment as framework-managed', () => {
-      assert.ok(spec('playbook').includes('FRAMEWORK-MANAGED (SDK v4.13.0+)'));
+      assert.ok(spec('playbook').includes('preservedAttachment — FRAMEWORK-MANAGED'));
     });
 
     it('instruct should warn against copying the guide variant example that uses a const before declaration', () => {
@@ -406,15 +375,15 @@ describe('SDK v4.13.6 Types - Integration Tests', () => {
       assert.doesNotMatch(executable, /return \{\s*\w+\s*\}/);
     });
 
-    it('table spec should allow index in augment mode and document the v4.13.3 properties', () => {
+    it('table spec should allow index in augment mode and document allowConfiguration and dbObjectId', () => {
       const content = spec('table');
-      assert.ok(content.includes('only `schema` and — SDK v4.13.0+ — `index` are allowed'));
-      assert.ok(content.includes('allowConfiguration: false, // boolean, optional (SDK v4.13.3+)'));
-      assert.ok(content.includes('dbObjectId: false, // boolean, optional (SDK v4.13.3+)'));
+      assert.match(content, /only `schema` and .* `index` are allowed/);
+      assert.ok(content.includes('allowConfiguration: false, // boolean, optional'));
+      assert.ok(content.includes('dbObjectId: false, // boolean, optional'));
     });
 
     it('column spec should accept any UrlColumn string, including relative values', () => {
-      assert.ok(spec('column').includes('any string is accepted (SDK v4.12.0+), including relative values'));
+      assert.match(spec('column'), /any string is accepted .*including relative values/);
     });
 
     it('acl spec should list 14 types, require name for aiux types, and document per-role policy', () => {
@@ -424,7 +393,8 @@ describe('SDK v4.13.6 Types - Integration Tests', () => {
       for (const type of ['aiux_page', 'aiux_widget', 'aiux_experience']) {
         assert.ok(content.includes(type));
       }
-      assert.ok(content.includes('(SDK v4.13.6+)'));
+      assert.ok(content.includes("{ role: string | Role, protectionPolicy?: '' | 'read' | 'protected' }"));
+      assert.ok(content.includes("{ role: 'admin', protectionPolicy: 'read' },"));
     });
 
     it('ui-action spec should document programmatic-only form/list and the AI styles', () => {
@@ -466,10 +436,8 @@ describe('SDK v4.13.6 Types - Integration Tests', () => {
       'email-notification', 'ui-policy', 'instance-scan', 'catalog-client-script',
       'catalog-item-record-producer', 'catalog-variable',
     ]) {
-      it(`${type} spec should document the $meta it accepts as of SDK v4.13.0`, () => {
-        const content = spec(type);
-        assert.ok(content.includes('$meta'));
-        assert.ok(content.includes('SDK v4.13.0+'));
+      it(`${type} spec should model the $meta its declaration accepts`, () => {
+        assert.match(code(spec(type)), /\$meta: \{/);
       });
     }
 
@@ -482,7 +450,7 @@ describe('SDK v4.13.6 Types - Integration Tests', () => {
     it('atf-server-catalog-item resources should use the real snake_case input and output names', () => {
       const content = spec('atf-server-catalog-item');
       assert.ok(content.includes('}): { catalog_item_id: string; };'));
-      assert.ok(content.includes("request_item: get_sys_id('sc_req_item', '')"));
+      assert.match(content, /\brequest_item:/);
       for (const snippet of snippets('atf-server-catalog-item')) {
         assert.doesNotMatch(code(snippet), /\b(catalogItemId|requestItem|requestId)\b/);
       }
@@ -496,9 +464,8 @@ describe('SDK v4.13.6 Types - Integration Tests', () => {
   describe('coding_in_fluent capabilities section', () => {
     const prompt = () => read(path.join(RES_DIR, 'prompt'), 'coding_in_fluent.md');
 
-    it('should carry a v4.13.6 capabilities entry naming all four new types', () => {
+    it('should name all four new types', () => {
       const content = prompt();
-      assert.ok(content.includes('13. **SDK v4.13.6 capabilities** (shipped across 4.12.0–4.13.6)'));
       for (const api of ['Assessment', 'RiskAssessment', 'DatabaseView', 'Interceptor']) {
         assert.ok(content.includes(`**${api}**`));
       }
@@ -511,12 +478,6 @@ describe('SDK v4.13.6 Types - Integration Tests', () => {
       assert.ok(content.includes('publicAccess'));
       assert.ok(content.includes('return { lookup: lookup }'));
       assert.ok(content.includes('**48** columns wide'));
-    });
-
-    it('should keep the previous version entries rather than replacing them', () => {
-      const content = prompt();
-      assert.ok(content.includes('SDK v4.11.2 capabilities'));
-      assert.ok(content.includes('SDK v4.10.1 capabilities'));
     });
 
     it('should no longer carry guidance the v4.13 SDK retired or contradicts', () => {

@@ -19,12 +19,20 @@ describe('parseCommandTimeoutOverride', () => {
     assert.equal(parseCommandTimeoutOverride('1'), 1);
   });
 
-  it('accepts a value with trailing non-digits (parseInt semantics)', () => {
-    assert.equal(parseCommandTimeoutOverride('300000ms'), 300000);
+  it('accepts the longest delay a Node timer can wait for (2^31 - 1 ms)', () => {
+    assert.equal(parseCommandTimeoutOverride('2147483647'), 2_147_483_647);
   });
 
-  for (const bad of ['0', '-5', 'abc', '', '   ']) {
-    it(`rejects non-positive / non-numeric ${JSON.stringify(bad)}`, () => {
+  it('allows surrounding whitespace', () => {
+    assert.equal(parseCommandTimeoutOverride(' 300000 '), 300000);
+  });
+
+  // parseInt read '1e6' and '1.5' as 1 ms, and the override wins over every
+  // per-command timeout, so each of these used to kill every command at once.
+  // Above 2^31 - 1 Node fires the timer after 1 ms (TimeoutOverflowWarning), the
+  // same kill-at-once failure.
+  for (const bad of ['0', '-5', 'abc', '', '   ', '1e6', '1.5', '300000ms', '0x10', '+5', '2147483648', '9007199254740993']) {
+    it(`rejects ${JSON.stringify(bad)}`, () => {
       assert.equal(parseCommandTimeoutOverride(bad), undefined);
     });
   }

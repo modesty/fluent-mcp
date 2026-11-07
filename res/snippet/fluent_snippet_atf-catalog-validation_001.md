@@ -19,8 +19,8 @@ Test({
 
   atf.catalog.validateVariableValue({
     $id: Now.ID['002'], // string | guid, mandatory
-    catalogItem: get_sys_id('sc_cat_item', 'name=iPhone'), // sys_id | Record<'sc_cat_item'>;
-    catalogConditions: "IO:get_sys_id('item_option_new', 'name=condition')=true" // string of variable sys_ids and the value to validate. If multiple, each has 'IO:' before and joined with ^, example: "IO:get_sys_id('item_option_new', '')=true^IO:get_sys_id('item_option_new', '')LIKEnone"
+    catalogItem: Now.ref('sc_cat_item', '<sys_id>'), // sys_id | Record<'sc_cat_item'>; the iPhone item's sys_id, looked up on the instance
+    catalogConditions: "IO:<sys_id of the condition variable>=true" // string of variable sys_ids and the value to validate. If multiple, each has 'IO:' before and joined with ^, example: "IO:<item_option_new sys_id>=true^IO:<item_option_new sys_id>LIKEnone"
   }): void;
 
 })

@@ -29,7 +29,7 @@ atf.form.submitForm({ // all props are mandatory
 // Clicks a button within a modal in the specified Form UI
 atf.form.clickModalButton({ // all props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
-  uiPage: get_sys_id('sys_ui_page', ''), // sys_id of Record&lt;'sys_ui_page'&gt;
+  uiPage: Now.ref('sys_ui_page', '<sys_id>'), // sys_id of Record&lt;'sys_ui_page'&gt;
   button: '', // button name
   assert: '', // '' | 'page_not_reloaded' | 'modal_not_closed' | 'page_reloaded'
   assertTimeout: 10, // seconds to wait for pass or fail after the button clickable
@@ -60,8 +60,8 @@ atf.form.clickUIAction({ // all props are mandatory
   table: '', // table name
   formUI: 'standard_ui', // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace'
   actionType: '', // 'ui_action' | 'declarative_action'
-  uiAction: get_sys_id('sys_ui_action', ''), // sys_id | Record&lt;'sys_ui_action'&gt;
-  declarativeAction: get_sys_id('sys_declarative_action_assignment', ''), // sys_id | Record&lt;'sys_declarative_action_assignment'&gt;
+  uiAction: Now.ref('sys_ui_action', '<sys_id>'), // sys_id | Record&lt;'sys_ui_action'&gt;
+  declarativeAction: Now.ref('sys_declarative_action_assignment', '<sys_id>'), // sys_id | Record&lt;'sys_declarative_action_assignment'&gt;
   assert: 'form_submitted_to_server', // 'form_submitted_to_server' | 'form_submission_canceled_in_browser' | 'page_reloaded_or_redirected'
 }): { recordId: string; table: string }
 

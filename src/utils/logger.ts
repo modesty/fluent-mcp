@@ -39,14 +39,35 @@ export interface LogEntry {
 }
 
 /**
+ * Read a configured minimum level (`FLUENT_MCP_LOG_LEVEL`): case-insensitive,
+ * with `warn` accepted for `warning`.
+ * @param raw The configured value
+ * @returns The level, or undefined when the value names no level
+ */
+export function parseLogLevel(raw: string | undefined): LogLevel | undefined {
+  const name = raw?.trim().toLowerCase();
+  if (!name) return undefined;
+  const level = name === 'warn' ? LogLevel.WARNING : name;
+  // Own keys only: `in` also accepted inherited names (constructor, __proto__,
+  // toString), which have no priority, so every line, errors too, was dropped.
+  return Object.hasOwn(logLevelPriority, level) ? (level as LogLevel) : undefined;
+}
+
+/**
  * Logger class that writes structured lines to stderr.
  */
 export class Logger {
   private readonly logLevel: LogLevel;
 
   constructor() {
-    const config = getConfig();
-    this.logLevel = (config.logLevel as LogLevel) || LogLevel.INFO;
+    const configured = getConfig().logLevel;
+    const level = parseLogLevel(configured);
+    // An unknown value used to be kept as is, so no level compared at or above
+    // it and every line was dropped (FLUENT_MCP_LOG_LEVEL=warn silenced the server).
+    this.logLevel = level ?? LogLevel.INFO;
+    if (level === undefined && configured?.trim()) {
+      this.warn(`Unknown FLUENT_MCP_LOG_LEVEL "${configured}"; using "info". Levels: ${Object.keys(logLevelPriority).join(', ')}.`);
+    }
   }
 
   /**

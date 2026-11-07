@@ -6,7 +6,7 @@ const applicationMenu = ApplicationMenu({
     title: '', // string, mandatory
     active: true, // boolean, mandatory, indicates whether menu appears
     roles: [], // array of role names | Role objects, for example ['admin', 'itil_user']
-    category: get_sys_id('sys_app_category', ''), // String, guid, second paramter is the category specified in user instructions or prompts or devrequest
+    category: Now.ref('sys_app_category', '<sys_id>'), // Record<'sys_app_category'> | string: a Record({ table: 'sys_app_category' }) const, an existing category by sys_id, or by name with Now.ref('sys_app_category', { name: '<category>' }); a plain name string is written verbatim and does not resolve
     hint: '', // string, defines the tooltip text that appears when a user hovers over the menu
     description: '', // string
     name: '', // string
@@ -21,12 +21,12 @@ const applicationSubMenu = Record({
         title: '', // string, max length is 80 characters
         active: true, //default is true, unless specified to make it inactive
         application: applicationMenu, // applicationMenu object
-        assessment: get_sys_id('asmt_metric_type', ''), // String, guid, second paramemter as per user instructions or prompts or devrequest
+        assessment: Now.ref('asmt_metric_type', '<sys_id>'), // String, guid: the sys_id of the existing asmt_metric_type record named in user instructions or prompts or devrequest, looked up on the instance
         deviceType: '', // '' | 'any' | 'browser' | 'mobile'
         filter: '', // String, conditions applied to list view for visibility in application navigator, Servicenow encoded query
         hint: '', // String, max length is 255 characters
         linkType: '', // '' | 'SEPARATOR' | 'TIMELINE' | 'DETAIL' | 'HTML' | 'ASSESSMENT' | 'LIST' | 'FILTER' | 'SCRIPT' | 'CONTENT_PAGE' | 'SEARCH' | 'SURVEY' | 'DOC_LINK' | 'NEW' | 'MAP' | 'REPORT' | 'DIRECT'
-        mapPage: get_sys_id('cmn_map_page', ''), // String, guid, second paramemter as per user instructions or prompts or devrequest
+        mapPage: Now.ref('cmn_map_page', '<sys_id>'), // String, guid: the sys_id of the existing cmn_map_page record named in user instructions or prompts or devrequest, looked up on the instance
         mobileTitle: '', // String, max length is 80 characters
         mobileViewName: '', // String, max length is 40 characters
         name: '', // table name
@@ -38,7 +38,7 @@ const applicationSubMenu = Record({
         viewName: '', // String
         windowName: '', // String
         report: '', // String
-        timelinePage: get_sys_id('cmn_timeline_page', ''), // String, guid, second paramemter as per user instructions or prompts or devrequest
+        timelinePage: Now.ref('cmn_timeline_page', '<sys_id>'), // String, guid: the sys_id of the existing cmn_timeline_page record named in user instructions or prompts or devrequest, looked up on the instance
     }
 })
 ```

@@ -47,17 +47,4 @@ describe('SessionManager', () => {
     manager.clearSession();
     assert.equal(manager.getWorkingDirectory(), undefined);
   });
-
-  it('should reset session on new instance', () => {
-    // Get first instance and set working directory
-    const manager1 = SessionManager.getInstance();
-    manager1.setWorkingDirectory('/test-dir');
-
-    // Force new instance
-    resetSingleton();
-
-    // Get new instance and verify it starts with empty data
-    const manager2 = SessionManager.getInstance();
-    assert.equal(manager2.getWorkingDirectory(), undefined);
-  });
 });

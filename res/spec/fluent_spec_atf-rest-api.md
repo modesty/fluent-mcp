@@ -5,9 +5,9 @@ atf.rest.sendRestRequest({ // each of the following props are mandatory
   $id: Now.ID[''], // string | guid, mandatory
   path: '', // string, ex. '/api/now/table/incident'
   body: '', // string, ex. "{data_one: 'value1', data_field: 'value2', data_three: 'value3'}"
-  mutualAuth: get_sys_id('sys_certificate',''), // sys_id | Record&lt;'sys_certificate'&gt;
+  mutualAuth: Now.ref('sys_certificate', '<sys_id>'), // sys_id | Record&lt;'sys_certificate'&gt;
   auth: '',// '' | 'basic' | 'mutual'
-  basicAuthentication: get_sys_id('sys_auth_profile_basic', ''), // sys_id | Record&lt;'sys_auth_profile_basic'&gt;
+  basicAuthentication: Now.ref('sys_auth_profile_basic', '<sys_id>'), // sys_id | Record&lt;'sys_auth_profile_basic'&gt;
   method: 'get', // 'get' | 'post' | 'put' | 'delete' | 'patch'
   queryParameters: {}, // object, snake_case name value pairs, ex.: { field_one: 'value1', field_two: 'value2' }
   headers: {}, // object, snake_case name value pairs, ex.: { header_one: 'value1', header_two: 'value2' }

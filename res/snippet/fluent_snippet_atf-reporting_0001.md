@@ -11,7 +11,7 @@ Test({
 }, (atf) => {
   atf.reporting.reportVisibility({
     $id: 'step_1_123456', // string | guid, mandatory
-    report: get_sys_id('sys_report', 'p1_incident_report'), // sys_id | Record<'sys_report'>;
+    report: Now.ref('sys_report', '<sys_id>'), // sys_id | Record<'sys_report'>; the P1 incident report's sys_id, looked up on the instance
     assert: 'can_view_report', // 'can_view_report' | 'cannot_view_report';
   })
   atf.server.log({

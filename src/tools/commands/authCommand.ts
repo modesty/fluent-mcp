@@ -1,148 +1,39 @@
-import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
+import { CommandArgument, CommandResult } from '../../utils/types.js';
 import { BaseCLICommand } from './baseCommand.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
-import { cliOption } from './cliArgv.js';
-import logger from '../../utils/logger.js';
 import { getProjectRootPath } from '../../config.js';
 
-/** `--type` choices declared by `now-sdk auth`. */
-const AUTH_TYPES = ['basic', 'oauth'] as const;
-
 /**
- * Command to prepare shell command for ServiceNow SDK authentication
- * Handles adding, listing, deleting, and selecting auth profiles
+ * Lists the CLI's stored auth profiles (`now-sdk auth --list`) for lazy auth
+ * validation. Internal: not exposed to MCP clients.
+ *
+ * Deliberately read-only. The profile store and its default profile are global
+ * state that every `now-sdk` run on the machine shares: `auth --add` always makes
+ * the new profile the default (sdk-cli `storeCredentials(alias, cred, true)`),
+ * and setting the previous default back cannot be made safe. A failure between
+ * the two writes skips it, and two validations that overlap restore the wrong
+ * default (W9 review). So the server never adds, deletes or selects a profile;
+ * the user does that in a terminal.
  */
 export class AuthCommand extends BaseCLICommand {
-  name = 'manage_fluent_auth';
-  description = 'Manage Fluent (ServiceNow SDK) authentication to instance with credential profiles, use this to add, list, delete, or switch between authentication profiles';
+  name = 'list_fluent_auth_profiles';
+  description = 'List the ServiceNow SDK auth profiles stored on this machine (read-only)';
   arguments: CommandArgument[] = [
-    {
-      name: 'add',
-      type: 'string',
-      required: false,
-      description: 'Instance name or URL to store authentication credentials for (now-sdk auth --add <value>)',
-    },
-    {
-      name: 'type',
-      type: 'string',
-      required: false,
-      domain: { kind: 'choices', values: AUTH_TYPES },
-      description:
-        'Type of authentication to use for new authentication credential. Choices: "basic", "oauth"',
-    },
-    {
-      name: 'alias',
-      type: 'string',
-      required: false,
-      description: 'Name for the authentication profile (required when using --add, --delete, --use)',
-    },
-    {
-      name: 'list',
-      type: 'boolean',
-      required: false,
-      description: 'List all existing stored authentication profiles',
-    },
-    {
-      name: 'delete',
-      type: 'string',
-      required: false,
-      description: 'Delete the specified authentication profile',
-    },
-    {
-      name: 'use',
-      type: 'string',
-      required: false,
-      description: 'Use the specified authentication profile',
-    },
     {
       name: 'debug',
       type: 'boolean',
       required: false,
       description: 'Print debug output',
     },
-    {
-      name: 'help',
-      type: 'boolean',
-      required: false,
-      description: 'Show help',
-    },
-    {
-      name: 'version',
-      type: 'boolean',
-      required: false,
-      description: 'Show version number',
-    },
   ];
 
-  async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
+  async execute(args: Record<string, unknown> = {}, signal?: AbortSignal): Promise<CommandResult> {
     this.validateArgs(args);
 
-    // Validate mutually exclusive primary actions: add | list | delete | use
-    const primaryFlags = [
-      typeof args.add !== 'undefined',
-      Boolean(args.list),
-      typeof args.delete !== 'undefined',
-      typeof args.use !== 'undefined',
-    ].filter(Boolean).length;
-    if (primaryFlags > 1) {
-      return CommandResultFactory.error('Provide only one of --add, --list, --delete, or --use');
-    }
-
-    // Resolve the bundled SDK CLI so auth works from any cwd (auth is a global
-    // operation, not tied to a Fluent project directory).
+    // Resolve the bundled SDK CLI so this works from any cwd.
     const { command, baseArgs } = resolveSdkCli();
-    const sdkArgs = [...baseArgs, 'auth'];
-
-    // Handle different auth operations
-    if (typeof args.add === 'string') {
-      const addValue = args.add as string;
-      if (!addValue.trim()) {
-        return CommandResultFactory.error('When using --add, you must provide a non-empty instance name or URL');
-      }
-      sdkArgs.push(cliOption('--add', addValue));
-
-      if (args.type) {
-        sdkArgs.push(cliOption('--type', args.type));
-      }
-
-      if (args.alias) {
-        sdkArgs.push(cliOption('--alias', args.alias));
-      }
-    } else if (args.list) {
-      sdkArgs.push('--list');
-    } else if (args.delete) {
-      sdkArgs.push(cliOption('--delete', args.delete));
-    } else if (args.use) {
-      sdkArgs.push(cliOption('--use', args.use));
-    }
-
+    const sdkArgs = [...baseArgs, 'auth', '--list'];
     this.appendCommonFlags(sdkArgs, args);
-
-    // Pass-through help/version if requested
-    if (args.help) {
-      sdkArgs.push('--help');
-    }
-    if (args.version) {
-      sdkArgs.push('--version');
-    }
-
-    // For basic auth --add, prepare stdin input from environment variables
-    // The SDK prompts for username and password interactively
-    let stdinInput: string | undefined;
-    if (typeof args.add === 'string' && args.type === 'basic') {
-      const username = process.env.SN_USER_NAME?.trim() || process.env.SN_USERNAME?.trim();
-      const password = process.env.SN_PASSWORD;
-
-      if (username && password) {
-        logger.debug('Preparing stdin input for basic auth from environment variables');
-        stdinInput = `${username}\n${password}\n`;
-      } else {
-        logger.debug('Basic auth credentials not found in environment variables', {
-          hasUsername: !!username,
-          hasPassword: !!password
-        });
-      }
-    }
 
     // Auth profiles are global SDK state, not Fluent-project state. The package
     // directory is an intentional neutral cwd for the bundled CLI.
@@ -150,7 +41,7 @@ export class AuthCommand extends BaseCLICommand {
       command,
       sdkArgs,
       getProjectRootPath(),
-      stdinInput,
+      undefined,
       undefined,
       signal
     );

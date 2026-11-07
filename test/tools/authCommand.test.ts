@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
 import type { CommandProcessor, CommandResult } from '../../src/utils/types.js';
 
-// AuthCommand reads the neutral project root from config, resolves the bundled
-// SDK CLI, and logs. All three are replaced with fixtures.
+// AuthCommand reads the neutral project root from config and resolves the
+// bundled SDK CLI; both, and the logger, are replaced with fixtures.
 mock.module('../../src/config.js', configFixture().mockOptions);
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 mock.module('../../src/utils/sdkCli.js', sdkCliFixture().mockOptions);
@@ -31,13 +31,6 @@ function createMockCmdWriter() {
   return { process: processFn } satisfies CommandProcessor;
 }
 
-/** Asserts every expected token appears in argv (order-insensitive). */
-function assertContainsAll(actual: readonly string[], expected: readonly string[]): void {
-  for (const token of expected) {
-    assert.ok(actual.includes(token), `expected argv to contain ${JSON.stringify(token)}; received ${JSON.stringify(actual)}`);
-  }
-}
-
 describe('AuthCommand', () => {
   let authCommand: InstanceType<typeof AuthCommand>;
   let mockCmdWriter: ReturnType<typeof createMockCmdWriter>;
@@ -47,73 +40,33 @@ describe('AuthCommand', () => {
     authCommand = new AuthCommand(mockCmdWriter);
   });
 
-  it('should have correct properties', () => {
-    assert.equal(authCommand.name, 'manage_fluent_auth');
-    assert.ok(authCommand.description.includes('Manage Fluent (ServiceNow SDK) authentication'));
-    const argNames = authCommand.arguments.map((a) => a.name);
-    assertContainsAll(argNames, ['add', 'type', 'alias', 'list', 'delete', 'use', 'debug']);
-    assert.ok(!argNames.includes('instanceUrl'));
-  });
-
-  it('should execute auth command with --add value and optional flags', async () => {
-    const args = {
-      add: 'foo', // instance name or URL
-      type: 'basic',
-      alias: 'bar',
-    };
-
-    const result = await authCommand.execute(args);
+  it('only lists profiles: auth --list from the neutral package directory, no stdin', async () => {
+    const result = await authCommand.execute();
 
     assert.equal(mockCmdWriter.process.mock.callCount(), 1);
     const [command, argv, cwd, stdinInput, timeoutMs, signal] = mockCmdWriter.process.mock.calls[0].arguments;
     assert.equal(command, process.execPath);
-    assertContainsAll(argv, [SDK_BIN, 'auth', '--add=foo', '--type=basic', '--alias=bar']);
+    assert.deepEqual(argv, [SDK_BIN, 'auth', '--list']);
     assert.equal(cwd, PROJECT_ROOT);
-    assert.equal(stdinInput, undefined); // credentials not set in env
+    assert.equal(stdinInput, undefined);
     assert.equal(timeoutMs, undefined);
     assert.equal(signal, undefined);
     assert.equal(result.success, true);
   });
 
-  // Add a comment explaining the relationship between execute and process
-  it('should handle relationship between execute and process methods', () => {
-    // The command.execute method should call the commandProcessor.process method
-    // This is a key part of the refactoring to ensure AuthCommand uses CLICmdWriter properly
+  it('passes --debug through', async () => {
+    await authCommand.execute({ debug: true });
 
-    const args = { list: true };
-
-    authCommand.execute(args);
-
-    // Verify the process method of the command processor was called
-    assert.ok(mockCmdWriter.process.mock.callCount() > 0);
+    assert.deepEqual(mockCmdWriter.process.mock.calls[0].arguments[1], [SDK_BIN, 'auth', '--list', '--debug']);
   });
 
-  it('should pass through --list, --help and --version', async () => {
-    const args = { list: true, help: true, version: true };
-    await authCommand.execute(args);
-
-    assert.equal(mockCmdWriter.process.mock.callCount(), 1);
-    const [command, argv, cwd, stdinInput, timeoutMs, signal] = mockCmdWriter.process.mock.calls[0].arguments;
-    assert.equal(command, process.execPath);
-    assertContainsAll(argv, [SDK_BIN, 'auth', '--list', '--help', '--version']);
-    assert.equal(cwd, PROJECT_ROOT);
-    assert.equal(stdinInput, undefined); // not needed for list/help/version
-    assert.equal(timeoutMs, undefined);
-    assert.equal(signal, undefined);
-  });
-
-  it('should error when multiple primary flags provided', async () => {
-    const result = await authCommand.execute({ list: true, use: 'bar' });
-    assert.equal(result.success, false);
-    assert.ok(result.error instanceof Error);
-    assert.ok((result.error as Error).message.includes('Provide only one of'));
-  });
-
-  it('should validate --type choices', async () => {
-    // The internal AuthCommand is held to the same schema as tools/call.
-    await assert.rejects(
-      authCommand.execute({ add: 'foo', type: 'invalid' }),
-      /Argument 'type' must be one of: basic, oauth\. Received: "invalid"/
-    );
-  });
+  // The profile store and its default profile are shared by every now-sdk run
+  // on the machine, so the server has no way to write them (W9 review).
+  for (const write of [{ add: 'https://dev.service-now.com' }, { use: 'dev' }, { delete: 'dev' }]) {
+    it(`rejects ${Object.keys(write)[0]}: the server never writes the profile store`, async () => {
+      // The internal AuthCommand is held to the same strict schema as tools/call.
+      await assert.rejects(authCommand.execute(write), /Input validation error/);
+      assert.equal(mockCmdWriter.process.mock.callCount(), 0);
+    });
+  }
 });

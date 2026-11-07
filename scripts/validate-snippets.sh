@@ -54,15 +54,12 @@ EXPECTED_FAILURES=(
   "fluent_snippet_sla_0001.md"
   # NowAssist snippet references external script file and requires full project context
   "fluent_snippet_now-assist-skill-config_0001.md"
-  # Snippets using get_sys_id() global (not available in isolation)
-  "fluent_snippet_scheduled-script_0005.md"
-  "fluent_snippet_acl_0001.md"
-  "fluent_snippet_acl_0003.md"
+  # List snippet: a sys_ui_view Record without $id (TS2345)
   "fluent_snippet_list_0002.md"
-  # Form snippets using legacy Record API with get_sys_id
+  # Legacy Record form snippets: `table` is not a sys_ui_section column (TS2353);
+  # form_0001 also has a string view `roles` (TS2322) and an invalid listRef (TS11)
   "fluent_snippet_form_0001.md"
   "fluent_snippet_form_0003.md"
-  "fluent_snippet_form_0004.md"
   # Snippets with unused variable warnings (strict mode, not actual errors)
   "fluent_snippet_application-menu_0001.md"
   "fluent_snippet_application-menu_0002.md"

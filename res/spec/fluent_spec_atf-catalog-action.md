@@ -3,7 +3,7 @@
 // open a catalog item by sys_id
 atf.catalog.openCatalogItem({
     $id: Now.ID[''], // string | guid, mandatory
-    catalogItem: get_sys_id('sc_cat_item', '') // sys_id | Record&lt;'sc_cat_item'&gt;
+    catalogItem: Now.ref('sc_cat_item', '<sys_id>') // sys_id | Record&lt;'sc_cat_item'&gt;
 }): void;
 
 // Add item to Shopping Cart after a call to atf.catalog.openCatalogItem
