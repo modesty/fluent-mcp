@@ -1,4 +1,4 @@
-import { ResourceLoader } from '../utils/resourceLoader.js';
+import { ResourceCatalog } from './resourceCatalog.js';
 import { ResourceType, CommandResultFactory } from '../utils/types.js';
 import logger from '../utils/logger.js';
 import { McpResourceNotFoundError } from '../utils/mcpErrors.js';
@@ -56,29 +56,12 @@ const RESOURCE_TYPE_CONFIGS: ResourceTypeConfig[] = [
  * `listResources()` / `readResource()`. This class is a pure content provider.
  */
 export class ResourceManager {
-  private resourceLoader: ResourceLoader;
-  private metadataTypes: string[] = [];
-
   /**
    * Create a new ResourceManager
+   * @param resourceCatalog The shared index of bundled `res/` content
    */
-  constructor() {
-    this.resourceLoader = new ResourceLoader();
-  }
+  constructor(private readonly resourceCatalog: ResourceCatalog = new ResourceCatalog()) {}
 
-  /**
-   * Initialize resources by loading metadata types
-   */
-  async initialize(): Promise<void> {
-    try {
-      // Get available metadata types
-      this.metadataTypes = await this.resourceLoader.getAvailableMetadataTypes();
-      logger.debug(`Loaded ${this.metadataTypes.length} metadata types for resources`);
-    } catch (error) {
-      logger.error('Error loading metadata types', CommandResultFactory.normalizeError(error));
-      throw error;
-    }
-  }
 
   /**
    * Get all available resources for listing
@@ -86,19 +69,15 @@ export class ResourceManager {
    */
   async listResources(): Promise<{ uri: string, name: string, title: string, mimeType: string }[]> {
     try {
-      // Make sure metadata types are loaded
-      if (!this.metadataTypes || this.metadataTypes.length === 0) {
-        this.metadataTypes = await this.resourceLoader.getAvailableMetadataTypes();
-      }
-
+      const metadataTypes = await this.resourceCatalog.getAvailableMetadataTypes();
       const resources: { uri: string; name: string; title: string; mimeType: string }[] = [];
 
       for (const config of RESOURCE_TYPE_CONFIGS) {
-        for (const type of this.metadataTypes) {
+        for (const type of metadataTypes) {
           if (config.hasSubId) {
             // For snippet types, list the first snippet
             try {
-              const snippetIds = await this.resourceLoader.listSnippets(type);
+              const snippetIds = await this.resourceCatalog.listSnippets(type);
               if (snippetIds.length > 0) {
                 resources.push({
                   uri: `${config.scheme}://${type}/${snippetIds[0]}`,
@@ -128,22 +107,6 @@ export class ResourceManager {
       logger.error('Error listing resources', CommandResultFactory.normalizeError(error));
       return [];
     }
-  }
-
-  /**
-   * Get the resource loader
-   * @returns ResourceLoader instance
-   */
-  getResourceLoader(): ResourceLoader {
-    return this.resourceLoader;
-  }
-
-  /**
-   * Get the metadata types
-   * @returns Array of metadata type strings
-   */
-  getMetadataTypes(): string[] {
-    return this.metadataTypes;
   }
 
   /**
@@ -185,7 +148,7 @@ export class ResourceManager {
       subId = pathParts.length > 0 ? pathParts[0] : undefined;
     }
 
-    const result = await this.resourceLoader.getResource(
+    const result = await this.resourceCatalog.getResource(
       config.resourceType,
       metadataType,
       subId

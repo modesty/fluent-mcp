@@ -19,7 +19,7 @@ mock.module('../src/utils/logger.js', loggerFixture().mockOptions);
 const { GetApiSpecCommand, GetSnippetCommand, GetInstructCommand } = await import(
   '../src/tools/resources/resourceTools.js'
 );
-const { ResourceLoader } = await import('../src/utils/resourceLoader.js');
+const { ResourceCatalog } = await import('../src/res/resourceCatalog.js');
 
 describe('SDK v4.4.0 Types - Unit Tests', () => {
   const IMPORT_SET_SPEC = '# ImportSet API spec\nImportSet({ $id: "", targetTable: "" })';
@@ -271,9 +271,9 @@ describe('SDK v4.4.0 Types - Unit Tests', () => {
     });
   });
 
-  describe('ResourceLoader', () => {
+  describe('ResourceCatalog', () => {
     it('should include new types when listing available metadata types', async () => {
-      const loader = new ResourceLoader();
+      const loader = new ResourceCatalog();
       const types = await loader.getAvailableMetadataTypes();
 
       assert.ok(types.includes('import-set'));

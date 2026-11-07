@@ -16,6 +16,10 @@
  */
 import { describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { configFixture, loggerFixture } from '../support/fixtures.js';
 
 mock.module('../../src/config.js', configFixture().mockOptions);
@@ -29,6 +33,39 @@ const TEST_TIMEOUT_MS = 10_000;
 /** A child that writes `text` to stdout immediately, then hangs indefinitely. */
 function hangingChildArgs(text: string): string[] {
   return ['-e', `process.stdout.write(${JSON.stringify(text)}); setInterval(() => {}, 1000);`];
+}
+
+/**
+ * Like {@link hangingChildArgs}, but the child writes `text` synchronously to
+ * fd 1 and only then creates `markerPath`. Once the marker exists the text is
+ * already in the pipe, so a test can act on "output emitted" instead of guessing
+ * with a wall-clock delay (a fixed 150 ms abort raced child startup under load).
+ */
+function hangingChildWithMarkerArgs(text: string, markerPath: string): string[] {
+  return ['-e', [
+    "const fs = require('node:fs');",
+    `fs.writeSync(1, ${JSON.stringify(text)});`,
+    `fs.writeFileSync(${JSON.stringify(markerPath)}, '');`,
+    'setInterval(() => {}, 1000);',
+  ].join(' ')];
+}
+
+/**
+ * Resolve once the child has created `markerPath`.
+ *
+ * Fails instead of polling forever: rejects when `run` settles first (the child
+ * exited before signalling readiness) and when `signal` aborts. Pass the test
+ * context's signal: node:test aborts it on timeout, but a timeout alone does not
+ * stop a pending loop, which would keep the test process alive.
+ */
+async function waitForMarker(markerPath: string, run: Promise<unknown>, signal: AbortSignal): Promise<void> {
+  let settled = false;
+  const markSettled = () => { settled = true; };
+  run.then(markSettled, markSettled);
+  while (!fs.existsSync(markerPath)) {
+    if (settled) throw new Error(`child finished before creating its readiness marker ${markerPath}`);
+    await delay(10, undefined, { signal });
+  }
 }
 
 describe('NodeProcessRunner — timeout returns partial output (P0.2)', () => {
@@ -69,25 +106,33 @@ describe('NodeProcessRunner — timeout returns partial output (P0.2)', () => {
 });
 
 describe('NodeProcessRunner — client cancellation kills the child (P0.3)', () => {
-  it('aborting the signal terminates the process and returns partial output', { timeout: TEST_TIMEOUT_MS }, async () => {
+  it('aborting the signal terminates the process and returns partial output', { timeout: TEST_TIMEOUT_MS }, async (t) => {
     const runner = new NodeProcessRunner();
     const controller = new AbortController();
 
-    // Abort shortly after the child has emitted its first output. If the child
+    // Abort once the child has provably emitted its first output. If the child
     // were NOT killed it hangs forever and this test would time out.
-    const timer = setTimeout(() => controller.abort(), 150);
+    const markerDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluent-mcp-cancel-'));
+    const markerPath = path.join(markerDir, 'emitted');
+    const run = runner.run(
+      process.execPath,
+      hangingChildWithMarkerArgs('emitted-then-cancelled', markerPath),
+      undefined,
+      undefined,
+      600_000, // long timeout so the *signal*, not the timeout, ends the process
+      controller.signal
+    );
     let result;
     try {
-      result = await runner.run(
-        process.execPath,
-        hangingChildArgs('emitted-then-cancelled'),
-        undefined,
-        undefined,
-        600_000, // long timeout so the *signal*, not the timeout, ends the process
-        controller.signal
-      );
+      await waitForMarker(markerPath, run, t.signal);
+      controller.abort();
+      result = await run;
     } finally {
-      clearTimeout(timer);
+      // On any failure path (early exit, test timeout) stop the child and wait
+      // for it, so no process or pending work outlives the test.
+      controller.abort();
+      await run.catch(() => undefined);
+      fs.rmSync(markerDir, { recursive: true, force: true });
     }
 
     assert.ok(result.stdout.includes('emitted-then-cancelled'));

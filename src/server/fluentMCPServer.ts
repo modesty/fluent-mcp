@@ -7,6 +7,7 @@ import loggingManager from '../utils/loggingManager.js';
 import logger from '../utils/logger.js';
 import { ToolsManager } from '../tools/toolsManager.js';
 import { ResourceManager } from '../res/resourceManager.js';
+import { ResourceCatalog } from '../res/resourceCatalog.js';
 import { PromptManager } from '../prompts/promptManager.js';
 import { McpResourceNotFoundError, McpInternalError } from '../utils/mcpErrors.js';
 
@@ -65,7 +66,7 @@ export class FluentMcpServer {
   private promptManager: PromptManager;
   private config: ReturnType<typeof getConfig>;
   private status: ServerStatus = ServerStatus.STOPPED;
-  private initializationPromise: Promise<void>;
+  private resourceCatalog: ResourceCatalog;
   private handle?: StdioServerHandle;
 
   /**
@@ -77,17 +78,13 @@ export class FluentMcpServer {
 
     // Managers are built once and shared across every McpServer instance the
     // factory produces: they hold the command registry and the loaded resource
-    // and prompt content, none of which is per-connection state.
-    this.toolsManager = new ToolsManager();
-    this.resourceManager = new ResourceManager();
-    this.promptManager = new PromptManager();
-
-    // Load resource and prompt content once. start() awaits this before
-    // accepting connections so the factory can register synchronously.
-    this.initializationPromise = Promise.all([
-      this.resourceManager.initialize(),
-      this.promptManager.initialize()
-    ]).then(() => { /* content loaded; registration happens per instance */ });
+    // and prompt content, none of which is per-connection state. One catalog
+    // of the bundled res/ content serves the resource tools, the resources/*
+    // handlers, and prompt rendering. Content is loaded by start().
+    this.resourceCatalog = new ResourceCatalog();
+    this.toolsManager = new ToolsManager(this.resourceCatalog);
+    this.resourceManager = new ResourceManager(this.resourceCatalog);
+    this.promptManager = new PromptManager(this.resourceCatalog);
   }
 
   /**
@@ -240,9 +237,10 @@ export class FluentMcpServer {
         );
       }
 
-      // Load resource and prompt content before accepting connections so the
-      // server factory below can register everything synchronously.
-      await this.initializationPromise;
+      // Load resource and prompt content once, before accepting connections,
+      // so the server factory below can register everything synchronously.
+      await this.resourceCatalog.load();
+      await this.promptManager.initialize();
 
       // serveStdio owns the transport and the era decision. legacy: 'serve'
       // (the default, explicit here) means a 2025-era opening is served from

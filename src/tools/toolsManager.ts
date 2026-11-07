@@ -17,6 +17,7 @@ import { buildInputZodSchema } from './toolSchema.js';
 import { autoValidateAuthIfConfigured } from '../server/fluentInstanceAuth.js';
 import loggingManager from '../utils/loggingManager.js';
 import { stripAnsi } from '../utils/cliError.js';
+import { ResourceCatalog } from '../res/resourceCatalog.js';
 
 /**
  * Owns the command registry and registers it onto MCP server instances.
@@ -50,8 +51,9 @@ export class ToolsManager {
 
   /**
    * Create a new ToolsManager and build its command registry.
+   * @param resourceCatalog The shared index of bundled `res/` content, read by the resource tools
    */
-  constructor() {
+  constructor(private readonly resourceCatalog: ResourceCatalog = new ResourceCatalog()) {
     this.commandRegistry = new CommandRegistry();
 
     // Initialize the tools
@@ -104,9 +106,9 @@ export class ToolsManager {
    */
   private registerResourceTools(): void {
     try {
-      this.commandRegistry.register(new GetApiSpecCommand());
-      this.commandRegistry.register(new GetSnippetCommand());
-      this.commandRegistry.register(new GetInstructCommand());
+      this.commandRegistry.register(new GetApiSpecCommand(this.resourceCatalog));
+      this.commandRegistry.register(new GetSnippetCommand(this.resourceCatalog));
+      this.commandRegistry.register(new GetInstructCommand(this.resourceCatalog));
       this.commandRegistry.register(new CheckAuthStatusCommand(this.ensureAuthValidated));
 
       logger.debug('Resource tools registered successfully');
