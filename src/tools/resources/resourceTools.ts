@@ -1,9 +1,11 @@
 /**
- * MCP tools for accessing ServiceNow metadata resources (API specs, snippets, instructions)
- * and checking authentication status
+ * MCP tools for reading the bundled Fluent knowledge (API specs, authoring
+ * guides, code snippets) and checking authentication status
  */
 import { z } from 'zod';
 import { ResourceCatalog } from '../../res/resourceCatalog.js';
+import { ServiceNowMetadataType } from '../../types.js';
+import { assertArguments, buildInputZodSchema } from '../toolSchema.js';
 import {
   CLICommand,
   CommandArgument,
@@ -15,272 +17,163 @@ import {
 import { SessionManager } from '../../utils/sessionManager.js';
 import logger from '../../utils/logger.js';
 
-/**
- * Shared MCP output schema for the metadata resource read tools
- * (get-api-spec, get-snippet, get-instruct). Extra keys are stripped by Zod,
- * so a single shape covers fetch + listing modes.
- */
+/** The one knowledge tool's name, for the pointers in prompts and instructions. */
+export const KNOWLEDGE_TOOL_NAME = 'get_fluent_knowledge';
+
+/** What each kind holds, with its article, for messages. */
+const KIND_LABEL: Record<ResourceType, string> = {
+  [ResourceType.SPEC]: 'an API specification',
+  [ResourceType.INSTRUCT]: 'an authoring guide',
+  [ResourceType.SNIPPET]: 'a code snippet',
+};
+
+const KINDS: readonly [ResourceType, ...ResourceType[]] = [ResourceType.SPEC, ResourceType.INSTRUCT, ResourceType.SNIPPET];
+
+/** The supported metadata types (single source of truth: {@link ServiceNowMetadataType}), sorted. */
+const METADATA_TYPES = Object.values(ServiceNowMetadataType).sort() as [string, ...string[]];
+
+/** Output schema of the knowledge tool. Extra keys are stripped by Zod, so one shape covers reads and listings. */
 const RESOURCE_OUTPUT_SCHEMA = {
   content: z.string().describe('The resource content (markdown).'),
-  resourceType: z.string().describe('Resource type: spec | snippet | instruct.'),
+  resourceType: z.string().describe('Resource kind: spec | snippet | instruct.'),
   metadataType: z.string().optional().describe('The ServiceNow metadata type, when a specific resource was returned.'),
   snippetId: z.string().optional().describe('The returned snippet id (snippets only).'),
   additionalSnippetIds: z.array(z.string()).optional().describe('Other available snippet ids (snippets only).'),
-  availableTypes: z.array(z.string()).optional().describe('All available metadata types (listing mode).'),
+  availableTypes: z.array(z.string()).optional().describe('The metadata types that have this kind (listing mode).'),
 };
 
 /**
- * Base class for resource access commands
+ * One read-only tool over the closed {@link ResourceCatalog}: `kind` selects the
+ * spec, instruct or snippet collection, `metadataType` the entry, and
+ * `snippetId` one snippet. The same content is served as `sn-spec://`,
+ * `sn-instruct://` and `sn-snippet://` resources, for clients that read
+ * resources rather than call tools.
  */
-export abstract class BaseResourceCommand implements CLICommand {
-  abstract name: string;
-  abstract description: string;
-  abstract resourceType: ResourceType;
+export class GetFluentKnowledgeCommand implements CLICommand {
+  name = KNOWLEDGE_TOOL_NAME;
+  description =
+    'Read Fluent knowledge for a ServiceNow metadata type (e.g., business-rule, script-include). ' +
+    "kind 'spec' returns the Fluent API specification, 'instruct' the authoring rules, conventions and pitfalls, " +
+    "and 'snippet' a runnable code example (without snippetId, the first one plus the ids of the others). " +
+    'Omit metadataType to list the metadata types that have that kind. ' +
+    'For SDK APIs and guides beyond metadata types, use explain_fluent_api.';
+  annotations = { readOnlyHint: true, idempotentHint: true };
   outputSchema = RESOURCE_OUTPUT_SCHEMA;
+  arguments: CommandArgument[] = [
+    {
+      name: 'kind',
+      type: 'string',
+      required: true,
+      description: 'What to read: spec (API specification), instruct (authoring guide) or snippet (code example)',
+      domain: { kind: 'choices', values: KINDS },
+    },
+    {
+      name: 'metadataType',
+      type: 'string',
+      required: false,
+      description: 'ServiceNow metadata type, lowercase (e.g., business-rule). Omit to list the types that have this kind',
+      domain: { kind: 'choices', values: METADATA_TYPES },
+    },
+    {
+      name: 'snippetId',
+      type: 'string',
+      required: false,
+      description: "Snippet id such as 0001, for kind 'snippet' only. Omit for the first snippet; the result lists the other ids",
+    },
+  ];
 
-  constructor(protected readonly resourceCatalog: ResourceCatalog = new ResourceCatalog()) {}
+  private inputSchema?: z.ZodType;
 
-  /**
-   * Resource commands don't use command processors
-   */
+  constructor(private readonly resourceCatalog: ResourceCatalog = new ResourceCatalog()) {}
+
+  /** Reads the catalog itself; no command processor. */
   getCommandProcessor(): undefined {
     return undefined;
   }
 
-  arguments: CommandArgument[] = [
-    {
-      name: 'metadataType',
-      type: 'string',
-      required: true,
-      description: 'ServiceNow metadata type (e.g., business-rule, script-include)',
-    },
-    {
-      name: 'id',
-      type: 'string',
-      required: false,
-      description: 'Optional identifier for specific resource (only for snippets)',
-    }
-  ];
-
-  /**
-   * Execute the resource command
-   * @param args Command arguments
-   * @returns Command result
-   */
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
     try {
-      // Normalize args before processing:
-      // 1. Lowercase metadataType to match resource file naming convention
-      // 2. Coerce null/empty id to undefined (LLMs often send null for "not provided")
-      const normalized = { ...args };
-      if (typeof normalized.metadataType === 'string') {
-        normalized.metadataType = normalized.metadataType.toLowerCase();
+      this.inputSchema ??= buildInputZodSchema(this.arguments);
+      assertArguments(this.name, this.inputSchema, args);
+      const kind = args.kind as ResourceType;
+      const metadataType = (args.metadataType ?? undefined) as string | undefined;
+      // An empty id is the "not provided" some clients send, like null.
+      const snippetId = (args.snippetId || undefined) as string | undefined;
+
+      if (snippetId !== undefined && kind !== ResourceType.SNIPPET) {
+        return CommandResultFactory.error(`snippetId applies only to kind 'snippet', not '${kind}'.`);
       }
-      if (normalized.id === null || normalized.id === '') {
-        delete normalized.id;
+      if (metadataType === undefined) {
+        return snippetId === undefined
+          ? await this.listTypes(kind)
+          : CommandResultFactory.error('snippetId needs a metadataType.');
       }
-      return await this.doExecute(normalized);
+      return kind === ResourceType.SNIPPET
+        ? await this.readSnippet(metadataType, snippetId)
+        : await this.read(kind, metadataType);
     } catch (error) {
       logger.error(`Error executing ${this.name}`, CommandResultFactory.normalizeError(error));
       return CommandResultFactory.fromError(error);
     }
   }
 
-  /**
-   * Template method for subclasses to implement core execution logic
-   * Override this instead of execute() to benefit from base error handling
-   */
-  protected async doExecute(args: Record<string, unknown>): Promise<CommandResult> {
-    this.validateArgs(args);
+  /** The metadata types that have a resource of this kind, from that kind's index. */
+  private async listTypes(kind: ResourceType): Promise<CommandResult> {
+    const types = await this.resourceCatalog.listMetadataTypes(kind);
+    if (types.length === 0) {
+      return CommandResultFactory.error(`No metadata types with ${KIND_LABEL[kind]} found.`);
+    }
+    const output =
+      `Available Fluent metadata types with ${KIND_LABEL[kind]} (${types.length}):\n${types.join('\n')}\n\n` +
+      `Call ${KNOWLEDGE_TOOL_NAME} with kind '${kind}' and a metadataType to read one.`;
+    return CommandResultFactory.success(output, 0, { content: output, resourceType: kind, availableTypes: types });
+  }
 
-    const metadataType = args.metadataType as string;
-    const id = args.id as string | undefined;
-
-    const result = await this.resourceCatalog.getResource(this.resourceType, metadataType, id);
-
+  private async read(kind: ResourceType, metadataType: string): Promise<CommandResult> {
+    const result = await this.resourceCatalog.getResource(kind, metadataType);
     if (!result.found) {
       return CommandResultFactory.error(
-        `No ${this.resourceType} resource found for metadata type '${metadataType}'. ` +
-        'Call get-api-spec without arguments to list all available metadata types.'
+        `No ${kind} resource found for metadata type '${metadataType}'. ` +
+        `Call ${KNOWLEDGE_TOOL_NAME} with only kind '${kind}' to list the types that have one.`
       );
     }
-
-    return CommandResultFactory.success(result.content, 0, {
-      content: result.content,
-      resourceType: this.resourceType,
-      metadataType,
-    });
+    return CommandResultFactory.success(result.content, 0, { content: result.content, resourceType: kind, metadataType });
   }
 
   /**
-   * Validate command arguments
-   * @param args Command arguments
-   * @throws Error if validation fails
+   * An explicit id is served exactly or reported missing with the ids that do
+   * exist; it is never silently replaced by another snippet. Without an id, the
+   * first snippet is returned and the others are named.
    */
-  protected validateArgs(args: Record<string, unknown>): void {
-    if (!args.metadataType) {
-      throw new Error(
-        "Missing required argument 'metadataType'. Provide a ServiceNow metadata type " +
-        "like 'business-rule' or 'script-include'. Call get-api-spec without arguments to list all available types."
-      );
-    }
-  }
-}
-
-/**
- * Command for accessing API specifications
- * When called without metadataType, lists all available metadata types
- */
-export class GetApiSpecCommand extends BaseResourceCommand {
-  name = 'get-api-spec';
-  description = 'Fetch the Fluent API specification for a ServiceNow metadata type (e.g., "business-rule", "script-include"). Call without arguments to list all available metadata types. Use this to understand the Fluent API for a specific metadata type before writing code. For code examples, use get-snippet instead. For best practices, use get-instruct instead.';
-  annotations = { readOnlyHint: true, idempotentHint: true };
-  resourceType = ResourceType.SPEC;
-
-  // Override arguments to make metadataType optional for listing
-  arguments: CommandArgument[] = [
-    {
-      name: 'metadataType',
-      type: 'string',
-      required: false,  // Optional - if not provided, lists all available types
-      description: 'ServiceNow metadata type (e.g., business-rule, script-include). Omit to list all available types.',
-    },
-  ];
-
-  /**
-   * Override doExecute to add listing functionality when no metadataType is provided
-   */
-  protected async doExecute(args: Record<string, unknown>): Promise<CommandResult> {
-    const metadataType = args.metadataType as string | undefined;
-
-    // If no metadataType provided, list all available types
-    if (!metadataType) {
-      try {
-        const metadataTypes = await this.resourceCatalog.getAvailableMetadataTypes();
-
-        if (metadataTypes.length === 0) {
-          return CommandResultFactory.error('No metadata types found.');
-        }
-
-        const output = `Available Fluent metadata types (${metadataTypes.length}):\n${metadataTypes.join('\n')}\n\nUse get-api-spec with a specific metadataType to fetch its API specification.`;
-        return CommandResultFactory.success(output, 0, {
-          content: output,
-          resourceType: this.resourceType,
-          availableTypes: metadataTypes,
-        });
-      } catch (error) {
-        logger.error('Error listing metadata types', CommandResultFactory.normalizeError(error));
-        return CommandResultFactory.fromError(error);
-      }
-    }
-
-    // Otherwise, fetch the specific API spec
-    return super.doExecute(args);
-  }
-
-  /**
-   * Override validateArgs since metadataType is now optional
-   */
-  protected validateArgs(_args: Record<string, unknown>): void {
-    // No validation needed - metadataType is optional
-  }
-}
-
-/**
- * Command for accessing code snippets
- */
-export class GetSnippetCommand extends BaseResourceCommand {
-  name = 'get-snippet';
-  description = 'Fetch a Fluent code snippet for a ServiceNow metadata type (e.g., "business-rule", "script-include"). Returns the first available snippet when called without an id. Provides additional snippet ids if more are available. For API specifications, use get-api-spec instead. For best practices, use get-instruct instead.';
-  annotations = { readOnlyHint: true, idempotentHint: true };
-  resourceType = ResourceType.SNIPPET;
-
-  /**
-   * Override doExecute to add snippet listing functionality
-   */
-  protected async doExecute(args: Record<string, unknown>): Promise<CommandResult> {
-    this.validateArgs(args);
-
-    const metadataType = args.metadataType as string;
-    const id = args.id as string | undefined;
-
+  private async readSnippet(metadataType: string, snippetId: string | undefined): Promise<CommandResult> {
     const snippetIds = await this.resourceCatalog.listSnippets(metadataType);
-
-    // An explicit id is served exactly or reported missing with the ids that
-    // do exist; it is never silently replaced by another snippet.
-    if (id) {
-      if (snippetIds.length > 0 && !snippetIds.includes(id)) {
-        return CommandResultFactory.error(
-          `Snippet '${id}' not found for metadata type '${metadataType}'. ` +
-          `Available snippet ids: ${snippetIds.join(', ')}.`
-        );
-      }
-      return super.doExecute(args);
-    }
-
-    // No id: return the first snippet and advertise the others
-
     if (snippetIds.length === 0) {
       return CommandResultFactory.error(
         `No snippets found for metadata type '${metadataType}'. ` +
-        'Verify the metadata type name using get-api-spec without arguments.'
+        `Call ${KNOWLEDGE_TOOL_NAME} with only kind 'snippet' to list the types that have one.`
       );
     }
-
-    // Get the first snippet
-    const result = await this.resourceCatalog.getResource(
-      this.resourceType,
-      metadataType,
-      snippetIds[0]
-    );
-
-    if (!result.found) {
+    if (snippetId !== undefined && !snippetIds.includes(snippetId)) {
       return CommandResultFactory.error(
-        `Snippet not found for metadata type '${metadataType}'. ` +
-        'Verify the metadata type name using get-api-spec without arguments.'
+        `Snippet '${snippetId}' not found for metadata type '${metadataType}'. ` +
+        `Available snippet ids: ${snippetIds.join(', ')}.`
       );
     }
 
-    // Add information about other available snippets
-    const additionalInfo = snippetIds.length > 1
-      ? `\n\nAdditional snippets available: ${snippetIds.slice(1).join(', ')}`
-      : '';
-
+    const id = snippetId ?? snippetIds[0];
+    const result = await this.resourceCatalog.getResource(ResourceType.SNIPPET, metadataType, id);
+    if (!result.found) {
+      return CommandResultFactory.error(`Snippet '${id}' not found for metadata type '${metadataType}'.`);
+    }
+    const others = snippetId === undefined ? snippetIds.slice(1) : [];
+    const additionalInfo = others.length > 0 ? `\n\nAdditional snippets available: ${others.join(', ')}` : '';
     return CommandResultFactory.success(result.content + additionalInfo, 0, {
       content: result.content,
-      resourceType: this.resourceType,
+      resourceType: ResourceType.SNIPPET,
       metadataType,
-      snippetId: snippetIds[0],
-      ...(snippetIds.length > 1 && { additionalSnippetIds: snippetIds.slice(1) }),
+      snippetId: id,
+      ...(others.length > 0 && { additionalSnippetIds: others }),
     });
-  }
-}
-
-/**
- * Command for accessing instructions
- */
-export class GetInstructCommand extends BaseResourceCommand {
-  name = 'get-instruct';
-  description = 'Fetch instructions and best practices for creating a ServiceNow metadata type using the Fluent API (e.g., "business-rule", "script-include"). Provides guidance on patterns, conventions, and common pitfalls. For API specifications, use get-api-spec. For code examples, use get-snippet.';
-  annotations = { readOnlyHint: true, idempotentHint: true };
-  resourceType = ResourceType.INSTRUCT;
-
-  // Override to only expose metadataType — instruct resources don't use id
-  arguments: CommandArgument[] = [
-    {
-      name: 'metadataType',
-      type: 'string',
-      required: true,
-      description: 'ServiceNow metadata type (e.g., business-rule, script-include)',
-    },
-  ];
-
-  /**
-   * Override doExecute to strip id — instruct resources are keyed by metadataType only.
-   */
-  protected async doExecute(args: Record<string, unknown>): Promise<CommandResult> {
-    const { id: _ignored, ...rest } = args;
-    return super.doExecute(rest);
   }
 }
 

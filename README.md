@@ -6,7 +6,7 @@ Built for [@servicenow/sdk@v4.14.0](https://github.com/ServiceNow/sdk/releases/t
 
 ## Key Features
 
-- **18 MCP Tools** — 14 ServiceNow SDK CLI command tools (`sdk_info`, `init`, `build`, `deploy`, `transform`, `dependencies`, `download`, `clean`, `pack`, `explain`, `query`, `cicd_fluent_app`, `cicd_fluent_test`, `fluent_exec_script`) plus 4 resource/auth tools (`get-api-spec`, `get-snippet`, `get-instruct`, `check_auth_status`).
+- **16 MCP Tools** — 14 ServiceNow SDK CLI command tools (`sdk_info`, `init`, `build`, `deploy`, `transform`, `dependencies`, `download`, `clean`, `pack`, `explain`, `query`, `cicd_fluent_app`, `cicd_fluent_test`, `fluent_exec_script`) plus 2 knowledge/auth tools (`get_fluent_knowledge`, `check_auth_status`).
 - **76 ServiceNow Metadata Types** — Packaged API specs (`sn-spec://`), authoring instructions (`sn-instruct://`), runnable snippets (`sn-snippet://`), and workflow prompts (`coding_in_fluent`, `create_custom_ui`).
 - **AI Agent Skills** — Built-in skills (`fluent-cli`, `fluent-security-review`, `fluent-general-review`, `fluent-perf-review`, and `fluent-domain-separation-review`) installable as a plugin for Claude Code, Codex, Copilot, and other skill-enabled agents.
 - **Lazy Auto-Authentication** — Resolves and caches an SDK auth profile matching `SN_INSTANCE_URL` on first use.
@@ -115,13 +115,11 @@ This repository ships standalone AI agent skills under [`skills/`](./skills) pac
 | `cicd_fluent_test` | Run, watch, or fetch results/logs for ATF test suites and tests via `sn_cicd` | `target` (`testsuite`\|`test`), `action` (`run`\|`watch`\|`result`\|`logs`), `testSuiteSysId`\|`testSuiteName`, `testSysId`\|`testName`, `progressId`, `resultId`, `pattern`, `limit`, `wait`, `output`, `select` |
 | `fluent_exec_script` | Run a server-side script on the instance like Scripts - Background (`now-sdk exec`; admin role, destructive — approve every run; a timeout does not stop the script) | `script`\|`file` (a `.js` file inside the project, ≤ 64 KB; run from a private copy and echoed with its SHA-256), `workingDirectory`, `scope`, `reason`, `timeoutMs`, `serverLogs`, `select`, `auth` |
 
-### Resource & Authentication Tools (4)
+### Knowledge & Authentication Tools (2)
 
 | Tool | Description | Key Parameters |
 |------|-------------|----------------|
-| `get-api-spec` | Get the Fluent API specification for a metadata type (omit to list all 76 types) | `metadataType` (optional) |
-| `get-snippet` | Get runnable Fluent code snippets for a metadata type | `metadataType`, `id` (optional) |
-| `get-instruct` | Get authoring rules, conventions, and pitfalls for a metadata type | `metadataType` |
+| `get_fluent_knowledge` | Get the Fluent API specification (`spec`), authoring rules and pitfalls (`instruct`), or a runnable code snippet (`snippet`) for a metadata type; omit `metadataType` to list the types that have that kind | `kind` (`spec`\|`instruct`\|`snippet`), `metadataType` (optional, one of the 76 types), `snippetId` (optional, snippets only) |
 | `check_auth_status` | Validate and return the current ServiceNow instance authentication status | None |
 
 ---

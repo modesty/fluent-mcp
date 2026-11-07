@@ -125,9 +125,9 @@ describe('stdio lifecycle through the real transport', () => {
       try {
         const tools = await client.request('tools/list');
         assert.equal(tools.error, undefined);
-        assert.ok(tools.result.tools.some((tool: Frame) => tool.name === 'get-api-spec'));
+        assert.ok(tools.result.tools.some((tool: Frame) => tool.name === 'get_fluent_knowledge'));
         const result = await client.request('tools/call', {
-          name: 'get-api-spec', arguments: { metadataType: 'business-rule' },
+          name: 'get_fluent_knowledge', arguments: { kind: 'spec', metadataType: 'business-rule' },
         });
         assert.equal(result.error, undefined);
         assert.ok(!result.result.isError);

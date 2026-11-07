@@ -72,7 +72,7 @@ export const incidentCreateTest = Test({
 })
 
 // ── Where the 92 step APIs live — fetch the sub-type, not this file ──────────────────
-// get-snippet / get-api-spec / get-instruct with the metadata type on the left:
+// get_fluent_knowledge (kind snippet / spec / instruct) with the metadata type on the left:
 //
 //   atf-form                      atf.form.*             open/fill/submit, modals
 //   atf-form-field                atf.form.*             field value + state asserts

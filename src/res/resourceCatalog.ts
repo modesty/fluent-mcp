@@ -108,6 +108,18 @@ export class ResourceCatalog {
     return [...(await this.load()).types];
   }
 
+  /**
+   * The supported metadata types that have a resource of this kind, from that
+   * kind's own index: a spec type without a guide or a snippet is not listed
+   * for `instruct` or `snippet`.
+   */
+  async listMetadataTypes(kind: ResourceType): Promise<string[]> {
+    const index = await this.load();
+    const entries: ReadonlyMap<string, unknown> =
+      kind === ResourceType.SPEC ? index.spec : kind === ResourceType.INSTRUCT ? index.instruct : index.snippets;
+    return index.types.filter((type) => entries.has(type));
+  }
+
   /** Snippet ids for a metadata type, in order; empty when it has none. */
   async listSnippets(metadataType: string): Promise<string[]> {
     const ids = (await this.load()).snippets.get(metadataType.toLowerCase());

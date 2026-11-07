@@ -168,8 +168,8 @@ export class PromptManager {
   /**
    * Render a prompt for the requested metadata types. For each requested type
    * it injects a real authoring summary drawn from the shipped instruction
-   * resource plus explicit pointers to the resource tools
-   * (`get-api-spec`/`get-instruct`/`get-snippet`) and URIs (`sn-spec://` etc.),
+   * resource plus explicit pointers to the knowledge tool
+   * (`get_fluent_knowledge`) and URIs (`sn-spec://` etc.),
    * then appends the complete, enum-derived catalog of supported types.
    * @param metadataList The comma-separated `metadata_list` argument (MCP prompt
    *   arguments are strings on the wire, e.g. "table,business-rule"). An absent
@@ -186,7 +186,7 @@ export class PromptManager {
 
     const total = ALL_METADATA_TYPES.length;
     const catalog =
-      `---\n\nAll ${total} supported metadata types (call \`get-api-spec\` with no arguments to list them at any time):\n\n` +
+      `---\n\nAll ${total} supported metadata types (call \`get_fluent_knowledge\` with only a kind to list them at any time):\n\n` +
       `${ALL_METADATA_TYPES.join(', ')}.`;
 
     const selected = sections.length > 0
@@ -204,12 +204,12 @@ export class PromptManager {
   private async renderTypeSection(type: string): Promise<string> {
     if (!ALL_METADATA_TYPES.includes(type)) {
       return `### ${type}\n\n\`${type}\` is not a recognized Fluent metadata type. ` +
-        `Call \`get-api-spec\` with no arguments to see all ${ALL_METADATA_TYPES.length} supported types.`;
+        `Call \`get_fluent_knowledge\` with only a kind to see all ${ALL_METADATA_TYPES.length} supported types.`;
     }
 
     const pointers =
-      'Fetch full details on demand: `get-api-spec`, `get-instruct`, and `get-snippet` ' +
-      `(metadataType: "${type}") — or read \`sn-spec://${type}\`, \`sn-instruct://${type}\`, \`sn-snippet://${type}/0001\`.`;
+      `Fetch full details on demand: \`get_fluent_knowledge\` (metadataType: "${type}", kind: "spec", "instruct" or "snippet") ` +
+      `— or read \`sn-spec://${type}\`, \`sn-instruct://${type}\`, \`sn-snippet://${type}/0001\`.`;
 
     let summary = '';
     try {

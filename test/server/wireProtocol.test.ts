@@ -231,7 +231,7 @@ async function assertCompletions(send: Send): Promise<void> {
   assert.deepEqual(await complete(spec, 'metadataType', 'script-i'), ['script-include']);
   assert.deepEqual(await complete(instruct, 'metadataType', 'business-'), ['business-rule']);
   assert.deepEqual(await complete(snippet, 'metadataType', 'business-'), ['business-rule']);
-  const ids = await complete(snippet, 'snippetId', '', { arguments: { metadataType: 'business-rule' } });
+  const ids = await complete(snippet, 'snippetId', '', { arguments: { kind: 'spec', metadataType: 'business-rule' } });
   assert.ok(ids.includes('0001') && ids.includes('0002'));
   assert.deepEqual(await complete(snippet, 'snippetId', ''), []);
 
@@ -325,7 +325,23 @@ describe('dual-era wire protocol', () => {
       assert.ok(names.length > 10);
       assert.deepStrictEqual(names, [...names].sort());
       assert.ok(names.includes('init_fluent_app'));
-      assert.ok(names.includes('get-api-spec'));
+      assert.ok(names.includes('get_fluent_knowledge'));
+    });
+
+    it('advertises one knowledge tool with kind and metadataType enums, and none of the tools it replaced', async () => {
+      const res = await wire.modern('tools/list');
+      const names = res.result.tools.map((t: Frame) => t.name);
+      assert.equal(names.length, 16);
+      for (const removed of ['get-api-spec', 'get-instruct', 'get-snippet']) assert.ok(!names.includes(removed), removed);
+
+      const tool = res.result.tools.find((t: Frame) => t.name === 'get_fluent_knowledge');
+      assert.deepStrictEqual(tool.inputSchema.required, ['kind']);
+      assert.deepStrictEqual(tool.inputSchema.properties.kind.enum, ['spec', 'instruct', 'snippet']);
+      assert.equal(tool.inputSchema.properties.metadataType.enum.length, 76);
+      assert.ok(tool.inputSchema.properties.metadataType.enum.includes('business-rule'));
+      assert.equal(tool.inputSchema.properties.snippetId.type, 'string');
+      assert.equal(tool.annotations.readOnlyHint, true);
+      assert.equal(tool.annotations.idempotentHint, true);
     });
 
     it('stamps the required resultType on results', async () => {
@@ -390,8 +406,8 @@ describe('dual-era wire protocol', () => {
 
     it('executes a tool call and returns its content', async () => {
       const res = await wire.modern('tools/call', {
-        name: 'get-api-spec',
-        arguments: { metadataType: 'business-rule' },
+        name: 'get_fluent_knowledge',
+        arguments: { kind: 'spec', metadataType: 'business-rule' },
       });
 
       assert.ok(!res.result.isError);
@@ -400,8 +416,8 @@ describe('dual-era wire protocol', () => {
 
     it('rejects an unknown tool argument via the enforced input schema', async () => {
       const res = await wire.modern('tools/call', {
-        name: 'get-api-spec',
-        arguments: { metadataType: 'business-rule', bogusArgument: 1 },
+        name: 'get_fluent_knowledge',
+        arguments: { kind: 'spec', metadataType: 'business-rule', bogusArgument: 1 },
       });
 
       // Enforced by the strict Zod object shared with the advertised schema.
@@ -468,8 +484,8 @@ describe('dual-era wire protocol', () => {
     it('does not cache-hint a non-cacheable result', async () => {
       // The cacheable list is closed; tools/call must never carry cache fields.
       const res = await wire.modern('tools/call', {
-        name: 'get-api-spec',
-        arguments: { metadataType: 'business-rule' },
+        name: 'get_fluent_knowledge',
+        arguments: { kind: 'spec', metadataType: 'business-rule' },
       });
 
       assert.equal(res.result.ttlMs, undefined);
@@ -521,10 +537,10 @@ describe('dual-era wire protocol', () => {
 
       const tools = await wire.legacy('tools/list');
       assert.equal(tools.error, undefined);
-      assert.ok(tools.result.tools.some((tool: Frame) => tool.name === 'get-api-spec'));
+      assert.ok(tools.result.tools.some((tool: Frame) => tool.name === 'get_fluent_knowledge'));
       assert.equal(tools.result.ttlMs, undefined);
       const called = await wire.legacy('tools/call', {
-        name: 'get-api-spec', arguments: { metadataType: 'business-rule' },
+        name: 'get_fluent_knowledge', arguments: { kind: 'spec', metadataType: 'business-rule' },
       });
       assert.equal(called.error, undefined);
       assert.equal(called.result.isError, false);

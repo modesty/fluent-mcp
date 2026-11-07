@@ -22,7 +22,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { ServiceNowMetadataType } from '../src/types.js';
 import { ResourceManager } from '../src/res/resourceManager.js';
-import { GetSnippetCommand } from '../src/tools/resources/resourceTools.js';
+import { GetFluentKnowledgeCommand } from '../src/tools/resources/resourceTools.js';
 import { registerTemplates } from './support/resourceTemplates.js';
 
 const PROJECT_ROOT = process.cwd();
@@ -439,8 +439,8 @@ describe('SDK v4.13.6 Types - Integration Tests', () => {
       const listed = await resources.list();
       assert.ok(listed.some((resource) => resource.uri === 'sn-snippet://ui-action/0001'));
 
-      const command = new GetSnippetCommand();
-      const defaultResult = await command.execute({ metadataType: 'ui-action' });
+      const command = new GetFluentKnowledgeCommand();
+      const defaultResult = await command.execute({ kind: 'snippet', metadataType: 'ui-action' });
       assert.equal(defaultResult.success, true);
       assert.equal(defaultResult.structuredContent?.snippetId, '0001');
       const ids = ['0001', ...(defaultResult.structuredContent?.additionalSnippetIds as string[] ?? [])];
@@ -455,7 +455,7 @@ describe('SDK v4.13.6 Types - Integration Tests', () => {
         assert.match(code(content), /import\s+\{\s*UiAction\s*\}\s+from\s+['"]@servicenow\/sdk\/core['"]/);
         assert.match(code(content), /UiAction\s*\(/);
 
-        const result = await command.execute({ metadataType: 'ui-action', id });
+        const result = await command.execute({ kind: 'snippet', metadataType: 'ui-action', snippetId: id });
         assert.equal(result.success, true);
         assert.equal(result.structuredContent?.content, content);
         if (id === '0001') assert.equal(defaultResult.structuredContent?.content, content);

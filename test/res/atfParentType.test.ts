@@ -2,9 +2,10 @@
  * Regression + contract tests for the `atf` parent metadata type.
  *
  * The bug: `atf` had a `res/instruct/fluent_instruct_atf.md` but no spec and no
- * snippet, and was not a `ServiceNowMetadataType` member. So `get-instruct atf`
- * succeeded while `get-api-spec atf` / `get-snippet atf` always failed, and `atf`
- * never appeared in the `get-api-spec` listing (which enumerates res/spec/).
+ * snippet, and was not a `ServiceNowMetadataType` member. So the former
+ * `get-instruct atf` succeeded while `get-api-spec atf` / `get-snippet atf` always
+ * failed, and `atf` never appeared in the spec listing (which enumerates res/spec/).
+ * Those three tools are now `get_fluent_knowledge` with `kind`.
  *
  * The contract: `atf` is the ATF family entry point. Its spec, instruct, AND
  * snippet must each expose every one of the 18 `atf-*` step sub-types, so a
@@ -34,9 +35,7 @@ mock.module(
   }).mockOptions
 );
 
-const { GetApiSpecCommand, GetSnippetCommand, GetInstructCommand } = await import(
-  '../../src/tools/resources/resourceTools.js'
-);
+const { GetFluentKnowledgeCommand } = await import('../../src/tools/resources/resourceTools.js');
 const { ServiceNowMetadataType } = await import('../../src/types.js');
 
 const RES = path.join(process.cwd(), 'res');
@@ -56,15 +55,10 @@ describe('`atf` parent metadata type', () => {
     assert.equal(SUB_TYPES.length, 18);
   });
 
-  describe('the original bug: all three tools now resolve `atf`', () => {
-    const tools = [
-      ['get-api-spec', () => new GetApiSpecCommand()],
-      ['get-snippet', () => new GetSnippetCommand()],
-      ['get-instruct', () => new GetInstructCommand()],
-    ] as const;
-    for (const [name, make] of tools) {
-      it(`${name} resolves metadataType "atf"`, async () => {
-        const result = await make().execute({ metadataType: 'atf' });
+  describe('the original bug: every kind now resolves `atf`', () => {
+    for (const kind of ['spec', 'snippet', 'instruct']) {
+      it(`kind '${kind}' resolves metadataType "atf"`, async () => {
+        const result = await new GetFluentKnowledgeCommand().execute({ kind, metadataType: 'atf' });
         assert.equal(result.success, true);
         assert.equal(result.exitCode, 0);
         assert.ok(result.output.length > 0);
@@ -72,15 +66,15 @@ describe('`atf` parent metadata type', () => {
     }
 
     for (const variant of ['ATF', 'Atf', 'aTf']) {
-      it(`get-api-spec normalizes the casing of ${variant}`, async () => {
-        const result = await new GetApiSpecCommand().execute({ metadataType: variant });
-        assert.equal(result.success, true);
-        assert.equal(result.structuredContent?.metadataType, 'atf');
+      it(`rejects the casing ${variant}: metadataType is a lowercase enum`, async () => {
+        const result = await new GetFluentKnowledgeCommand().execute({ kind: 'spec', metadataType: variant });
+        assert.equal(result.success, false);
+        assert.match(result.output, new RegExp(`Argument 'metadataType' must be one of: .*Received: "${variant}"`));
       });
     }
 
     it('lists `atf` among the available types', async () => {
-      const result = await new GetApiSpecCommand().execute({});
+      const result = await new GetFluentKnowledgeCommand().execute({ kind: 'spec' });
       const availableTypes = result.structuredContent?.availableTypes as string[] | undefined;
       assert.ok(Array.isArray(availableTypes) && availableTypes.includes('atf'));
     });

@@ -1,7 +1,5 @@
 export {
-  BaseResourceCommand,
-  GetApiSpecCommand,
-  GetSnippetCommand,
-  GetInstructCommand,
+  GetFluentKnowledgeCommand,
+  KNOWLEDGE_TOOL_NAME,
   CheckAuthStatusCommand,
 } from './resourceTools.js';

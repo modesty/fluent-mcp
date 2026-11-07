@@ -86,6 +86,27 @@ describe('ResourceCatalog (real directory tree)', () => {
     assert.deepEqual(await c.listSnippets('table'), ['0001', '0002']);
   });
 
+  it('lists, per kind, the supported types that kind has a file for', async () => {
+    const sparse = fs.mkdtempSync(path.join(root, 'sparse-'));
+    const sparseDirs = {
+      [ResourceType.SPEC]: path.join(sparse, 'spec'),
+      [ResourceType.SNIPPET]: path.join(sparse, 'snippet'),
+      [ResourceType.INSTRUCT]: path.join(sparse, 'instruct'),
+    };
+    for (const dir of Object.values(sparseDirs)) fs.mkdirSync(dir);
+    for (const type of ['acl', 'business-rule', 'table']) fs.writeFileSync(path.join(sparseDirs.spec, `fluent_spec_${type}.md`), type);
+    fs.writeFileSync(path.join(sparseDirs.instruct, 'fluent_instruct_business-rule.md'), 'guide');
+    // A guide or snippet for a type without a spec is not a supported type.
+    fs.writeFileSync(path.join(sparseDirs.instruct, 'fluent_instruct_orphan.md'), 'orphan');
+    fs.writeFileSync(path.join(sparseDirs.snippet, 'fluent_snippet_table_0001.md'), 'snippet');
+    fs.writeFileSync(path.join(sparseDirs.snippet, 'fluent_snippet_orphan_0001.md'), 'orphan');
+
+    const c = new ResourceCatalog(sparseDirs as never);
+    assert.deepEqual(await c.listMetadataTypes(ResourceType.SPEC), ['acl', 'business-rule', 'table']);
+    assert.deepEqual(await c.listMetadataTypes(ResourceType.INSTRUCT), ['business-rule']);
+    assert.deepEqual(await c.listMetadataTypes(ResourceType.SNIPPET), ['table']);
+  });
+
   it('reports an explicit unknown snippet id as not found, never another snippet', async () => {
     const result = await catalog().getResource(ResourceType.SNIPPET, 'table', '9999');
     assert.equal(result.found, false);

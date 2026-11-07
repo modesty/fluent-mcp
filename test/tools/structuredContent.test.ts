@@ -1,6 +1,6 @@
 /**
  * Verifies the focused MCP improvements added for the SDK v4.7.x upgrade:
- *  - read tools (get-api-spec, get-snippet, get-instruct, check_auth_status) declare an
+ *  - read tools (get_fluent_knowledge, check_auth_status) declare an
  *    `outputSchema` and return `structuredContent` that validates against it (mirrors the
  *    MCP SDK's own `validateToolOutput` contract);
  *  - the transform command exposes the new `table`/`id` flags and no longer maps `preview`.
@@ -18,12 +18,8 @@ import { loggerFixture } from '../support/fixtures.js';
 // the actual resource files this test is verifying. Only logging is silenced.
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 
-const {
-  GetApiSpecCommand,
-  GetSnippetCommand,
-  GetInstructCommand,
-  CheckAuthStatusCommand,
-} = await import('../../src/tools/resources/resourceTools.js');
+const { GetFluentKnowledgeCommand, CheckAuthStatusCommand } = await import('../../src/tools/resources/resourceTools.js');
+const { ResourceCatalog } = await import('../../src/res/resourceCatalog.js');
 const { TransformCommand } = await import('../../src/tools/commands/transformCommand.js');
 const { CLICmdWriter } = await import('../../src/tools/processors/cliCmdWriter.js');
 const { SessionManager } = await import('../../src/utils/sessionManager.js');
@@ -46,9 +42,9 @@ describe('Read tools — outputSchema + structuredContent', () => {
   beforeEach(() => SessionManager.getInstance().clearSession());
   afterEach(() => SessionManager.getInstance().clearSession());
 
-  it('get-api-spec (listing mode) returns schema-valid structuredContent', async () => {
-    const cmd = new GetApiSpecCommand();
-    const result = await cmd.execute({});
+  it('get_fluent_knowledge (listing mode) returns schema-valid structuredContent', async () => {
+    const cmd = new GetFluentKnowledgeCommand();
+    const result = await cmd.execute({ kind: 'spec' });
     assert.equal(result.success, true);
     expectValidStructuredContent(cmd.outputSchema, result.structuredContent);
     assert.equal(Array.isArray(result.structuredContent?.availableTypes), true);
@@ -56,29 +52,54 @@ describe('Read tools — outputSchema + structuredContent', () => {
     assert.ok((result.structuredContent?.availableTypes as string[]).includes('data-policy'));
   });
 
-  it('get-api-spec (spec mode) returns schema-valid structuredContent', async () => {
-    const cmd = new GetApiSpecCommand();
-    const result = await cmd.execute({ metadataType: 'data-policy' });
+  it("get_fluent_knowledge kind 'spec' returns schema-valid structuredContent", async () => {
+    const cmd = new GetFluentKnowledgeCommand();
+    const result = await cmd.execute({ kind: 'spec', metadataType: 'data-policy' });
     assert.equal(result.success, true);
     expectValidStructuredContent(cmd.outputSchema, result.structuredContent);
     assert.equal(result.structuredContent?.metadataType, 'data-policy');
     assert.equal(result.structuredContent?.resourceType, 'spec');
   });
 
-  it('get-snippet returns schema-valid structuredContent with snippetId', async () => {
-    const cmd = new GetSnippetCommand();
-    const result = await cmd.execute({ metadataType: 'data-policy' });
+  it("get_fluent_knowledge kind 'snippet' returns schema-valid structuredContent with snippetId", async () => {
+    const cmd = new GetFluentKnowledgeCommand();
+    const result = await cmd.execute({ kind: 'snippet', metadataType: 'data-policy' });
     assert.equal(result.success, true);
     expectValidStructuredContent(cmd.outputSchema, result.structuredContent);
     assert.notEqual(result.structuredContent?.snippetId, undefined);
   });
 
-  it('get-instruct returns schema-valid structuredContent', async () => {
-    const cmd = new GetInstructCommand();
-    const result = await cmd.execute({ metadataType: 'data-policy' });
+  it("get_fluent_knowledge kind 'instruct' returns schema-valid structuredContent", async () => {
+    const cmd = new GetFluentKnowledgeCommand();
+    const result = await cmd.execute({ kind: 'instruct', metadataType: 'data-policy' });
     assert.equal(result.success, true);
     expectValidStructuredContent(cmd.outputSchema, result.structuredContent);
     assert.equal(result.structuredContent?.resourceType, 'instruct');
+  });
+
+  it('advertises exactly the shipped metadata types as the metadataType enum', async () => {
+    const domain = new GetFluentKnowledgeCommand().arguments.find((arg) => arg.name === 'metadataType')?.domain;
+    assert.equal(domain?.kind, 'choices');
+    const onDisk = await new ResourceCatalog().getAvailableMetadataTypes();
+    // Same set; the enum is sorted by type name, the catalog by file name.
+    assert.deepEqual(domain.kind === 'choices' ? [...domain.values].sort() : [], [...onDisk].sort());
+    assert.equal(onDisk.length, 76);
+  });
+
+  it('lists, per kind, only the types that have that kind', async () => {
+    const cmd = new GetFluentKnowledgeCommand();
+    const catalog = new ResourceCatalog();
+    const all = await catalog.getAvailableMetadataTypes();
+    for (const kind of ['spec', 'instruct']) {
+      const result = await cmd.execute({ kind });
+      assert.deepEqual(result.structuredContent?.availableTypes, all, kind);
+    }
+    const snippetTypes = (await cmd.execute({ kind: 'snippet' })).structuredContent?.availableTypes as string[];
+    const withSnippets = [];
+    for (const type of all) if ((await catalog.listSnippets(type)).length > 0) withSnippets.push(type);
+    assert.deepEqual(snippetTypes, withSnippets);
+    // atf-form-sp has a spec but no snippet.
+    assert.ok(all.includes('atf-form-sp') && !snippetTypes.includes('atf-form-sp'));
   });
 
   it('check_auth_status returns schema-valid structuredContent', async () => {

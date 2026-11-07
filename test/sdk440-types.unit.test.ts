@@ -1,6 +1,7 @@
 /**
  * Unit tests for SDK v4.4.0 metadata coverage - resource tool command pipeline
  * Tests with mocked filesystem, following patterns from test/tools/resourceTools.test.ts
+ * (get_fluent_knowledge, one describe block per kind)
  *
  * Native runner: the real node:fs stays in place and only the three functions
  * the resource loader uses are stubbed on the shared object, with the running
@@ -16,9 +17,7 @@ import { configFixture, loggerFixture } from './support/fixtures.js';
 mock.module('../src/config.js', configFixture().mockOptions);
 mock.module('../src/utils/logger.js', loggerFixture().mockOptions);
 
-const { GetApiSpecCommand, GetSnippetCommand, GetInstructCommand } = await import(
-  '../src/tools/resources/resourceTools.js'
-);
+const { GetFluentKnowledgeCommand } = await import('../src/tools/resources/resourceTools.js');
 const { ResourceCatalog } = await import('../src/res/resourceCatalog.js');
 
 describe('SDK v4.4.0 Types - Unit Tests', () => {
@@ -153,15 +152,15 @@ describe('SDK v4.4.0 Types - Unit Tests', () => {
     });
   });
 
-  describe('GetApiSpecCommand', () => {
-    let command: InstanceType<typeof GetApiSpecCommand>;
+  describe("get_fluent_knowledge kind 'spec'", () => {
+    let command: InstanceType<typeof GetFluentKnowledgeCommand>;
 
     beforeEach(() => {
-      command = new GetApiSpecCommand();
+      command = new GetFluentKnowledgeCommand();
     });
 
     it('should return spec for import-set', async () => {
-      const result = await command.execute({ metadataType: 'import-set' });
+      const result = await command.execute({ kind: 'spec', metadataType: 'import-set' });
 
       assert.equal(result.exitCode, 0);
       assert.equal(result.success, true);
@@ -170,7 +169,7 @@ describe('SDK v4.4.0 Types - Unit Tests', () => {
     });
 
     it('should return spec for ui-policy', async () => {
-      const result = await command.execute({ metadataType: 'ui-policy' });
+      const result = await command.execute({ kind: 'spec', metadataType: 'ui-policy' });
 
       assert.equal(result.exitCode, 0);
       assert.equal(result.success, true);
@@ -179,7 +178,7 @@ describe('SDK v4.4.0 Types - Unit Tests', () => {
     });
 
     it('should return spec for flow', async () => {
-      const result = await command.execute({ metadataType: 'flow' });
+      const result = await command.execute({ kind: 'spec', metadataType: 'flow' });
 
       assert.equal(result.exitCode, 0);
       assert.equal(result.success, true);
@@ -188,15 +187,15 @@ describe('SDK v4.4.0 Types - Unit Tests', () => {
     });
   });
 
-  describe('GetSnippetCommand', () => {
-    let command: InstanceType<typeof GetSnippetCommand>;
+  describe("get_fluent_knowledge kind 'snippet'", () => {
+    let command: InstanceType<typeof GetFluentKnowledgeCommand>;
 
     beforeEach(() => {
-      command = new GetSnippetCommand();
+      command = new GetFluentKnowledgeCommand();
     });
 
     it('should return snippets for import-set and list additional IDs', async () => {
-      const result = await command.execute({ metadataType: 'import-set' });
+      const result = await command.execute({ kind: 'snippet', metadataType: 'import-set' });
 
       assert.equal(result.exitCode, 0);
       assert.equal(result.success, true);
@@ -207,7 +206,7 @@ describe('SDK v4.4.0 Types - Unit Tests', () => {
     });
 
     it('should return snippets for ui-policy and list additional IDs', async () => {
-      const result = await command.execute({ metadataType: 'ui-policy' });
+      const result = await command.execute({ kind: 'snippet', metadataType: 'ui-policy' });
 
       assert.equal(result.exitCode, 0);
       assert.equal(result.success, true);
@@ -218,7 +217,7 @@ describe('SDK v4.4.0 Types - Unit Tests', () => {
     });
 
     it('should return snippet for atf-rest-assert-payload', async () => {
-      const result = await command.execute({ metadataType: 'atf-rest-assert-payload' });
+      const result = await command.execute({ kind: 'snippet', metadataType: 'atf-rest-assert-payload' });
 
       assert.equal(result.exitCode, 0);
       assert.equal(result.success, true);
@@ -226,25 +225,25 @@ describe('SDK v4.4.0 Types - Unit Tests', () => {
       assert.ok(result.output.includes('assertResponseJSONPayloadIsValid'));
     });
 
-    it('should return error for typo metadata type atf-asert-payload', async () => {
-      const result = await command.execute({ metadataType: 'atf-asert-payload' });
+    it('rejects the typo metadata type atf-asert-payload with the valid types', async () => {
+      const result = await command.execute({ kind: 'snippet', metadataType: 'atf-asert-payload' });
 
       assert.equal(result.exitCode, 1);
       assert.equal(result.success, false);
-      assert.ok(result.output.includes("No snippets found for metadata type 'atf-asert-payload'"));
+      assert.match(result.output, /metadataType: Argument 'metadataType' must be one of: .*atf-rest-assert-payload.*Received: "atf-asert-payload"/);
       assert.notEqual(result.error, undefined);
     });
   });
 
-  describe('GetInstructCommand', () => {
-    let command: InstanceType<typeof GetInstructCommand>;
+  describe("get_fluent_knowledge kind 'instruct'", () => {
+    let command: InstanceType<typeof GetFluentKnowledgeCommand>;
 
     beforeEach(() => {
-      command = new GetInstructCommand();
+      command = new GetFluentKnowledgeCommand();
     });
 
     it('should return instructions for import-set', async () => {
-      const result = await command.execute({ metadataType: 'import-set' });
+      const result = await command.execute({ kind: 'instruct', metadataType: 'import-set' });
 
       assert.equal(result.exitCode, 0);
       assert.equal(result.success, true);
@@ -253,7 +252,7 @@ describe('SDK v4.4.0 Types - Unit Tests', () => {
     });
 
     it('should return instructions for ui-policy', async () => {
-      const result = await command.execute({ metadataType: 'ui-policy' });
+      const result = await command.execute({ kind: 'instruct', metadataType: 'ui-policy' });
 
       assert.equal(result.exitCode, 0);
       assert.equal(result.success, true);
@@ -262,7 +261,7 @@ describe('SDK v4.4.0 Types - Unit Tests', () => {
     });
 
     it('should return instructions for email-notification', async () => {
-      const result = await command.execute({ metadataType: 'email-notification' });
+      const result = await command.execute({ kind: 'instruct', metadataType: 'email-notification' });
 
       assert.equal(result.exitCode, 0);
       assert.equal(result.success, true);
