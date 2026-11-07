@@ -38,9 +38,6 @@ mock.module('../../src/tools/registry/commandFactory.js', {
 });
 
 const mockGetCommand = mock.fn();
-const mockToMCPTools = mock.fn(() => [
-  { id: 'mock-command', title: 'Mock Command', description: 'A mock command for testing' },
-]);
 mock.module('../../src/tools/registry/commandRegistry.js', {
   namedExports: {
     // Stores what is registered, so getAllCommands() reflects reality: since the
@@ -54,7 +51,6 @@ mock.module('../../src/tools/registry/commandRegistry.js', {
         }),
         getAllCommands: mock.fn(() => commands),
         getCommand: mockGetCommand,
-        toMCPTools: mockToMCPTools,
       };
     }),
   },

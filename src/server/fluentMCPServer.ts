@@ -125,40 +125,22 @@ export class FluentMcpServer {
     );
 
     // Declaring a capability makes v2's McpServer install its own default
-    // handlers for that capability's methods. Resources and prompts are served
-    // entirely by the SDK from what is registered here (resources/*, prompts/*,
-    // and completion/complete); only tools/list is replaced below.
+    // handlers for that capability's methods, and every method is served by
+    // the SDK from what is registered here: tools/list and tools/call from
+    // registerTool(), resources/* and prompts/* from the templates and
+    // prompts, completion/complete from both, and server/discover itself.
+    //
+    // There is deliberately no hand-written handler. In particular there is no
+    // `notifications/initialized` handler: its only remaining job was to
+    // trigger the transitional `roots/list` fetch, and MCP 2026-07-28 both
+    // removed the handshake it belongs to and made server-initiated requests
+    // illegal. Auth validation is lazy and command-triggered (see
+    // ToolsManager.ensureAuthValidated).
     this.toolsManager.registerOn(mcpServer);
     this.resourceManager.registerOn(mcpServer);
     this.promptManager.registerOn(mcpServer);
-    this.setupHandlers(mcpServer);
 
     return mcpServer;
-  }
-
-  /**
-   * Set up the hand-written MCP protocol handlers on one server instance.
-   */
-  private setupHandlers(mcpServer: McpServer): void {
-    const server = mcpServer.server;
-
-    // tools/list is served from the CommandRegistry rather than from what
-    // registerTool() inferred, because the registry is the single source of
-    // truth for advertised annotations, _meta and outputSchema.
-    server.setRequestHandler('tools/list', async () => ({
-      tools: this.toolsManager.getMCPTools(),
-    }));
-
-    // Note: tools/call is dispatched by the callbacks registered via
-    // registerTool() in ToolsManager, so it is deliberately not handled here.
-    //
-    // There is also deliberately no `notifications/initialized` handler: its only
-    // remaining job was to trigger the transitional `roots/list` fetch, and MCP
-    // 2026-07-28 both removed the handshake it belongs to and made
-    // server-initiated requests illegal. Auth validation is lazy and
-    // command-triggered (see ToolsManager.ensureAuthValidated).
-    //
-    // `server/discover` is installed by the SDK itself for modern connections.
   }
 
   /**

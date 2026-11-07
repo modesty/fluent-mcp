@@ -594,7 +594,11 @@ describe('dual-era wire protocol', () => {
       try {
         const modern = await modernWire.modern('tools/list');
         assert.equal(modern.error, undefined);
-        assert.deepStrictEqual(res.result.tools, modern.result.tools);
+        // Compared as JSON, which is what crosses a real transport: the SDK
+        // object for one era carries keys set to undefined (`execution`) that
+        // JSON drops and the in-memory transport keeps.
+        const asJson = (tools: unknown) => JSON.parse(JSON.stringify(tools));
+        assert.deepStrictEqual(asJson(res.result.tools), asJson(modern.result.tools));
       } finally {
         await modernWire.close();
       }

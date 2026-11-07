@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { McpServer, ServerContext, Tool } from '@modelcontextprotocol/server';
+import { McpServer, ServerContext } from '@modelcontextprotocol/server';
 import { CommandFactory } from './registry/commandFactory.js';
 import { CommandRegistry } from './registry/commandRegistry.js';
 import { NodeProcessRunner } from './processors/processRunner.js';
@@ -122,9 +122,9 @@ export class ToolsManager {
    * @param command The command to register
    */
   private registerToolFromCommand(server: McpServer, command: CLICommand): void {
-    // Build the enforced input schema from the single source of truth shared with
-    // the advertised tools/list schema (commandRegistry.toMCPTools), so canonical
-    // types and required fields cannot drift. See src/tools/toolSchema.ts.
+    // The SDK serves both tools/call and tools/list from this registration: it
+    // enforces this Zod object and advertises its JSON Schema, so the two cannot
+    // drift. See src/tools/toolSchema.ts.
     // This is already a concrete ZodObject (z.strictObject), i.e. a Standard
     // Schema object, not a v1 raw shape — the codemod could not prove that
     // statically and flagged it; verified by hand instead.
@@ -137,7 +137,6 @@ export class ToolsManager {
     server.registerTool(
       command.name,
       {
-        title: command.name,
         description: command.description,
         inputSchema: inputSchema,
         ...(command.outputSchema && { outputSchema: z.object(command.outputSchema) }),
@@ -245,14 +244,6 @@ export class ToolsManager {
     return cleanOutput && cleanOutput.trim() !== errorMsg
       ? `Error (exit ${result.exitCode}): ${errorMsg}\n\nOutput:\n${cleanOutput}`
       : `Error (exit ${result.exitCode}): ${errorMsg}`;
-  }
-
-  /**
-   * Get all commands as MCP tools
-   * @returns List of MCP tools
-   */
-  getMCPTools(): Tool[] {
-    return this.commandRegistry.toMCPTools();
   }
 
   /**

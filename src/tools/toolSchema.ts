@@ -1,20 +1,17 @@
 import { z } from 'zod';
-import type { Tool } from '@modelcontextprotocol/server';
 import type { ArgumentDomain, CommandArgument } from '../utils/types.js';
 
 /**
  * Single source of truth for a tool's INPUT schema.
  *
- * A tool is described in two places that must share one contract:
- *  - **enforced** on `tools/call` — `ToolsManager` passes this strict Zod object to
- *    `mcpServer.registerTool()`, which validates incoming arguments against it;
- *  - **advertised** on `tools/list` — `CommandRegistry.toMCPTools()` emits the
- *    canonical JSON Schema so clients know what to send.
- *
- * Deriving both from {@link buildInputZodSchema} keeps the canonical types and
- * required set aligned. The enforced schema additionally accepts null for
- * optional values as an input compatibility behavior; that normalization is
- * intentionally not exposed as a nullable union to clients.
+ * `ToolsManager` passes the strict Zod object from {@link buildInputZodSchema}
+ * to `mcpServer.registerTool()`, and the SDK serves both sides of the contract
+ * from it: it validates `tools/call` arguments against the object and
+ * advertises the object's JSON Schema on `tools/list`, so types, required set,
+ * `enum` and `pattern` cannot drift. The enforced schema additionally accepts
+ * null for optional values as an input compatibility behavior; that
+ * normalization is a preprocess step, so it is not advertised as a nullable
+ * union.
  */
 
 /** The input of a failed check, as the Zod issue reports it. */
@@ -158,21 +155,6 @@ export function buildInputZodShape(args: CommandArgument[]): z.ZodRawShape {
  */
 export function buildInputZodSchema(args: CommandArgument[]): z.ZodObject<z.ZodRawShape> {
   return z.strictObject(buildInputZodShape(args));
-}
-
-/**
- * Convert a command's input arguments to the JSON Schema advertised in
- * `tools/list`, derived from the exact Zod object enforced on `tools/call`.
- *
- * Uses zod v4's native JSON-Schema conversion (`z.toJSONSchema`) rather than the
- * legacy conversion packages, which can mis-convert zod v4 shapes.
- * Optional properties advertise their canonical value type while the matching
- * enforced schema accepts null as an omitted-value compatibility form.
- * @param args The command's declared arguments
- * @returns A JSON Schema object suitable for `Tool.inputSchema`
- */
-export function buildInputJsonSchema(args: CommandArgument[]): Tool['inputSchema'] {
-  return z.toJSONSchema(buildInputZodSchema(args)) as Tool['inputSchema'];
 }
 
 /**
