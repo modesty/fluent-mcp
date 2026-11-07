@@ -11,8 +11,8 @@ import { ResourceCatalog } from '../res/resourceCatalog.js';
 import { PromptManager } from '../prompts/promptManager.js';
 
 const SERVER_INSTRUCTIONS = [
-  'Use explain_fluent_api for SDK APIs and guides, get-api-spec for metadata-type schemas,',
-  'get-instruct for authoring guidance, and get-snippet for focused examples.',
+  'Use explain_fluent_api for SDK APIs and guides, and get_fluent_knowledge for a metadata type:',
+  'kind spec for its API specification, instruct for authoring guidance, snippet for focused examples.',
   'For application work, run init_fluent_app, then build_fluent_app, then deploy_fluent_app.',
   'Instance authentication is validated lazily, cached in the session, and injected when a command needs it.',
 ].join(' ');

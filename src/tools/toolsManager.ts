@@ -8,9 +8,7 @@ import { CLICmdWriter } from './processors/cliCmdWriter.js';
 import { CLICommand, CommandResult, CommandResultFactory, EnsureAuthValidated } from '../utils/types.js';
 import logger from '../utils/logger.js';
 import {
-  GetApiSpecCommand,
-  GetSnippetCommand,
-  GetInstructCommand,
+  GetFluentKnowledgeCommand,
   CheckAuthStatusCommand
 } from './resources/resourceTools.js';
 import { buildInputZodSchema } from './toolSchema.js';
@@ -106,9 +104,7 @@ export class ToolsManager {
    */
   private registerResourceTools(): void {
     try {
-      this.commandRegistry.register(new GetApiSpecCommand(this.resourceCatalog));
-      this.commandRegistry.register(new GetSnippetCommand(this.resourceCatalog));
-      this.commandRegistry.register(new GetInstructCommand(this.resourceCatalog));
+      this.commandRegistry.register(new GetFluentKnowledgeCommand(this.resourceCatalog));
       this.commandRegistry.register(new CheckAuthStatusCommand(this.ensureAuthValidated));
 
       logger.debug('Resource tools registered successfully');

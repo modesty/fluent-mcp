@@ -73,18 +73,12 @@ function mockResourceCommand(name: string, description: string, output: string) 
   });
 }
 
-const GetApiSpecCommand = mockResourceCommand('get-api-spec', 'Get API specification', 'Mock API spec');
-const GetSnippetCommand = mockResourceCommand('get-snippet', 'Get code snippet', 'Mock snippet');
-const GetInstructCommand = mockResourceCommand('get-instruct', 'Get instructions', 'Mock instructions');
-const ListMetadataTypesCommand = mockResourceCommand('list-metadata-types', 'List metadata types', 'Mock output');
+const GetFluentKnowledgeCommand = mockResourceCommand('get_fluent_knowledge', 'Read Fluent knowledge', 'Mock knowledge');
 const CheckAuthStatusCommand = mockResourceCommand('check_auth_status', 'Check authentication status', 'Mock auth status');
 
 mock.module('../../src/tools/resources/resourceTools.js', {
   namedExports: {
-    GetApiSpecCommand,
-    GetSnippetCommand,
-    GetInstructCommand,
-    ListMetadataTypesCommand,
+    GetFluentKnowledgeCommand,
     CheckAuthStatusCommand,
   },
 });
@@ -114,10 +108,7 @@ describe('ToolsManager', () => {
 
   beforeEach(() => {
     for (const command of [
-      GetApiSpecCommand,
-      GetSnippetCommand,
-      GetInstructCommand,
-      ListMetadataTypesCommand,
+      GetFluentKnowledgeCommand,
       CheckAuthStatusCommand,
     ]) {
       command.mock.resetCalls();
@@ -151,7 +142,7 @@ describe('ToolsManager', () => {
   });
 
   it('registers every resource tool with a strict object input schema', () => {
-    assert.equal(mockMcpServer.registerTool.mock.callCount(), 4);
+    assert.equal(mockMcpServer.registerTool.mock.callCount(), 2);
 
     for (const call of mockMcpServer.registerTool.mock.calls) {
       const [name, config] = call.arguments;

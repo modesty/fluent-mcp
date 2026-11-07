@@ -1,5 +1,5 @@
 /**
- * Unit tests for resource tool commands
+ * Unit tests for get_fluent_knowledge, the one tool over the resource catalog
  *
  * Native runner: the filesystem is stubbed on the shared node:fs object, so the
  * real ResourceCatalog reads canned directory listings and file contents. The
@@ -17,10 +17,7 @@ import { configFixture, loggerFixture } from '../support/fixtures.js';
 mock.module('../../src/config.js', configFixture().mockOptions);
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 
-const { GetApiSpecCommand, GetSnippetCommand, GetInstructCommand } = await import(
-  '../../src/tools/resources/resourceTools.js'
-);
-const { ResourceCatalog } = await import('../../src/res/resourceCatalog.js');
+const { GetFluentKnowledgeCommand } = await import('../../src/tools/resources/resourceTools.js');
 
 describe('Resource Tool Commands', () => {
   // Test metadata type to use throughout tests
@@ -73,107 +70,96 @@ describe('Resource Tool Commands', () => {
     });
   });
 
-  describe('GetApiSpecCommand', () => {
-    let command: InstanceType<typeof GetApiSpecCommand>;
+  let command: InstanceType<typeof GetFluentKnowledgeCommand>;
 
-    beforeEach(() => {
-      command = new GetApiSpecCommand();
-    });
+  beforeEach(() => {
+    command = new GetFluentKnowledgeCommand();
+  });
 
-    it('should return API specification for a valid metadata type', async () => {
-      // Execute the command with a valid metadata type
-      const result = await command.execute({ metadataType: TEST_METADATA_TYPE });
+  describe("kind 'spec'", () => {
+    it('returns the API specification for a metadata type', async () => {
+      const result = await command.execute({ kind: 'spec', metadataType: TEST_METADATA_TYPE });
 
-      // Verify the result contains the expected content
       assert.equal(result.exitCode, 0);
       assert.equal(result.success, true);
       assert.equal(result.output, mockSpecContent);
-
-      // Verify the content contains expected text for a business rule spec
-      assert.ok(result.output.includes('Business Rule spec'));
-      assert.ok(result.output.includes('BusinessRule('));
+      assert.deepEqual(result.structuredContent, {
+        content: mockSpecContent, resourceType: 'spec', metadataType: TEST_METADATA_TYPE,
+      });
     });
 
-    it('should handle resource not found for non-existent metadata type', async () => {
-      // Execute the command with a non-existent metadata type
-      const result = await command.execute({ metadataType: 'non-existent' });
+    it('reports a supported type the catalog has no file for as not found', async () => {
+      // acl is a ServiceNowMetadataType member, but not in the mocked listing.
+      const result = await command.execute({ kind: 'spec', metadataType: 'acl' });
 
-      assert.equal(result.exitCode, 1);
       assert.equal(result.success, false);
-      assert.ok(result.output.includes("resource found for metadata type 'non-existent'"));
+      assert.match(result.output, /No spec resource found for metadata type 'acl'\. Call get_fluent_knowledge with only kind 'spec'/);
       assert.notEqual(result.error, undefined);
     });
 
-    it('should list available metadata types when no argument provided', async (t) => {
-      // Mock the catalog to return our mock types
-      t.mock.method(ResourceCatalog.prototype, 'getAvailableMetadataTypes', async () => mockTypes);
+    it('lists the types that have a spec when metadataType is omitted (or null)', async () => {
+      for (const args of [{ kind: 'spec' }, { kind: 'spec', metadataType: null }]) {
+        const result = await command.execute(args);
 
-      // Execute the command without arguments - should list available types
-      const result = await command.execute({});
-
-      assert.equal(result.exitCode, 0);
-      assert.equal(result.success, true);
-      assert.ok(result.output.includes('Available Fluent metadata types'));
+        assert.equal(result.success, true, JSON.stringify(args));
+        assert.equal(result.output,
+          `Available Fluent metadata types with an API specification (4):\n${[...mockTypes].sort().join('\n')}\n\n` +
+          "Call get_fluent_knowledge with kind 'spec' and a metadataType to read one.");
+        assert.deepEqual(result.structuredContent?.availableTypes, [...mockTypes].sort());
+      }
     });
   });
 
-  describe('GetSnippetCommand', () => {
-    let command: InstanceType<typeof GetSnippetCommand>;
+  describe("kind 'instruct'", () => {
+    it('lists only the types that have a guide, each of which can be read (sparse catalog)', async (t) => {
+      const readdir = fs.promises.readdir;
+      t.mock.method(fs.promises, 'readdir', async (path: string) =>
+        path.includes('instruct') ? ['fluent_instruct_business-rule.md'] : (readdir as (p: string) => Promise<string[]>)(path));
+      const sparse = new GetFluentKnowledgeCommand();
 
-    beforeEach(() => {
-      command = new GetSnippetCommand();
+      const listing = await sparse.execute({ kind: 'instruct' });
+      assert.equal(listing.success, true);
+      assert.deepEqual(listing.structuredContent?.availableTypes, [TEST_METADATA_TYPE]);
+      assert.match(listing.output, /^Available Fluent metadata types with an authoring guide \(1\):\nbusiness-rule\n/);
+
+      const listed = await sparse.execute({ kind: 'instruct', metadataType: TEST_METADATA_TYPE });
+      assert.equal(listed.success, true);
+      const unlisted = await sparse.execute({ kind: 'instruct', metadataType: 'script-include' });
+      assert.match(unlisted.output, /No instruct resource found for metadata type 'script-include'/);
     });
 
-    it('should return specific snippet when ID is provided', async () => {
-      // Execute the command with a valid metadata type and snippet ID
-      const result = await command.execute({
-        metadataType: TEST_METADATA_TYPE,
-        id: TEST_SNIPPET_ID,
-      });
+    it('returns the authoring guide for a metadata type', async () => {
+      const result = await command.execute({ kind: 'instruct', metadataType: TEST_METADATA_TYPE });
 
-      // Verify the result contains the expected snippet content
-      assert.equal(result.exitCode, 0);
+      assert.equal(result.success, true);
+      assert.equal(result.output, mockInstructContent);
+      assert.equal(result.structuredContent?.resourceType, 'instruct');
+    });
+  });
+
+  describe("kind 'snippet'", () => {
+    it('returns a specific snippet when snippetId is provided', async () => {
+      const result = await command.execute({ kind: 'snippet', metadataType: TEST_METADATA_TYPE, snippetId: TEST_SNIPPET_ID });
+
       assert.equal(result.success, true);
       assert.equal(result.output, mockSnippetContent);
-
-      // Verify the content contains expected text for a business rule snippet
-      assert.ok(result.output.includes('Business Rule API example'));
-      assert.ok(result.output.includes('BusinessRule('));
+      assert.equal(result.structuredContent?.snippetId, TEST_SNIPPET_ID);
+      assert.equal(result.structuredContent?.additionalSnippetIds, undefined);
     });
 
-    it('should list available snippets when ID is not provided', async () => {
-      // The mock will return snippet IDs: 0001, 0002, 0003
-      const mockSnippetIds = ['0001', '0002', '0003'];
+    it('returns the first snippet and names the others when snippetId is omitted, empty or null', async () => {
+      for (const snippetId of [undefined, '', null]) {
+        const result = await command.execute({ kind: 'snippet', metadataType: TEST_METADATA_TYPE, snippetId });
 
-      // Execute the command without specifying a snippet ID
-      const result = await command.execute({ metadataType: TEST_METADATA_TYPE });
-
-      // Verify the result contains the default snippet content and lists other available snippets
-      assert.equal(result.exitCode, 0);
-      assert.equal(result.success, true);
-      assert.ok(result.output.includes(mockSnippetContent));
-
-      // Verify that additional snippets are listed (excluding the default one)
-      assert.ok(result.output.includes('Additional snippets available:'));
-      // Check for other snippet IDs (besides the default 0001)
-      mockSnippetIds
-        .filter((id) => id !== '0001')
-        .forEach((id) => {
-          assert.ok(result.output.includes(id));
-        });
-    });
-
-    it('should normalize uppercase metadataType to lowercase', async () => {
-      // Pass uppercase metadata type - should be normalized to lowercase
-      const result = await command.execute({ metadataType: 'BUSINESS-RULE' });
-
-      assert.equal(result.exitCode, 0);
-      assert.equal(result.success, true);
-      assert.ok(result.output.includes(mockSnippetContent));
+        assert.equal(result.success, true, String(snippetId));
+        assert.equal(result.output, `${mockSnippetContent}\n\nAdditional snippets available: 0002, 0003`);
+        assert.equal(result.structuredContent?.snippetId, '0001');
+        assert.deepEqual(result.structuredContent?.additionalSnippetIds, ['0002', '0003']);
+      }
     });
 
     it('reports an unknown snippet id with the ids that exist, never another snippet', async () => {
-      const result = await command.execute({ metadataType: TEST_METADATA_TYPE, id: '9999' });
+      const result = await command.execute({ kind: 'snippet', metadataType: TEST_METADATA_TYPE, snippetId: '9999' });
 
       assert.equal(result.success, false);
       assert.match(result.output, /Snippet '9999' not found for metadata type 'business-rule'/);
@@ -181,69 +167,53 @@ describe('Resource Tool Commands', () => {
       assert.ok(!result.output.includes(mockSnippetContent));
     });
 
-    it('does not resolve a path-like id or metadata type outside the index', async () => {
-      for (const args of [
-        { metadataType: TEST_METADATA_TYPE, id: '/../../../../README' },
-        { metadataType: 'x/../../../README' },
-      ]) {
-        const result = await command.execute(args);
-        assert.equal(result.success, false, JSON.stringify(args));
-        assert.ok(!result.output.includes(mockSnippetContent));
-      }
-      const spec = await new GetApiSpecCommand().execute({ metadataType: 'x/../../../README' });
-      assert.equal(spec.success, false);
-      assert.match(spec.output, /No spec resource found/);
+    it('reports a supported type without snippets', async () => {
+      const result = await command.execute({ kind: 'snippet', metadataType: 'script-include' });
+
+      assert.equal(result.success, false);
+      assert.match(result.output, /No snippets found for metadata type 'script-include'/);
     });
 
-    it('should handle no snippets found for non-existent metadata type', async () => {
-      // Execute the command with a non-existent metadata type
-      const result = await command.execute({ metadataType: 'non-existent' });
+    it('lists only the types that have a snippet', async () => {
+      const result = await command.execute({ kind: 'snippet' });
 
-      assert.equal(result.exitCode, 1);
-      assert.equal(result.success, false);
-      assert.ok(result.output.includes("No snippets found for metadata type 'non-existent'"));
-      assert.notEqual(result.error, undefined);
+      assert.equal(result.success, true);
+      assert.deepEqual(result.structuredContent?.availableTypes, [TEST_METADATA_TYPE]);
     });
   });
 
-  describe('GetInstructCommand', () => {
-    let command: InstanceType<typeof GetInstructCommand>;
+  describe('the input contract', () => {
+    const rejected = async (args: Record<string, unknown>, message: RegExp) => {
+      const result = await command.execute(args);
+      assert.equal(result.success, false, JSON.stringify(args));
+      assert.match(result.output, message);
+      assert.ok(!result.output.includes('Business Rule'), 'no content is served');
+    };
 
-    beforeEach(() => {
-      command = new GetInstructCommand();
+    it('requires kind, from a closed set', async () => {
+      await rejected({ metadataType: TEST_METADATA_TYPE }, /kind: Missing required argument 'kind'/);
+      await rejected({ kind: 'guide', metadataType: TEST_METADATA_TYPE }, /Argument 'kind' must be one of: spec, instruct, snippet\. Received: "guide"/);
     });
 
-    it('should return instructions for a valid metadata type', async () => {
-      // Execute the command with a valid metadata type
-      const result = await command.execute({ metadataType: TEST_METADATA_TYPE });
-
-      // Verify the result contains the expected instruction content
-      assert.equal(result.exitCode, 0);
-      assert.equal(result.success, true);
-      assert.equal(result.output, mockInstructContent);
-
-      // Verify the content contains expected text for business rule instructions
-      assert.ok(result.output.includes('Instructions for Fluent Business Rule API'));
+    it('accepts only a supported, lowercase metadata type', async () => {
+      for (const metadataType of ['BUSINESS-RULE', 'non-existent', 'x/../../../README', '']) {
+        await rejected({ kind: 'spec', metadataType }, /metadataType: Argument 'metadataType' must be one of: /);
+      }
     });
 
-    it('should handle resource not found for non-existent metadata type', async () => {
-      // Execute the command with a non-existent metadata type
-      const result = await command.execute({ metadataType: 'non-existent' });
-
-      assert.equal(result.exitCode, 1);
-      assert.equal(result.success, false);
-      assert.ok(result.output.includes("resource found for metadata type 'non-existent'"));
-      assert.notEqual(result.error, undefined);
+    it('rejects the removed id key', async () => {
+      await rejected({ kind: 'snippet', metadataType: TEST_METADATA_TYPE, id: TEST_SNIPPET_ID }, /Input validation error: .*"id"/);
     });
 
-    it('should handle missing required arguments', async () => {
-      // Execute the command without required arguments
-      const result = await command.execute({});
+    it('takes snippetId only for kind snippet, and only with a metadata type', async () => {
+      for (const kind of ['spec', 'instruct']) {
+        await rejected({ kind, metadataType: TEST_METADATA_TYPE, snippetId: TEST_SNIPPET_ID }, new RegExp(`snippetId applies only to kind 'snippet', not '${kind}'`));
+      }
+      await rejected({ kind: 'snippet', snippetId: TEST_SNIPPET_ID }, /snippetId needs a metadataType/);
+    });
 
-      assert.equal(result.exitCode, 1);
-      assert.equal(result.success, false);
-      assert.ok(result.output.includes("Missing required argument 'metadataType'"));
-      assert.notEqual(result.error, undefined);
+    it('does not resolve a path-like snippet id outside the index', async () => {
+      await rejected({ kind: 'snippet', metadataType: TEST_METADATA_TYPE, snippetId: '/../../../../README' }, /Snippet '\/\.\.\/\.\.\/\.\.\/\.\.\/README' not found/);
     });
   });
 });

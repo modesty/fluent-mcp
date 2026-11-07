@@ -20,7 +20,7 @@ const EXPLAIN_FORMATS = ['pretty', 'raw'] as const;
  */
 export class ExplainCommand extends BaseCLICommand {
   name = 'explain_fluent_api';
-  description = 'Look up Fluent SDK documentation for any API or guide. Accepts a topic name (e.g., "BusinessRule", "Acl") or a keyword/tag (e.g., "flow", "atf"). Set list=true to enumerate available topics (optionally combined with topic to filter). Set peek=true for a brief summary. Set format="raw" for plain markdown. Read-only; no authentication or active Fluent project required. Use get-api-spec for metadata-type specifications and get-snippet for code examples.';
+  description = 'Look up Fluent SDK documentation for any API or guide. Accepts a topic name (e.g., "BusinessRule", "Acl") or a keyword/tag (e.g., "flow", "atf"). Set list=true to enumerate available topics (optionally combined with topic to filter). Set peek=true for a brief summary. Set format="raw" for plain markdown. Read-only; no authentication or active Fluent project required. Use get_fluent_knowledge for metadata-type specifications, authoring guides and code examples.';
   annotations = { readOnlyHint: true, idempotentHint: true };
   timeoutMs = 15_000;
   arguments: CommandArgument[] = [

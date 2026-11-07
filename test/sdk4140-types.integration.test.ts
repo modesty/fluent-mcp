@@ -262,10 +262,10 @@ describe('SDK v4.14.0 Types - Integration Tests', () => {
       assert.equal(byName.get('fluent_exec_script')?.annotations?.destructiveHint, true);
     });
 
-    it('lists fluent_exec_script in the MCPB manifest, keeping tools sorted (18 total)', () => {
+    it('lists fluent_exec_script in the MCPB manifest, keeping tools sorted (16 total since get_fluent_knowledge)', () => {
       const manifest = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, 'manifest.json'), 'utf-8')) as { tools: Array<{ name: string }> };
       const names = manifest.tools.map((t) => t.name);
-      assert.equal(names.length, 18);
+      assert.equal(names.length, 16);
       assert.ok(names.includes('fluent_exec_script'));
       assert.deepStrictEqual(names, [...names].sort());
     });

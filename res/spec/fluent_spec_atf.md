@@ -213,7 +213,7 @@ Test(
 
 ## Step sub-type index — 18 metadata types, 12 `atf.*` namespaces
 
-Every step below is reached as `atf.<namespace>.<method>` on this callback's `atf` argument; none needs its own import. Fetch a row's detail with `get-api-spec`, `get-instruct`, or `get-snippet` using the **metadata type** in column 1. The two reusable-test methods, `atf.executeTest` and `atf.setReusableTestOutputs` (SDK v4.14.0+), are top-level `atf.*` methods in no namespace; they are documented above, not in a sub-type.
+Every step below is reached as `atf.<namespace>.<method>` on this callback's `atf` argument; none needs its own import. Fetch a row's detail with `get_fluent_knowledge` (`kind` `spec`, `instruct` or `snippet`) using the **metadata type** in column 1. The two reusable-test methods, `atf.executeTest` and `atf.setReusableTestOutputs` (SDK v4.14.0+), are top-level `atf.*` methods in no namespace; they are documented above, not in a sub-type.
 
 | metadata type | namespace | use it for | steps |
 |---|---|---|---|

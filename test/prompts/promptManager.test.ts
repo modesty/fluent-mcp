@@ -165,9 +165,8 @@ describe('coding_in_fluent prompt rendering (P0.1)', () => {
     assert.ok(text.includes('### table'));
 
     // Explicit tool pointers.
-    assert.ok(text.includes('get-api-spec'));
-    assert.ok(text.includes('get-instruct'));
-    assert.ok(text.includes('get-snippet'));
+    assert.ok(text.includes('get_fluent_knowledge'));
+    assert.ok(!/get-(api-spec|instruct|snippet)/.test(text), 'no pointer to a removed tool');
 
     // Explicit resource-URI pointers.
     assert.ok(text.includes('sn-spec://business-rule'));

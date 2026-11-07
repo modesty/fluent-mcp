@@ -318,9 +318,7 @@ SN_INSTANCE_URL=https://company.service-now.com SN_AUTH_TYPE=oauth npm run inspe
    - explain_fluent_api
    - fluent_exec_script
    - fluent_transform
-   - get-api-spec
-   - get-instruct
-   - get-snippet
+   - get_fluent_knowledge
    - init_fluent_app
    - pack_fluent_app
    - query_fluent_records

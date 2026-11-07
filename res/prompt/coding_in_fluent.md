@@ -133,8 +133,8 @@ Fluent (ServiceNow SDK) is a TypeScript-based domain-specific language that allo
 
 Fluent provides a strongly-typed API for every supported ServiceNow metadata type — a dedicated constructor for most, and a typed `Record()` table for a few (e.g. `field-style`). This server ships the full specification, authoring instructions, and runnable snippets for each type — fetch them on demand instead of guessing an API shape:
 
-- **API specification** — the `get-api-spec` tool (or resource URI `sn-spec://<type>`)
-- **Authoring instructions & best practices** — the `get-instruct` tool (or `sn-instruct://<type>`)
-- **Runnable code snippet** — the `get-snippet` tool (or `sn-snippet://<type>/<id>`)
+- **API specification** — the `get_fluent_knowledge` tool with `kind: "spec"` (or resource URI `sn-spec://<type>`)
+- **Authoring instructions & best practices** — `kind: "instruct"` (or `sn-instruct://<type>`)
+- **Runnable code snippet** — `kind: "snippet"`, optionally with a `snippetId` (or `sn-snippet://<type>/<id>`)
 
-Call `get-api-spec` with no arguments at any time to list every available metadata type. When this prompt is invoked with a `metadata_list`, per-type guidance and the full type catalog are appended below.
+Call `get_fluent_knowledge` with only a `kind` at any time to list every metadata type that has one. When this prompt is invoked with a `metadata_list`, per-type guidance and the full type catalog are appended below.
