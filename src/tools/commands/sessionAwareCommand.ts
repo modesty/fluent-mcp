@@ -1,4 +1,3 @@
-import path from 'node:path';
 import {
   CommandArgument,
   CommandProcessor,
@@ -13,6 +12,7 @@ import { resolveSdkCli } from '../../utils/sdkCli.js';
 import { cliOption } from './cliArgv.js';
 import logger from '../../utils/logger.js';
 import { getConfig } from '../../config.js';
+import { resolveProjectDirectory } from '../../utils/projectDirectory.js';
 
 export const WORKING_DIRECTORY_ARGUMENT: CommandArgument = {
   name: 'workingDirectory',
@@ -57,40 +57,25 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
       !(typeof explicitWorkingDirectory === 'string' && explicitWorkingDirectory.trim() === '');
 
     if (hasExplicitWorkingDirectory) {
-      return this.validateWorkingDirectory(explicitWorkingDirectory, "'workingDirectory' tool argument");
+      return resolveProjectDirectory(explicitWorkingDirectory, "'workingDirectory' tool argument");
     }
 
     const sessionManager = SessionManager.getInstance();
     const sessionDir = sessionManager.getWorkingDirectory();
     if (sessionDir) {
-      const resolved = this.validateWorkingDirectory(sessionDir, 'initialized session');
+      const resolved = resolveProjectDirectory(sessionDir, 'initialized session');
       logger.debug(`Using session working directory: ${resolved}`);
       return resolved;
     }
 
     const configuredDir = getConfig().workingDirectory;
     if (configuredDir !== undefined) {
-      const resolved = this.validateWorkingDirectory(configuredDir, 'FLUENT_MCP_WORKING_DIR');
+      const resolved = resolveProjectDirectory(configuredDir, 'FLUENT_MCP_WORKING_DIR');
       logger.debug(`Using FLUENT_MCP_WORKING_DIR: ${resolved}`);
       return resolved;
     }
 
     return undefined;
-  }
-
-  private validateWorkingDirectory(value: unknown, source: string): string {
-    if (typeof value !== 'string' || value.trim() === '') {
-      throw new Error(`${source} must be a non-empty absolute path.`);
-    }
-
-    const directory = path.normalize(value.trim());
-    if (!path.isAbsolute(directory)) {
-      throw new Error(`${source} must be an absolute path: ${value}`);
-    }
-    if (path.parse(directory).root === directory) {
-      throw new Error(`${source} must not be the filesystem root: ${directory}`);
-    }
-    return directory;
   }
 
   /**

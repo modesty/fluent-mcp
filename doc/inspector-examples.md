@@ -423,7 +423,9 @@ For a default shared by project-aware calls, launch with:
 FLUENT_MCP_WORKING_DIR=/absolute/path/to/disposable-fluent-project npm run inspect
 ```
 
-The path must be absolute, non-empty, and different from the filesystem root. Neither the Inspector connection nor the server's current directory supplies a project implicitly.
+The path must be absolute and name an existing directory that is not the filesystem root. The check runs on the resolved path, so a symlink to `/` is refused too, and `~` or relative paths are not expanded. Neither the Inspector connection nor the server's current directory supplies a project implicitly.
+
+`init_fluent_app` takes its destination the same way: an existing empty directory, or a new directory under an existing parent. It returns `cd '<dir>' && <now-sdk init …>` to run in a terminal.
 
 ### Batch Testing with Scripts
 

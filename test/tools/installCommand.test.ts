@@ -4,13 +4,15 @@
 import { beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { assertCalledWith } from '../support/mockAssertions.js';
-import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
+import { configFixture, loggerFixture, sdkCliFixture, tempProjectDir } from '../support/fixtures.js';
 import type { CommandProcessor } from '../../src/utils/types.js';
+
+const WORKING_DIR = tempProjectDir('working-dir');
 
 // Session replacement: the command resolves its working directory from the
 // initialized session, which this suite pins to a fixed path.
 const session = {
-  getWorkingDirectory: mock.fn((): string | undefined => '/mock/working/dir'),
+  getWorkingDirectory: mock.fn((): string | undefined => WORKING_DIR),
   setWorkingDirectory: mock.fn(),
   getAuthAlias: mock.fn((): string | undefined => undefined),
   setAuthAlias: mock.fn(),
@@ -94,7 +96,7 @@ describe('InstallCommand', () => {
         mockProcessor.process,
         process.execPath,
         [SDK_BIN, 'install'],
-        '/mock/working/dir',
+        WORKING_DIR,
         undefined, // stdinInput
         900000,   // timeoutMs
         undefined  // signal
@@ -110,7 +112,7 @@ describe('InstallCommand', () => {
         mockProcessor.process,
         process.execPath,
         [SDK_BIN, 'install', '--skip-flow-activation'],
-        '/mock/working/dir',
+        WORKING_DIR,
         undefined, // stdinInput
         900000,   // timeoutMs
         undefined  // signal
@@ -157,7 +159,7 @@ describe('InstallCommand', () => {
         mockProcessor.process,
         process.execPath,
         [SDK_BIN, 'install', '--auth=my-alias', '--skip-flow-activation', '--debug'],
-        '/mock/working/dir',
+        WORKING_DIR,
         undefined, // stdinInput
         900000,   // timeoutMs
         undefined  // signal

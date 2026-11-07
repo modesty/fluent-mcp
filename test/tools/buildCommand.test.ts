@@ -7,11 +7,13 @@
 import { beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { assertCalledWith } from '../support/mockAssertions.js';
-import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
+import { configFixture, loggerFixture, sdkCliFixture, tempProjectDir } from '../support/fixtures.js';
 import type { CommandProcessor } from '../../src/utils/types.js';
 
+const WORKING_DIR = tempProjectDir('working-dir');
+
 const session = {
-  getWorkingDirectory: mock.fn((): string | undefined => '/mock/working/dir'),
+  getWorkingDirectory: mock.fn((): string | undefined => WORKING_DIR),
   setWorkingDirectory: mock.fn(),
   getAuthAlias: mock.fn((): string | undefined => undefined),
   setAuthAlias: mock.fn(),
@@ -58,7 +60,7 @@ describe('BuildCommand', () => {
       const result = await command.execute({ ...args });
 
       assert.equal(result.success, true);
-      assertCalledWith(mockProcessor.process, process.execPath, [...argv], '/mock/working/dir', undefined, 180_000, undefined);
+      assertCalledWith(mockProcessor.process, process.execPath, [...argv], WORKING_DIR, undefined, 180_000, undefined);
     });
   }
 });

@@ -1,13 +1,19 @@
 import { beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { assertCalledWith, assertNotCalled } from '../support/mockAssertions.js';
-import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { configFixture, loggerFixture, sdkCliFixture, tempProjectDir } from '../support/fixtures.js';
 import type { CommandProcessor, CommandResult } from '../../src/utils/types.js';
+
+const EXPLICIT_DIR = tempProjectDir('explicit');
+const SESSION_DIR = tempProjectDir('session');
+const CONFIGURED_DIR = tempProjectDir('configured');
 
 // Session replacement: the working-directory chain reads the initialized session
 // first, so each test pins what the session reports.
 const session = {
-  getWorkingDirectory: mock.fn((): string | undefined => '/session/project'),
+  getWorkingDirectory: mock.fn((): string | undefined => SESSION_DIR),
   setWorkingDirectory: mock.fn(),
   getAuthAlias: mock.fn((): string | undefined => undefined),
   setAuthAlias: mock.fn(),
@@ -73,7 +79,7 @@ describe('SessionAwareCLICommand working-directory resolution', () => {
       })),
     };
     command = new TestSessionAwareCommand(processor);
-    session.getWorkingDirectory.mock.mockImplementation(() => '/session/project');
+    session.getWorkingDirectory.mock.mockImplementation(() => SESSION_DIR);
     setConfig({
       logLevel: 'info',
       resourcePaths: {},
@@ -82,14 +88,14 @@ describe('SessionAwareCLICommand working-directory resolution', () => {
   });
 
   it('uses an explicit absolute tool argument before every fallback', async () => {
-    const result = await command.execute({ workingDirectory: '/explicit/project' });
+    const result = await command.execute({ workingDirectory: EXPLICIT_DIR });
 
     assert.equal(result.success, true);
     assertCalledWith(
       processor.process,
       process.execPath,
       [SDK_BIN, 'test'],
-      '/explicit/project',
+      EXPLICIT_DIR,
       undefined,
       undefined,
       undefined
@@ -100,18 +106,18 @@ describe('SessionAwareCLICommand working-directory resolution', () => {
   it('uses the initialized session when no explicit argument exists', async () => {
     await command.execute({});
 
-    assertRanIn('/session/project');
+    assertRanIn(SESSION_DIR);
   });
 
   it('uses FLUENT_MCP_WORKING_DIR after an empty session', async () => {
     session.getWorkingDirectory.mock.mockImplementation(() => undefined);
     setConfig({
-      workingDirectory: '/configured/project',
+      workingDirectory: CONFIGURED_DIR,
     });
 
     await command.execute({});
 
-    assertRanIn('/configured/project');
+    assertRanIn(CONFIGURED_DIR);
   });
 
   for (const [label, value] of [
@@ -121,11 +127,11 @@ describe('SessionAwareCLICommand working-directory resolution', () => {
   ] as const) {
     it(`treats an explicit ${label} workingDirectory as absent and continues fallback resolution`, async () => {
       session.getWorkingDirectory.mock.mockImplementation(() => undefined);
-      setConfig({ workingDirectory: '/configured/project' });
+      setConfig({ workingDirectory: CONFIGURED_DIR });
 
       await command.execute({ workingDirectory: value });
 
-      assertRanIn('/configured/project');
+      assertRanIn(CONFIGURED_DIR);
     });
   }
 
@@ -157,10 +163,12 @@ describe('SessionAwareCLICommand working-directory resolution', () => {
     assert.ok(!result.error.message.includes(process.cwd()));
   });
 
-  for (const [name, args, cfg] of [
-    ['relative explicit path', { workingDirectory: 'relative/project' }, {}],
-    ['filesystem root', { workingDirectory: '/' }, {}],
-    ['relative configured path', {}, { workingDirectory: 'relative/project' }],
+  for (const [name, args, cfg, pattern] of [
+    ['relative explicit path', { workingDirectory: 'relative/project' }, {}, /must be an absolute path/],
+    ['~ explicit path', { workingDirectory: '~/project' }, {}, /must be an absolute path/],
+    ['filesystem root', { workingDirectory: '/' }, {}, /must identify a dedicated project directory, not "\/"/],
+    ['missing explicit directory', { workingDirectory: path.join(EXPLICIT_DIR, 'missing') }, {}, /does not exist/],
+    ['relative configured path', {}, { workingDirectory: 'relative/project' }, /FLUENT_MCP_WORKING_DIR must be an absolute path/],
   ] as const) {
     it(`rejects ${name} instead of falling through`, async () => {
       session.getWorkingDirectory.mock.mockImplementation(() => undefined);
@@ -169,17 +177,48 @@ describe('SessionAwareCLICommand working-directory resolution', () => {
       const result = await command.execute(args);
 
       assert.equal(result.success, false);
-      assert.match(result.error?.message ?? '', /absolute path|filesystem root/);
+      assert.match(result.error?.message ?? '', pattern);
       assertNotCalled(processor.process);
     });
   }
 
+  it('rejects a symlink to the filesystem root, from any source', async (t) => {
+    const link = path.join(tempProjectDir('links'), 'root');
+    try {
+      fs.symlinkSync(path.parse(link).root, link, 'dir');
+    } catch {
+      t.skip('symlinks need privileges here');
+      return;
+    }
+    session.getWorkingDirectory.mock.mockImplementation(() => link);
+
+    const result = await command.execute({});
+
+    assert.equal(result.success, false);
+    assert.match(result.error?.message ?? '', /initialized session must identify a dedicated project directory, not ".*" \(it resolves to/);
+    assertNotCalled(processor.process);
+  });
+
+  it('hands the processor the canonical directory', async (t) => {
+    const link = path.join(tempProjectDir('links'), 'project');
+    try {
+      fs.symlinkSync(EXPLICIT_DIR, link, 'dir');
+    } catch {
+      t.skip('symlinks need privileges here');
+      return;
+    }
+
+    await command.execute({ workingDirectory: `${link}${path.sep}` });
+
+    assertRanIn(EXPLICIT_DIR);
+  });
+
   it('never forwards workingDirectory as SDK argv', async () => {
-    await command.execute({ workingDirectory: '/explicit/project' });
+    await command.execute({ workingDirectory: EXPLICIT_DIR });
 
     const sdkArgs = processor.process.mock.calls[0].arguments[1];
     assert.ok(!sdkArgs.includes('workingDirectory'));
-    assert.ok(!sdkArgs.includes('/explicit/project'));
+    assert.ok(!sdkArgs.includes(EXPLICIT_DIR));
   });
 
   it('normalizes processor exceptions into command errors', async () => {

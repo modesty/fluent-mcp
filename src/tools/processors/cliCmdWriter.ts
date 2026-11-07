@@ -1,5 +1,4 @@
-import { CommandResult, CommandResultFactory } from '../../utils/types.js';
-import { BaseCommandProcessor } from './baseCommandProcessor.js';
+import { CommandProcessor, CommandResult, CommandResultFactory } from '../../utils/types.js';
 import logger from '../../utils/logger.js';
 import { shellQuote } from '../../utils/shellQuote.js';
 
@@ -11,27 +10,22 @@ import { shellQuote } from '../../utils/shellQuote.js';
  * entry is therefore shell-escaped here (POSIX, `shellQuote`), after the
  * command has encoded it for yargs (`cliOption`), so the shell hands the CLI
  * exactly the argv the command built. Commands never quote for the shell.
+ *
+ * The SDK CLI works in its process cwd (`now-sdk init` writes the new project
+ * there), so the text enters the project directory itself rather than leaving
+ * that to whoever runs it: `cd '<dir>' && <command>`.
  */
-export class CLICmdWriter extends BaseCommandProcessor {
+export class CLICmdWriter implements CommandProcessor {
   /**
    * Return the shell text of the command, without running it. The writer
    * spawns nothing, so it takes no stdin, timeout, signal or run options.
    */
-  async process(command: string, args: string[], customWorkingDir?: string): Promise<CommandResult> {
-    try {
-      const cwd = this.resolveCommandWorkingDirectory(customWorkingDir);
+  async process(command: string, args: string[], cwd?: string): Promise<CommandResult> {
+    const commandText = [command, ...args].map(shellQuote).join(' ');
+    const fullCommandText = cwd ? `cd ${shellQuote(cwd)} && ${commandText}` : commandText;
 
-      const commandText = [command, ...args].map(shellQuote).join(' ');
+    logger.info(`Generated command text: ${fullCommandText}`);
 
-      // Add working directory context if available
-      const cwdInfo = cwd ? `(in directory: ${cwd})` : '';
-      const fullCommandText = cwdInfo ? `${commandText} ${cwdInfo}` : commandText;
-
-      logger.info(`Generated command text: ${fullCommandText}`);
-
-      return CommandResultFactory.success(fullCommandText);
-    } catch (error) {
-      return CommandResultFactory.fromError(error);
-    }
+    return CommandResultFactory.success(fullCommandText);
   }
 }

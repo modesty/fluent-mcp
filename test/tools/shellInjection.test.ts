@@ -16,13 +16,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { hasOption, optionValue } from '../support/argv.js';
 import { assertNotCalled } from '../support/mockAssertions.js';
-import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
+import { configFixture, loggerFixture, sdkCliFixture, tempProjectDir } from '../support/fixtures.js';
 import type { CommandProcessor } from '../../src/utils/types.js';
+
+const WORKING_DIR = tempProjectDir('working-dir');
 
 // Session replacement: commands resolve their working directory from the
 // initialized session, which this suite pins to a fixed path.
 const session = {
-  getWorkingDirectory: mock.fn((): string | undefined => '/mock/working/dir'),
+  getWorkingDirectory: mock.fn((): string | undefined => WORKING_DIR),
   setWorkingDirectory: mock.fn(),
   getAuthAlias: mock.fn((): string | undefined => undefined),
   setAuthAlias: mock.fn(),

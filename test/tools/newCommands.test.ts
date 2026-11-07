@@ -4,13 +4,15 @@
 import { beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { assertCalledWith, assertNotCalled } from '../support/mockAssertions.js';
-import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
+import { configFixture, loggerFixture, sdkCliFixture, tempProjectDir } from '../support/fixtures.js';
 import type { CommandProcessor } from '../../src/utils/types.js';
+
+const WORKING_DIR = tempProjectDir('working-dir');
 
 // Session replacement: commands resolve their working directory from the
 // initialized session, which this suite pins to a fixed path.
 const session = {
-  getWorkingDirectory: mock.fn((): string | undefined => '/mock/working/dir'),
+  getWorkingDirectory: mock.fn((): string | undefined => WORKING_DIR),
   setWorkingDirectory: mock.fn(),
   getAuthAlias: mock.fn((): string | undefined => undefined),
   setAuthAlias: mock.fn(),
@@ -104,7 +106,7 @@ describe('New SDK Commands', () => {
         mockProcessor.process,
         process.execPath,
         [SDK_BIN, 'download', 'my-app'],
-        '/mock/working/dir',
+        WORKING_DIR,
         undefined, // stdinInput
         600000,   // timeoutMs
         undefined  // signal
@@ -126,7 +128,7 @@ describe('New SDK Commands', () => {
         mockProcessor.process,
         process.execPath,
         [SDK_BIN, 'download', 'my-app', '--source=./src', '--incremental', '--debug'],
-        '/mock/working/dir',
+        WORKING_DIR,
         undefined, // stdinInput
         600000,   // timeoutMs
         undefined  // signal
@@ -170,7 +172,7 @@ describe('New SDK Commands', () => {
         mockProcessor.process,
         process.execPath,
         [SDK_BIN, 'clean'],
-        '/mock/working/dir',
+        WORKING_DIR,
         undefined, // stdinInput
         15000,    // timeoutMs
         undefined  // signal
@@ -190,7 +192,7 @@ describe('New SDK Commands', () => {
         mockProcessor.process,
         process.execPath,
         [SDK_BIN, 'clean', '--source=src', '--debug'],
-        '/mock/working/dir',
+        WORKING_DIR,
         undefined, // stdinInput
         15000,    // timeoutMs
         undefined  // signal
@@ -234,7 +236,7 @@ describe('New SDK Commands', () => {
         mockProcessor.process,
         process.execPath,
         [SDK_BIN, 'pack'],
-        '/mock/working/dir',
+        WORKING_DIR,
         undefined, // stdinInput
         30000,    // timeoutMs
         undefined  // signal
@@ -254,7 +256,7 @@ describe('New SDK Commands', () => {
         mockProcessor.process,
         process.execPath,
         [SDK_BIN, 'pack', '--source=./build', '--debug'],
-        '/mock/working/dir',
+        WORKING_DIR,
         undefined, // stdinInput
         30000,    // timeoutMs
         undefined  // signal

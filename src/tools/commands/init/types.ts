@@ -31,14 +31,6 @@ export interface CreationInitData {
 export type InitIntent = 'conversion' | 'creation';
 
 /**
- * Validation result with optional error message
- */
-export interface ValidationResult {
-  valid: boolean;
-  error?: string;
-}
-
-/**
  * Validation result with multiple errors
  */
 export interface MultiValidationResult {

@@ -1,6 +1,3 @@
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 import {
   CommandArgument,
   CommandProcessor,
@@ -9,9 +6,9 @@ import {
   EnsureAuthValidated,
 } from '../../utils/types.js';
 import { BaseCLICommand } from './baseCommand.js';
-import { FluentAppValidator } from '../../utils/fluentAppValidator.js';
 import { SessionManager } from '../../utils/sessionManager.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
+import { checkInitDestination, createInitDestination, removeCreatedDestination } from '../../utils/projectDirectory.js';
 import { cliOption } from './cliArgv.js';
 import logger from '../../utils/logger.js';
 import {
@@ -36,7 +33,7 @@ import {
  */
 export class InitCommand extends BaseCLICommand {
   name = 'init_fluent_app';
-  description = 'Initialize a new Fluent (ServiceNow SDK) application or convert an existing scoped application. Set intent to "creation" for a new app (requires appName, packageName, scopeName, template) or "conversion" to convert from an instance sys_id or local directory (requires from, and auth for instance conversion). The workingDirectory must be an empty directory. After init, use build_fluent_app to compile.';
+  description = 'Initialize a new Fluent (ServiceNow SDK) application or convert an existing scoped application. Set intent to "creation" for a new app (requires appName, packageName, scopeName, template) or "conversion" to convert from an instance sys_id or an absolute local application directory (requires from, and auth for instance conversion). The workingDirectory must be an absolute path to an empty directory, or to a new directory under an existing one. The result is a shell command that enters that directory and runs the SDK init. After init, use build_fluent_app to compile.';
   // Creates a local project directory and sets the session working directory; for
   // conversion it also reads from an instance. Non-idempotent (a second run on a
   // populated directory is refused), and open-world for the conversion path.
@@ -55,7 +52,7 @@ export class InitCommand extends BaseCLICommand {
       name: 'from',
       type: 'string',
       required: false,
-      description: 'For conversion: sys_id of the sys_app record or local file path to convert from',
+      description: 'For conversion: the sys_id of the sys_app record on the instance, or the absolute path of a local scoped application directory (one with a sys_app_<sys_id>.xml file in it, or in its update/ or scope/ subdirectory). ~ and relative paths are not expanded.',
     },
     {
       name: 'appName',
@@ -92,7 +89,7 @@ export class InitCommand extends BaseCLICommand {
       name: 'workingDirectory',
       type: 'string',
       required: true,
-      description: 'The directory where the Fluent (ServiceNow SDK) application will be created. Must be an empty local directory with no package.json or now.config.json files.',
+      description: 'Absolute path of the directory the Fluent (ServiceNow SDK) application is created in: an existing empty directory, or a new directory under an existing one (it is created). Not the filesystem root, and not a populated directory. ~ and relative paths are not expanded.',
     },
     {
       name: 'debug',
@@ -108,75 +105,6 @@ export class InitCommand extends BaseCLICommand {
   ) {
     super(commandProcessor);
     this.ensureAuthValidated = ensureAuthValidated;
-  }
-
-  /**
-   * Create a new directory with a timestamp in the user's home directory
-   */
-  private createDefaultWorkingDirectory(): string {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const dirName = `fluent-app-${timestamp}`;
-    const dirPath = path.join(os.homedir(), dirName);
-
-    try {
-      fs.mkdirSync(dirPath, { recursive: true });
-      logger.info(`Created new working directory: ${dirPath}`);
-      return dirPath;
-    } catch (error) {
-      logger.error(`Failed to create directory ${dirPath}: ${error}`);
-      throw new Error(
-        `Failed to create default working directory: ${CommandResultFactory.normalizeError(error).message}`,
-        { cause: error }
-      );
-    }
-  }
-
-  /**
-   * Prepare and validate the working directory
-   */
-  private async prepareWorkingDirectory(
-    initData: ConversionInitData | CreationInitData
-  ): Promise<CommandResult | string> {
-    const sessionManager = SessionManager.getInstance();
-    let workingDirectory: string;
-
-    if (initData.workingDirectory) {
-      workingDirectory = InitValidator.normalizePath(initData.workingDirectory);
-
-      if (!fs.existsSync(workingDirectory)) {
-        try {
-          fs.mkdirSync(workingDirectory, { recursive: true });
-          logger.info(`Created working directory: ${workingDirectory}`);
-        } catch (error) {
-          return CommandResultFactory.error(
-            `Failed to create working directory ${workingDirectory}: ${CommandResultFactory.normalizeError(error).message}`
-          );
-        }
-      }
-
-      const appCheck = await FluentAppValidator.checkFluentAppExists(workingDirectory);
-      if (appCheck.hasApp) {
-        sessionManager.setWorkingDirectory(workingDirectory);
-        return CommandResultFactory.success(
-          `The directory ${workingDirectory} already contains a Fluent (ServiceNow SDK) application.\n` +
-          `Package name: ${appCheck.packageName}\nScope name: ${appCheck.scopeName}\n` +
-          'This directory has been saved as your working directory for future commands.'
-        );
-      }
-
-      if (appCheck.errorMessage) {
-        return CommandResultFactory.error(appCheck.errorMessage);
-      }
-    } else {
-      try {
-        workingDirectory = this.createDefaultWorkingDirectory();
-      } catch (error) {
-        return CommandResultFactory.fromError(error);
-      }
-    }
-
-    sessionManager.setWorkingDirectory(workingDirectory);
-    return workingDirectory;
   }
 
   /**
@@ -259,43 +187,55 @@ export class InitCommand extends BaseCLICommand {
       let initData: ConversionInitData | CreationInitData;
 
       if (intent === 'conversion') {
-        initData = InitArgsResolver.resolveConversionData(args);
-
-        // Validate 'from' parameter
-        const validation = await InitValidator.validateFromParameter(initData.from);
-        if (!validation.valid) {
-          return CommandResultFactory.error(`Invalid 'from' parameter: ${validation.error}`);
-        }
+        const conversion = InitArgsResolver.resolveConversionData(args);
+        // The SDK gets the resolved source, not the caller's spelling of it:
+        // it runs in the destination, where a relative path means something else.
+        initData = { ...conversion, from: InitValidator.resolveConversionSource(conversion.from) };
       } else {
         initData = InitArgsResolver.resolveCreationData(args);
 
         // Validate creation parameters
-        const validation = await InitValidator.validateCreationParameters(initData as CreationInitData);
+        const validation = InitValidator.validateCreationParameters(initData as CreationInitData);
         if (!validation.valid) {
           return CommandResultFactory.error(`Invalid parameters: ${validation.errors.join(', ')}`);
         }
       }
 
-      // Step 3: Handle working directory
-      const workingDirResult = await this.prepareWorkingDirectory(initData);
-
-      // If prepareWorkingDirectory returned a CommandResult, return it (app already exists or error)
-      if (typeof workingDirResult !== 'string') {
-        return workingDirResult;
-      }
-
-      const workingDirectory = workingDirResult;
-
-      // Step 4: Build and execute SDK command using the bundled CLI
+      // Step 3: Build the SDK command for the bundled CLI. A conversion from an
+      // instance may wait here for lazy auth, so this comes before the
+      // destination check: nothing awaited may separate that check from its use.
       const { command, baseArgs } = resolveSdkCli();
       const sdkArgs = intent === 'conversion'
         ? await this.buildConversionArgs(initData as ConversionInitData, baseArgs)
         : this.buildCreationArgs(initData as CreationInitData, baseArgs);
 
-      const result = await this.commandProcessor.process(command, sdkArgs, workingDirectory);
+      // Step 4: Check the destination and create it if it is new, with no
+      // await in between. Nothing on disk or in the session has changed before
+      // this point, so any earlier failure leaves both as they were.
+      const localSource = intent === 'conversion' && !InitValidator.isSysId((initData as ConversionInitData).from)
+        ? (initData as ConversionInitData).from
+        : undefined;
+      const destination = checkInitDestination(initData.workingDirectory, localSource);
+      const workingDirectory = destination.directory;
+      const created = createInitDestination(destination);
+      if (created) logger.info(`Created working directory: ${workingDirectory}`);
+
+      // Step 5: Produce the command, which enters the destination (`now-sdk
+      // init` writes the project into its cwd). The session takes the directory
+      // only when that succeeds. On failure, a directory this call created is
+      // removed again (best effort, empty only); one that already existed is
+      // never touched. A failure of the SDK itself, once someone runs the
+      // returned command, happens outside the server and is not rolled back.
+      let result: CommandResult | undefined;
+      try {
+        result = await this.commandProcessor.process(command, sdkArgs, workingDirectory);
+      } finally {
+        if (created && !result?.success) removeCreatedDestination(workingDirectory);
+      }
       logger.info(`Executed init command in directory: ${workingDirectory} - ${JSON.stringify(result)}`);
 
       if (result.success) {
+        SessionManager.getInstance().setWorkingDirectory(workingDirectory);
         result.output += `\n\nThis directory (${workingDirectory}) has been saved as your working directory for future commands.`;
       }
 

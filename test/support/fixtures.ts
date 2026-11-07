@@ -14,6 +14,9 @@
  */
 import { mock } from 'node:test';
 import type { TestContext } from 'node:test';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 /** Mirrors src/utils/logger.ts LogLevel values (string enum). */
 export const LOG_LEVEL = {
@@ -138,4 +141,26 @@ export function captureStderr(t: TestContext): string[] {
     return true;
   });
   return chunks;
+}
+
+let projectRoot: string | undefined;
+
+/**
+ * A real, empty directory for a command to resolve as its Fluent project. A
+ * project directory must exist (`resolveProjectDirectory` resolves it with
+ * realpath), so a suite whose processor is mocked still needs a real one. The
+ * returned path is canonical, so it equals the cwd the command hands its
+ * processor. All of them live under one temp root per test process, removed
+ * when the process exits.
+ * @param name A label for the directory, unique within the test file
+ */
+export function tempProjectDir(name: string): string {
+  if (!projectRoot) {
+    const created = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fluent-test-project-')));
+    process.once('exit', () => fs.rmSync(created, { recursive: true, force: true }));
+    projectRoot = created;
+  }
+  const directory = path.join(projectRoot, name);
+  fs.mkdirSync(directory, { recursive: true });
+  return directory;
 }

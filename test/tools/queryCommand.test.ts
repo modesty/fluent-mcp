@@ -9,14 +9,16 @@ import { beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { hasOption, optionValue } from '../support/argv.js';
 import { assertCalledWith, assertNotCalled } from '../support/mockAssertions.js';
-import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
+import { configFixture, loggerFixture, sdkCliFixture, tempProjectDir } from '../support/fixtures.js';
 import type { CommandProcessor } from '../../src/utils/types.js';
+
+const WORKING_DIR = tempProjectDir('working-dir');
 
 // Session replacement. Default the session to a resolvable auth alias so the
 // required-auth gate passes; individual tests override getAuthAlias to exercise
 // the unauthenticated path.
 const session = {
-  getWorkingDirectory: mock.fn((): string | undefined => '/mock/working/dir'),
+  getWorkingDirectory: mock.fn((): string | undefined => WORKING_DIR),
   setWorkingDirectory: mock.fn(),
   getAuthAlias: mock.fn((): string | undefined => 'session-alias'),
   setAuthAlias: mock.fn(),
@@ -55,7 +57,7 @@ describe('QueryCommand', () => {
     // Re-assert the default alias and working directory so a prior test's
     // per-call override cannot leak.
     session.getAuthAlias.mock.mockImplementation(() => 'session-alias');
-    session.getWorkingDirectory.mock.mockImplementation(() => '/mock/working/dir');
+    session.getWorkingDirectory.mock.mockImplementation(() => WORKING_DIR);
     mockProcessor = {
       process: mock.fn<ProcessFn>(async () => ({ success: true, output: '{"records":[]}', exitCode: 0 })),
     };
@@ -86,7 +88,7 @@ describe('QueryCommand', () => {
         '--output=json',
         '--auth=session-alias',
       ],
-      '/mock/working/dir',
+      WORKING_DIR,
       undefined,
       60000,
       undefined,

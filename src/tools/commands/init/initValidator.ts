@@ -4,34 +4,28 @@
  */
 
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 
-import { FluentAppValidator } from '../../../utils/fluentAppValidator.js';
-import { CommandResultFactory } from '../../../utils/types.js';
-import logger from '../../../utils/logger.js';
-import {
-  CreationInitData,
-  MultiValidationResult,
-  ValidationResult,
-} from './types.js';
+import { resolveExistingDirectory } from '../../../utils/projectDirectory.js';
+import { CreationInitData, MultiValidationResult } from './types.js';
+
+/** The remedy a conversion source error ends with. */
+const CONVERSION_SOURCE_REMEDY =
+  'Supply an instance sys_id (32 hexadecimal characters) or the absolute path of a scoped application directory to convert.';
+
+/**
+ * The application record files `now-sdk init --from <dir>` converts from, and
+ * the subdirectories it looks in (`ProjectFactory.getSysAppXML` in
+ * `@servicenow/sdk-api`).
+ */
+const SYS_APP_XML = /^sys_(store_)?app_[0-9a-zA-Z]{32}\.xml$/;
+const SYS_APP_XML_DIRS = ['', 'update', 'scope'];
 
 /**
  * Validator class for InitCommand parameters
  * Single Responsibility: Handles all validation logic
  */
 export class InitValidator {
-  /**
-   * Normalize a path by expanding ~ and resolving to absolute
-   */
-  static normalizePath(inputPath: string): string {
-    let normalized = inputPath;
-    if (normalized.startsWith('~/')) {
-      normalized = path.join(os.homedir(), normalized.slice(2));
-    }
-    return path.resolve(normalized);
-  }
-
   /**
    * Return whether a conversion source is an instance application sys_id.
    * Keeping this predicate next to validation prevents command construction
@@ -42,96 +36,48 @@ export class InitValidator {
   }
 
   /**
-   * Validate working directory - must be empty local directory with no package.json or now.config.json
+   * Resolve the conversion source once, to the value the SDK receives: an
+   * instance sys_id as is, or a local application directory as its canonical
+   * path. A local source must be absolute, like the destination: the SDK runs
+   * in the destination, so a relative path would name a different directory
+   * there than it did here, and `~` is never expanded in argv.
+   * @param from The `from` argument
+   * @returns The sys_id, or the canonical source directory
+   * @throws Error with an actionable message for any other value
    */
-  static async validateWorkingDirectory(workingDirectory: string): Promise<ValidationResult> {
-    const normalizedPath = InitValidator.normalizePath(workingDirectory);
-
-    // Check if directory exists, create if it doesn't
-    if (!fs.existsSync(normalizedPath)) {
-      try {
-        fs.mkdirSync(normalizedPath, { recursive: true });
-        logger.info(`Created working directory: ${normalizedPath}`);
-      } catch (error) {
-        return {
-          valid: false,
-          error: `Failed to create working directory ${normalizedPath}: ${CommandResultFactory.normalizeError(error).message}`,
-        };
-      }
-    }
-
-    // Check if it's a directory
-    const stats = fs.statSync(normalizedPath);
-    if (!stats.isDirectory()) {
-      return {
-        valid: false,
-        error: `Working directory path is not a directory: ${normalizedPath}`,
-      };
-    }
-
-    // Check if directory is empty or only contains allowed files
-    const files = fs.readdirSync(normalizedPath);
-    const forbiddenFiles = ['package.json', 'now.config.json'];
-
-    for (const file of files) {
-      if (forbiddenFiles.includes(file)) {
-        return {
-          valid: false,
-          error: `Working directory must not contain ${file}. Directory must be empty or only contain non-conflicting files.`,
-        };
-      }
-    }
-
-    return { valid: true };
-  }
-
-  /**
-   * Validate 'from' parameter for conversion
-   */
-  static async validateFromParameter(from: string): Promise<ValidationResult> {
+  static resolveConversionSource(from: string): string {
     if (InitValidator.isSysId(from)) {
-      return { valid: true };
+      return from;
     }
 
-    // Anything that is not an exact sys_id is a local source. This supports
-    // bare relative directory names such as "myapp" instead of classifying
-    // them as instance sources merely because they contain no path separator.
-    const normalizedPath = InitValidator.normalizePath(from);
-
-    if (!fs.existsSync(normalizedPath)) {
-      return {
-        valid: false,
-        error: from.includes('/') || from.includes('\\')
-          ? `Local path does not exist: ${normalizedPath}`
-          : `sys_id must be a 32-character hexadecimal string or an existing local path: ${normalizedPath}`,
-      };
+    const directory = resolveExistingDirectory(from, 'from', CONVERSION_SOURCE_REMEDY, 'an application directory');
+    if (!InitValidator.hasSysAppXml(directory)) {
+      throw new Error(
+        `from holds no application record: ${directory}. now-sdk init converts a directory with a ` +
+        'sys_app_<sys_id>.xml or sys_store_app_<sys_id>.xml file in it, or in its update/ or scope/ subdirectory. ' +
+        CONVERSION_SOURCE_REMEDY
+      );
     }
+    return directory;
+  }
 
-    // Check if it's a directory containing a ServiceNow app
-    try {
-      const appCheck = await FluentAppValidator.checkFluentAppExists(normalizedPath);
-      if (!appCheck.hasApp && !appCheck.errorMessage) {
-        return {
-          valid: false,
-          error: `Directory ${normalizedPath} does not contain a valid ServiceNow application`,
-        };
+  /** Whether the directory has an application record where the SDK looks for one. */
+  private static hasSysAppXml(directory: string): boolean {
+    return SYS_APP_XML_DIRS.some((subdir) => {
+      const dir = path.join(directory, subdir);
+      try {
+        return fs.statSync(dir).isDirectory() && fs.readdirSync(dir).some((item) => SYS_APP_XML.test(item));
+      } catch {
+        return false;
       }
-    } catch (error) {
-      return {
-        valid: false,
-        error: `Failed to validate directory: ${CommandResultFactory.normalizeError(error).message}`,
-      };
-    }
-
-    return { valid: true };
+    });
   }
 
   /**
-   * Validate creation parameters
+   * Validate creation parameters. The destination directory is checked
+   * separately, for both intents (`checkInitDestination`).
    */
-  static async validateCreationParameters(
-    data: CreationInitData
-  ): Promise<MultiValidationResult> {
+  static validateCreationParameters(data: CreationInitData): MultiValidationResult {
     const errors: string[] = [];
 
     if (!data.appName || data.appName.trim().length === 0) {
@@ -154,18 +100,6 @@ export class InitValidator {
       }
       if (/\s/.test(data.scopeName)) {
         errors.push('scopeName cannot contain spaces');
-      }
-    }
-
-    if (!data.workingDirectory || data.workingDirectory.trim().length === 0) {
-      errors.push('workingDirectory is required and cannot be empty');
-    } else {
-      // Validate working directory
-      const workingDirValidation = await InitValidator.validateWorkingDirectory(
-        data.workingDirectory
-      );
-      if (!workingDirValidation.valid) {
-        errors.push(workingDirValidation.error || 'Invalid working directory');
       }
     }
 

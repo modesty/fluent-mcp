@@ -4,6 +4,8 @@
  * real InitCommand and CLICmdWriter produce the text, /bin/sh splits it into
  * argv, and the bundled CLI's own yargs-parser reads --appName from that argv.
  * The app name must come back exactly, and nothing in it may become an option.
+ * The text must also start the SDK in the new project directory, since
+ * `now-sdk init` writes the project into its cwd.
  */
 import { after, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,7 +16,7 @@ import { InitCommand } from '../../src/tools/commands/initCommand.js';
 import { CLICmdWriter } from '../../src/tools/processors/cliCmdWriter.js';
 import { cliOption } from '../../src/tools/commands/cliArgv.js';
 import { parseCliOption } from '../support/argv.js';
-import { SHELLS, shellSplit } from '../support/shell.js';
+import { SHELLS, launchNodeCommandText, shellSplit } from '../support/shell.js';
 
 /** The --appName value the CLI parses from the argv, plus every other option entry. */
 function readArgv(argv: string[]): { appName: unknown; options: string[] } {
@@ -29,22 +31,35 @@ function readArgv(argv: string[]): { appName: unknown; options: string[] } {
 const EXPECTED_OPTIONS = ['--packageName=my-app', '--scopeName=x_my_app', '--template=typescript.basic'];
 
 describe('init_fluent_app command text: writer → shell → yargs', { skip: process.platform === 'win32' }, () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fluent-init-shell-'));
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fluent-init-shell-')));
   after(() => fs.rmSync(root, { recursive: true, force: true }));
 
   let count = 0;
-  const commandText = async (appName: string): Promise<string> => {
-    const workingDirectory = path.join(root, `app-${++count}`);
+  /** The full first line of the result: `cd <dir> && <command>`. */
+  const resultText = async (appName: string, workingDirectory = path.join(root, `app-${++count}`)): Promise<string> => {
     const result = await new InitCommand(new CLICmdWriter()).execute({
       intent: 'creation', appName, packageName: 'my-app', scopeName: 'x_my_app', template: 'typescript.basic',
       workingDirectory,
     });
     assert.equal(result.success, true, result.output);
-    const firstLine = result.output.split('\n')[0];
-    const suffix = ` (in directory: ${workingDirectory})`;
-    assert.ok(firstLine.endsWith(suffix), firstLine);
-    return firstLine.slice(0, -suffix.length);
+    return result.output.split('\n')[0];
   };
+  /** The command after the leading `cd <dir> && `. */
+  const commandText = async (appName: string): Promise<string> => {
+    const text = await resultText(appName);
+    return text.slice(text.indexOf(' && ') + ' && '.length);
+  };
+
+  for (const shell of SHELLS) {
+    it(`starts the SDK in the new, quoted project directory under ${shell.name}`, async () => {
+      const workingDirectory = path.join(root, `it's "new" $HOME ${shell.name}`);
+      const launched = launchNodeCommandText(await resultText('My App', workingDirectory), shell);
+
+      assert.equal(launched.cwd, workingDirectory);
+      assert.equal(readArgv(launched.argv).appName, 'My App');
+      assert.equal(launched.argv[1], 'init');
+    });
+  }
 
   for (const appName of [
     "'My App' --help ''", "'My App'", 'My App', "it's mine", '"x" --help', 'My "Best" App', 'Simple',
