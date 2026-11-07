@@ -20,6 +20,7 @@ type ServerFactory = () => unknown;
 // --- MCP SDK ----------------------------------------------------------------
 
 const mockRegisterTool = mock.fn();
+const mockRegisterPrompt = mock.fn();
 const mockSetRequestHandler = mock.fn();
 const mockSetNotificationHandler = mock.fn();
 const mockRequest = mock.fn();
@@ -31,6 +32,7 @@ type ServerOptions = { capabilities: Record<string, Record<string, unknown> | un
 const McpServer = mock.fn(function (_info?: unknown, _options?: ServerOptions) {
   return {
     registerTool: mockRegisterTool,
+    registerPrompt: mockRegisterPrompt,
     connect: mock.fn(),
     close: mockClose,
     server: {
@@ -41,7 +43,10 @@ const McpServer = mock.fn(function (_info?: unknown, _options?: ServerOptions) {
     },
   };
 });
-mock.module('@modelcontextprotocol/server', { namedExports: { McpServer } });
+// PromptManager builds its argument schemas with `completable`; the identity
+// stand-in is enough here because completion is covered over the wire.
+const completable = (schema: unknown) => schema;
+mock.module('@modelcontextprotocol/server', { namedExports: { McpServer, completable } });
 
 // Capture the factory serveStdio is given, plus the handle it returns.
 const mockHandleClose = mock.fn(async () => undefined);
@@ -62,6 +67,8 @@ const config = configFixture({
     instruct: '/mock/path/to/instruct',
   },
 });
+// The shipped res/prompt files load from the real project root (the runner's cwd).
+config.getProjectRootPath.mock.mockImplementation(() => process.cwd());
 mock.module('../../src/config.js', config.mockOptions);
 const { findMissingResourcePaths } = config;
 
@@ -93,6 +100,7 @@ const { ServerStatus } = await import('../../src/types.js');
 
 const allMocks: Array<{ mock: { resetCalls(): void } }> = [
   mockRegisterTool,
+  mockRegisterPrompt,
   mockSetRequestHandler,
   mockSetNotificationHandler,
   mockRequest,
@@ -183,9 +191,10 @@ describe('FluentMcpServer with Modular Design', () => {
       assertCalledTimes(mockResourceRegisterOn, 1);
       assert.equal(mockResourceRegisterOn.mock.calls[0].arguments[0], instance);
       assert.ok(!methods.some((method) => method.startsWith('resources/')));
-      // prompts/* come from PromptManager.registerOn, which is not mocked here.
-      assert.ok(methods.includes('prompts/list'));
-      assert.ok(methods.includes('prompts/get'));
+      // Prompts go through registerPrompt (PromptManager is not mocked here);
+      // the SDK serves prompts/* and completion/complete from them.
+      assert.deepEqual(mockRegisterPrompt.mock.calls.map((call) => call.arguments[0]), ['coding_in_fluent', 'create_custom_ui']);
+      assert.ok(!methods.some((method) => method.startsWith('prompts/')));
       // tools/call is dispatched by registerTool, never hand-registered.
       assert.ok(!methods.includes('tools/call'));
     });

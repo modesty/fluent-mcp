@@ -54,13 +54,7 @@ const variable = (variables: Variables, name: string): string => String(variable
  * three SDK resource templates. The SDK owns `resources/list`,
  * `resources/templates/list` and `resources/read` (including the not-found
  * answer for a URI no template matches); this class only supplies listings and
- * reads from the shared catalog.
- *
- * Mosey: no `complete` callbacks yet. Any completer installs the SDK's single
- * `completion/complete` handler, which resolves prompt refs only from prompts
- * registered with `registerPrompt`; while PromptManager hand-registers its
- * handlers, every advertised prompt would complete as "not found". W4 moves
- * prompts onto `registerPrompt` and adds both completers together.
+ * reads and `completion/complete` suggestions from the shared catalog.
  */
 export class ResourceManager {
   /**
@@ -73,6 +67,12 @@ export class ResourceManager {
     for (const kind of RESOURCE_KINDS) {
       const template = new ResourceTemplate(kind.uriTemplate, {
         list: async () => ({ resources: await this.list(kind) }),
+        complete: {
+          metadataType: (value) => this.completeMetadataType(kind, value),
+          ...(kind.resourceType === ResourceType.SNIPPET && {
+            snippetId: (value, context) => this.completeSnippetId(value, context?.arguments?.metadataType),
+          }),
+        },
       });
       mcpServer.registerResource(
         kind.scheme,
@@ -81,6 +81,21 @@ export class ResourceManager {
         (uri, variables) => this.read(kind, uri, variables)
       );
     }
+  }
+
+  /** Metadata types with a resource of this kind, by prefix (snippets: types that have one). */
+  private async completeMetadataType(kind: ResourceKind, value: string): Promise<string[]> {
+    const prefix = value.toLowerCase();
+    const types = (await this.resourceCatalog.getAvailableMetadataTypes()).filter((type) => type.startsWith(prefix));
+    if (kind.resourceType !== ResourceType.SNIPPET) return types;
+    const withSnippets = await Promise.all(types.map(async (type) => (await this.resourceCatalog.listSnippets(type)).length > 0));
+    return types.filter((_, i) => withSnippets[i]);
+  }
+
+  /** Snippet ids of the already-chosen metadata type, by prefix; none until a type is chosen. */
+  private async completeSnippetId(value: string, metadataType: string | undefined): Promise<string[]> {
+    if (!metadataType) return [];
+    return (await this.resourceCatalog.listSnippets(metadataType)).filter((id) => id.startsWith(value));
   }
 
   /** Every concrete resource of one kind, for `resources/list`. */

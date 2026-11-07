@@ -4,7 +4,7 @@ description: "Guide for coding in Fluent (ServiceNow SDK) with examples for spec
 arguments:
   - name: metadata_list
     description: 'Comma-separated list of metadata types to include in the guide (e.g., "table,business-rule,script-include")'
-    required: true
+    required: false
 ---
 
 # Coding in ServiceNow Fluent

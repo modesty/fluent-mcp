@@ -110,30 +110,6 @@ export class LoggingManager {
       { status }
     );
   }
-
-  /**
-   * Log prompt listing failed
-   * @param error The error that occurred
-   */
-  logPromptListingFailed(error: unknown): void {
-    logger.error(
-      'Failed to list prompts',
-      CommandResultFactory.normalizeError(error)
-    );
-  }
-
-  /**
-   * Log prompt retrieval failed
-   * @param promptName The name of the prompt that failed to retrieve
-   * @param error The error that occurred
-   */
-  logPromptRetrievalFailed(promptName: string, error: unknown): void {
-    logger.error(
-      `Failed to get prompt '${promptName}'`,
-      CommandResultFactory.normalizeError(error)
-    );
-  }
-
 }
 
 // Create and export a singleton instance

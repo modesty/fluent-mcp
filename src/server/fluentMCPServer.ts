@@ -125,9 +125,9 @@ export class FluentMcpServer {
     );
 
     // Declaring a capability makes v2's McpServer install its own default
-    // handlers for that capability's methods. Resources are served entirely by
-    // the SDK from the registered templates (resources/list, templates/list,
-    // and read); only tools/list is replaced below.
+    // handlers for that capability's methods. Resources and prompts are served
+    // entirely by the SDK from what is registered here (resources/*, prompts/*,
+    // and completion/complete); only tools/list is replaced below.
     this.toolsManager.registerOn(mcpServer);
     this.resourceManager.registerOn(mcpServer);
     this.promptManager.registerOn(mcpServer);
