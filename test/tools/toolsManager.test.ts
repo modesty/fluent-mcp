@@ -25,8 +25,10 @@ mock.module('../../src/utils/logger.js', loggerOptions);
 mock.module('../../src/tools/processors/processRunner.js', {
   namedExports: { NodeProcessRunner: mock.fn() },
 });
+// A test can give the next constructed executor a process() to observe.
+const CLIExecutor = mock.fn(function (): object | void {});
 mock.module('../../src/tools/processors/cliExecutor.js', {
-  namedExports: { CLIExecutor: mock.fn() },
+  namedExports: { CLIExecutor },
 });
 mock.module('../../src/tools/processors/cliCmdWriter.js', {
   namedExports: { CLICmdWriter: mock.fn() },
@@ -34,11 +36,10 @@ mock.module('../../src/tools/processors/cliCmdWriter.js', {
 // The CLI commands a ToolsManager built from now on registers. Empty by
 // default; the tools/call suite adds one command per test.
 const factoryCommands: unknown[] = [];
+const createCommands = mock.fn((_executor: unknown, _writer: unknown, _ensureAuth: unknown) => [...factoryCommands]);
 mock.module('../../src/tools/registry/commandFactory.js', {
   namedExports: {
-    CommandFactory: {
-      createCommands: mock.fn(() => [...factoryCommands]),
-    },
+    CommandFactory: { createCommands },
   },
 });
 
@@ -192,29 +193,10 @@ describe('ToolsManager', () => {
     assertCalledWith(command.execute, {}, controller.signal);
   });
 
-  it('should format command result correctly', () => {
-    const successResult = {
-      success: true,
-      output: 'Success output',
-    };
-
-    const failResult = {
-      success: false,
-      output: 'Failure output',
-      exitCode: 1,
-      error: 'Error message',
-    };
-
-    const formattedSuccess = toolsManager.formatResult(successResult);
-    const formattedFail = toolsManager.formatResult(failResult);
-
-    // Success: clean output only (no emoji prefix, no "Command executed successfully" wrapper)
-    assert.equal(formattedSuccess, 'Success output');
-
-    // Failure: concise error with exit code and output context
-    assert.ok(formattedFail.includes('Error (exit 1)'));
-    assert.ok(formattedFail.includes('Failure output'));
-    assert.ok(formattedFail.includes('Error message'));
+  it('formats a successful result as its output alone', () => {
+    // No emoji prefix, no "Command executed successfully" wrapper. Failures are
+    // pinned exactly by the next test.
+    assert.equal(toolsManager.formatResult({ success: true, output: 'Success output' }), 'Success output');
   });
 
   it('never reports "Unknown error" and does not repeat a message that equals the output', () => {
@@ -232,6 +214,25 @@ describe('ToolsManager', () => {
     const silent = toolsManager.formatResult({ success: false, output: 'null', exitCode: 1 });
     assert.ok(!silent.includes('Unknown error'));
     assert.equal(silent, 'Error (exit 1): the command reported no error message\n\nOutput:\nnull');
+  });
+
+  it('lists auth profiles with auth --list through the shared executor', async () => {
+    const listed = { success: true, output: '[now-sdk] Listing all credentials: ', exitCode: 0 };
+    const process = mock.fn(async (_command: string, _argv: string[], _cwd: string) => listed);
+    const executor = { process };
+    CLIExecutor.mock.mockImplementationOnce(function () {
+      return executor;
+    });
+    createCommands.mock.resetCalls();
+
+    const manager = new ToolsManager();
+    const result = await manager.listAuthProfiles();
+
+    // The executor the CLI commands were built with is the one that runs the listing.
+    assert.equal(createCommands.mock.calls[0].arguments[0], executor);
+    assert.equal(process.mock.callCount(), 1);
+    assert.deepEqual(process.mock.calls[0].arguments[1].slice(-2), ['auth', '--list']);
+    assert.equal(result, listed);
   });
 });
 
@@ -267,12 +268,12 @@ describe('ToolsManager tools/call handler', () => {
     });
   }
 
-  it('returns an isError result with the message when execute() throws', async () => {
+  it('formats a throw from execute() like any failed result', async () => {
     const handler = handlerFor({ name: 'failing_cmd', execute: async () => { throw new Error('spawn exploded'); } });
 
     const result = await handler({}, context(async () => undefined));
 
-    assert.deepEqual(result, { content: [{ type: 'text', text: 'Error: spawn exploded' }], isError: true });
+    assert.deepEqual(result, { content: [{ type: 'text', text: 'Error (exit 1): spawn exploded' }], isError: true });
   });
 
   it('sends an initial notice, heartbeats and a final notice for a long-running command', async (t) => {

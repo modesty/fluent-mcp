@@ -231,8 +231,10 @@ BreakVariable({
 })
 
 // Container start (begin a collapsible section)
-// NOTE: ContainerStartVariable does NOT accept `question` — it carries layout structure only.
+// NOTE: `question` is the container title: mandatory with `displayTitle: true`, optional otherwise.
 ContainerStartVariable({
+    question: 'Request Details', // string, mandatory when displayTitle is true
+    displayTitle: true,     // boolean, optional — show the question as the container title
     layout: 'normal',       // 'normal' | '2across' | '2down', optional
     // + base properties
 })
@@ -246,7 +248,8 @@ ContainerSplitVariable({
 // Container end (close a container section)
 // NOTE: ContainerEndVariable does NOT accept `question` — it just closes a container.
 ContainerEndVariable({
-    // base properties only.
+    order: 900,             // number, optional — must be higher than the matching ContainerStartVariable
+    // also: active, disableInitialSlotFill — no other properties
 })
 
 // ─── SPECIAL VARIABLES ───

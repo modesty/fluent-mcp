@@ -2,7 +2,7 @@
 ```typescript
 // Validates whether a UI Action button is visible or not on the current form.
 atf.form.uiActionVisibility({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['ui_action_visibility_step'], // string | guid, mandatory
   table: '', // table name
   formUI: '', // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace'
   visible: [Now.ref('sys_ui_action', '<sys_id>')], // array of (sys_id | Record&lt;'sys_ui_action'&gt;)
@@ -11,13 +11,13 @@ atf.form.uiActionVisibility({ // all props are mandatory
 
 // Clicks a UI Action button on the current form and asserts the form submission results
 atf.form.clickUIAction({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['click_ui_action_step'], // string | guid, mandatory
   table: '', // table name
   uiAction: Now.ref('sys_ui_action', '<sys_id>'), // sys_id | Record&lt;'sys_ui_action'&gt;
   assert: 'form_submitted_to_server', // 'form_submitted_to_server' | 'form_submission_canceled_in_browser' | 'page_reloaded_or_redirected'
   actionType: '', // 'ui_action' | 'declarative_action'
   declarativeAction: Now.ref('sys_declarative_action_assignment', '<sys_id>'), // sys_id | Record&lt;'sys_declarative_action_assignment'&gt;
   formUI: 'standard_ui', // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace'
-}): { recordId: string; table: string }
+}): { record_id: string; table: string } // snake_case OUTPUT: clicked.record_id
 
 ```

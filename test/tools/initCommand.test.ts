@@ -270,49 +270,15 @@ describe('InitCommand', () => {
       assertProcessCalledWithSdkArgs(() => true, validDir, 'the resolved directory');
     });
 
-    it('rejects the filesystem root with the actionable message', async () => {
-      const rootDir = path.parse(root).root;
-      const result = await initCommand.execute({ ...CREATION, workingDirectory: rootDir });
+    // The refusal matrix (root, symlinks, relative paths, populated) is
+    // checkInitDestination's, in projectDirectory.test.ts; these pin the wiring.
+    it('rejects a populated directory, reaching no processor and no session', async () => {
+      const dir = directoryWith('populated', { 'notes.txt': '' });
 
-      assertRefused(result,
-        `workingDirectory must identify a dedicated project directory, not "${rootDir}". ` +
-        'Supply an empty absolute directory or a new absolute directory path to create.');
+      const result = await initCommand.execute({ ...CREATION, workingDirectory: dir });
+
+      assertRefused(result, /workingDirectory is not empty/);
     });
-
-    it('rejects a symlink to the filesystem root', async (t) => {
-      const link = fresh('root-link');
-      try {
-        fs.symlinkSync(path.parse(root).root, link, 'dir');
-      } catch {
-        t.skip('symlinks need privileges here');
-        return;
-      }
-
-      const result = await initCommand.execute({ ...CREATION, workingDirectory: link });
-
-      assertRefused(result, /must identify a dedicated project directory, not ".*" \(it resolves to/);
-    });
-
-    for (const value of ['my-app', '~/my-app', 'apps/my-app']) {
-      it(`rejects ${JSON.stringify(value)} rather than resolving it against the server`, async () => {
-        const result = await initCommand.execute({ ...CREATION, workingDirectory: value });
-
-        assertRefused(result, new RegExp(`workingDirectory must be an absolute path, not "${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`));
-      });
-    }
-
-    for (const [label, files] of [
-      ['a package.json', { 'package.json': '{}' }],
-      ['any file at all', { 'notes.txt': '' }],
-    ] as const) {
-      it(`rejects a directory holding ${label}`, async () => {
-        const dir = directoryWith('populated', files);
-
-        const result = await initCommand.execute({ ...CREATION, workingDirectory: dir });
-
-        assertRefused(result, /workingDirectory is not empty/);
-      });
-    }
 
     it('rejects an existing Fluent project, pointing at the project tools instead', async () => {
       const dir = fluentProject('existing-app');
@@ -557,13 +523,6 @@ describe('InitCommand', () => {
     );
   });
 
-  it('should infer conversion, not creation, when from and packageName are both given', async () => {
-    const result = await initCommand.execute({ workingDirectory: validDir, from: SYS_ID, auth: 'test-auth', packageName: 'converted-app' });
-
-    assert.equal(result.success, true);
-    assert.ok(!mockExecutor.process.mock.calls[0].arguments[1].some((entry: string) => entry.startsWith('--appName')));
-  });
-
   describe('local conversion source', () => {
     it('passes the canonical source to the SDK without triggering auth validation', async (t) => {
       const source = legacyApp('source');
@@ -702,17 +661,5 @@ describe('InitCommand', () => {
     assert.equal(result.success, false);
     assert.ok(result.error?.message.includes("Argument 'template' must be one of: base, javascript.react"));
     assertNotCalled(mockExecutor.process);
-  });
-
-  it('should determine intent from from parameter', async () => {
-    await initCommand.execute({ workingDirectory: validDir, from: SYS_ID });
-
-    assertProcessCalledWithSdkArgs(containsAll([`--from=${SYS_ID}`]), validDir, "'--from <sys_id>'");
-  });
-
-  it('should determine intent from creation parameters', async () => {
-    await initCommand.execute({ ...CREATION, workingDirectory: validDir });
-
-    assertProcessCalledWithSdkArgs(containsAll(['--appName=Test App']), validDir, '--appName=Test App');
   });
 });

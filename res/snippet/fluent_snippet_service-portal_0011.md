@@ -1,9 +1,9 @@
 # Create a Service Portal Angular Provider as a factory
 
 ```typescript
-import { SpAngularProvider } from '@servicenow/sdk/core'
+import { SPAngularProvider } from '@servicenow/sdk/core'
 
-SpAngularProvider({
+SPAngularProvider({
     $id: Now.ID['utility_factory'],
     name: 'UtilityFactory',
     type: 'factory',

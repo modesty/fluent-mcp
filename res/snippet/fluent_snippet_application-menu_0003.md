@@ -1,5 +1,6 @@
 # Application Menu API example: creating a top application menu with defined role access and an app category object and an application submenu (application module) for top application menu with, link_type as ASSESSMENT
 ```typescript
+// App scope: x_snc_example
 import { ApplicationMenu, Record, Role } from "@servicenow/sdk/core";
 
 const secureAppUserRole = Role({
@@ -27,7 +28,7 @@ const applicationMenu = ApplicationMenu({
     order: 100,
 })
 
-const applicationSubMenu = Record({
+export const applicationSubMenu = Record({
     $id: Now.ID['rec1'],
     table: "sys_app_module",
     data: {
@@ -35,7 +36,7 @@ const applicationSubMenu = Record({
         application: applicationMenu,
         active: true,
         hint: 'Sub Menu under system security',
-        linkType: 'ASSESSMENT',
+        link_type: 'ASSESSMENT',
         assessment: Now.ref('asmt_metric_type', '<sys_id>'), // sys_id of the existing `Basic Flow` assessment metric type, looked up on the instance
     },
 })

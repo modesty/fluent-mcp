@@ -2,7 +2,7 @@
 ```typescript
 import { UiPolicy } from '@servicenow/sdk/core'
 
-UiPolicy({
+export const resolvedIncidentPolicy = UiPolicy({
 	$id: Now.ID['resolved_incident_policy'],
 	table: 'incident',
 	shortDescription: 'Hide related lists and show messages when incident is resolved',
@@ -47,13 +47,15 @@ UiPolicy({
 			cleared: false,
 		},
 	],
+	// Each `list` is '<child_table>.<reference_field>' for a reference-based related list, or the sys_id
+	// (or a Record<'sys_relationship'>) of a relationship. Never add the 'REL:' prefix; the plugin writes it.
 	relatedListActions: [
 		{
-			list: 'incident.task',
+			list: 'incident_task.incident', // Incident Tasks
 			visible: false,
 		},
 		{
-			list: 'REL:' + Now.ID['incident_child_incidents'],
+			list: 'incident.parent_incident', // Child Incidents
 			visible: false,
 		},
 	],

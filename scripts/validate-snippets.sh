@@ -31,109 +31,12 @@ TOTAL=0
 PASSED=0
 FAILED=0
 SKIPPED=0
-EXPECTED_FAIL=0
 
 # Report file (coverage/snippet-validation.md)
 REPORT_FILE="$PROJECT_ROOT/coverage/snippet-validation.md"
 PASS_LIST=()
 FAIL_LIST=()
-XFAIL_LIST=()
 SKIP_LIST=()
-
-# Snippets known to reference external symbols not available in isolation.
-# These are tracked so regressions in *other* snippets are still caught.
-EXPECTED_FAILURES=(
-  # Catalog snippets reference external catalogItemRef / variableSetRef variables
-  "fluent_snippet_catalog-client-script_0001.md"
-  "fluent_snippet_catalog-ui-policy_0001.md"
-  "fluent_snippet_catalog-item_0001.md"
-  "fluent_snippet_catalog-item-record-producer_0001.md"
-  "fluent_snippet_catalog-variable_0001.md"
-  "fluent_snippet_variable-set_0001.md"
-  # SLA snippet references external variables
-  "fluent_snippet_sla_0001.md"
-  # NowAssist snippet references external script file and requires full project context
-  "fluent_snippet_now-assist-skill-config_0001.md"
-  # List snippet: a sys_ui_view Record without $id (TS2345)
-  "fluent_snippet_list_0002.md"
-  # Legacy Record form snippets: `table` is not a sys_ui_section column (TS2353);
-  # form_0001 also has a string view `roles` (TS2322) and an invalid listRef (TS11)
-  "fluent_snippet_form_0001.md"
-  "fluent_snippet_form_0003.md"
-  # Snippets with unused variable warnings (strict mode, not actual errors)
-  "fluent_snippet_application-menu_0001.md"
-  "fluent_snippet_application-menu_0002.md"
-  "fluent_snippet_application-menu_0003.md"
-  "fluent_snippet_application-menu_0004.md"
-  "fluent_snippet_application-menu_0005.md"
-  # Column snippets — scope-dependent naming enforced by build
-  "fluent_snippet_column_0001.md"
-  "fluent_snippet_column_0002.md"
-  "fluent_snippet_column-generic_0001.md"
-  # Cross-scope privilege references external scope
-  # Table snippets — scope prefix naming
-  "fluent_snippet_table_0001.md"
-  "fluent_snippet_table_0002.md"
-  "fluent_snippet_table_0003.md"
-  # Column 0003-0005 — global scope prefix requirements (pre-existing)
-  "fluent_snippet_column_0003.md"
-  "fluent_snippet_column_0004.md"
-  "fluent_snippet_column_0005.md"
-  # Service-portal snippets — use old API patterns or reference external modules (pre-existing)
-  "fluent_snippet_service-portal_0001.md"
-  "fluent_snippet_service-portal_0002.md"
-  "fluent_snippet_service-portal_0003.md"
-  "fluent_snippet_service-portal_0004.md"
-  "fluent_snippet_service-portal_0005.md"
-  "fluent_snippet_service-portal_0006.md"
-  "fluent_snippet_service-portal_0007.md"
-  "fluent_snippet_service-portal_0008.md"
-  "fluent_snippet_service-portal_0009.md"
-  "fluent_snippet_service-portal_0010.md"
-  "fluent_snippet_service-portal_0011.md"
-  "fluent_snippet_service-portal_0012.md"
-  "fluent_snippet_service-portal_0013.md"
-  "fluent_snippet_service-portal_0014.md"
-  "fluent_snippet_service-portal_0015.md"
-  "fluent_snippet_service-portal_0016.md"
-  "fluent_snippet_service-portal_0017.md"
-  "fluent_snippet_service-portal_0018.md"
-  # Property/Role snippets — pre-existing issues
-  "fluent_snippet_property_0001.md"
-  "fluent_snippet_property_0002.md"
-  "fluent_snippet_property_0003.md"
-  "fluent_snippet_role_0001.md"
-  # Scripted REST — pre-existing issues
-  "fluent_snippet_scripted-rest_0001.md"
-  # UI page/policy snippets — reference external variables (pre-existing)
-  "fluent_snippet_ui-page_0003.md"
-  "fluent_snippet_ui-page_0007.md"
-  "fluent_snippet_ui-page_0010.md"
-  "fluent_snippet_ui-policy_0003.md"
-  # ATF snippets using assertType (pre-existing, not changed in this update)
-  "fluent_snippet_atf-form_0001.md"
-  "fluent_snippet_atf-server-record_0001.md"
-  "fluent_snippet_atf-server-record_0002.md"
-  "fluent_snippet_atf-catalog-action_0002.md"
-  "fluent_snippet_atf-catalog-action_0003.md"
-  "fluent_snippet_atf-catalog-validation_001.md"
-  "fluent_snippet_atf-catalog-variable_001.md"
-  "fluent_snippet_atf-form-action_0001.md"
-  "fluent_snippet_atf-form-action_0002.md"
-  "fluent_snippet_atf-form-action_0003.md"
-  "fluent_snippet_atf-form-field_0001.md"
-  "fluent_snippet_atf-reporting_0001.md"
-  "fluent_snippet_atf-email_0002.md"
-  "fluent_snippet_atf-email_0003.md"
-)
-
-is_expected_failure() {
-  local name="$1"
-  for ef in "${EXPECTED_FAILURES[@]}"; do
-    [[ "$name" == "$ef" ]] && return 0
-  done
-  return 1
-}
 
 # ── Setup skeleton project ──────────────────────────────────────────
 setup_skeleton() {
@@ -202,27 +105,21 @@ build_snippet() {
   local snippet_name
   snippet_name="$(basename "$snippet_file")"
 
-  # Most snippets are intentionally validated in global scope. The augment
-  # example owns x_acme_* fields, so validate it in the matching named scope;
-  # otherwise the SDK correctly rejects those fields as foreign-owned.
-  # table_0004's `fx_` tables are unprefixed for global (`u_`) and x_ scopes; a
-  # non-x_, non-global scope is not prefix-checked, so it builds as written there
-  # and its column XML (e.g. reference_qual_condition) is actually exercised.
-  case "$snippet_name" in
-    fluent_snippet_table_0005.md)
-      configure_scope "x_acme" "0123456789abcdef0123456789abcdef"
-      ;;
-    fluent_snippet_table_0004.md)
-      configure_scope "sn_fx" "0123456789abcdef0123456789abcdef"
-      ;;
-    *)
-      configure_scope "global" "global"
-      ;;
-  esac
-
   # Extract code
   local code
   code="$(extract_typescript "$snippet_file")"
+
+  # A snippet builds in global scope unless its code states the app scope it
+  # assumes with a line `// App scope: <scope>`. The build checks table and
+  # column name prefixes against the scope (`u_` in global, `<scope>_` in an
+  # `x_` scope), so the marker is a precondition the reader needs too.
+  local scope
+  scope="$(printf '%s\n' "$code" | sed -n 's|^// App scope: \([a-z0-9_]*\).*|\1|p' | head -1)"
+  if [[ -n "$scope" && "$scope" != "global" ]]; then
+    configure_scope "$scope" "0123456789abcdef0123456789abcdef"
+  else
+    configure_scope "global" "global"
+  fi
 
   # Skip if no typescript block found
   if [[ -z "$code" ]]; then
@@ -234,6 +131,7 @@ build_snippet() {
 
   # Write to skeleton
   rm -f "$WORK_DIR/src/fluent/"*.now.ts
+  rm -rf "${WORK_DIR:?}/dist"
   echo "$code" > "$WORK_DIR/src/fluent/snippet.now.ts"
 
   # Build
@@ -241,26 +139,33 @@ build_snippet() {
   local exit_code=0
   output="$(npx now-sdk build "$WORK_DIR" 2>&1)" || exit_code=$?
 
+  # A build can succeed yet write an unresolved value into the XML, e.g.
+  # Symbol(Now.UNRESOLVED) for a reference the plugins could not resolve, or
+  # Symbol(NowAttachShape) for Now.attach() as a column default (SDK 4.14.0).
+  local unresolved=""
   if [[ $exit_code -eq 0 ]]; then
+    unresolved="$(grep -rl 'Symbol(' "$WORK_DIR/dist" 2>/dev/null | head -1 || true)"
+  fi
+
+  if [[ $exit_code -eq 0 && -z "$unresolved" ]]; then
     printf "  ${GREEN}[PASS]${NC} %s\n" "$snippet_name"
     PASSED=$((PASSED + 1))
     PASS_LIST+=("$snippet_name")
   else
-    if is_expected_failure "$snippet_name"; then
-      printf "  ${YELLOW}[XFAIL]${NC} %s (expected)\n" "$snippet_name"
-      EXPECTED_FAIL=$((EXPECTED_FAIL + 1))
-      XFAIL_LIST+=("$snippet_name")
+    printf "  ${RED}[FAIL]${NC} %s\n" "$snippet_name"
+    local first_err
+    if [[ -n "$unresolved" ]]; then
+      first_err="build wrote an unresolved Symbol(...) value into ${unresolved#$WORK_DIR/}"
+      printf "         %s\n" "$first_err"
     else
-      printf "  ${RED}[FAIL]${NC} %s\n" "$snippet_name"
       # Print only the ERROR lines, strip ANSI codes
-      local first_err
       first_err="$(echo "$output" | grep -i "error" | sed 's/\x1b\[[0-9;]*m//g' | head -1)"
       echo "$output" | grep -i "error" | sed 's/\x1b\[[0-9;]*m//g' | while IFS= read -r line; do
         printf "         %s\n" "$line"
       done
-      FAILED=$((FAILED + 1))
-      FAIL_LIST+=("$snippet_name|$first_err")
     fi
+    FAILED=$((FAILED + 1))
+    FAIL_LIST+=("$snippet_name|$first_err")
   fi
 }
 
@@ -277,13 +182,12 @@ write_report() {
     echo "| Status | Count |"
     echo "|--------|-------|"
     echo "| ✅ Passed | $PASSED |"
-    echo "| ❌ Failed (unexpected) | $FAILED |"
-    echo "| 🟡 Expected failures (fragments / external deps) | $EXPECTED_FAIL |"
+    echo "| ❌ Failed | $FAILED |"
     echo "| ⚪ Skipped (no typescript block) | $SKIPPED |"
     echo "| **Total** | **$TOTAL** |"
     echo ""
     if [[ $FAILED -gt 0 ]]; then
-      echo "## Unexpected failures"
+      echo "## Failures"
       echo ""
       for entry in "${FAIL_LIST[@]}"; do
         local name="${entry%%|*}"
@@ -295,14 +199,6 @@ write_report() {
     echo "## Passed (${#PASS_LIST[@]})"
     echo ""
     for name in ${PASS_LIST[@]+"${PASS_LIST[@]}"}; do
-      echo "- $name"
-    done
-    echo ""
-    echo "## Expected failures — fragments or external dependencies (${#XFAIL_LIST[@]})"
-    echo ""
-    echo "Snippets in this list are intentional fragments that demonstrate API patterns but cannot compile in isolation (e.g., references to cross-file imports, scope-dependent identifiers, external Now.include() targets). Tracked so regressions in *other* snippets are still caught."
-    echo ""
-    for name in ${XFAIL_LIST[@]+"${XFAIL_LIST[@]}"}; do
       echo "- $name"
     done
     echo ""
@@ -375,7 +271,6 @@ main() {
   else
     printf "0 failed, "
   fi
-  printf "${YELLOW}%d expected failures${NC}, " "$EXPECTED_FAIL"
   printf "%d skipped, " "$SKIPPED"
   printf "%d total\n" "$TOTAL"
   echo ""
@@ -385,9 +280,8 @@ main() {
     write_report
   fi
 
-  # Exit with failure only for unexpected failures
   if [[ $FAILED -gt 0 ]]; then
-    printf "${RED}Unexpected compilation failures detected!${NC}\n"
+    printf "${RED}Snippet compilation failures detected!${NC}\n"
     exit 1
   fi
 

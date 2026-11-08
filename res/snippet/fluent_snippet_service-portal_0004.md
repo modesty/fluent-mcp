@@ -1,9 +1,9 @@
 # Create a Service Portal widget with SASS styling
 
 ```typescript
-import { SpWidget } from '@servicenow/sdk/core'
+import { SPWidget } from '@servicenow/sdk/core'
 
-SpWidget({
+SPWidget({
     $id: Now.ID['sass_styled_widget'],
     name: 'SASS Styled Widget',
     description: 'Widget using SASS for styling',
@@ -15,7 +15,7 @@ SpWidget({
     <p>{{c.data.content}}</p>
   </div>
 </div>`,
-    sassSrc: `$primary-color: #337ab7;
+    customCss: `$primary-color: #337ab7;
 $padding: 15px;
 
 .custom-widget {

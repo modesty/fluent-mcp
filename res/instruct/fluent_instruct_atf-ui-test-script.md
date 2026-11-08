@@ -1,8 +1,8 @@
 # Instructions for Fluent ATF UI Test Script (TestingLibrary) API
 
-Always reference `fluent_instruct_atf.md` and the ATF UI Test Script API specification for details.
+Always reference the `atf` instructions (`get_fluent_knowledge` kind `instruct`) and the ATF UI Test Script API specification for details.
 
-1. Start from the shared `Test()` scaffold in `fluent_instruct_atf.md`.
+1. Start from the shared `Test()` scaffold in the `atf` instructions (`get_fluent_knowledge` kind `instruct`).
 2. Use `atf.uiTestScript.runTest()` **only** for custom UI that the standard `atf.form.*` / `atf.catalog.*` steps cannot reach — Angular/React widgets, embedded SPAs, custom workspaces, and `now-*` web components. Use the standard ATF categories for standard forms, catalog items, and pure server-side logic.
 3. Give every `Test()` and every step a unique `$id`. Steps execute sequentially.
 4. Keep the script body in a sibling `.js` file and reference it with `Now.include('./file.script.js')` for IDE support. Use an inline template literal only for a trivial one-liner, or when the script must interpolate a prior step's output (GEM interpolation is incompatible with `Now.include()`).

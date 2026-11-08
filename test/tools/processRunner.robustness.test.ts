@@ -97,7 +97,6 @@ describe('NodeProcessRunner — timeout returns partial output (P0.2)', () => {
       process.execPath,
       hangingChildWithMarkerArgs('partial-before-timeout', markerPath),
       undefined,
-      undefined,
       250, // per-call timeout, on the mocked clock
       controller.signal
     );
@@ -137,7 +136,6 @@ describe('NodeProcessRunner — timeout returns partial output (P0.2)', () => {
       process.execPath,
       hangingChildArgs('x'),
       undefined,
-      undefined,
       600_000 // caller asked for 10 minutes; the override must clamp to 200ms
     );
 
@@ -164,7 +162,6 @@ describe('NodeProcessRunner — timeout returns partial output (P0.2)', () => {
         process.execPath,
         ['-e', "setTimeout(() => process.stdout.write('done'), 300)"],
         undefined,
-        undefined,
         perCall
       );
 
@@ -186,7 +183,6 @@ describe('NodeProcessRunner — client cancellation kills the child (P0.3)', () 
     const run = runner.run(
       process.execPath,
       hangingChildWithMarkerArgs('emitted-then-cancelled', markerPath),
-      undefined,
       undefined,
       600_000, // long timeout so the *signal*, not the timeout, ends the process
       controller.signal
@@ -214,7 +210,6 @@ describe('NodeProcessRunner — client cancellation kills the child (P0.3)', () 
     const result = await runner.run(
       process.execPath,
       hangingChildArgs('never-mind'),
-      undefined,
       undefined,
       600_000,
       AbortSignal.abort()
@@ -261,7 +256,7 @@ describe('NodeProcessRunner — output is bounded (P0.4)', () => {
     const bounded = await runner.run(process.execPath, childArgs);
     assert.equal(bounded.stdoutTruncated, true);
 
-    const raised = await runner.run(process.execPath, childArgs, undefined, undefined, undefined, undefined, { maxStdoutChars: 5000 });
+    const raised = await runner.run(process.execPath, childArgs, undefined, undefined, undefined, { maxStdoutChars: 5000 });
     assert.equal(raised.stdout, 'A'.repeat(2000));
     assert.equal(raised.stdoutTruncated, undefined);
     assert.match(raised.stderr, /characters truncated/);

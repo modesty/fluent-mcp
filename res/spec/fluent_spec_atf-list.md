@@ -4,7 +4,7 @@
 // Validates the visibility of the selected related lists on a form. A valid form must be open.
 // The ONLY atf.list step that takes neither `listType` nor `relatedList`.
 atf.list.relatedListVisibility({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['related_list_visibility_step'], // string | guid, mandatory
   table: 'incident', // TableName, mandatory - the table whose form is open
   visible: ['task.parent'], // string[], optional (default []) - related lists asserted VISIBLE
   notVisible: [], // string[], optional (default []) - related lists asserted NOT visible
@@ -13,7 +13,7 @@ atf.list.relatedListVisibility({
 // Applies a filter to a list, narrowing it to matching records. Clears any existing filter on the list.
 // A list module, or a form with related lists, must be open.
 const filterResult = atf.list.applyFilterToList({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['apply_filter_to_list_step'], // string | guid, mandatory
   listType: 'related_list', // 'related_list' | 'list', optional (default 'related_list')
   table: 'incident', // TableName, mandatory - the table whose form/list is open
   relatedList: 'task.parent', // Record&lt;'sys_relationship'&gt; | string, mandatory - '&lt;child_table&gt;.&lt;field&gt;' or 'REL:&lt;sys_id&gt;'
@@ -24,7 +24,7 @@ const filterResult = atf.list.applyFilterToList({
 
 // Validates the presence (or absence) of a specified record in a list.
 atf.list.recordPresentInList({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['record_present_in_list_step'], // string | guid, mandatory
   table: 'incident', // TableName, mandatory
   listType: 'related_list', // 'related_list' | 'list', optional (default 'related_list')
   relatedList: 'task.parent', // Record&lt;'sys_relationship'&gt; | string, mandatory
@@ -35,7 +35,7 @@ atf.list.recordPresentInList({
 
 // Opens a specified record in a list.
 atf.list.openRecordInList({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['open_record_in_list_step'], // string | guid, mandatory
   listType: 'related_list', // 'related_list' | 'list', optional (default 'related_list')
   table: 'incident', // TableName, mandatory
   relatedList: 'task.parent', // Record&lt;'sys_relationship'&gt; | string, mandatory
@@ -47,7 +47,7 @@ atf.list.openRecordInList({
 // The default visible UI Actions vary with the currently impersonated user.
 // NOTE: this is the one atf.list step where `relatedListTable` is OPTIONAL.
 atf.list.listUIActionVisibility({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['list_ui_action_visibility_step'], // string | guid, mandatory
   listType: 'related_list', // 'related_list' | 'list', optional (default 'related_list')
   table: 'incident', // TableName, mandatory
   relatedList: 'task.parent', // Record&lt;'sys_relationship'&gt; | string, mandatory
@@ -59,7 +59,7 @@ atf.list.listUIActionVisibility({
 // Clicks a UI Action on a list. HAS REAL SIDE EFFECTS — it executes the action.
 // After this step, do NOT use further steps against the current form or list: it will likely navigate away.
 atf.list.clickListUIAction({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['click_list_ui_action_step'], // string | guid, mandatory
   listType: 'related_list', // 'related_list' | 'list', optional (default 'related_list')
   table: 'incident', // TableName, mandatory
   relatedList: 'task.parent', // Record&lt;'sys_relationship'&gt; | string, mandatory

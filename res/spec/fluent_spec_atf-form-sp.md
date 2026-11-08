@@ -2,34 +2,34 @@
 ```typescript
 // Opens a new form for the selected table in Service Portal.
 atf.form_SP.openNewForm({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['open_new_form_step'], // string | guid, mandatory
   table: '', // table name
   view: '', // string
 }): void;
 
 // Navigates to a Service Portal page.
 atf.form_SP.openServicePortalPage({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['open_service_portal_page_step'], // string | guid, mandatory
   pageId: '', // string, the sys_id or URL suffix of the Service Portal page
 }): void;
 
 // Sets a field value on the current Service Portal form after a call to atf.form_SP.openNewForm.
 atf.form_SP.setFieldValue({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['set_field_value_step'], // string | guid, mandatory
   table: '', // table name
   fieldValues: {}, // a valid JSON object, field must be snake_case and double-quoted and values must be double-quoted with properly escaped JSON values: { "field_one": "value1", "field_two": "value2" }
 }): void;
 
 // Validates that a field value matches expected conditions on the current Service Portal form.
 atf.form_SP.fieldValueValidation({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['field_value_validation_step'], // string | guid, mandatory
   table: '', // table name
   conditions: '', // string, servicenow encoded query
 }): void;
 
 // Validates field states (mandatory, read-only, visible) on the current Service Portal form.
 atf.form_SP.fieldStateValidation({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['field_state_validation_step'], // string | guid, mandatory
   table: '', // table name
   fieldName: '', // string, the field name to validate
   isMandatory: false, // boolean
@@ -39,7 +39,7 @@ atf.form_SP.fieldStateValidation({ // all props are mandatory
 
 // Validates the visibility of a UI action on the current Service Portal form.
 atf.form_SP.uiActionVisibilityValidation({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['ui_action_visibility_validation_step'], // string | guid, mandatory
   table: '', // table name
   uiAction: Now.ref('sys_ui_action', '<sys_id>'), // sys_id | Record<'sys_ui_action'>
   isVisible: true, // boolean
@@ -47,20 +47,20 @@ atf.form_SP.uiActionVisibilityValidation({ // all props are mandatory
 
 // Adds attachments to the current Service Portal form.
 atf.form_SP.addAttachmentsToForm({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['add_attachments_to_form_step'], // string | guid, mandatory
   table: '', // table name
   attachments: [], // array of attachment objects
 }): void;
 
 // Submits the current Service Portal form.
 atf.form_SP.submitForm({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['submit_form_step'], // string | guid, mandatory
   assert: '', // '' | 'form_submitted_to_server' | 'form_submission_canceled_in_browser'
 }): { table: string; record_id: string }; // output keys are snake_case
 
 // Clicks a UI action button on the current Service Portal form.
 atf.form_SP.clickUIAction({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['click_ui_action_step'], // string | guid, mandatory
   table: '', // table name, mandatory
   uiAction: Now.ref('sys_ui_action', '<sys_id>'), // sys_id | Record<'sys_ui_action'>, mandatory
   assert: 'form_submitted_to_server', // optional as of SDK v4.13.0 (was mandatory; no SDK default — omitted is written empty): 'form_submitted_to_server' | 'form_submission_canceled_in_browser' (only these two values)

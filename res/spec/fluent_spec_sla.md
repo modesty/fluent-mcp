@@ -1,7 +1,8 @@
 # **Context:** Sla API spec: Used to create a ServiceNow SLA definition (`contract_sla`) — a Service Level Agreement that tracks time-based commitments for task records. Uses the `Duration()` helper for time values.
 
 ```typescript
-import { Sla, Duration } from '@servicenow/sdk/core'
+import { Sla } from '@servicenow/sdk/core'
+// Duration() is a global helper declared by the SDK: use it without importing it
 
 // Creates a new SLA definition (`contract_sla`)
 Sla({

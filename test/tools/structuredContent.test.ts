@@ -73,19 +73,10 @@ describe('Read tools — outputSchema + structuredContent', () => {
     assert.equal(result.structuredContent?.resourceType, 'instruct');
   });
 
-  it('advertises exactly the shipped metadata types as the metadataType enum', async () => {
-    const domain = new GetFluentKnowledgeCommand().arguments.find((arg) => arg.name === 'metadataType')?.domain;
-    assert.equal(domain?.kind, 'choices');
-    const onDisk = await new ResourceCatalog().getAvailableMetadataTypes();
-    // Same set; the enum is sorted by type name, the catalog by file name.
-    assert.deepEqual(domain.kind === 'choices' ? [...domain.values].sort() : [], [...onDisk].sort());
-    assert.equal(onDisk.length, 76);
-  });
-
   it('lists, per kind, only the types that have that kind', async () => {
     const cmd = new GetFluentKnowledgeCommand();
     const catalog = new ResourceCatalog();
-    const all = await catalog.getAvailableMetadataTypes();
+    const all = [...(await catalog.load()).types];
     for (const kind of ['spec', 'instruct']) {
       const result = await cmd.execute({ kind });
       assert.deepEqual(result.structuredContent?.availableTypes, all, kind);

@@ -2,7 +2,7 @@
 import { Test } from '@servicenow/sdk/core'
 import '@servicenow/sdk-core/global'
 Test({
-  $id: Now.ID[''], // fill in a valid GUID string or the name of the test
+  $id: Now.ID['atf-form-field_0001'], // fill in a valid GUID string or the name of the test
   name: 'Cancel Change Request For Normal type', // string
   description: 'Test to cancel a Change Request of Normal type before review state', // string
   active: true, // boolean
@@ -22,14 +22,14 @@ Test({
       'assignment_group': '679434f053231300e321ddeeff7b12d8',
       'state': 'Assess'
     },
-    assertType: 'record_successfully_inserted',
+    assert: 'record_successfully_inserted',
     enforceSecurity: true
   })
 
   atf.form.openExistingRecord({
     $id: Now.ID['0003'],
     table: 'change_request', // Open the 'Change Request' form
-    recordId: insertedRecord.recordId,
+    recordId: insertedRecord.record_id,
     formUI: 'standard_ui',
     view: '',
     selectedTabIndex: 0
@@ -42,7 +42,7 @@ Test({
     actionType: 'ui_action',
     uiAction: '4f2777b3cb100200d71cb9c0c24c9c91',
     declarativeAction: '',
-    assertType: 'form_submitted_to_server'
+    assert: 'form_submitted_to_server'
   })
 
   atf.form.setFieldValue({
@@ -58,7 +58,7 @@ Test({
     $id: Now.ID['0006'],
     formUI: 'standard_ui', // Click the ok button
     uiPage: '06a7db02b7703300fecf082e7e11a9e8',
-    assertType: '',
+    assert: '',
     button: 'ok',
     assertTimeout: 10
   })

@@ -8,40 +8,17 @@ import { fileURLToPath } from 'node:url';
 import { parseCommandTimeoutOverride } from './utils/commandTimeout.js';
 
 /**
- * Find the project root by examining the module path.
- * This works reliably in all environments including Claude Desktop App.
- *
- * In runtime (ESM environment): Uses import.meta.url to get the actual file location
- * In test environment: Falls back to process.cwd() with directory traversal
+ * The installed package root: the directory above this module (`dist/` when
+ * built, `src/` in a test stage), which holds package.json and `res/`.
  */
 export function getProjectRootPath(): string {
-  // For ESM runtime: Use import.meta.url to get the actual module path
-  if (import.meta?.url) {
-    const modulePath = fileURLToPath(import.meta.url);
-    const moduleDir = path.dirname(modulePath);
-    return path.resolve(moduleDir, '..'); // navigate up to the project root
-  }
-  return process.cwd();
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 }
 
-const packageJsonPath = path.resolve(getProjectRootPath(), 'package.json');
-let packageInfo: {
-  name: string;
-  version: string;
-  description: string;
-  [key: string]: unknown;
-} = {
-  name: '@modesty/fluent-mcp',
-  version: '0.0.2',
-  description: 'Fluent MCP server for ServiceNow SDK',
-};
-
-try {
-  const packageData = fs.readFileSync(packageJsonPath, 'utf-8');
-  packageInfo = JSON.parse(packageData);
-} catch (error) {
-  console.error(`Failed to load package.json: ${error}`);
-}
+/** The package's own package.json, which every build and install ships. */
+const packageInfo = JSON.parse(
+  fs.readFileSync(path.resolve(getProjectRootPath(), 'package.json'), 'utf-8')
+) as { name: string; version: string; description: string };
 
 /**
  * Configuration interface for the MCP server
@@ -74,8 +51,6 @@ export interface McpServerConfig {
 
   /** ServiceNow SDK CLI configuration */
   servicenowSdk: {
-    /** Path to ServiceNow SDK CLI */
-    cliPath: string;
     /**
      * Fallback timeout (ms) for SDK CLI commands that do not declare their own.
      * Per-command timeouts (e.g. deploy/build) normally supersede this.
@@ -100,17 +75,13 @@ const ENV_VAR = {
   RESOURCE_PATH_SPEC: `${ENV_PREFIX}RESOURCE_PATH_SPEC`,
   RESOURCE_PATH_SNIPPET: `${ENV_PREFIX}RESOURCE_PATH_SNIPPET`,
   RESOURCE_PATH_INSTRUCT: `${ENV_PREFIX}RESOURCE_PATH_INSTRUCT`,
-  SERVICENOW_SDK_CLI_PATH: `${ENV_PREFIX}SERVICENOW_SDK_CLI_PATH`,
   COMMAND_TIMEOUT_MS: `${ENV_PREFIX}COMMAND_TIMEOUT_MS`,
 };
 
 /**
- * Default configuration for the MCP server
+ * Defaults for the settings an environment variable can replace
  */
-export const defaultConfig: McpServerConfig = {
-  name: packageInfo.name,
-  version: packageInfo.version,
-  description: packageInfo.description,
+const defaultConfig: Pick<McpServerConfig, 'logLevel' | 'resourcePaths' | 'servicenowSdk'> = {
   logLevel: 'info',
   resourcePaths: {
     spec: path.resolve(getProjectRootPath(), './res/spec'),
@@ -118,7 +89,6 @@ export const defaultConfig: McpServerConfig = {
     instruct: path.resolve(getProjectRootPath(), './res/instruct'),
   },
   servicenowSdk: {
-    cliPath: 'snc', // Default command name if installed globally
     commandTimeoutMs: 30000, // 30 seconds default timeout
   },
 };
@@ -148,10 +118,6 @@ export function getConfig(): McpServerConfig {
       ),
     },
     servicenowSdk: {
-      cliPath: getEnvVar(
-        ENV_VAR.SERVICENOW_SDK_CLI_PATH,
-        defaultConfig.servicenowSdk.cliPath
-      ),
       commandTimeoutMs: defaultConfig.servicenowSdk.commandTimeoutMs,
       // FLUENT_MCP_COMMAND_TIMEOUT_MS is an operator override, not the base
       // default: only honor it when present and a positive integer.

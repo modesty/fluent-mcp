@@ -5,15 +5,6 @@
  * request object — or fails with a message naming exactly which arguments are
  * missing.
  *
- * Replaces the former `InitElicitator`, which asked the client for missing
- * values via `server.server.elicitInput(...)`. MCP 2026-07-28 removed
- * server-initiated requests (SEP-2322: "The previous pattern of
- * server-initiated requests is no longer supported. This is a breaking
- * change."), and the SDK v2 `ServerContext.mcpReq.elicitInput` throws outright
- * on a 2026-era request. Since `init_fluent_app` already advertises every one
- * of these arguments in `tools/list`, the caller can supply them directly and
- * the tool needs no round trip.
- *
  * Note the requirement is *conditional*, so it cannot be expressed by marking
  * the arguments `required: true` in the input schema: `from` is required only
  * for conversion, and `appName`/`packageName`/`scopeName`/`template` only for

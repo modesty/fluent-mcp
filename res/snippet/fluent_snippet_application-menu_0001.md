@@ -1,5 +1,6 @@
 # Application Menu API example: creating a top application menu with defined role access and a app category object
 ```typescript
+// App scope: x_snc_example
 import { ApplicationMenu, Record, Role } from "@servicenow/sdk/core";
 
 const customRole = Role({
@@ -16,8 +17,8 @@ const appCategory = Record({
     },
 })
 
-const exAppMenu = ApplicationMenu({
-    $id: 0,
+export const exAppMenu = ApplicationMenu({
+    $id: Now.ID['example_app_menu'],
     title: 'Example Application menu',
     hint: 'this is an example application menu',
     description: 'a random description',

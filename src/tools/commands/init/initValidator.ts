@@ -74,38 +74,23 @@ export class InitValidator {
   }
 
   /**
-   * Validate creation parameters. The destination directory is checked
-   * separately, for both intents (`checkInitDestination`).
+   * Validate the creation parameters' formats. Presence is already enforced:
+   * `InitArgsResolver.resolveCreationData` rejects a missing or blank appName,
+   * packageName, scopeName or template, and the input schema holds the template
+   * to its choices. The destination directory is checked separately, for both
+   * intents (`checkInitDestination`).
    */
   static validateCreationParameters(data: CreationInitData): MultiValidationResult {
     const errors: string[] = [];
 
-    if (!data.appName || data.appName.trim().length === 0) {
-      errors.push('appName is required and cannot be empty');
+    if (!data.scopeName.startsWith('x_')) {
+      errors.push('scopeName must start with "x_" prefix');
     }
-
-    if (!data.packageName || data.packageName.trim().length === 0) {
-      errors.push('packageName is required and cannot be empty');
+    if (data.scopeName.length > 18) {
+      errors.push('scopeName cannot be longer than 18 characters');
     }
-
-    if (!data.scopeName || data.scopeName.trim().length === 0) {
-      errors.push('scopeName is required and cannot be empty');
-    } else {
-      // Validate scopeName format
-      if (!data.scopeName.startsWith('x_')) {
-        errors.push('scopeName must start with "x_" prefix');
-      }
-      if (data.scopeName.length > 18) {
-        errors.push('scopeName cannot be longer than 18 characters');
-      }
-      if (/\s/.test(data.scopeName)) {
-        errors.push('scopeName cannot contain spaces');
-      }
-    }
-
-    // The template's choices are part of the input schema (InitCommand.validateArgs).
-    if (!data.template || data.template.trim().length === 0) {
-      errors.push('template is required and cannot be empty');
+    if (/\s/.test(data.scopeName)) {
+      errors.push('scopeName cannot contain spaces');
     }
 
     return {

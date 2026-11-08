@@ -6,7 +6,7 @@ Always reference the RiskAssessment API specifications for more details.
    - If no record comes back, or `active` is not true, **stop**. Tell the user the plugin must be activated (All > System Definition > Plugins) before this can be built and installed.
 3. **When to use it.** Use it to score a `change_request` and map the score to a change risk level (high, moderate, low) through thresholds.
 4. **When NOT to use it.**
-   - For any other target table, or for surveys and general scored assessments, use `Assessment` (see `fluent_instruct_assessment.md`).
+   - For any other target table, or for surveys and general scored assessments, use `Assessment` (see the `assessment` instructions, `get_fluent_knowledge` kind `instruct`).
    - Do not use `Assessment()` to build a change risk assessment either: it writes `asmt_metric_type`, not `change_risk_asmt`.
 5. **There is no `table` and no `evaluationMethod` property.** The build fixes the target to `change_request` and forces `evaluation_method` to `risk_assessment`.
    - Passing either property is a type error. The SDK risk-assessment guide's wording "defaults `table` to change_request … avoid overriding it" wrongly implies it can be overridden.

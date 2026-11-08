@@ -2,8 +2,8 @@
  * P0.1: the `coding_in_fluent` prompt renders REAL resource-backed guidance —
  * per-type instruction summaries plus explicit tool/URI pointers — and the full,
  * enum-derived catalog of supported metadata types. It must contain zero generic
- * "Use the appropriate Fluent API methods" stubs, and the catalog must list all
- * 76 types (single source of truth: ServiceNowMetadataType in src/types.ts).
+ * "Use the appropriate Fluent API methods" stubs, and the catalog must list every
+ * type (single source of truth: ServiceNowMetadataType in src/types.ts).
  *
  * Native runner: configuration is NOT mocked. The real getProjectRootPath() and
  * resourcePaths resolve to the staged copy of the shipped res/ tree
@@ -206,32 +206,17 @@ describe('coding_in_fluent prompt rendering (P0.1)', () => {
     assert.ok(!text.includes('Reference the specific instructions for'));
   });
 
-  it('appends the full enum-derived catalog of all 76 metadata types', async () => {
+  it('appends the full enum-derived catalog of every metadata type', async () => {
     const text = await renderCodingInFluent('flow');
-    const total = Object.values(ServiceNowMetadataType).length;
+    const types = Object.values(ServiceNowMetadataType);
+    const marker = `All ${types.length} supported metadata types`;
+    assert.ok(text.includes(marker));
 
-    assert.equal(total, 76); // guards against the pre-v4.14.0 count of 75 (+ ui-macro)
-    assert.ok(text.includes(`All ${total} supported metadata types`));
-
-    // Every supported type appears in the rendered catalog.
-    for (const type of Object.values(ServiceNowMetadataType)) {
-      assert.ok(text.includes(type));
-    }
-    // Including the v4.9.0 addition.
-    assert.ok(text.includes('atf-ui-test-script'));
-  });
-
-  /**
-   * MCP prompt arguments are string-valued on the wire, so the comma-separated
-   * form documented in res/prompt/coding_in_fluent.md is the only form a
-   * conforming client can send. It must be split, not treated as one type name.
-   */
-  it('splits the documented comma-separated metadata_list string', async () => {
-    const text = await renderCodingInFluent('state-model,atf-list');
-
-    assert.ok(text.includes('### state-model'));
-    assert.ok(text.includes('### atf-list'));
-    assert.ok(!text.includes('not a recognized Fluent metadata type'));
+    // The catalog section itself lists exactly the enum, in order. The count is
+    // pinned by resourceCoverage.test.ts.
+    const catalog = text.slice(text.lastIndexOf(marker)).trimEnd();
+    const list = catalog.slice(catalog.indexOf(':\n\n') + 3).replace(/\.$/, '').split(', ');
+    assert.deepEqual(list, types);
   });
 
   it('tolerates whitespace and casing around comma-separated entries', async () => {

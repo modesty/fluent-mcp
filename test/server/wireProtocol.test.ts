@@ -368,16 +368,12 @@ describe('dual-era wire protocol', () => {
       assert.deepStrictEqual(res.result.tools.map((t: Frame) => t.name), EXPECTED_TOOLS);
     });
 
-    it('advertises one knowledge tool with kind and metadataType enums, and none of the tools it replaced', async () => {
+    it('advertises one knowledge tool with kind and metadataType enums', async () => {
+      // EXPECTED_TOOLS above pins that the tools it replaced are gone.
       const res = await wire.modern('tools/list');
-      const names = res.result.tools.map((t: Frame) => t.name);
-      assert.equal(names.length, 16);
-      for (const removed of ['get-api-spec', 'get-instruct', 'get-snippet']) assert.ok(!names.includes(removed), removed);
-
       const tool = res.result.tools.find((t: Frame) => t.name === 'get_fluent_knowledge');
       assert.deepStrictEqual(tool.inputSchema.required, ['kind']);
       assert.deepStrictEqual(tool.inputSchema.properties.kind.enum, ['spec', 'instruct', 'snippet']);
-      assert.equal(tool.inputSchema.properties.metadataType.enum.length, 76);
       assert.ok(tool.inputSchema.properties.metadataType.enum.includes('business-rule'));
       assert.equal(tool.inputSchema.properties.snippetId.type, 'string');
       assert.equal(tool.annotations.readOnlyHint, true);
@@ -395,11 +391,6 @@ describe('dual-era wire protocol', () => {
       assert.ok(list.result.resources.length > 100);
 
       await assertResourceReads((method, params) => wire.modern(method, params));
-    });
-
-    it('reports a missing resource as -32602, not -32002', async () => {
-      const res = await wire.modern('resources/read', { uri: 'sn-spec://no-such-type' });
-      assert.equal(res.error.code, -32602);
     });
 
     it('advertises the three resource templates', async () => {
@@ -420,8 +411,8 @@ describe('dual-era wire protocol', () => {
       assert.equal(new Set(list.result.resources.map((r: Frame) => r.name)).size, uris.length);
     });
 
-    it('reports a URI no template matches as -32602 with data.uri (was -32603)', async () => {
-      for (const uri of ['unknown-scheme://x', 'sn-snippet://business-rule', 'sn-snippet://business-rule/9999']) {
+    it('reports a missing resource or a URI no template matches as -32602 with data.uri (was -32002/-32603)', async () => {
+      for (const uri of ['sn-spec://no-such-type', 'unknown-scheme://x', 'sn-snippet://business-rule', 'sn-snippet://business-rule/9999']) {
         const res = await wire.modern('resources/read', { uri });
         assert.equal(res.error?.code, -32602, uri);
         assert.equal(res.error.data?.uri, uri);

@@ -2,7 +2,7 @@
 ```typescript
 // Validates field values on the current form after a call to atf.form.openNewForm or atf.form.openExistingRecord
 atf.form.fieldValueValidation({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['field_value_validation_step'], // string | guid, mandatory
   table: '', // table name
   conditions: '', // servicenow encoded query
   formUI: 'standard_ui' // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace' 
@@ -10,7 +10,7 @@ atf.form.fieldValueValidation({ // all props are mandatory
 
 // Sets field values on the current form after a call to atf.form.openNewForm or atf.form.openExistingRecord
 atf.form.setFieldValue({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['set_field_value_step'], // string | guid, mandatory
   table: '', // table name
   fieldValues: {}, // a valid JSON object, field must be snake_case and double-quoted and values must be double-quoted with properly escaped JSON values: { "field_one": "value1", "field_two": "value2" }
   formUI: 'standard_ui', // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace'
@@ -18,7 +18,7 @@ atf.form.setFieldValue({ // all props are mandatory
 
 // Validates states of the desired fields on the current form after a call to atf.form.openNewForm or atf.form.openExistingRecord
 atf.form.fieldStateValidation({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['field_state_validation_step'], // string | guid, mandatory
   table: '', // table name
   visible: [''], // array of field names
   notVisible: [''], // array of field names

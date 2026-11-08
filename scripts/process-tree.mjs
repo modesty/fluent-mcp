@@ -45,11 +45,10 @@ let sampling = null;
 
 /**
  * Spawn options that give an owned child a process group of its own on POSIX.
- * @param {NodeJS.Platform} [platform]
  * @returns {{ detached: boolean }}
  */
-export function ownedSpawnOptions(platform = process.platform) {
-  return { detached: platform !== 'win32' };
+export function ownedSpawnOptions() {
+  return { detached: process.platform !== 'win32' };
 }
 
 /**
@@ -59,12 +58,11 @@ export function ownedSpawnOptions(platform = process.platform) {
  * @param {string} command
  * @param {string[]} args
  * @param {import('node:child_process').SpawnOptions} options
- * @param {NodeJS.Platform} [platform]
  * @returns {import('node:child_process').ChildProcess}
  */
-export function spawnOwned(command, args, options, platform = process.platform) {
-  const child = spawn(command, args, { ...options, ...ownedSpawnOptions(platform) });
-  if (platform === 'win32') {
+export function spawnOwned(command, args, options) {
+  const child = spawn(command, args, { ...options, ...ownedSpawnOptions() });
+  if (process.platform === 'win32') {
     windowsTrees.set(child, new Map());
     startSampling();
     sampleOwnedTrees();
@@ -81,11 +79,10 @@ export function spawnOwned(command, args, options, platform = process.platform) 
  * process.
  * @param {import('node:child_process').ChildProcess} child
  * @param {NodeJS.Signals} signal sent to the group on POSIX; Windows always ends the tree forcibly
- * @param {NodeJS.Platform} [platform]
  */
-export function signalTree(child, signal, platform = process.platform) {
+export function signalTree(child, signal) {
   if (child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return;
-  if (platform === 'win32') {
+  if (process.platform === 'win32') {
     // /F is needed: a console application ignores the close request that a plain taskkill sends.
     spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
     return;
@@ -96,10 +93,10 @@ export function signalTree(child, signal, platform = process.platform) {
 /**
  * Records the descendants of every live Windows child. A call made while a sample is still
  * reading returns that sample, so samples never overlap. An unreadable process table records
- * nothing this time. Exported so a test can sample at a chosen moment.
+ * nothing this time.
  * @returns {Promise<void>}
  */
-export function sampleOwnedTrees() {
+function sampleOwnedTrees() {
   sampling ??= readProcessTable()
     .then(
       (rows) => recordDescendants(rows),
@@ -116,7 +113,7 @@ export function sampleOwnedTrees() {
  * @param {string} text
  * @returns {{ pid: number, ppid: number, created: bigint }[]}
  */
-export function parseProcessTable(text) {
+function parseProcessTable(text) {
   const rows = [];
   for (const line of text.split(/\r?\n/)) {
     const [pid, ppid, created] = line.trim().split(/\s+/);
@@ -138,7 +135,7 @@ export function parseProcessTable(text) {
  * @param {number | null} [exitedPid]
  * @returns {Map<number, bigint>} the same tree
  */
-export function extendTree(tree, rows, exitedPid = null) {
+function extendTree(tree, rows, exitedPid = null) {
   const liveByPid = new Map(rows.map((row) => [row.pid, row]));
   for (let grew = true; grew; ) {
     grew = false;
@@ -178,7 +175,7 @@ function trustedParentCreated(tree, liveByPid, pid, exitedPid) {
  * @param {{ pid: number, created: bigint }[]} rows
  * @returns {number[]}
  */
-export function recordedPids(tree, rows) {
+function recordedPids(tree, rows) {
   return rows.filter((row) => tree.get(row.pid) === row.created).map((row) => row.pid);
 }
 

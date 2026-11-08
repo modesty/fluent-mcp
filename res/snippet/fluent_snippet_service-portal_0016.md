@@ -3,11 +3,12 @@
 import { SPPage } from '@servicenow/sdk/core'
 
 SPPage({
-	$id: Now.ID['sp_knowledge_portal_page'],
+	// SPPage takes no $id: pageId is the record's identity and the ?id=<pageId> used to route to it
+	pageId: 'knowledge_hub',
 	title: 'Knowledge Hub',
-	description: 'Central knowledge base page with search and featured articles',
+	shortDescription: 'Central knowledge base page with search and featured articles',
 	public: false,
-	roles: 'itil,knowledge',
-	category: 'Knowledge Management',
+	roles: ['itil', 'knowledge'], // users need at least one of these roles
+	category: 'kb',
 })
 ```

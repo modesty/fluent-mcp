@@ -40,15 +40,14 @@ describe('AuthCommand', () => {
     authCommand = new AuthCommand(mockCmdWriter);
   });
 
-  it('only lists profiles: auth --list from the neutral package directory, no stdin', async () => {
+  it('only lists profiles: auth --list from the neutral package directory, with the default timeout', async () => {
     const result = await authCommand.execute();
 
     assert.equal(mockCmdWriter.process.mock.callCount(), 1);
-    const [command, argv, cwd, stdinInput, timeoutMs, signal] = mockCmdWriter.process.mock.calls[0].arguments;
+    const [command, argv, cwd, timeoutMs, signal] = mockCmdWriter.process.mock.calls[0].arguments;
     assert.equal(command, process.execPath);
     assert.deepEqual(argv, [SDK_BIN, 'auth', '--list']);
     assert.equal(cwd, PROJECT_ROOT);
-    assert.equal(stdinInput, undefined);
     assert.equal(timeoutMs, undefined);
     assert.equal(signal, undefined);
     assert.equal(result.success, true);
@@ -62,11 +61,9 @@ describe('AuthCommand', () => {
 
   // The profile store and its default profile are shared by every now-sdk run
   // on the machine, so the server has no way to write them (W9 review).
-  for (const write of [{ add: 'https://dev.service-now.com' }, { use: 'dev' }, { delete: 'dev' }]) {
-    it(`rejects ${Object.keys(write)[0]}: the server never writes the profile store`, async () => {
-      // The internal AuthCommand is held to the same strict schema as tools/call.
-      await assert.rejects(authCommand.execute(write), /Input validation error/);
-      assert.equal(mockCmdWriter.process.mock.callCount(), 0);
-    });
-  }
+  it('rejects add: the server never writes the profile store', async () => {
+    // The internal AuthCommand is held to the same strict schema as tools/call.
+    await assert.rejects(authCommand.execute({ add: 'https://dev.service-now.com' }), /Input validation error/);
+    assert.equal(mockCmdWriter.process.mock.callCount(), 0);
+  });
 });

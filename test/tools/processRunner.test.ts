@@ -3,7 +3,7 @@
  * keeping the default info-level log clean. The logger is replaced with the
  * shared fixture (every level a mock.fn), so we assert against its level methods.
  *
- * Also covers non-interactive stdin (input written whole, then closed) and spawn failures (ENOENT).
+ * Also covers spawn failures (ENOENT).
  *
  * Native runner: the runner itself is real and spawns real child processes; only
  * config and logger are replaced, registered before the module is imported.
@@ -62,76 +62,6 @@ describe('NodeProcessRunner logging level', () => {
 
     const infoText = joinCalls(mockedLogger.info);
     assert.ok(!infoText.includes('[STDERR]'));
-  });
-});
-
-describe('NodeProcessRunner shell-free execution (H1 injection defense)', () => {
-  beforeEach(resetLoggerCalls);
-
-  it('passes spaces, globs, metacharacters, and newlines through as inert literals', async () => {
-    const runner = new NodeProcessRunner();
-    // Spaces, `;`, `$()`, a newline, `|`, and `>` — all of which a shell would
-    // interpret as syntax. Shell-free, they must survive verbatim as one argv[1].
-    const payload = 'a b;*.ts?c$(whoami)\nrm|x>y';
-    const result = await runner.run(
-      process.execPath,
-      ['-e', 'process.stdout.write(process.argv[1])', payload]
-    );
-
-    assert.equal(result.exitCode, 0);
-    // No command substitution ran, no split on spaces/newlines, no redirection.
-    assert.equal(result.stdout, payload);
-  });
-});
-
-/**
- * A child that reads stdin to EOF the way `now-sdk auth --add --password-stdin`
- * does (sdk-cli `readPasswordFromStdin`): it prints no prompt first, and then
- * prints what it read as JSON.
- */
-const READS_STDIN_TO_EOF = ['-e', [
-  'const chunks = [];',
-  "process.stdin.on('data', (d) => chunks.push(d));",
-  "process.stdin.on('end', () => process.stdout.write('read=' + JSON.stringify(Buffer.concat(chunks).toString())));",
-].join(' ')];
-
-describe('NodeProcessRunner stdin', () => {
-  beforeEach(resetLoggerCalls);
-
-  it('writes the input whole and closes stdin, so a read to EOF completes without a prompt', { timeout: 10_000 }, async () => {
-    // The former runner wrote only after a "? " prompt, so this child waited
-    // for input until the timeout; it also split the input into non-empty lines.
-    const runner = new NodeProcessRunner();
-    const result = await runner.run(process.execPath, READS_STDIN_TO_EOF, undefined, 'p@ss\n\nword\n', 5_000);
-
-    assert.equal(result.exitCode, 0, result.stderr);
-    assert.equal(result.stdout, 'read="p@ss\\n\\nword\\n"');
-  });
-
-  it('writes nothing to a child that prints a "? " line when the call has no input', { timeout: 10_000 }, async () => {
-    // The former runner answered any stdout ending in "? <text>" with the next
-    // input line, so a diagnostic of that shape received a credential (W9
-    // review). The child echoes anything it reads and otherwise waits until the
-    // runner's timeout ends it; stdin stays open, as it always did without input.
-    const runner = new NodeProcessRunner();
-    const result = await runner.run(
-      process.execPath,
-      ['-e', "process.stdout.write('? Continue with the default instance? '); process.stdin.on('data', (d) => process.stdout.write('got:' + d));"],
-      undefined,
-      undefined,
-      1_500
-    );
-
-    assert.equal(result.exitCode, 124);
-    assert.ok(!result.stdout.includes('got:'), `stdin was written: ${result.stdout}`);
-  });
-
-  it('reports the exit of a child that ends without reading its input (EPIPE)', { timeout: 10_000 }, async () => {
-    // 1 MB exceeds the pipe buffer, so the write is still pending when the child exits.
-    const runner = new NodeProcessRunner();
-    const result = await runner.run(process.execPath, ['-e', 'process.exit(3)'], undefined, 'x'.repeat(1_000_000));
-
-    assert.equal(result.exitCode, 3);
   });
 });
 

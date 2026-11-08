@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { CommandArgument, CommandResult, CommandResultFactory, isRunnerStoppedExit } from '../../utils/types.js';
+import { CommandArgument, CommandResult, CommandResultFactory, MAX_TIMER_DELAY_MS, isRunnerStoppedExit } from '../../utils/types.js';
 import { ENVELOPE_RUN_OPTIONS, shapeEnvelopeResult } from '../../utils/jsonSelect.js';
 import { parseCliEnvelope } from '../../utils/cliEnvelope.js';
 import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
@@ -12,15 +12,12 @@ import { getProjectRootPath } from '../../config.js';
 import { SELECT_PATH_DOMAIN, assertPositiveInteger } from './argValidation.js';
 import type { ArgumentDomain } from '../../utils/types.js';
 import { CONTROL_CHARACTERS_EXCEPT_LINE_FORMATTING } from '../toolSchema.js';
+import { DEBUG_ARGUMENT } from './baseCommand.js';
+import { CLI_REPORT_HEADROOM_MS } from './responseTimeout.js';
+import { isWithinDirectory } from '../../utils/projectDirectory.js';
 
 /** `now-sdk exec --timeout` default, in milliseconds (SDK v4.14.0 `exec/index.js` DEFAULT_TIMEOUT_MS). */
 const CLI_DEFAULT_TIMEOUT_MS = 300_000;
-
-/** Largest `--timeout` the CLI accepts (`exec/index.js` MAX_TIMEOUT_MS). */
-const CLI_MAX_TIMEOUT_MS = 2_147_483_647;
-
-/** Headroom past the CLI's own wait, so the CLI reports its timeout rather than the runner killing it. */
-const CLI_REPORT_HEADROOM_MS = 60_000;
 
 /**
  * Upper bound on the script length. The script reaches the CLI as one argv
@@ -53,13 +50,6 @@ interface ScriptFile {
   relativePath: string;
   content: string;
   sha256: string;
-}
-
-/** True when `child` (a real path) is strictly inside `parent` (a real path). */
-function isInside(parent: string, child: string): boolean {
-  const relative = path.relative(parent, child);
-  // `..` only as a whole path segment: a file named `..backfill.js` is inside.
-  return relative !== '' && relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 }
 
 /**
@@ -157,12 +147,7 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
       required: false,
       description: 'Credential alias to use for authentication with instance (auto-injected from session if not provided)',
     },
-    {
-      name: 'debug',
-      type: 'boolean',
-      required: false,
-      description: 'Print debug output',
-    },
+    DEBUG_ARGUMENT,
   ];
 
   /**
@@ -221,8 +206,9 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
 
     if (args.timeoutMs !== undefined && args.timeoutMs !== null) {
       const timeoutMs = assertPositiveInteger(args.timeoutMs, 'timeoutMs');
-      if (timeoutMs > CLI_MAX_TIMEOUT_MS) {
-        throw new Error(`Argument 'timeoutMs' must be at most ${CLI_MAX_TIMEOUT_MS}. Received: ${timeoutMs}.`);
+      // The CLI's own maximum (`exec/index.js` MAX_TIMEOUT_MS) is the timer limit.
+      if (timeoutMs > MAX_TIMER_DELAY_MS) {
+        throw new Error(`Argument 'timeoutMs' must be at most ${MAX_TIMER_DELAY_MS}. Received: ${timeoutMs}.`);
       }
     }
   }
@@ -249,7 +235,7 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
     } catch {
       throw new Error(`Script file not found: ${requested}`);
     }
-    if (!isInside(realProject, realFile)) {
+    if (realFile === realProject || !isWithinDirectory(realProject, realFile)) {
       throw new Error(`Script file must be inside the Fluent project ${realProject}; "${String(args.file)}" resolves to ${realFile}.`);
     }
     const stat = fs.statSync(realFile);
@@ -303,25 +289,23 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
     const providedAuth = typeof args.auth === 'string' ? args.auth : undefined;
     const resolvedAuth = await this.resolveAuthAlias(providedAuth);
     if (!resolvedAuth) {
-      return CommandResultFactory.error(
-        'fluent_exec_script requires authentication to a ServiceNow instance, but no credential alias was found. ' +
-        "Pass 'auth' with a stored profile alias, or set SN_INSTANCE_URL so lazy validation can load a matching profile into the session. " +
-        "Use the ServiceNow SDK 'now-sdk auth --add <instance>' command to create a profile."
-      );
+      return this.missingAuthResult();
+    }
+
+    if (!scriptFile) {
+      // Inline: one literal argv entry on the shell-free runner. Passing a script
+      // positionally (or by file) keeps the CLI from waiting on the runner's open stdin.
+      return this.runExec(args, resolvedAuth, [String(args.script)], undefined, signal);
     }
 
     // A file is run from a private copy, so a later edit to the project file cannot
     // change what runs after its content was read, hashed, and reported.
-    const tempDir = scriptFile ? fs.mkdtempSync(path.join(os.tmpdir(), 'fluent-exec-')) : undefined;
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluent-exec-'));
     try {
-      const scriptSource = scriptFile && tempDir
-        ? [cliOption('--file', this.writePrivateCopy(tempDir, scriptFile.content))]
-        // Inline: one literal argv entry on the shell-free runner. Passing a script
-        // positionally (or by file) keeps the CLI from waiting on the runner's open stdin.
-        : [String(args.script)];
+      const scriptSource = [cliOption('--file', this.writePrivateCopy(tempDir, scriptFile.content))];
       return await this.runExec(args, resolvedAuth, scriptSource, scriptFile, signal);
     } finally {
-      if (tempDir) fs.rmSync(tempDir, { recursive: true, force: true });
+      fs.rmSync(tempDir, { recursive: true, force: true });
     }
   }
 
@@ -364,7 +348,6 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
       command,
       sdkArgs,
       getProjectRootPath(),
-      undefined,
       this.resolveTimeoutMs(args),
       signal,
       ENVELOPE_RUN_OPTIONS

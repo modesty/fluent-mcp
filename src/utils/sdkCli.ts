@@ -3,8 +3,8 @@
  *
  * Why this exists: invoking the CLI as `npx now-sdk …` only works when the
  * current working directory has `@servicenow/sdk` installed locally (its bin is
- * named `now-sdk`). Global operations like `auth` run from arbitrary client
- * roots that are not Fluent projects, so `npx` tries to fetch a registry
+ * named `now-sdk`). Global operations like `auth` run from directories that
+ * are not Fluent projects, so `npx` tries to fetch a registry
  * package literally named `now-sdk` → 404. fluent-mcp bundles
  * `@servicenow/sdk`, so we resolve and run its bundled CLI directly regardless
  * of cwd. Since the SDK is a runtime dependency, failure to resolve it indicates

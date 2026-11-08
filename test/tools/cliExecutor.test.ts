@@ -23,18 +23,7 @@ describe('CLIExecutor failure messages', () => {
     assert.equal(result.error?.message, "sn_cicd request to 'api/sn_cicd/tests/run_test' failed (400): Start ATF test Failed with the given test ID");
   });
 
-  it('takes the error from the errors array of an exec script that ran and threw', async () => {
-    const stdout = '{"ok":false,"scope":"x_acme_app","output":[],"errors":["ReferenceError: foo is not defined"]}';
-    const result = await new CLIExecutor(runner({ stdout, stderr: '', exitCode: 1 })).process('node', ['cli'], '/tmp/x');
-    assert.equal(result.error?.message, 'ReferenceError: foo is not defined');
-  });
-
-  it('takes the error from the CLI logger ERROR line on stdout', async () => {
-    const result = await new CLIExecutor(runner({ stdout: '[now-sdk] ERROR: Build failed due to errors', stderr: '', exitCode: 1 }))
-      .process('node', ['cli'], '/tmp/x');
-    assert.equal(result.error?.message, 'Build failed due to errors');
-  });
-
+  // Each message source (errors array, ERROR lines) is covered by cliError.test.ts.
   it('keeps stderr as the message when it is the only source, and sets none on success', async () => {
     const failed = await new CLIExecutor(runner({ stdout: '', stderr: 'boom', exitCode: 2 })).process('node', ['cli'], '/tmp/x');
     assert.equal(failed.error?.message, 'boom');
@@ -46,8 +35,8 @@ describe('CLIExecutor failure messages', () => {
   it('forwards per-call process options and reports a cut stdout', async () => {
     const run = mock.fn<ProcessRunner['run']>(async () => ({ stdout: '{"ok":true', stderr: '', exitCode: 0, stdoutTruncated: true }));
     const options = { maxStdoutChars: 1234 };
-    const result = await new CLIExecutor({ run }).process('node', ['cli'], '/tmp/x', undefined, 5_000, undefined, options);
-    assert.equal(run.mock.calls[0].arguments[6], options);
+    const result = await new CLIExecutor({ run }).process('node', ['cli'], '/tmp/x', 5_000, undefined, options);
+    assert.equal(run.mock.calls[0].arguments[5], options);
     assert.equal(result.outputTruncated, true);
     const whole = await new CLIExecutor(runner({ stdout: '{"ok":true}', stderr: '', exitCode: 0 })).process('node', ['cli'], '/tmp/x');
     assert.equal(whole.outputTruncated, undefined);

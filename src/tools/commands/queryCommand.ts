@@ -1,8 +1,9 @@
-import { ArgumentDomain, CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
+import { ArgumentDomain, CommandArgument, CommandResult } from '../../utils/types.js';
 import { ENVELOPE_RUN_OPTIONS, shapeEnvelopeResult } from '../../utils/jsonSelect.js';
 import { SessionAwareCLICommand } from './sessionAwareCommand.js';
 import { SELECT_PATH_DOMAIN } from './argValidation.js';
 import { cliOption } from './cliArgv.js';
+import { DEBUG_ARGUMENT } from './baseCommand.js';
 
 /**
  * A table name: letters, digits and "_". The SDK builds the request path as
@@ -123,12 +124,7 @@ export class QueryCommand extends SessionAwareCLICommand {
       required: false,
       description: 'Credential alias to use for authentication with instance (auto-injected from session if not provided)',
     },
-    {
-      name: 'debug',
-      type: 'boolean',
-      required: false,
-      description: 'Print debug output',
-    },
+    DEBUG_ARGUMENT,
   ];
 
   /**
@@ -154,11 +150,7 @@ export class QueryCommand extends SessionAwareCLICommand {
     const providedAuth = typeof args.auth === 'string' ? args.auth : undefined;
     const resolvedAuth = await this.resolveAuthAlias(providedAuth);
     if (!resolvedAuth) {
-      return CommandResultFactory.error(
-        'query_fluent_records requires authentication to a ServiceNow instance, but no credential alias was found. ' +
-        "Pass 'auth' with a stored profile alias, or set SN_INSTANCE_URL so lazy validation can load a matching profile into the session. " +
-        "Use the ServiceNow SDK 'now-sdk auth --add <instance>' command to create a profile."
-      );
+      return this.missingAuthResult();
     }
 
     const table = args.table as string;
@@ -198,8 +190,8 @@ export class QueryCommand extends SessionAwareCLICommand {
         queryCategory: '--query-category',
         timeout: '--timeout',
         auth: '--auth',
-        noCount: { flag: '--no-count', hasValue: false },
-        queryNoDomain: { flag: '--query-no-domain', hasValue: false },
+        noCount: { flag: '--no-count' },
+        queryNoDomain: { flag: '--query-no-domain' },
       },
       prefixFlags,
       signal,

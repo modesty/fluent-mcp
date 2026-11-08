@@ -28,12 +28,9 @@ const sessionInstance = {
   getAuthValidationResult: mock.fn((): unknown => undefined),
   setAuthValidationResult: mock.fn(),
 };
-const SessionManager = {
-  getInstance: mock.fn(() => sessionInstance),
-  getWorkingDirectory: mock.fn(() => WORKING_DIR),
-  setWorkingDirectory: mock.fn(),
-};
-mock.module('../../src/utils/sessionManager.js', { namedExports: { SessionManager } });
+mock.module('../../src/utils/sessionManager.js', {
+  namedExports: { SessionManager: { getInstance: () => sessionInstance } },
+});
 
 const { DownloadCommand, TransformCommand } = await import('../../src/tools/commands/index.js');
 const { RESPONSE_TIMEOUT_ARGUMENT, runnerTimeoutForResponseTimeout } = await import(
@@ -92,24 +89,14 @@ describe('timeoutSeconds (SDK v4.13.0 --timeout)', () => {
 
   for (const [_name, create, baseArgs, subcommand] of commandCases) {
     describe(_name, () => {
-      it('advertises timeoutSeconds', () => {
-        const command = create(mockProcessor);
-        assert.ok(command.arguments.map((arg) => arg.name).includes('timeoutSeconds'));
-      });
-
-      it('raises the default runner budget above the old 180 s cap', () => {
-        assert.equal(create(mockProcessor).timeoutMs, 600_000);
-      });
-
       it('maps timeoutSeconds to --timeout and extends the runner timeout', async () => {
         const command = create(mockProcessor);
         const result = await command.execute({ ...baseArgs, auth: 'dev', timeoutSeconds: 7200 });
 
         assert.equal(result.success, true);
-        const [, argv, , , timeoutMs] = (mockProcessor.process.mock.calls[0] as ProcessCall).arguments as [
+        const [, argv, , timeoutMs] = (mockProcessor.process.mock.calls[0] as ProcessCall).arguments as [
           unknown,
           string[],
-          unknown,
           unknown,
           number,
         ];
@@ -123,10 +110,9 @@ describe('timeoutSeconds (SDK v4.13.0 --timeout)', () => {
         const command = create(mockProcessor);
         await command.execute({ ...baseArgs, auth: 'dev' });
 
-        const [, argv, , , timeoutMs] = (mockProcessor.process.mock.calls[0] as ProcessCall).arguments as [
+        const [, argv, , timeoutMs] = (mockProcessor.process.mock.calls[0] as ProcessCall).arguments as [
           unknown,
           string[],
-          unknown,
           unknown,
           number,
         ];

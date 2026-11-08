@@ -2,19 +2,19 @@
 ```typescript
 // Assert the HTTP response payload is equals to or contains a specified value
 atf.rest.assertResponsePayload({ 
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['assert_response_payload_step'], // string | guid, mandatory
   responseBody: '', // string, expected response body 
   operation: 'equals' // 'equals' | 'not_equals' | 'exists' | 'contains' | 'does_not_contain'
 }): void
 
 // Assert the JSON response payload is valid.
 atf.rest.assertResponseJSONPayloadIsValid({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['assert_response_json_payload_is_valid_step'], // string | guid, mandatory
 }): void // input object with no properties
 
 // Assert the JSON response payload element 
 atf.rest.assertJsonResponsePayloadElement({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['assert_json_response_payload_element_step'], // string | guid, mandatory
   elementName: '', // string, JSON SNC path of the element
   operation: 'contains', // 'contains' | 'does_not_contain' | 'equals' | 'not_equals' | 'exists'
   elementValue: '' // string, value to compare
@@ -22,12 +22,12 @@ atf.rest.assertJsonResponsePayloadElement({
 
 // Assert the REST API's XML response payload is well-formed
 atf.rest.assertResponseXMLPayloadIsWellFormed({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['assert_response_xml_payload_is_well_formed_step'], // string | guid, mandatory
 }): void // input object with no properties
 
 // Assert the REST API's XML response payload element
 atf.rest.assertXMLResponsePayloadElement({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['assert_xml_response_payload_element_step'], // string | guid, mandatory
   elementPath: '', // xpath to the element
   operation: 'contains', // 'contains' | 'does_not_contain' | 'equals' | 'not_equals' | 'exists'
   elementValue: '' // string, value to compare

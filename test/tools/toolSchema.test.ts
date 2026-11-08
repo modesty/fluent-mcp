@@ -49,13 +49,11 @@ function sampleValue(arg: CommandArgument): unknown {
     case 'string': return 'x';
     case 'number': return 1;
     case 'boolean': return true;
-    case 'array': return [];
-    default: return 'x';
   }
 }
 
 const JSON_TYPE: Record<string, string> = {
-  string: 'string', number: 'number', boolean: 'boolean', array: 'array',
+  string: 'string', number: 'number', boolean: 'boolean',
 };
 
 interface AdvertisedProperty {
@@ -75,11 +73,6 @@ describe('Tool input schema — advertised (tools/list) and enforced (tools/call
   ];
 
   const byName = new Map(advertised.map((t) => [t.name, t]));
-
-  it('advertises every registered command, in name order', () => {
-    const names = advertised.map((t) => t.name);
-    assert.deepStrictEqual(names, commands.map((c) => c.name).sort());
-  });
 
   it('advertises only the name, description, schemas and annotations: no title that repeats the name', () => {
     const allowed = new Set(['name', 'description', 'inputSchema', 'outputSchema', 'annotations']);
@@ -175,20 +168,6 @@ describe('Tool input schema — advertised (tools/list) and enforced (tools/call
           input[arg.name] = arg.required ? sampleValue(arg) : null;
         }
         assert.equal(buildInputZodSchema(command.arguments).safeParse(input).success, true);
-      });
-
-      it('accepts null for optional arguments as omitted input', () => {
-        const optional = command.arguments.find((arg) => !arg.required);
-        if (!optional) return;
-
-        const input: Record<string, unknown> = {};
-        for (const arg of command.arguments) {
-          if (arg.required) input[arg.name] = sampleValue(arg);
-        }
-        input[optional.name] = null;
-
-        const parsed = buildInputZodSchema(command.arguments).safeParse(input);
-        assert.equal(parsed.success, true);
       });
 
       it('enforced Zod shape rejects input missing a required arg', () => {

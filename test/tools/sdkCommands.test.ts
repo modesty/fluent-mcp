@@ -2,7 +2,7 @@ import { beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { assertCalledTimes } from '../support/mockAssertions.js';
 import { configFixture, loggerFixture, sdkCliFixture } from '../support/fixtures.js';
-import type { CLICommand, ProcessResult } from '../../src/utils/types.js';
+import type { CLICommand, ProcessResult, ProcessRunner } from '../../src/utils/types.js';
 
 // The SDK commands read the neutral project root and resolve the bundled CLI
 // through config/sdkCli, both replaced explicitly here.
@@ -13,40 +13,17 @@ mock.module('../../src/utils/sdkCli.js', sdkCliFixture().mockOptions);
 // Import command tools from individual modules
 const { CommandFactory } = await import('../../src/tools/registry/commandFactory.js');
 const { CLIExecutor } = await import('../../src/tools/processors/cliExecutor.js');
-const { NodeProcessRunner } = await import('../../src/tools/processors/processRunner.js');
 
 const SDK_BIN = '/test/node_modules/@servicenow/sdk/bin/index.js';
 
-// Mock the NodeProcessRunner for testing
-class MockProcessRunner extends NodeProcessRunner {
-  mockResult: ProcessResult = {
-    stdout: 'mock output',
-    stderr: '',
-    exitCode: 0
-  };
-
-  setMockResult(result: ProcessResult) {
-    this.mockResult = result;
-  }
-
-  async run(_command: string, args: string[] = [], _cwd?: string, _stdinInput?: string): Promise<ProcessResult> {
-    // Return different mocked responses based on args
+/** A runner answering the two sdk_info invocations: --version, and help for anything else. */
+class MockProcessRunner implements ProcessRunner {
+  async run(_command: string, args: string[] = []): Promise<ProcessResult> {
     if (args.includes('--version') || args.includes('-v')) {
       // `now-sdk --version` prints the bare version (verified on SDK 4.14.0).
-      return {
-        stdout: '4.14.0',
-        stderr: '',
-        exitCode: 0
-      };
-    } else if (args.includes('--help') || args.includes('-h')) {
-      return {
-        stdout: 'ServiceNow SDK Help information',
-        stderr: '',
-        exitCode: 0
-      };
+      return { stdout: '4.14.0', stderr: '', exitCode: 0 };
     }
-
-    return this.mockResult;
+    return { stdout: 'ServiceNow SDK Help information', stderr: '', exitCode: 0 };
   }
 }
 
@@ -99,7 +76,6 @@ describe('SDK Command Tools', () => {
       _command: string,
       args: string[] = [],
       _cwd?: string,
-      _stdinInput?: string,
       _timeoutMs?: number,
       _signal?: AbortSignal
     ): Promise<ProcessResult> => {
@@ -130,13 +106,12 @@ describe('SDK Command Tools', () => {
 
     // Verify the command was called with expected arguments
     assertCalledTimes(run, 1);
-    const [command, args, cwd, stdinInput, timeoutMs, signal] = run.mock.calls[0].arguments;
+    const [command, args, cwd, timeoutMs, signal] = run.mock.calls[0].arguments;
     assert.equal(command, process.execPath);
     for (const token of [SDK_BIN, 'auth', '--help']) {
       assert.ok(args?.includes(token), `expected argv to contain ${token}; received ${JSON.stringify(args)}`);
     }
     assert.equal(typeof cwd, 'string'); // Working directory should be provided (project root path)
-    assert.equal(stdinInput, undefined);
     assert.equal(timeoutMs, 10000);
     assert.equal(signal, undefined);
 

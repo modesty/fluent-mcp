@@ -17,28 +17,28 @@ const applicationMenu = ApplicationMenu({
 const applicationSubMenu = Record({
     $id: '', // string | guid, mandatory
     table: 'sys_app_module', // string, mandatory, should always be 'sys_app_module'
-    data: {
+    data: { // keys are sys_app_module column names (snake_case), not camelCase
         title: '', // string, max length is 80 characters
         active: true, //default is true, unless specified to make it inactive
         application: applicationMenu, // applicationMenu object
         assessment: Now.ref('asmt_metric_type', '<sys_id>'), // String, guid: the sys_id of the existing asmt_metric_type record named in user instructions or prompts or devrequest, looked up on the instance
-        deviceType: '', // '' | 'any' | 'browser' | 'mobile'
+        device_type: 'any', // 'any' | 'browser' | 'mobile'
         filter: '', // String, conditions applied to list view for visibility in application navigator, Servicenow encoded query
         hint: '', // String, max length is 255 characters
-        linkType: '', // '' | 'SEPARATOR' | 'TIMELINE' | 'DETAIL' | 'HTML' | 'ASSESSMENT' | 'LIST' | 'FILTER' | 'SCRIPT' | 'CONTENT_PAGE' | 'SEARCH' | 'SURVEY' | 'DOC_LINK' | 'NEW' | 'MAP' | 'REPORT' | 'DIRECT'
-        mapPage: Now.ref('cmn_map_page', '<sys_id>'), // String, guid: the sys_id of the existing cmn_map_page record named in user instructions or prompts or devrequest, looked up on the instance
-        mobileTitle: '', // String, max length is 80 characters
-        mobileViewName: '', // String, max length is 40 characters
+        link_type: 'LIST', // 'LIST' (default) | 'SEPARATOR' | 'TIMELINE' | 'DETAIL' | 'HTML' | 'ASSESSMENT' | 'FILTER' | 'SCRIPT' | 'CONTENT_PAGE' | 'SEARCH' | 'SURVEY' | 'DOC_LINK' | 'NEW' | 'MAP' | 'REPORT' | 'DIRECT'
+        map_page: Now.ref('cmn_map_page', '<sys_id>'), // String, guid: the sys_id of the existing cmn_map_page record named in user instructions or prompts or devrequest, looked up on the instance
+        mobile_title: '', // String, max length is 80 characters
+        mobile_view_name: '', // String, max length is 40 characters
         name: '', // table name
         order: 100, // number
-        overrideMenuRoles: false, // boolean, default false
+        override_menu_roles: false, // boolean, default false
         query: '', // String, max length is 3500 characters, is link type arguments
-        requireConfirmation: true, // boolean, default is true
+        require_confirmation: true, // boolean, default is true
         uncancelable: false, // boolean, default is false
-        viewName: '', // String
-        windowName: '', // String
+        view_name: '', // String
+        window_name: '', // String
         report: '', // String
-        timelinePage: Now.ref('cmn_timeline_page', '<sys_id>'), // String, guid: the sys_id of the existing cmn_timeline_page record named in user instructions or prompts or devrequest, looked up on the instance
+        timeline_page: Now.ref('cmn_timeline_page', '<sys_id>'), // String, guid: the sys_id of the existing cmn_timeline_page record named in user instructions or prompts or devrequest, looked up on the instance
     }
 })
 ```

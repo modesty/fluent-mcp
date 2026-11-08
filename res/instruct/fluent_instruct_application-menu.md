@@ -9,10 +9,9 @@ Follow the below instructions for top Application Menu
 Follow the below instructions for Application Submenu under top Application Menu. Application Submenu is also known as app module or application module at Servicenow platform menu navigator.
 1. Identify the right value for `link_type` column from the below combination of it's label and value, as per the user prompts, instructions or devrequest.
 2. The below combinations format is "<column label> or <display value>"~"<actual value>". For example: "List of Records"~"LIST" - label is `List of Records` and value is `LIST`.
-   "None"~""
    "Separator"~"SEPARATOR"
    "Timeline Page"~"TIMELINE"
-   "Single"~"Record"
+   "Single Record"~"DETAIL"
    "HTML (from Arguments:)"~"HTML"
    "Assessment"~"ASSESSMENT"
    "List of Records"~"LIST"
@@ -26,7 +25,7 @@ Follow the below instructions for Application Submenu under top Application Menu
    "Map Page"~"MAP"
    "Run a Report"~"REPORT"
    "URL (from Arguments:)"~"DIRECT"
-3. If `link_type` is not specified in user instructions or prompts, then completely skip the field from code generation.
+3. If `link_type` is not specified in user instructions or prompts, then completely skip the field from code generation (the column defaults to `LIST`; it has no empty choice).
 4. `assessment` is link type assessment and is applicable and mandatory only when `link_type` is `ASSESSMENT`.
 5. `name` is table associated to link type and is applicable and mandatory only when `link_type` is `FILTER` or `LIST` or `NEW` or `SEARCH` or `DETAIL`.
 6. `query` is link type arguments and is mandatory only when `link_type` is `DOC_LINK` or `HTML` or `SCRIPT` or `DIRECT`.

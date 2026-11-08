@@ -1,9 +1,9 @@
 # Create a Service Portal widget with client script for interactivity
 
 ```typescript
-import { SpWidget } from '@servicenow/sdk/core'
+import { SPWidget } from '@servicenow/sdk/core'
 
-SpWidget({
+SPWidget({
     $id: Now.ID['interactive_widget'],
     name: 'Interactive Widget',
     description: 'Widget with client-side interaction',

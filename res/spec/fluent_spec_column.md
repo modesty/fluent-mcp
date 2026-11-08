@@ -667,9 +667,12 @@ TemplateValue<'table_name'>({ field1: 'value1', field2: 100, field3: true })
 
 // --- Now.attach ---
 
-// Now.attach: attaches an image file to a BasicImageColumn default value
-Now.attach('path/to/image.png') // returns an Image reference
-// path is relative to the source root
+// Now.attach: attaches an image file to a record data field (e.g. sp_portal.icon), creating sys_attachment records.
+// NOT as a column `default` (e.g. BasicImageColumn): SDK 4.14.0 type-checks it but writes the literal
+// `Symbol(NowAttachShape)` as the dictionary default and creates no sys_attachment
+Now.attach('./images/logo.png') // returns an Image reference
+// path is relative to the .now.ts file that calls it and must start with './' or '../';
+// the image file must exist there at build time (else "File not found")
 // Supported formats: jpg, png, bmp, gif, jpeg, ico, svg (case-insensitive)
 
 ```

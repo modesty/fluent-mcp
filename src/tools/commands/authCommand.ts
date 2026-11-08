@@ -1,5 +1,5 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
-import { BaseCLICommand } from './baseCommand.js';
+import { BaseCLICommand, DEBUG_ARGUMENT } from './baseCommand.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
 import { getProjectRootPath } from '../../config.js';
 
@@ -19,15 +19,10 @@ export class AuthCommand extends BaseCLICommand {
   name = 'list_fluent_auth_profiles';
   description = 'List the ServiceNow SDK auth profiles stored on this machine (read-only)';
   arguments: CommandArgument[] = [
-    {
-      name: 'debug',
-      type: 'boolean',
-      required: false,
-      description: 'Print debug output',
-    },
+    DEBUG_ARGUMENT,
   ];
 
-  async execute(args: Record<string, unknown> = {}, signal?: AbortSignal): Promise<CommandResult> {
+  async execute(args: Record<string, unknown> = {}): Promise<CommandResult> {
     this.validateArgs(args);
 
     // Resolve the bundled SDK CLI so this works from any cwd.
@@ -37,13 +32,6 @@ export class AuthCommand extends BaseCLICommand {
 
     // Auth profiles are global SDK state, not Fluent-project state. The package
     // directory is an intentional neutral cwd for the bundled CLI.
-    return await this.commandProcessor.process(
-      command,
-      sdkArgs,
-      getProjectRootPath(),
-      undefined,
-      undefined,
-      signal
-    );
+    return await this.commandProcessor.process(command, sdkArgs, getProjectRootPath());
   }
 }

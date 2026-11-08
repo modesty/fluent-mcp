@@ -39,6 +39,9 @@ jobs:
       - name: Validate authoring instructions
         run: npm run validate:instructs
 
+      - name: Validate snippets build
+        run: npm run validate:snippets
+
       - name: Build project
         run: npm run build
 

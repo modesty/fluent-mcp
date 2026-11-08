@@ -2,7 +2,7 @@
 ```typescript
 // Validates whether a declarative action is visible on the current form
 atf.form.declarativeActionVisibility({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['declarative_action_visibility_step'], // string | guid, mandatory
   table: '', // table name
   formUI: '', // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace'
   visible: [Now.ref('sys_declarative_action_assignment', '<sys_id>')], // Array of (sys_id | Record&lt;'sys_declarative_action_assignment'&gt;)
@@ -11,10 +11,10 @@ atf.form.declarativeActionVisibility({ // all props are mandatory
 
 // Clicks a declarative action on the current form.
 atf.form.clickDeclarativeAction({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['click_declarative_action_step'], // string | guid, mandatory
   table: '', // table name
   declarativeAction: Now.ref('sys_declarative_action_assignment', '<sys_id>'), // sys_id | Record&lt;'sys_declarative_action_assignment'&gt;
   assert: 'form_submitted_to_server', //'form_submitted_to_server' | 'form_submission_canceled_in_browser' | 'page_reloaded_or_redirected'
   formUI: 'standard_ui', // 'standard_ui' | 'service_operations_workspace' | 'asset_workspace' | 'cmdb_workspace'
-}): { recordId: string; table: string }
+}): { record_id: string; table: string } // snake_case OUTPUT: clicked.record_id
 ```

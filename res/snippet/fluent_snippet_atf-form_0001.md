@@ -18,7 +18,7 @@ Test({
   atf.form.setFieldValue({
     $id: 'step_2_654321',
     table: "incident",
-    fieldValues: { "caller_id": `${""}` },
+    fieldValues: { "caller_id": "77ad8176731313005754660c4cf6a7de" }, // reference field: the sys_id of a sys_user record
     formUI: 'standard_ui'
   })
   const outputOfSubmit = atf.form.submitForm({
@@ -29,7 +29,7 @@ Test({
   atf.form.openExistingRecord({
     $id: 'step_4_fedcba',
     table: "incident",
-    recordId: outputOfSubmit.recordId,
+    recordId: outputOfSubmit.record_id, // submitForm output is snake_case record_id
     formUI: 'cmdb_workspace',
     view: '',
     selectedTabIndex: 0

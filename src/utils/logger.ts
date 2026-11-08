@@ -5,13 +5,13 @@
 
 import { getConfig } from '../config.js';
 
-// Log levels enum - uses MCP/RFC 5424 severity level names
+// Log levels enum - RFC 5424 severity level names, which FLUENT_MCP_LOG_LEVEL accepts
 export enum LogLevel {
   DEBUG = 'debug',
   INFO = 'info',
   NOTICE = 'notice',
-  WARNING = 'warning', // MCP protocol standard name
-  WARN = 'warning',    // Alias for WARNING (both map to 'warning' for MCP compliance)
+  WARNING = 'warning',
+  WARN = 'warning',    // Alias for WARNING
   ERROR = 'error',
   CRITICAL = 'critical',
   ALERT = 'alert',
@@ -31,7 +31,7 @@ const logLevelPriority: Record<string, number> = {
   [LogLevel.EMERGENCY]: 7,
 };
 
-export interface LogEntry {
+interface LogEntry {
   timestamp: string;
   level: LogLevel;
   message: string;
@@ -162,13 +162,6 @@ export class Logger {
   }
 
   /**
-   * Log a message at the warning level
-   */
-  public warning(message: string, context?: Record<string, unknown>): void {
-    this.logAtLevel(LogLevel.WARNING, message, context);
-  }
-
-  /**
    * Log a message at the error level, with optional error object for stack trace
    */
   public error(
@@ -190,40 +183,9 @@ export class Logger {
 
     this.logAtLevel(LogLevel.ERROR, message, errorContext);
   }
-
-  /**
-   * Log a message at the critical level
-   */
-  public critical(message: string, context?: Record<string, unknown>): void {
-    this.logAtLevel(LogLevel.CRITICAL, message, context);
-  }
-
-  /**
-   * Log a message at the alert level
-   */
-  public alert(message: string, context?: Record<string, unknown>): void {
-    this.logAtLevel(LogLevel.ALERT, message, context);
-  }
-
-  /**
-   * Log a message at the emergency level
-   */
-  public emergency(message: string, context?: Record<string, unknown>): void {
-    this.logAtLevel(LogLevel.EMERGENCY, message, context);
-  }
-
-  /**
-   * Log a message with an object for additional context at any level
-   */
-  public log(level: LogLevel, message: string, obj?: unknown): void {
-    const context = obj as Record<string, unknown>;
-    this.logAtLevel(level, message, context);
-  }
 }
 
 // Create a singleton logger instance for the application
 const logger = new Logger();
 
-// Export both as named and default export
-export { logger };
 export default logger;

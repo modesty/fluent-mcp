@@ -1,10 +1,10 @@
-# **Context:** CatalogItemRecordProducer API spec: Used to create a Record Producer (`sc_cat_item_producer`) — a specialized catalog item that creates a record in a specified ServiceNow table when submitted. Inherits all CatalogItem properties and adds record-creation-specific fields
+# **Context:** CatalogItemRecordProducer API spec: Used to create a Record Producer (`sc_cat_item_producer`) — a specialized catalog item that creates a record in a specified ServiceNow table when submitted. Inherits the shared CatalogItem properties (not its fulfillment, pricing, delivery, legacy cart or `requestMethod`/`customCart`/`useScLayout` settings) and adds record-creation-specific fields
 
 ```typescript
 import { CatalogItemRecordProducer } from '@servicenow/sdk/core'
 
 // Creates a Record Producer (`sc_cat_item_producer`)
-// Inherits all CatalogItem properties (see catalog-item spec) plus the following:
+// Inherits the shared CatalogItem properties (see catalog-item spec) plus the following:
 CatalogItemRecordProducer({
     $id: Now.ID['my_record_producer'], // string | Now.ID key, mandatory — unique identifier
 
@@ -23,7 +23,6 @@ CatalogItemRecordProducer({
     hideSaveAsDraft: false, // boolean, optional
     hideAttachment: false,  // boolean, optional
     mandatoryAttachment: false, // boolean, optional — mutually exclusive with hideAttachment
-    requestMethod: 'submit', // 'order' | 'request' | 'submit', optional — typically 'submit' for record producers
     order: 0,               // number, optional
     roles: [],              // (string | Role)[], optional
 

@@ -97,7 +97,6 @@ describe('InstallCommand', () => {
         process.execPath,
         [SDK_BIN, 'install'],
         WORKING_DIR,
-        undefined, // stdinInput
         900000,   // timeoutMs
         undefined  // signal
       );
@@ -113,7 +112,6 @@ describe('InstallCommand', () => {
         process.execPath,
         [SDK_BIN, 'install', '--skip-flow-activation'],
         WORKING_DIR,
-        undefined, // stdinInput
         900000,   // timeoutMs
         undefined  // signal
       );
@@ -160,7 +158,6 @@ describe('InstallCommand', () => {
         process.execPath,
         [SDK_BIN, 'install', '--auth=my-alias', '--skip-flow-activation', '--debug'],
         WORKING_DIR,
-        undefined, // stdinInput
         900000,   // timeoutMs
         undefined  // signal
       );

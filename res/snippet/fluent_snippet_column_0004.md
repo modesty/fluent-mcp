@@ -1,4 +1,5 @@
 ```typescript
+// App scope: x_myapp
 import { FieldListColumn, SlushBucketColumn, Table, TableNameColumn, TemplateValueColumn } from '@servicenow/sdk/core'
 
 export const x_myapp_report_template = Table({

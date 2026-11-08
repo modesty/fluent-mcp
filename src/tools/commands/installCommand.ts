@@ -1,5 +1,6 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
 import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
+import { DEBUG_ARGUMENT } from './baseCommand.js';
 
 /**
  * Command to install a Fluent (ServiceNow SDK) application to a ServiceNow instance
@@ -38,19 +39,14 @@ export class InstallCommand extends SessionAwareCLICommand {
       required: false,
       description: 'Install asynchronously, polling the instance until it finishes (CLI default true since SDK v4.12.0; falls back to a synchronous install when the instance returns no progress tracker). Set false to force a synchronous install, e.g. when progress tracking fails with a connection error.',
     },
-    {
-      name: 'debug',
-      type: 'boolean',
-      required: false,
-      description: 'Print debug output',
-    }
+    DEBUG_ARGUMENT
   ];
 
   async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
     return this.executeSdkCommand('install', args, {
       auth: '--auth',
-      skipFlowActivation: { flag: '--skip-flow-activation', hasValue: false },
-      async: { flag: '--async', hasValue: false, negatable: true },
+      skipFlowActivation: { flag: '--skip-flow-activation' },
+      async: { flag: '--async', negatable: true },
     }, [], signal);
   }
 }

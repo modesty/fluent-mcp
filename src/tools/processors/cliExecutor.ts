@@ -15,7 +15,6 @@ export class CLIExecutor implements CommandProcessor {
     command: string,
     args: string[],
     cwd?: string,
-    stdinInput?: string,
     timeoutMs?: number,
     signal?: AbortSignal,
     options?: ProcessRunOptions
@@ -24,7 +23,7 @@ export class CLIExecutor implements CommandProcessor {
       // Command invocation detail is verbose; outcomes surface via CommandResult.
       logger.debug(`Executing command: ${command} ${args.join(' ')}`, { cwd });
 
-      const result = await this.processRunner.run(command, args, cwd, stdinInput, timeoutMs, signal, options);
+      const result = await this.processRunner.run(command, args, cwd, timeoutMs, signal, options);
 
       const success = result.exitCode === 0;
       // The SDK CLI reports failures on stdout (logger lines, or a machine-mode

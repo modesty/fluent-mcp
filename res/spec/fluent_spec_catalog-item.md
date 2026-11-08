@@ -92,7 +92,7 @@ CatalogItem({
     pricingDetails: [],     // PricingDetail[], optional — { amount: number, currencyType: string, field: string }[]
 
     // ─── Delivery ───
-    deliveryTime: Duration({ days: 1 }), // Duration, optional — expected fulfillment time
+    deliveryTime: { days: 1 }, // Duration object { days?, hours?, minutes?, seconds? }, optional — expected fulfillment time; a plain object, not Duration() (the CatalogItem plugin fails: Failed to cast DurationShape to ObjectShape)
     deliveryPlanScript: '',  // string, optional — script for determining delivery plan
     entitlementScript: '',   // string, optional — script for entitlement check
 

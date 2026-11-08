@@ -60,7 +60,7 @@ describe('BuildCommand', () => {
       const result = await command.execute({ ...args });
 
       assert.equal(result.success, true);
-      assertCalledWith(mockProcessor.process, process.execPath, [...argv], WORKING_DIR, undefined, 180_000, undefined);
+      assertCalledWith(mockProcessor.process, process.execPath, [...argv], WORKING_DIR, 180_000);
     });
   }
 });

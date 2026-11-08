@@ -3,7 +3,7 @@
 // Perform search for a Catalog Item or Record Producer in the specified Catalog and Category
 // Inputs are camelCase; the OUTPUT key is snake_case (`catalog_item_id`), like every ATF step output.
 atf.server.searchForCatalogItem({
-    $id: Now.ID[''], // string | guid, mandatory
+    $id: Now.ID['search_for_catalog_item_step'], // string | guid, mandatory
     searchTerm: '', // string, mandatory
     assertItem: Now.ref('sc_cat_item', '<sys_id>'), // sys_id | Record&lt;'sc_cat_item'&gt;, mandatory
     catalog: Now.ref('sc_catalog', '<sys_id>'), // sys_id | Record&lt;'sc_catalog'&gt;, optional (SDK v4.13.0+; was mandatory) — omit to search every catalog
@@ -14,7 +14,7 @@ atf.server.searchForCatalogItem({
 
 // Checkout the Shopping Cart and generates a new request.
 atf.server.checkoutShoppingCart({
-    $id: Now.ID[''], // string | guid, mandatory
+    $id: Now.ID['checkout_shopping_cart_step'], // string | guid, mandatory
     requestedFor: Now.ref('sys_user', '<sys_id>'), // sys_id | Record&lt;'sys_user'&gt;, mandatory
     deliveryAddress: '123 main st', // string, mandatory
     specialInstructions: 'none', // string, mandatory
@@ -25,7 +25,7 @@ atf.server.checkoutShoppingCart({
 // NOTE: this step's input is snake_case `request_item` (an exception to the camelCase-input rule) and it takes
 // an `sc_req_item` sys_id — do not pass checkoutShoppingCart's `request_id`, which identifies an `sc_request`.
 atf.server.replayRequestItem({
-    $id: Now.ID[''], // string | guid, mandatory
+    $id: Now.ID['replay_request_item_step'], // string | guid, mandatory
     request_item: Now.ref('sc_req_item', '<sys_id>'), // sys_id | Record&lt;'sc_req_item'&gt;, mandatory
 }): {
     table: string;

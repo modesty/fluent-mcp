@@ -117,10 +117,13 @@ describe('Shell-free arg handling for free-string paths (H1)', () => {
     });
 
     it('the real process runner spawns without a shell: the child receives the values verbatim and nothing runs', async () => {
+      // The schema rejects control characters before any spawn; the runner itself
+      // must still keep a newline from splitting or ending a command.
+      const values = [...hostile, 'a b;*.ts?c$(whoami)\nrm|x>y'];
       const printArgv = 'process.stdout.write(JSON.stringify(process.argv.slice(1)))';
-      const result = await new NodeProcessRunner().run(process.execPath, ['-e', printArgv, '--', ...hostile]);
+      const result = await new NodeProcessRunner().run(process.execPath, ['-e', printArgv, '--', ...values]);
       assert.equal(result.exitCode, 0, result.stderr);
-      assert.deepStrictEqual(JSON.parse(result.stdout), hostile);
+      assert.deepStrictEqual(JSON.parse(result.stdout), values);
       assert.equal(fs.existsSync(sentinel), false);
     });
 

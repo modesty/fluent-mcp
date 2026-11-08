@@ -6,7 +6,14 @@ import { CLICommand } from '../../utils/types.js';
 export class CommandRegistry {
   private commands: Map<string, CLICommand> = new Map();
 
+  /**
+   * Add a command. A second command with the same name is a wiring error and
+   * throws, rather than silently replacing the first.
+   */
   register(command: CLICommand): void {
+    if (this.commands.has(command.name)) {
+      throw new Error(`A command named '${command.name}' is already registered`);
+    }
     this.commands.set(command.name, command);
   }
 

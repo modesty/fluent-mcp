@@ -18,7 +18,7 @@ import { shellQuote } from '../../utils/shellQuote.js';
 export class CLICmdWriter implements CommandProcessor {
   /**
    * Return the shell text of the command, without running it. The writer
-   * spawns nothing, so it takes no stdin, timeout, signal or run options.
+   * spawns nothing, so it takes no timeout, signal or run options.
    */
   async process(command: string, args: string[], cwd?: string): Promise<CommandResult> {
     const commandText = [command, ...args].map(shellQuote).join(' ');

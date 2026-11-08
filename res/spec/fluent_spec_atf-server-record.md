@@ -2,19 +2,19 @@
 ```typescript
 // Perform a database query to verify if a record matching the conditions set in this step are met
 atf.server.recordQuery({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['record_query_step'], // string | guid, mandatory
   table: '', // table name
   fieldValues: '', // string, servicenow encoded query
   enforceSecurity: true, // boolean; recordQuery DEFAULTS TO FALSE (the other record steps default to true) - set it
     // to true explicitly so the query runs with the test user's access
   assert: 'records_match_query', // 'records_match_query' | 'no_records_match_query';
 }): { table: string; 
-    firstRecord: string; // sys_id of the first record
+    first_record: string; // sys_id of the first record (snake_case OUTPUT)
 };
 
 // Validates that a given record meets the specified conditions on the server-side.
 atf.server.recordValidation({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['record_validation_step'], // string | guid, mandatory
   table: '', // table name
   fieldValues: '', // string, servicenow encoded query
   recordId: '', // sys_id of the record
@@ -24,19 +24,19 @@ atf.server.recordValidation({ // all props are mandatory
 
 // Inserts a record into a table. Specify the field values to set on the new record, outputs the table and the sys_id of the new record.
 atf.server.recordInsert({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['record_insert_step'], // string | guid, mandatory
   table: '', // table name
   fieldValues: {}, // a valid JSON object, field must be snake_case and double-quoted and values must be double-quoted with properly escaped JSON values, example: { "field_one": "value1", "field_two": "value2" }
   assert: '', // 'record_successfully_inserted' | 'record_not_inserted';
   enforceSecurity: true, // boolean; defaults to true in SDK v4.5.0
 }): { table: string; 
-  recordId: string; // sys_id of the new record
+  record_id: string; // sys_id of the new record (snake_case OUTPUT: inserted.record_id)
 };
 
 // Changes field values of a record on the server.
 // follow this step with atf.server.recordValidation step to ensure that the changes were applied.
 atf.server.recordUpdate({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['record_update_step'], // string | guid, mandatory
   table: '', // table name
   fieldValues: {}, // a valid JSON object, field must be snake_case and double-quoted and values must be double-quoted with properly escaped JSON values, example: { "field_name": "value1", "field_two": "value2" }
   recordId: '', // sys_id of the record
@@ -46,7 +46,7 @@ atf.server.recordUpdate({ // all props are mandatory
 
 // Deletes a record of a table.
 atf.server.recordDelete({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['record_delete_step'], // string | guid, mandatory
   table: '', // table name
   recordId: '', // sys_id of the record
   enforceSecurity: true, // boolean; defaults to true in SDK v4.5.0

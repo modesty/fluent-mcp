@@ -1,8 +1,10 @@
 ```typescript
 import { DomainIdColumn, Table, TranslatedFieldColumn, TranslatedTextColumn } from '@servicenow/sdk/core'
 
-export const business_calendar_group = Table({
-    name: 'business_calendar_group',
+// A custom global table (u_ prefix); the platform's business_calendar_group cannot be redefined by an app.
+// `sys_domain` is the platform's standard domain-separation field name, so the DomainIdColumn keeps it.
+export const u_business_calendar_group = Table({
+    name: 'u_business_calendar_group',
     label: 'Business Calendar Group',
     display: 'name',
     schema: {

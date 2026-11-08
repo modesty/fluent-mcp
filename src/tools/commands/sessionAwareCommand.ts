@@ -23,6 +23,33 @@ export const WORKING_DIRECTORY_ARGUMENT: CommandArgument = {
 };
 
 /**
+ * Resolve the auth alias for a command that contacts an instance: the explicit
+ * alias, else the session alias, else the alias that lazy validation of
+ * `SN_INSTANCE_URL` stores in the session (undefined when there is none).
+ */
+export async function resolveAuthAlias(
+  providedAuth: string | undefined,
+  ensureAuthValidated: EnsureAuthValidated
+): Promise<string | undefined> {
+  if (providedAuth) {
+    return providedAuth;
+  }
+  const sessionManager = SessionManager.getInstance();
+  const sessionAuth = sessionManager.getAuthAlias();
+  if (sessionAuth) {
+    logger.debug(`Auto-injecting auth alias from session: ${sessionAuth}`);
+    return sessionAuth;
+  }
+
+  await ensureAuthValidated();
+  const validatedAuth = sessionManager.getAuthAlias();
+  if (validatedAuth) {
+    logger.debug(`Auto-injecting validated auth alias from session: ${validatedAuth}`);
+  }
+  return validatedAuth;
+}
+
+/**
  * Base class for commands that operate inside a Fluent project directory.
  * Extends BaseCLICommand and adds working directory handling, auth resolution, and timeout support.
  */
@@ -40,11 +67,7 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
    *
    * Resolution order: explicit `workingDirectory` argument → initialized session
    * → `FLUENT_MCP_WORKING_DIR` → undefined (the caller turns that into an
-   * actionable error). MCP Roots was formerly a fourth rung; MCP 2026-07-28
-   * deprecated Roots and removed the server-initiated `roots/list` request that
-   * populated it, so it is gone rather than migrated — the three remaining rungs
-   * are the spec's own sanctioned mechanisms (tool parameter, server
-   * configuration).
+   * actionable error).
    * @returns The working directory to use for the command
    */
   protected getWorkingDirectory(explicitWorkingDirectory?: unknown): string | undefined {
@@ -79,63 +102,25 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
   }
 
   /**
-   * Resolve authentication alias from provided value or session fallback.
-   * Used by commands that require instance authentication (install, transform, dependencies, download).
+   * Resolve the auth alias for a command that requires instance access: the
+   * explicit value, else the session alias (lazily validated on first use).
    * @param providedAuth Explicit auth alias from command args
    * @returns The resolved auth alias, or undefined if none available
    */
-  protected async resolveAuthAlias(providedAuth?: string): Promise<string | undefined> {
-    if (providedAuth) {
-      return providedAuth;
-    }
-    const sessionManager = SessionManager.getInstance();
-    const sessionAuth = sessionManager.getAuthAlias();
-    if (sessionAuth) {
-      logger.debug(`Auto-injecting auth alias from session: ${sessionAuth}`);
-      return sessionAuth;
-    }
-
-    await this.ensureAuthValidated();
-    const validatedAuth = sessionManager.getAuthAlias();
-    if (validatedAuth) {
-      logger.debug(`Auto-injecting validated auth alias from session: ${validatedAuth}`);
-    }
-    return validatedAuth;
+  protected resolveAuthAlias(providedAuth?: string): Promise<string | undefined> {
+    return resolveAuthAlias(providedAuth, this.ensureAuthValidated);
   }
 
   /**
-   * Execute a command that requires a working directory from the session
-   * @param command The command to execute
-   * @param args The command arguments
-   * @param stdinInput Optional input written whole to the child's stdin, which is then closed
-   * @param timeoutMs Optional command-specific timeout (falls back to this.timeoutMs)
-   * @param signal Optional abort signal from the MCP client (kills the child on cancel)
-   * @param explicitWorkingDirectory The per-call `workingDirectory` tool argument, if supplied
-   * @param options Optional per-call process options (e.g. a raised stdout capture cap)
-   * @returns The command result
+   * The failure of an instance command that found no auth alias, naming the
+   * ways to provide one.
    */
-  protected async executeWithSessionWorkingDirectory(
-    command: string,
-    args: string[],
-    stdinInput?: string,
-    timeoutMs?: number,
-    signal?: AbortSignal,
-    explicitWorkingDirectory?: unknown,
-    options?: ProcessRunOptions
-  ): Promise<CommandResult> {
-    try {
-      const workingDirectory = this.getWorkingDirectory(explicitWorkingDirectory);
-      if (!workingDirectory) {
-        return CommandResultFactory.error(
-          "No Fluent project working directory is configured. Pass the 'workingDirectory' tool argument with an absolute path, run init_fluent_app to initialize the session, or set FLUENT_MCP_WORKING_DIR to an absolute path."
-        );
-      }
-
-      const effectiveTimeout = timeoutMs ?? this.timeoutMs;
-      return await this.commandProcessor.process(command, args, workingDirectory, stdinInput, effectiveTimeout, signal, options);
-    } catch (error) {
-      return CommandResultFactory.fromError(error);
-    }
+  protected missingAuthResult(): CommandResult {
+    return CommandResultFactory.error(
+      `${this.name} requires authentication to a ServiceNow instance, but no credential alias was found. ` +
+      "Pass 'auth' with a stored profile alias, or set SN_INSTANCE_URL so lazy validation can load a matching profile into the session. " +
+      "Use the ServiceNow SDK 'now-sdk auth --add <instance>' command to create a profile."
+    );
   }
 
   /**
@@ -143,9 +128,10 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
    * Automatically resolves auth from session when 'auth' is in flagMapping but not provided in args.
    * Uses resolveTimeoutMs(args) for process execution.
    *
-   * A boolean flag config marked `negatable` emits the yargs negation
-   * (`--no-<flag>`) when the value is `false` — the only way to turn off a CLI
-   * flag that defaults to true. Without it, `false` emits nothing.
+   * A string flag config takes the argument's value (`--flag=value`). An object
+   * config is a boolean flag: `true` emits the bare flag, and `false` emits the
+   * yargs negation (`--no-<flag>`) only when marked `negatable`, the only way to
+   * turn off a CLI flag that defaults to true. Without it, `false` emits nothing.
    * @param sdkCommand The SDK command name (e.g., 'build', 'install')
    * @param args The command arguments object
    * @param flagMapping Optional mapping of arg names to CLI flags
@@ -157,7 +143,7 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
   protected async executeSdkCommand(
     sdkCommand: string,
     args: Record<string, unknown>,
-    flagMapping: Record<string, string | { flag: string; hasValue: boolean; negatable?: boolean }> = {},
+    flagMapping: Record<string, string | { flag: string; negatable?: boolean }> = {},
     positionalArgs: string[] = [],
     signal?: AbortSignal,
     options?: ProcessRunOptions
@@ -188,19 +174,12 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
       const value = args[argName];
       if (value !== undefined && value !== null && value !== '') {
         if (typeof flagConfig === 'string') {
-          // Simple string flag with value
           sdkArgs.push(cliOption(flagConfig, value));
-        } else {
-          // Object config with flag and hasValue
-          if (flagConfig.hasValue) {
-            sdkArgs.push(cliOption(flagConfig.flag, value));
-          } else if (value) {
-            // Boolean flag without value
-            sdkArgs.push(flagConfig.flag);
-          } else if (flagConfig.negatable) {
-            // Explicit false on a default-true CLI flag: emit the yargs negation
-            sdkArgs.push(flagConfig.flag.replace(/^--/, '--no-'));
-          }
+        } else if (value) {
+          sdkArgs.push(flagConfig.flag);
+        } else if (flagConfig.negatable) {
+          // Explicit false on a default-true CLI flag: emit the yargs negation
+          sdkArgs.push(flagConfig.flag.replace(/^--/, '--no-'));
         }
       }
     }
@@ -208,23 +187,24 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
     // Add common flags (like --debug)
     this.appendCommonFlags(sdkArgs, args);
 
+    const timeoutMs = this.resolveTimeoutMs(args);
     if (!this.requiresProject) {
       // The CLI resolves nothing from its cwd for this command, so the installed
       // package directory is a neutral cwd and no Fluent project is needed.
-      return this.commandProcessor.process(
-        command, sdkArgs, getProjectRootPath(), undefined, this.resolveTimeoutMs(args), signal, options
-      );
+      return this.commandProcessor.process(command, sdkArgs, getProjectRootPath(), timeoutMs, signal, options);
     }
 
-    return this.executeWithSessionWorkingDirectory(
-      command,
-      sdkArgs,
-      undefined,
-      this.resolveTimeoutMs(args),
-      signal,
-      args.workingDirectory,
-      options
-    );
+    try {
+      const workingDirectory = this.getWorkingDirectory(args.workingDirectory);
+      if (!workingDirectory) {
+        return CommandResultFactory.error(
+          "No Fluent project working directory is configured. Pass the 'workingDirectory' tool argument with an absolute path, run init_fluent_app to initialize the session, or set FLUENT_MCP_WORKING_DIR to an absolute path."
+        );
+      }
+      return await this.commandProcessor.process(command, sdkArgs, workingDirectory, timeoutMs, signal, options);
+    } catch (error) {
+      return CommandResultFactory.fromError(error);
+    }
   }
 
   /**

@@ -4,7 +4,7 @@
 // Imports (shown in the shared ATF scaffold): import { Test } from '@servicenow/sdk/core'; import '@servicenow/sdk/global'
 Test(
   {
-    $id: Now.ID[''], // string | guid, mandatory - unique test id
+    $id: Now.ID['my_ui_component_test'], // string | guid, mandatory - unique test id
     name: '', // string, mandatory - e.g. 'Custom UI: <Workflow Name>'
     description: '', // string, mandatory - what it validates AND how (name the component, action, and assertion)
     active: true, // boolean, mandatory
@@ -12,7 +12,7 @@ Test(
   (atf) => {
     // Runs a TestingLibrary test script in the client test runner.
     atf.uiTestScript.runTest({
-      $id: Now.ID[''], // string | guid, mandatory - unique step id
+      $id: Now.ID['run_test_step'], // string | guid, mandatory - unique step id
       script: Now.include('./my_workflow_test.script.js'), // string | ReturnType<typeof Now.include>, mandatory
         // Prefer Now.include('./file.script.js') to keep the body in a real .js file (IDE support).
         // Use an inline template literal ONLY for trivial one-liners or when interpolating a prior step's output.

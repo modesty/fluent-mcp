@@ -1,5 +1,6 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
 import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
+import { DEBUG_ARGUMENT } from './baseCommand.js';
 import {
   RESPONSE_TIMEOUT_ARGUMENT,
   runnerTimeoutForResponseTimeout,
@@ -84,12 +85,7 @@ export class TransformCommand extends SessionAwareCLICommand {
       ...RESPONSE_TIMEOUT_ARGUMENT,
       description: `${RESPONSE_TIMEOUT_ARGUMENT.description} Only affects a full-application transform from the instance (no from, table, or id).`,
     },
-    {
-      name: 'debug',
-      type: 'boolean',
-      required: false,
-      description: 'Print debug output',
-    }
+    DEBUG_ARGUMENT
   ];
 
   /**
@@ -139,8 +135,8 @@ export class TransformCommand extends SessionAwareCLICommand {
       ...(!offline && { auth: '--auth' }),
       table: '--table',
       id: '--id',
-      force: { flag: '--force', hasValue: false },
-      format: { flag: '--format', hasValue: false, negatable: true },
+      force: { flag: '--force' },
+      format: { flag: '--format', negatable: true },
       timeoutSeconds: '--timeout',
     }, [], signal);
   }

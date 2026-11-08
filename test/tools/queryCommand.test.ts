@@ -93,7 +93,6 @@ describe('QueryCommand', () => {
         '--auth=session-alias',
       ],
       PACKAGE_ROOT,
-      undefined,
       60000,
       undefined,
       ENVELOPE_RUN_OPTIONS

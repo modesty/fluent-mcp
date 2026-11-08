@@ -63,10 +63,10 @@ export function removeStage(stage) {
  * Compile the given test files into .test-build/<stage>/ and stage package
  * metadata and resources beside the compiled output.
  * @param {string[]} testFiles repo-relative paths of *.test.ts files under test/
- * @param {string} [stage='default'] staging directory name under .test-build/
+ * @param {string} stage staging directory name under .test-build/
  * @returns {string} absolute path of the staging root
  */
-export function stageTests(testFiles, stage = 'default') {
+export function stageTests(testFiles, stage) {
   if (testFiles.length === 0) throw new Error('stageTests requires at least one test file');
   const stageRoot = stageRootFor(stage);
   rmSync(stageRoot, { recursive: true, force: true });

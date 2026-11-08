@@ -1,12 +1,16 @@
-# Create a Service Portal Angular Provider as a filter
+# Create a Service Portal Angular Provider for a reusable formatter (in place of an Angular filter)
+
+An `sp_angular_provider` is a `directive`, `factory` or `service` only; there is no `filter` type. Wrap the
+formatting function in a factory, inject it into the widget's client controller, and call it from the template
+(for example `{{c.timeAgo(item.sys_created_on)}}` after `c.timeAgo = timeAgo;`).
 
 ```typescript
-import { SpAngularProvider } from '@servicenow/sdk/core'
+import { SPAngularProvider } from '@servicenow/sdk/core'
 
-SpAngularProvider({
+SPAngularProvider({
     $id: Now.ID['time_ago_filter'],
     name: 'timeAgo',
-    type: 'filter',
+    type: 'factory',
     script: `function() {
     return function(dateString) {
         if (!dateString) return '';

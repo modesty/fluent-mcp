@@ -1,5 +1,6 @@
 # Table augment example (SDK v4.7.0+): add columns — and (SDK v4.13.0+) indexes — to the platform `incident` table without creating a new table
 ```typescript
+// App scope: x_acme
 import { Table, StringColumn, BooleanColumn, ChoiceColumn } from '@servicenow/sdk/core'
 
 // Augment mode: only `augments`, `schema` and (SDK v4.13.0+) `index` are allowed. Added column names must use the current

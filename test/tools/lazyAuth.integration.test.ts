@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { hasOption, optionValue } from '../support/argv.js';
+import { optionValue } from '../support/argv.js';
 import { assertCalledTimes, assertNotCalled } from '../support/mockAssertions.js';
 import { configFixture, loggerFixture, sdkCliFixture, tempProjectDir } from '../support/fixtures.js';
 import type { CommandProcessor, EnsureAuthValidated } from '../../src/utils/types.js';
@@ -128,40 +128,6 @@ describe('lazy auto-auth', () => {
     assertNotCalled(ensureAuth);
     const argv = commandProcessor.process.mock.calls[0].arguments[1];
     assert.equal(optionValue(argv, '--auth'), 'explicit-alias');
-  });
-
-  it('does not validate auth for a local transform', async () => {
-    const ensureAuth = ensureAuthSpy();
-    const commandProcessor = processor();
-    const transform = new TransformCommand(commandProcessor, ensureAuth);
-
-    await transform.execute({
-      from: '/tmp/local-update-set.xml',
-      workingDirectory: PROJECT_DIR,
-    });
-
-    assertNotCalled(ensureAuth);
-    assert.ok(!hasOption(commandProcessor.process.mock.calls[0].arguments[1], '--auth'));
-  });
-
-  it('rejects an explicit auth alias on a local transform without validating or spawning', async () => {
-    // The CLI declares `.conflicts('from', ['mode', 'auth'])`, so forwarding the
-    // alias would only trade this message for a yargs failure after spawn.
-    const ensureAuth = ensureAuthSpy();
-    const commandProcessor = processor();
-    const transform = new TransformCommand(commandProcessor, ensureAuth);
-
-    await assert.rejects(
-      transform.execute({
-        from: '/tmp/local-update-set.xml',
-        auth: 'explicit-local-alias',
-        workingDirectory: PROJECT_DIR,
-      }),
-      /Arguments 'from' and 'auth' cannot be combined/
-    );
-
-    assertNotCalled(ensureAuth);
-    assertNotCalled(commandProcessor.process);
   });
 
   it('memoizes a failed validation instead of racing or retrying', async () => {

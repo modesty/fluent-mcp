@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import fs from 'node:fs';
-import { defaultConfig, findMissingResourcePaths, getConfig, getProjectRootPath } from '../src/config.js';
+import { findMissingResourcePaths, getConfig, getProjectRootPath } from '../src/config.js';
 import { withEnvironment } from './support/fixtures.js';
 
 // Runs under the native runner with the REAL config module (no global mocks).
@@ -47,7 +47,7 @@ describe('Config Module', () => {
     assert.notEqual(getProjectRootPath(), process.cwd());
   });
 
-  it('getConfig resolves the resource directories under the package root', () => {
+  it('getConfig defaults the resource directories to the staged res tree under the package root', () => {
     const rootPath = getProjectRootPath();
     const restore = withEnvironment(RESOURCE_ENV);
     try {
@@ -59,14 +59,6 @@ describe('Config Module', () => {
     } finally {
       restore();
     }
-  });
-
-  it('defaultConfig resource directories match the staged res tree', () => {
-    const rootPath = getProjectRootPath();
-
-    assert.equal(defaultConfig.resourcePaths.spec, path.join(rootPath, 'res', 'spec'));
-    assert.equal(defaultConfig.resourcePaths.snippet, path.join(rootPath, 'res', 'snippet'));
-    assert.equal(defaultConfig.resourcePaths.instruct, path.join(rootPath, 'res', 'instruct'));
   });
 
   it('findMissingResourcePaths reports nothing for the staged layout', () => {

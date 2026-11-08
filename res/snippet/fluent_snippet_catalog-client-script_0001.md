@@ -1,9 +1,31 @@
 # Two catalog client scripts: onLoad to initialize field visibility, and onSubmit to validate that a future date is selected before submission
 
 ```typescript
-import { CatalogClientScript } from '@servicenow/sdk/core'
-import { laptopRequestItem } from './laptop-request-item.now'
-import { laptopVariableSet } from './laptop-variable-set.now'
+import { CatalogClientScript, CatalogItem } from '@servicenow/sdk/core'
+import { DateVariable, MultiLineTextVariable, SelectBoxVariable, SingleLineTextVariable } from '@servicenow/sdk/core'
+
+// Catalog item the scripts attach to (fulfilled by an existing flow; look sys_ids up with now-sdk query)
+export const laptopRequestItem = CatalogItem({
+    $id: Now.ID['laptop_request_catalog_item'],
+    name: 'Laptop Request',
+    shortDescription: 'Request a new laptop for business use',
+    catalogs: ['e0d08b13c3330100c8b837659bba8fb4'], // Service Catalog
+    flow: '523da512c611228900811a37c97c2014', // sys_hub_flow that fulfills the request
+    variables: {
+        employee_type: SelectBoxVariable({
+            question: 'Employee Type',
+            order: 100,
+            mandatory: true,
+            choices: {
+                employee: { label: 'Employee', sequence: 1 },
+                contractor: { label: 'Contractor', sequence: 2 },
+            },
+        }),
+        corporate_card_number: SingleLineTextVariable({ question: 'Corporate Card Number', order: 200 }),
+        justification: MultiLineTextVariable({ question: 'Business Justification', order: 300, mandatory: true }),
+        required_by: DateVariable({ question: 'Required By Date', order: 400 }),
+    },
+})
 
 // onLoad: Pre-populate the requester's name and hide the corporate card field by default
 export const laptopFormOnLoad = CatalogClientScript({
@@ -33,7 +55,7 @@ export const laptopEmployeeTypeOnChange = CatalogClientScript({
     $id: Now.ID['laptop_employee_type_on_change'],
     name: 'Laptop Form - Show Corporate Card for Employees',
     type: 'onChange',
-    variableName: laptopVariableSet.variables.employee_type,
+    variableName: laptopRequestItem.variables.employee_type,
     catalogItem: laptopRequestItem,
     appliesTo: 'item',
     appliesOnCatalogItemView: true,

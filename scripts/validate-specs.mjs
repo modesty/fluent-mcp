@@ -30,6 +30,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 // This script lives in scripts/. The repo root (res/, node_modules/,
 // coverage/) is one level up; the validator scaffold lives under .mosey/.
@@ -343,6 +344,99 @@ function checkAtfIndex() {
   return problems;
 }
 
+/**
+ * Check the documented outputs of ATF steps against the installed SDK.
+ *
+ * The type-check above cannot see them: `atf` is declared `any`, and
+ * normalizeSpecCode() strips every `}): { ... }` return annotation. So a spec
+ * that documents `{ recordId: string }` for a step whose SDK result is
+ * `{ record_id: string }` passes, and a reader who copies `submitted.recordId`
+ * gets TS2551 from `now-sdk build`.
+ *
+ * The expected outputs are read from the SDK itself (the `ATFType` interface in
+ * sdk-core's app/Test.d.ts, through the TypeScript checker), so nothing here is
+ * pinned to an SDK version. Every `atf.<namespace>.<step>(...)` call in a spec
+ * code block must name a step the SDK declares, and when the call carries a
+ * return annotation (`void` or `{ ... }`), its member names must equal the
+ * SDK's output names.
+ */
+function readSdkAtfOutputs() {
+  const dts = path.join(PROJECT_ROOT, 'node_modules', '@servicenow', 'sdk-core', 'dist', 'app', 'Test.d.ts');
+  if (!fs.existsSync(dts)) throw new Error(`ATF declarations not found at ${path.relative(PROJECT_ROOT, dts)}`);
+  const program = ts.createProgram([dts], { noEmit: true, skipLibCheck: true });
+  const checker = program.getTypeChecker();
+  const atfType = program.getSourceFile(dts).statements.find(
+    s => ts.isInterfaceDeclaration(s) && s.name.text === 'ATFType'
+  );
+  if (!atfType) throw new Error('interface ATFType not found in sdk-core app/Test.d.ts');
+
+  const outputs = new Map(); // 'form.submitForm' → sorted output names, or null for void
+  for (const namespace of checker.getPropertiesOfType(checker.getTypeAtLocation(atfType))) {
+    const namespaceType = checker.getTypeOfSymbolAtLocation(namespace, atfType);
+    for (const step of checker.getPropertiesOfType(namespaceType)) {
+      const names = new Set();
+      let returnsValue = false;
+      for (const signature of checker.getTypeOfSymbolAtLocation(step, atfType).getCallSignatures()) {
+        const result = checker.getReturnTypeOfSignature(signature);
+        if (result.flags & ts.TypeFlags.Void) continue;
+        returnsValue = true;
+        for (const member of checker.getPropertiesOfType(result)) names.add(member.name);
+      }
+      outputs.set(`${namespace.name}.${step.name}`, returnsValue ? [...names].sort() : null);
+    }
+  }
+  return outputs;
+}
+
+/** Index just past the bracket that closes the one opened before `start`. */
+function skipBalanced(code, start) {
+  let depth = 1;
+  let i = start;
+  while (i < code.length && depth > 0) {
+    const c = code[i++];
+    if (c === '(' || c === '{' || c === '[') depth++;
+    else if (c === ')' || c === '}' || c === ']') depth--;
+  }
+  return i;
+}
+
+function checkAtfOutputs() {
+  let sdkOutputs;
+  try {
+    sdkOutputs = readSdkAtfOutputs();
+  } catch (err) {
+    return [err.message];
+  }
+  const show = names => (names ? `{ ${names.join(', ')} }` : 'void');
+
+  const problems = [];
+  const files = fs.readdirSync(SPEC_DIR)
+    .filter(f => f.startsWith('fluent_spec_') && f.endsWith('.md') && (!FILTER || f.includes(FILTER)))
+    .sort();
+  for (const filename of files) {
+    const code = extractTypescript(path.join(SPEC_DIR, filename));
+    const call = /\batf\.(\w+)\.(\w+)\s*(?:<[^>(]*>)?\(/g;
+    let m;
+    while ((m = call.exec(code))) {
+      const step = `${m[1]}.${m[2]}`;
+      if (!sdkOutputs.has(step)) {
+        problems.push(`${filename}: atf.${step} is not a step of the installed SDK`);
+        continue;
+      }
+      const annotation = code.slice(skipBalanced(code, call.lastIndex)).match(/^\s*:\s*(void\b|\{[^{}]*\})/);
+      if (!annotation) continue;
+      const documented = annotation[1] === 'void'
+        ? null
+        : [...annotation[1].replace(/\/\/[^\n]*/g, '').matchAll(/(\w+)\??\s*:/g)].map(x => x[1]).sort();
+      const expected = sdkOutputs.get(step);
+      if (JSON.stringify(documented) !== JSON.stringify(expected)) {
+        problems.push(`${filename}: atf.${step} documents ${show(documented)}, the SDK returns ${show(expected)}`);
+      }
+    }
+  }
+  return problems;
+}
+
 function main() {
   console.log(`\nValidating res/spec/*.md against @servicenow/sdk (installed version) types…\n`);
 
@@ -386,12 +480,21 @@ function main() {
     console.log('  [OK]   ATF parent index covers every atf-* sub-type');
   }
 
+  // Documented ATF step outputs vs the SDK's (skipped like the index above)
+  const outputProblems = (!FILTER || FILTER.startsWith('atf')) ? checkAtfOutputs() : [];
+  if (outputProblems.length > 0) {
+    console.log('  [FAIL] ATF step outputs documented in specs');
+    for (const p of outputProblems) console.log(`         ${p}`);
+  } else if (!FILTER || FILTER.startsWith('atf')) {
+    console.log('  [OK]   ATF step outputs documented in specs match the SDK');
+  }
+
   console.log('');
   console.log(`Results: ${totals.passed} clean, ${totals.failed} with errors, ${totals.skipped} skipped, ${specs.length} total`);
   console.log(`Report:  coverage/spec-validation.md`);
   console.log('');
 
-  process.exit(totals.failed > 0 || atfProblems.length > 0 ? 1 : 0);
+  process.exit(totals.failed > 0 || atfProblems.length > 0 || outputProblems.length > 0 ? 1 : 0);
 }
 
 main();

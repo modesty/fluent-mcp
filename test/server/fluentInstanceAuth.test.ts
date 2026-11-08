@@ -20,14 +20,12 @@ const { SessionManager } = await import('../../src/utils/sessionManager.js');
 
 /**
  * A ToolsManager whose listAuthProfiles answers `auth --list` with the given
- * output and exit code. `runAuth`, the former entry point for `auth --add` and
- * `auth --use`, is a spy that succeeds, so a validation that still wrote the
- * profile store would be seen doing it.
+ * output and exit code. listAuthProfiles is the only ToolsManager entry point
+ * validation uses; it has no way to write the profile store.
  */
 function makeToolsManager(listOutput = '', listExitCode = 0) {
   const listAuthProfiles = mock.fn(async () => ({ success: listExitCode === 0, output: listOutput, exitCode: listExitCode }));
-  const runAuth = mock.fn(async () => ({ success: true, output: '', exitCode: 0 }));
-  return { listAuthProfiles, runAuth, toolsManager: { listAuthProfiles, runAuth } as unknown as ToolsManager };
+  return { listAuthProfiles, toolsManager: { listAuthProfiles } as unknown as ToolsManager };
 }
 
 /** `auth --list` output for the given profiles, as the CLI prints it. */
@@ -44,9 +42,6 @@ function listing(...profiles: { alias: string; host: string; isDefault?: boolean
 const BASIC_ENV = {
   SN_INSTANCE_URL: 'https://dev12345.service-now.com',
   SN_AUTH_TYPE: 'basic',
-  // Credentials in the environment no longer lead to an add.
-  SN_USER_NAME: 'admin',
-  SN_PASSWORD: 'secret',
 };
 
 const ADD_COMMAND = 'npx @servicenow/sdk auth --add https://dev12345.service-now.com --type basic --alias dev12345.service-now.com';
@@ -60,9 +55,6 @@ describe('autoValidateAuthIfConfigured', () => {
     restoreEnvironment = withEnvironment({
       SN_INSTANCE_URL: undefined,
       SN_AUTH_TYPE: undefined,
-      SN_USER_NAME: undefined,
-      SN_USERNAME: undefined,
-      SN_PASSWORD: undefined,
     });
   });
 
@@ -91,35 +83,20 @@ describe('autoValidateAuthIfConfigured', () => {
     assert.equal(tm.listAuthProfiles.mock.callCount(), 1);
   });
 
-  it('never adds a basic profile, even with SN_USER_NAME and SN_PASSWORD set', async () => {
+  it('returns the basic add command and stores the result when no profile matches', async () => {
     Object.assign(process.env, BASIC_ENV);
 
-    // auth --add makes the new profile the CLI default. Setting the old one back
-    // was skipped when the add failed after storing the profile, and two
-    // overlapping validations restored the wrong default (W9 review).
+    // auth --add makes the new profile the CLI default, so the server never
+    // adds one itself; the user runs the returned command (W9 review).
     const tm = makeToolsManager('');
     const result = await autoValidateAuthIfConfigured(tm.toolsManager);
 
     assert.equal(tm.listAuthProfiles.mock.callCount(), 1);
-    assert.equal(tm.runAuth.mock.callCount(), 0);
     assert.equal(result.status, 'not_authenticated');
     assert.equal(result.message, 'No auth profile matches dev12345.service-now.com. The server does not add profiles; add one in a terminal with the command below.');
     assert.equal(result.actionRequired, ADD_COMMAND);
     assert.equal(SessionManager.getInstance().getAuthAlias(), undefined);
     assert.deepEqual(SessionManager.getInstance().getAuthValidationResult(), result);
-  });
-
-  it('only reads the profile store when validations overlap', async () => {
-    Object.assign(process.env, BASIC_ENV);
-
-    // Separate server processes do not share the single-flight promise; with
-    // no write, overlapping validations cannot leave a different default.
-    const tm = makeToolsManager(listing({ alias: 'other', host: 'https://other.service-now.com', isDefault: true }));
-    const results = await Promise.all([1, 2, 3].map(() => autoValidateAuthIfConfigured(tm.toolsManager)));
-
-    assert.equal(tm.listAuthProfiles.mock.callCount(), 3);
-    assert.equal(tm.runAuth.mock.callCount(), 0);
-    assert.deepEqual(results.map((result) => result.status), ['not_authenticated', 'not_authenticated', 'not_authenticated']);
   });
 
   it('says how to keep the current CLI default when adding by hand', async () => {
@@ -207,8 +184,6 @@ describe('autoValidateAuthIfConfigured', () => {
   it('reports an unreadable credential store instead of no matching profile (SDK v4.14.0+)', async () => {
     process.env.SN_INSTANCE_URL = 'https://dev12345.service-now.com';
     process.env.SN_AUTH_TYPE = 'basic';
-    process.env.SN_USER_NAME = 'admin';
-    process.env.SN_PASSWORD = 'secret';
 
     // `auth --list` logs failures on stdout and exits 1 (sdk-cli command/auth/index.js).
     const tm = makeToolsManager(

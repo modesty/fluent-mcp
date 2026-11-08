@@ -2,47 +2,47 @@
 ```typescript
 // filters the Email [sys_email] table to find an email that was sent from a notification during testing
 atf.email.validateOutboundEmail({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['validate_outbound_email_step'], // string | guid, mandatory
   conditions: '', //string, Servicenow encoded query
 }):void;
 
 // Filters the Email [sys_email] table to find an email that was sent from a flow during testing.
 atf.email.validateOutboundEmailGeneratedByFlow({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['validate_outbound_email_generated_by_flow_step'], // string | guid, mandatory
   sourceFlow: Now.ref('sys_hub_flow', '<sys_id>'), // sys_id | Record&lt;'sys_hub_flow'&gt;;
   conditions: '', //string, Servicenow encoded query
 }): void;
 
 // Filters the Email [sys_email] table to find an email that was sent from a notification during testing.
 atf.email.validateOutboundEmailGeneratedByNotification({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['validate_outbound_email_generated_by_notification_step'], // string | guid, mandatory
   sourceNotification: Now.ref('sysevent_email_action', '<sys_id>'), // sys_id | Record&lt;'sysevent_email_action'&gt;;
   conditions: '', //string, Servicenow encoded query
 }): void;
 
 // Generates a new inbound email. This step also creates an email.read event upon step completion
 atf.email.generateInboundEmail({ 
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['generate_inbound_email_step'], // string | guid, mandatory
   from: '',
   to: '', 
   subject: '',
   body: '' 
-}): { outputEmailRecord: ''};
+}): { output_email_record: '' }; // sys_id of the generated sys_email record (snake_case OUTPUT)
 
 // generates an Email [sys_email] record that looks like an email sent in reply to a system notification. This step also creates an email.read event upon step completion.
 atf.email.generateInboundReplyEmail({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['generate_inbound_reply_email_step'], // string | guid, mandatory
   targetTable: '', 
   targetRecord: '', // string | Record&lt;'targetTable'&gt;;
   subject: '',
   body: '',
   from: '',
   to: '',
-}): { outputReplyEmailRecord: ''}; // recordId of the inbound reply email
+}): { output_reply_email_record: '' }; // sys_id of the inbound reply email (snake_case OUTPUT)
 
 // Generates a string that can be used as test data for another test step. By default, the string is 10 characters long. The maximum length of the string is 10,000 characters.
 atf.email.generateRandomString({ 
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['generate_random_string_step'], // string | guid, mandatory
   length: 1024, // number
-}): { randomString: '' };
+}): { random_string: '' }; // snake_case OUTPUT
 ```

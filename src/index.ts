@@ -17,36 +17,65 @@ const config = getConfig();
 // Create a global server instance
 const server = new FluentMcpServer();
 
-// Handle process signals for graceful shutdown
-process.on('SIGINT', handleShutdown);
-process.on('SIGTERM', handleShutdown);
+/** Exit status of the process: 0 for a requested shutdown, 1 for a fatal error. */
+type ExitStatus = 0 | 1;
 
-// Handle unhandled errors and exceptions
+/** Upper bound on cleanup, so a fatal error cannot leave a hung process behind. */
+const SHUTDOWN_TIMEOUT_MS = 5_000;
+
+let exitStatus: ExitStatus = 0;
+let shutdown: Promise<void> | undefined;
+
+/**
+ * Stop the server once and exit. Single-flight: a signal or fatal error that
+ * arrives while shutdown runs joins it. The status only rises, so a later signal
+ * never turns a fatal exit into 0, and a failed or timed-out cleanup exits 1.
+ */
+function shutdownWith(status: ExitStatus): Promise<void> {
+  exitStatus = Math.max(exitStatus, status) as ExitStatus;
+  process.exitCode = exitStatus;
+  shutdown ??= stopServer().then(() => process.exit(exitStatus));
+  return shutdown;
+}
+
+async function stopServer(): Promise<void> {
+  logger.info('Shutting down server...', { processId: process.pid });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Shutdown did not finish within ${SHUTDOWN_TIMEOUT_MS} ms`)), SHUTDOWN_TIMEOUT_MS);
+  });
+  try {
+    await Promise.race([server.stop(), timeout]);
+    logger.info('Server stopped successfully', { processId: process.pid });
+  } catch (error) {
+    exitStatus = 1;
+    logger.error('Error during shutdown', CommandResultFactory.normalizeError(error));
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+process.on('SIGINT', () => void shutdownWith(0));
+process.on('SIGTERM', () => void shutdownWith(0));
+
 process.on('uncaughtException', (error) => {
   logger.error('Uncaught exception', error, {
     type: 'uncaughtException',
     processId: process.pid
   });
-  handleShutdown();
+  void shutdownWith(1);
 });
 
-process.on('unhandledRejection', (reason, _promise) => {
+// Fatal, like an uncaught exception: this is Node's own default
+// (--unhandled-rejections=throw), which installing a handler would otherwise
+// replace with log-and-continue on a server in an unknown state.
+process.on('unhandledRejection', (reason) => {
   logger.error('Unhandled promise rejection',
     reason instanceof Error ? reason : new Error(String(reason)),
     { type: 'unhandledRejection', processId: process.pid }
   );
+  void shutdownWith(1);
 });
-
-async function handleShutdown(): Promise<void> {
-  logger.info('Shutting down server...', { processId: process.pid });
-  try {
-    await server.stop();
-    logger.info('Server stopped successfully', { processId: process.pid });
-  } catch (error) {
-    logger.error('Error during shutdown', CommandResultFactory.normalizeError(error));
-  }
-  process.exit(0);
-}
 
 // Start the server
 async function main(): Promise<void> {
@@ -66,7 +95,7 @@ async function main(): Promise<void> {
     logger.error('Error initializing Fluent MCP Server',
       CommandResultFactory.normalizeError(error)
     );
-    process.exit(1);
+    await shutdownWith(1);
   }
 }
 

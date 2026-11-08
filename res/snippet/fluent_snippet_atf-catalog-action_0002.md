@@ -21,7 +21,7 @@ Test({
 
   atf.catalog.orderCatalogItem({
     $id: Now.ID['003'], // string | guid, mandatory
-    assertType: 'form_submitted_to_server' // 'form_submitted_to_server' |'form_submission_cancelled_in_browser'
+    assert: 'form_submitted_to_server' // 'form_submitted_to_server' |'form_submission_cancelled_in_browser'
   })
 
 })
