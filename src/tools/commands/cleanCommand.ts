@@ -1,5 +1,6 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
 import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
+import { DEBUG_ARGUMENT } from './baseCommand.js';
 
 /**
  * Command to clean output directory of a Fluent (ServiceNow SDK) application
@@ -18,12 +19,7 @@ export class CleanCommand extends SessionAwareCLICommand {
       required: false,
       description: 'Path to the directory that contains package.json configuration',
     },
-    {
-      name: 'debug',
-      type: 'boolean',
-      required: false,
-      description: 'Print debug output',
-    }
+    DEBUG_ARGUMENT
   ];
 
   async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {

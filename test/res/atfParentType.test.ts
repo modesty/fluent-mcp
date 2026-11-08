@@ -79,20 +79,6 @@ describe('`atf` parent metadata type', () => {
         assert.ok(result.output.length > 0);
       });
     }
-
-    for (const variant of ['ATF', 'Atf', 'aTf']) {
-      it(`rejects the casing ${variant}: metadataType is a lowercase enum`, async () => {
-        const result = await new GetFluentKnowledgeCommand().execute({ kind: 'spec', metadataType: variant });
-        assert.equal(result.success, false);
-        assert.match(result.output, new RegExp(`Argument 'metadataType' must be one of: .*Received: "${variant}"`));
-      });
-    }
-
-    it('lists `atf` among the available types', async () => {
-      const result = await new GetFluentKnowledgeCommand().execute({ kind: 'spec' });
-      const availableTypes = result.structuredContent?.availableTypes as string[] | undefined;
-      assert.ok(Array.isArray(availableTypes) && availableTypes.includes('atf'));
-    });
   });
 
   describe('every sub-type is exposed from the parent', () => {

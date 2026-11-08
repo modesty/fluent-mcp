@@ -1,5 +1,6 @@
 # defines a new table that extends the sys_metadata table and includes various columns with different properties. The table is designed to configure FX currency settings, specifying the number of digits to display, the currency to display, the rate table to use, and the reference currency to use for conversions.
 ```typescript
+// App scope: sn_fx (a non-x_, non-global scope: the build does not prefix-check its table names)
 import { Table, StringColumn, TableNameColumn, ReferenceColumn, FieldNameColumn,  } from "@servicenow/sdk/core";
 
 export const fx_configuration = Table({

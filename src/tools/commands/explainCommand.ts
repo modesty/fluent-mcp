@@ -1,5 +1,5 @@
 import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
-import { BaseCLICommand } from './baseCommand.js';
+import { BaseCLICommand, DEBUG_ARGUMENT } from './baseCommand.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
 import { assertNotOption, cliOption } from './cliArgv.js';
 import { getProjectRootPath } from '../../config.js';
@@ -49,12 +49,7 @@ export class ExplainCommand extends BaseCLICommand {
       domain: { kind: 'choices', values: EXPLAIN_FORMATS },
       description: 'Output format: "pretty" (terminal, default) or "raw" (plain markdown).',
     },
-    {
-      name: 'debug',
-      type: 'boolean',
-      required: false,
-      description: 'Print debug output',
-    },
+    DEBUG_ARGUMENT,
   ];
 
   async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
@@ -83,7 +78,6 @@ export class ExplainCommand extends BaseCLICommand {
       command,
       sdkArgs,
       getProjectRootPath(),
-      undefined,
       this.timeoutMs,
       signal
     );

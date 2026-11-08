@@ -3,7 +3,7 @@ Always reference the Assessment API specifications for more details.
 1. Import `Assessment` from `@servicenow/sdk/core` (SDK v4.12.0+). One `Assessment()` call writes the definition row (`asmt_metric_type`) plus every category (`asmt_metric_category`), metric (`asmt_metric`) and answer option (`asmt_metric_definition`), wiring the `metric_type`, `category` and `metric` foreign keys from the nesting. Never author those tables separately with `Record()`, and never set the foreign keys by hand.
 2. **When to use it.** Use `Assessment` to **evaluate and score records** on a target `table` — vendors, CIs, services, projects — with weighted, normalized results. Use it with `evaluationMethod: 'survey'` to **collect unscored feedback** such as CSAT, NPS or onboarding questions.
 3. **When NOT to use it.**
-   - For **change-request risk**, use `RiskAssessment` instead (see `fluent_instruct_risk-assessment.md`).
+   - For **change-request risk**, use `RiskAssessment` instead (see the `risk-assessment` instructions, `get_fluent_knowledge` kind `instruct`).
    - Quizzes, attestations, test plans and vendor-risk assessments are not authorable: `evaluationMethod` accepts **only** `'assessment'` or `'survey'`.
    - It is not a delivery mechanism (see rule 17).
 4. **Set `evaluationMethod` explicitly, every time.** Omitting it means `'assessment'`, which makes `table` and `scaleFactor` mandatory. A survey **must** say `evaluationMethod: 'survey'`.

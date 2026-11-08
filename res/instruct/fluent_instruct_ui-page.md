@@ -84,6 +84,8 @@ Always reference the UI Page API specifications for more details.
 
 ## Jelly Template Guidelines
 
+1. **Escape Jelly expressions in inline `html`**: in a template literal every Jelly `${...}` must be written `\${...}`; an unescaped one is a TypeScript interpolation and fails the build (TS2304 `Cannot find name 'jvar_x'`, or TS224/TS239 for `${!empty(...)}`). Phase-two `$[...]` needs no escape. Or keep the Jelly in its own file with `html: Now.include('./page.jelly.xml')`.
+1. **Jelly variables in `<g:evaluate>`**: add `jelly="true"` and read them as `jelly.jvar_name`; do not splice `${jvar_name}` into the script text (it injects request input into server code). Add `object="true"` to keep a non-string result (e.g. a `GlideUser`) instead of its string form.
 1. **Variable scope**: Variables created with `<g:evaluate var="jvar_name">` are available in Jelly context.
 1. **Server-side execution**: Jelly code executes on the server before being sent to client.
 1. **JSON data passing**: Use `JSON.stringify()` in Jelly to pass data to client-side JavaScript.

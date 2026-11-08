@@ -9,7 +9,7 @@ Test({
   active: true,
   failOnServerError: true
 }, (atf) => {
-  const outputEmailRecord = atf.email.generateInboundEmail({
+  atf.email.generateInboundEmail({
     $id: 'step_1_abcdef',
     from: 't2t@pale.org',
     to: 'no-reply@pale.org',

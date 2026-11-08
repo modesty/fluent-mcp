@@ -24,7 +24,7 @@ export type ArgumentDomain =
 // Domain Models
 export interface CommandArgument {
   name: string;
-  type: 'string' | 'number' | 'boolean' | 'array';
+  type: 'string' | 'number' | 'boolean';
   required: boolean;
   description: string;
   /** For a string argument: the values it accepts beyond being a string. */
@@ -66,12 +66,8 @@ export enum ResourceType {
 export interface ResourceResult {
   /** Content of the loaded resource */
   content: string;
-  /** Path to the resource */
-  path: string;
   /** Metadata type of the resource */
   metadataType: string;
-  /** Resource type (spec, snippet, instruct) */
-  resourceType: string;
   /** Whether the resource was found */
   found: boolean;
 }
@@ -117,8 +113,6 @@ export interface ProcessRunner {
     command: string,
     args: string[],
     cwd?: string,
-    /** Written to the child's stdin whole, which is then closed; without it, stdin stays open. */
-    stdinInput?: string,
     timeoutMs?: number,
     /** Abort signal from the MCP client; aborting kills the child process. */
     signal?: AbortSignal,
@@ -138,12 +132,9 @@ export interface CommandProcessor {
      * layer: a project directory from `resolveProjectDirectory` or an init
      * destination from `checkInitDestination` (`src/utils/projectDirectory.ts`),
      * or the installed package directory as a neutral cwd for commands that need
-     * no project. Processors do not check it again. There is no server-side
-     * fallback: the former `useMcpCwd` flag selected an MCP Roots lookup, which
-     * MCP 2026-07-28 removed.
+     * no project. Processors do not check it again.
      */
     customWorkingDir?: string,
-    stdinInput?: string,
     timeoutMs?: number,
     /** Abort signal from the MCP client; propagated to the process runner. */
     signal?: AbortSignal,

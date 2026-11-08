@@ -28,4 +28,13 @@ describe('CommandRegistry', () => {
       ['a_first', 'middle', 'z_last']
     );
   });
+
+  it('refuses a second command with a registered name instead of replacing the first', () => {
+    const registry = new CommandRegistry();
+    const first = command('duplicate');
+    registry.register(first);
+
+    assert.throws(() => registry.register(command('duplicate')), /'duplicate' is already registered/);
+    assert.deepStrictEqual(registry.getAllCommands(), [first]);
+  });
 });

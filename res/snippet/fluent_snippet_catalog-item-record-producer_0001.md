@@ -11,11 +11,11 @@ export const reportIncidentProducer = CatalogItemRecordProducer({
     description: '<p>Use this form to report IT issues, software problems, or service outages. Your request will be routed to the IT support team.</p>',
     table: 'incident',
     state: 'published',
-    requestMethod: 'submit',
     redirectUrl: 'generatedRecord',
 
-    catalogs: [{ $id: '', table: 'sc_catalog', sys_id: 'e0d08b13c3330100c8b837659bba8fb4' }],
-    categories: [{ $id: '', table: 'sc_category', sys_id: '5c7eb61bc0a8010e00e1d5d0af9b2c93' }], // IT
+    // sys_ids of existing records (look them up with now-sdk query sc_catalog / sc_category)
+    catalogs: ['e0d08b13c3330100c8b837659bba8fb4'], // Service Catalog
+    categories: ['5c7eb61bc0a8010e00e1d5d0af9b2c93'], // IT
 
     variables: {
         issue_title: SingleLineTextVariable({
@@ -34,6 +34,12 @@ export const reportIncidentProducer = CatalogItemRecordProducer({
             question: 'How urgently do you need this resolved?',
             order: 300,
             mandatory: true,
+            // values match the incident urgency choices
+            choices: {
+                '1': { label: 'High - I cannot work', sequence: 1 },
+                '2': { label: 'Medium - I can work with a workaround', sequence: 2 },
+                '3': { label: 'Low - Minor inconvenience', sequence: 3 },
+            },
             defaultValue: '3',
         }),
         affected_ci: ReferenceVariable({

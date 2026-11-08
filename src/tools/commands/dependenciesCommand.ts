@@ -1,5 +1,6 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
 import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
+import { DEBUG_ARGUMENT } from './baseCommand.js';
 
 /**
  * Command to manage dependencies in a Fluent (ServiceNow SDK) application
@@ -18,12 +19,7 @@ export class DependenciesCommand extends SessionAwareCLICommand {
       required: false,
       description: 'Credential alias to use for authentication with instance (auto-injected from session if not provided)',
     },
-    {
-      name: 'debug',
-      type: 'boolean',
-      required: false,
-      description: 'Print debug output',
-    }
+    DEBUG_ARGUMENT
   ];
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {

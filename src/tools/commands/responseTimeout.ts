@@ -2,10 +2,11 @@ import { CommandArgument } from '../../utils/types.js';
 import { assertPositiveInteger } from './argValidation.js';
 
 /**
- * Headroom the runner leaves past the CLI's own idle timeout, so a stalled
- * download is reported by the CLI rather than cut off by the runner.
+ * Headroom the runner leaves past a caller-raised CLI wait (the download idle
+ * timeout, the exec `--timeout`), so the CLI reports its own timeout rather
+ * than the runner cutting it off.
  */
-const CLI_REPORT_HEADROOM_MS = 60_000;
+export const CLI_REPORT_HEADROOM_MS = 60_000;
 
 /**
  * `now-sdk download` / `transform` `--timeout` (SDK v4.13.0+): the maximum

@@ -2,6 +2,14 @@ import type { z } from 'zod';
 import { CLICommand, CommandArgument, CommandProcessor, CommandResult } from '../../utils/types.js';
 import { assertArguments, buildInputZodSchema } from '../toolSchema.js';
 
+/** The `debug` argument, which `appendCommonFlags` maps to `--debug`. */
+export const DEBUG_ARGUMENT: CommandArgument = {
+  name: 'debug',
+  type: 'boolean',
+  required: false,
+  description: 'Print debug output',
+};
+
 /**
  * Base abstract class for all CLI commands
  * Implements the Template Method pattern for validation

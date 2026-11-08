@@ -102,7 +102,6 @@ describe('CicdAppCommand', () => {
         '--output=json',
       ],
       WORKING_DIR,
-      undefined,
       command.timeoutMs,
       undefined,
       ENVELOPE_RUN_OPTIONS
@@ -373,7 +372,6 @@ describe('CicdTestCommand', () => {
         '--output=json',
       ],
       '/mock/project/root',
-      undefined,
       command.timeoutMs,
       undefined,
       ENVELOPE_RUN_OPTIONS
@@ -414,20 +412,6 @@ describe('CicdTestCommand', () => {
     assert.ok(badAction.output.includes('run, watch, result'));
 
     assertNotCalled(mockProcessor.process);
-  });
-
-  it('should require an identifier to run, and reject both at once', async () => {
-    const command = new CicdTestCommand(mockProcessor);
-
-    const missing = await command.execute({ target: 'testsuite', action: 'run' });
-    assert.equal(missing.success, false);
-    assert.ok(missing.output.includes("either 'testSuiteSysId' or 'testSuiteName'"));
-
-    const both = await command.execute({
-      target: 'test', action: 'run', testSysId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', testName: 'b',
-    });
-    assert.equal(both.success, false);
-    assert.ok(both.output.includes('mutually exclusive'));
   });
 
   it('should require progressId for watch and resultId for result', async () => {
@@ -481,6 +465,9 @@ describe('CicdTestCommand', () => {
       ['suite sys_id and name together', { target: 'testsuite', action: 'run', testSuiteSysId: SUITE, testSuiteName: 'S' },
         "'testSuiteSysId' and 'testSuiteName' are mutually exclusive"],
       ['a test run with no id', { target: 'test', action: 'run' }, "Provide either 'testSysId' or 'testName'"],
+      ['a suite run with no id', { target: 'testsuite', action: 'run' }, "Provide either 'testSuiteSysId' or 'testSuiteName'"],
+      ['test sys_id and name together', { target: 'test', action: 'run', testSysId: TEST, testName: 'b' },
+        "'testSysId' and 'testName' are mutually exclusive"],
       ['captureNodeLogs on a suite', { target: 'testsuite', action: 'run', testSuiteSysId: SUITE, captureNodeLogs: true },
         "'captureNodeLogs' is only valid with target=\"test\""],
       ['a run-only name on result', { target: 'testsuite', action: 'result', resultId: RESULT, testSuiteName: 'S' },

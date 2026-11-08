@@ -5,7 +5,8 @@ import {
   CommandResultFactory,
   EnsureAuthValidated,
 } from '../../utils/types.js';
-import { BaseCLICommand } from './baseCommand.js';
+import { BaseCLICommand, DEBUG_ARGUMENT } from './baseCommand.js';
+import { resolveAuthAlias } from './sessionAwareCommand.js';
 import { SessionManager } from '../../utils/sessionManager.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
 import { checkInitDestination, createInitDestination, removeCreatedDestination } from '../../utils/projectDirectory.js';
@@ -22,10 +23,8 @@ import {
 /**
  * Command to initialize a new ServiceNow application
  *
- * Every input arrives with the `tools/call` arguments — the tool never asks the
- * client for more. MCP 2026-07-28 removed server-initiated requests (SEP-2322),
- * so the former elicitation flow was deleted rather than ported to
- * multi-round-trip; see `init/initArgsResolver.ts`.
+ * Every input arrives with the `tools/call` arguments; the tool never asks the
+ * client for more.
  *
  * Uses composition to delegate responsibilities:
  * - InitArgsResolver: Resolves the intent-specific request from the arguments
@@ -91,12 +90,7 @@ export class InitCommand extends BaseCLICommand {
       required: true,
       description: 'Absolute path of the directory the Fluent (ServiceNow SDK) application is created in: an existing empty directory, or a new directory under an existing one (it is created). Not the filesystem root, and not a populated directory. ~ and relative paths are not expanded.',
     },
-    {
-      name: 'debug',
-      type: 'boolean',
-      required: false,
-      description: 'Print debug output',
-    },
+    DEBUG_ARGUMENT,
   ];
 
   constructor(
@@ -105,24 +99,6 @@ export class InitCommand extends BaseCLICommand {
   ) {
     super(commandProcessor);
     this.ensureAuthValidated = ensureAuthValidated;
-  }
-
-  /**
-   * Get the auth alias from session or from the provided data
-   */
-  private async getAuthAlias(providedAuth?: string): Promise<string | undefined> {
-    if (providedAuth) {
-      return providedAuth;
-    }
-    const sessionManager = SessionManager.getInstance();
-    const sessionAuth = sessionManager.getAuthAlias();
-    if (sessionAuth) {
-      logger.debug(`Auto-injecting auth alias from session: ${sessionAuth}`);
-      return sessionAuth;
-    }
-
-    await this.ensureAuthValidated();
-    return sessionManager.getAuthAlias();
   }
 
   /**
@@ -138,12 +114,12 @@ export class InitCommand extends BaseCLICommand {
     // A local-path conversion is entirely local and must not trigger profile
     // discovery. An exact sys_id reads from an instance and therefore needs
     // the explicit/session/lazy-validated auth resolution path. An explicit
-    // alias is honored even for a local path, but getAuthAlias returns it
+    // alias is honored even for a local path, but resolveAuthAlias returns it
     // without invoking lazy validation.
     const convertsFromInstance = InitValidator.isSysId(data.from);
     const hasExplicitAuth = typeof data.auth === 'string' && data.auth.trim() !== '';
     if (convertsFromInstance || hasExplicitAuth) {
-      const auth = await this.getAuthAlias(data.auth);
+      const auth = await resolveAuthAlias(data.auth, this.ensureAuthValidated);
       if (auth) sdkArgs.push(cliOption('--auth', auth));
     }
 
@@ -160,12 +136,12 @@ export class InitCommand extends BaseCLICommand {
     // CLICmdWriter shell-escapes every entry of this argv. A name the caller
     // already wrapped in double quotes meant them as shell quoting, so they are
     // removed here rather than kept as part of the name.
-    const appName = String(data.appName);
+    const { appName } = data;
     const bareAppName = /^".*"$/.test(appName) ? appName.slice(1, -1) : appName;
     sdkArgs.push(cliOption('--appName', bareAppName));
     sdkArgs.push(cliOption('--packageName', data.packageName));
     sdkArgs.push(cliOption('--scopeName', data.scopeName));
-    if (data.template) sdkArgs.push(cliOption('--template', data.template));
+    sdkArgs.push(cliOption('--template', data.template));
     // Creation is not offline: `now-sdk init` resolves a credential either way
     // (`--auth`, else the CLI's default profile) and reads that instance's
     // vendor prefix to warn about a scopeName without it (sdk-cli
@@ -175,7 +151,7 @@ export class InitCommand extends BaseCLICommand {
     // target is the explicit alias, else the session's (lazily validated
     // SN_INSTANCE_URL) one; with neither, the CLI default applies and the
     // result says so.
-    const auth = await this.getAuthAlias(data.auth);
+    const auth = await resolveAuthAlias(data.auth, this.ensureAuthValidated);
     if (auth) sdkArgs.push(cliOption('--auth', auth));
     if (data.debug) sdkArgs.push('--debug');
 

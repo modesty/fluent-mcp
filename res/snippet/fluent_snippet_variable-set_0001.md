@@ -5,7 +5,6 @@ import { VariableSet } from '@servicenow/sdk/core'
 import {
     SingleLineTextVariable,
     MultiLineTextVariable,
-    SelectBoxVariable,
     ReferenceVariable,
     CheckboxVariable,
     EmailVariable,

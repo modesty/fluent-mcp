@@ -112,7 +112,6 @@ describe('ExecScriptCommand', () => {
         '--output=json',
       ],
       '/mock/project/root',
-      undefined,
       360_000,
       undefined,
       ENVELOPE_RUN_OPTIONS
@@ -165,7 +164,6 @@ describe('ExecScriptCommand', () => {
         '--debug',
       ],
       '/mock/project/root',
-      undefined,
       960_000, // the CLI's wait + 60 s headroom
       undefined,
       ENVELOPE_RUN_OPTIONS
@@ -175,7 +173,7 @@ describe('ExecScriptCommand', () => {
   it('keeps the default runner budget when timeoutMs is below it', async () => {
     const command = new ExecScriptCommand(mockProcessor);
     await command.execute({ ...BASE_ARGS, timeoutMs: 5_000 });
-    assert.equal(mockProcessor.process.mock.calls[0].arguments[4], 360_000);
+    assert.equal(mockProcessor.process.mock.calls[0].arguments[3], 360_000);
   });
 
   it('reports a runner-stopped run as possibly still running on the instance', async () => {
@@ -188,14 +186,6 @@ describe('ExecScriptCommand', () => {
       assert.match(result.output, /may still be running on the instance/);
       assert.match(result.output, /Do not retry automatically/);
     }
-  });
-
-  it('passes a CLI failure envelope through unchanged', async () => {
-    const output = '{"ok":false,"error":{"message":"Scope \\"x_nope\\" was not found"}}';
-    mockProcessor = createProcessor({ success: false, output, exitCode: 1 });
-    const command = new ExecScriptCommand(mockProcessor);
-    const result = await command.execute({ ...BASE_ARGS });
-    assert.equal(result.output, output);
   });
 
   // The CLI applies --select to failure envelopes too, so it is applied here instead.

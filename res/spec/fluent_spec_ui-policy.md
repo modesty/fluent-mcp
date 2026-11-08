@@ -33,7 +33,8 @@ UiPolicy({
  relatedListActions: [], // UiPolicyRelatedListAction[], optional - list of related list visibility controls
    // Each related list action object:
    //   list: '', // string | Record<'sys_relationship'>, optional - the related list identifier
-   //     // Supports: 'REL:sys_id' for system relationships, 'parent_table.child_table' for parent-child, or direct string
+   //     // Supports: '<child_table>.<reference_field>' for a reference-based list (e.g. 'incident_task.incident'), or the
+   //     // sys_id / Record<'sys_relationship'> of a relationship. Do not add the 'REL:' prefix: the plugin writes it.
    //   visible: true, // boolean | 'ignore', optional - whether the related list should be visible
  setValues: [], // UiPolicySetValue[], optional - field values to set when condition is met
    // Each set value: { field: '', value: '' }

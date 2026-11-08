@@ -2,7 +2,7 @@
 ```typescript
 // Impersonates the specified user in the current session for the duration of the test or until another user is impersonated.
 atf.server.impersonate({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['impersonate_step'], // string | guid, mandatory
   user: Now.ref('sys_user', '<sys_id>'), // sys_id | Record&lt;'sys_user'&gt; - an earlier step's output (createUser(...).user) or a
     // sys_id looked up on the instance; never the coalesce-key Now.ref form (it writes a random sys_id per build)
 }): { 
@@ -14,7 +14,7 @@ atf.server.impersonate({
 // The app's role, declared once at module level (e.g. in the app's roles file) and passed by reference:
 const appUserRole = Role({ name: 'x_app.user' }) // no $id: deprecated on Role (the identity is derived from `name`)
 atf.server.createUser({ // every property except $id is optional
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['create_user_step'], // string | guid, mandatory
   fieldValues: {}, // a valid JSON object, field must be snake_case and double-quoted and values must be double-quoted with properly escaped JSON values, example: { "user_name": "john.doe", "home_phone": "18581234567" }. Do NOT include first_name or last_name
   groups: [Now.ref('sys_user_group', '<sys_id>')], // array of sys_id | Record&lt;'sys_user_group'&gt; - a sys_id looked up on the instance
   roles: [appUserRole], // (string | Role)[], default [] - pass the app's Role() record or a role sys_id. A role NAME
@@ -26,13 +26,13 @@ atf.server.createUser({ // every property except $id is optional
 
 // Logs a message that can contain a variable or other information pertaining to the test. This message will be stored as a step result upon test completion.
 atf.server.log({
-    $id: Now.ID[''], // string | guid, mandatory
+    $id: Now.ID['log_step'], // string | guid, mandatory
     log: '', // string
 }): void;
 
 // Perform a database query to verify if a record matching the conditions set in this step are met
 atf.server.recordQuery({ // all props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['record_query_step'], // string | guid, mandatory
   table: '', // table name
   fieldValues: '', // string, servicenow encoded query
   enforceSecurity: true, // boolean; recordQuery DEFAULTS TO FALSE (unlike the other record steps, which default to true) -
@@ -44,7 +44,7 @@ atf.server.recordQuery({ // all props are mandatory
 
 // Inserts a record into a table. Specify the field values to set on the new record, outputs the table and the sys_id of the new record.
 atf.server.recordInsert({ // all props are mandatory
-    $id: Now.ID[''], // string | guid, mandatory
+    $id: Now.ID['record_insert_step'], // string | guid, mandatory
     table: '', // table name
     fieldValues: {}, // a valid JSON object, field must be snake_case and double-quoted and values must be double-quoted with properly escaped JSON values, example: { "field_one": "value1", "field_two": "value2" }
     assert: '', // 'record_successfully_inserted' | 'record_not_inserted';
@@ -59,13 +59,13 @@ atf.server.recordInsert({ // all props are mandatory
 
 // Runs a server-side script in the context of the test.
 atf.server.runServerSideScript({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['run_server_side_script_step'], // string | guid, mandatory
   script: '', // string, the server-side script to execute
-}): void;
+}): { table: string; record_id: string };
 
 // Adds attachments to an existing record.
 atf.server.addAttachmentsToExistingRecord({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['add_attachments_to_existing_record_step'], // string | guid, mandatory
   table: '', // table name
   recordId: '', // sys_id of the record
   attachments: [], // array of attachment objects

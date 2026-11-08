@@ -103,11 +103,6 @@ export class ResourceCatalog {
     return this.indexPromise;
   }
 
-  /** All supported metadata types (those with an API spec), sorted. */
-  async getAvailableMetadataTypes(): Promise<string[]> {
-    return [...(await this.load()).types];
-  }
-
   /**
    * The supported metadata types that have a resource of this kind, from that
    * kind's own index: a spec type without a guide or a snippet is not listed
@@ -127,18 +122,16 @@ export class ResourceCatalog {
   }
 
   /**
-   * Read one resource. A snippet without an id is the type's first snippet; an
-   * explicit id that does not exist is **not found** (never another snippet).
+   * Read one resource. A snippet is addressed by its id: a missing id, or one
+   * that does not exist, is **not found** (never another snippet).
    */
   async getResource(resourceType: ResourceType, metadataType: string, id?: string): Promise<ResourceResult> {
     const type = metadataType.toLowerCase();
     const file = this.fileFor(await this.load(), resourceType, type, id);
-    const notFound: ResourceResult = { content: '', path: '', metadataType: type, resourceType, found: false };
-    if (!file) return notFound;
+    if (!file) return { content: '', metadataType: type, found: false };
 
-    const filePath = path.join(this.directories[resourceType], file);
-    const content = await fs.promises.readFile(filePath, 'utf-8');
-    return { content, path: filePath, metadataType: type, resourceType, found: true };
+    const content = await fs.promises.readFile(path.join(this.directories[resourceType], file), 'utf-8');
+    return { content, metadataType: type, found: true };
   }
 
   private fileFor(index: ResourceIndex, resourceType: ResourceType, type: string, id?: string): string | undefined {
@@ -147,11 +140,8 @@ export class ResourceCatalog {
         return index.spec.get(type);
       case ResourceType.INSTRUCT:
         return index.instruct.get(type);
-      case ResourceType.SNIPPET: {
-        const ids = index.snippets.get(type);
-        if (!ids) return undefined;
-        return id === undefined ? ids.values().next().value : ids.get(id);
-      }
+      case ResourceType.SNIPPET:
+        return id === undefined ? undefined : index.snippets.get(type)?.get(id);
     }
   }
 }

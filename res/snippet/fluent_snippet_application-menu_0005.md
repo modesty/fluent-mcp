@@ -1,5 +1,6 @@
 # Application Menu API example: creating a top application menu with defined role access and a app category object and an application submenu (application module) for top application menu, with link_type as DIRECT and query as form of path params
 ```typescript
+// App scope: x_snc_example
 import { ApplicationMenu, Record, Role } from "@servicenow/sdk/core";
 
 const secureAppUserRole = Role({
@@ -27,14 +28,14 @@ const applicationMenu = ApplicationMenu({
     order: 100,
 })
 
-const applicationSubMenu = Record({
+export const applicationSubMenu = Record({
     $id: Now.ID['rec3'],
     table: "sys_app_module",
     data: {
         title: 'Scheduled Notifications',
         application: applicationMenu,
         active: true,
-        linkType: 'DIRECT',
+        link_type: 'DIRECT',
         query: 'sys_trigger_list.do?sysparm_query=job_id.handler_classSTARTSWITHcom.snc.pa.%5EORsys_id%3Da51441d1d70022004cd2a3b20e61039a%5EORDERBYnext_action'
     },
 })

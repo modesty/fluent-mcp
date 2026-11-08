@@ -1,6 +1,7 @@
 # Property API example: creating a new integer Property in ServiceNow with access roles specified
 ```typescript
-import { Role, Property } from "@servicenow/sdk/core";
+// App scope: x_snc_app
+import { Property } from "@servicenow/sdk/core";
 
 export const intProp = Property({
    $id: Now.ID['1234'],

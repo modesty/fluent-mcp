@@ -2,22 +2,21 @@
 ```typescript
 import { Table, TableNameColumn, FieldNameColumn, BooleanColumn, DateTimeColumn } from "@servicenow/sdk/core";
 
-export const sys_data_ob_configuration = Table({
-    name: 'sys_data_ob_configuration',
+export const u_data_ob_configuration = Table({
+    name: 'u_data_ob_configuration', // global scope: a new table's name carries the u_ prefix; its own columns need none
     label: 'Access Observer Configuration',
     extends: 'sys_metadata',
     schema: {
         table: TableNameColumn({
             attributes: { tableChoicesScript: 'DataObserverChoiceTables', show_table_names_on_label: true },
             mandatory: true,
-            choice_type: '3',
             hint: 'Which table is being observed',
         }),
         column: FieldNameColumn({
             attributes: { fieldChoicesScript: 'DataObserverChoiceFields', show_field_names_on_label: true },
             mandatory: true,
             hint: 'The field to observe',
-            dynamicValueDefinitions: { type: 'dependent_field', columnName: 'table' },
+            dependent: 'table', // field choices come from the table selected in `table`
         }),
         active: BooleanColumn({ default: 'true' }),
         start_job_immediately: BooleanColumn({ label: 'Start job immediately', default: 'false' }),

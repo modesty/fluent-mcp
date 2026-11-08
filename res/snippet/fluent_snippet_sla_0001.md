@@ -1,7 +1,8 @@
 # Define two incident SLAs: Priority 1 (4-hour response, 8-hour resolution) and Priority 2 (8-hour response, 24-hour resolution), both using business hours schedule
 
 ```typescript
-import { Sla, Duration } from '@servicenow/sdk/core'
+import { Sla } from '@servicenow/sdk/core'
+// Duration() is a global helper (declared by the SDK), not an import
 
 // Priority 1 Response SLA — 4-hour window during business hours
 export const incidentP1ResponseSla = Sla({
@@ -16,17 +17,12 @@ export const incidentP1ResponseSla = Sla({
         start: 'priority=1^state!=6',
         stop: 'state=6',
         pause: 'state=3', // On Hold
+        resume: 'state!=3',
+        cancel: 'priority!=1',
     },
     whenTo: {
         resume: 'on_condition',
         cancel: 'on_condition',
-    },
-    conditions: {
-        start: 'priority=1^state!=6',
-        stop: 'state=6',
-        pause: 'state=3',
-        resume: 'state!=3',
-        cancel: 'priority!=1',
     },
 })
 
@@ -45,6 +41,21 @@ export const incidentP1ResolutionSla = Sla({
         pause: 'state=3',
         resume: 'state!=3',
         cancel: 'priority!=1',
+    },
+})
+
+// Priority 2 Response SLA — 8-hour window during business hours
+export const incidentP2ResponseSla = Sla({
+    $id: Now.ID['incident_p2_response_sla'],
+    name: 'P2 Incident Response',
+    table: 'incident',
+    type: 'SLA',
+    target: 'response',
+    duration: Duration({ hours: 8 }),
+    schedule: 'b1992362eb601100fcfb858ad106fe16',
+    conditions: {
+        start: 'priority=2^state!=6',
+        stop: 'state=6',
     },
 })
 

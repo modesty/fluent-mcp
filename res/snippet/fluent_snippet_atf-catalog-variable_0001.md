@@ -17,12 +17,12 @@ Test({
     })
     atf.catalog.openRecordProducer({
         $id: Now.ID['002'],
-        catalogItem: "",
+        catalogItem: "<sys_id of the Create Incident record producer>", // sys_id | Record<'sc_cat_item_producer'>, looked up on the instance
     })
     atf.catalog.setVariableValue({
         $id: Now.ID['003'],
-        catalogItem: "",
-        variableValues: `IO:"5a33d0ef0a0a0b9b007b906f6c589c57"=1 - High^IO:"3f272c500a0a0b990059c24380a2bc02"=test`
+        catalogItem: "<sys_id of the Create Incident record producer>", // the record producer opened above
+        variableValues: `IO:5a33d0ef0a0a0b9b007b906f6c589c57=1 - High^IO:3f272c500a0a0b990059c24380a2bc02=test` // IO:<item_option_new sys_id>=value, joined with ^
     })
     const outputOfSubmit = atf.catalog.submitRecordProducer({
         $id: Now.ID['004'],
@@ -35,7 +35,7 @@ Test({
     atf.form.openExistingRecord({
         $id: Now.ID['006'],
         table: "incident",
-        recordId: outputOfSubmit.recordId,
+        recordId: outputOfSubmit.record_id, // input camelCase, output snake_case
         formUI: 'standard_ui',
         view: '',
         selectedTabIndex: 0
@@ -59,7 +59,7 @@ Test({
         actionType: 'ui_action',
         uiAction: "041881ef2f8d1300a09a839fb18c959b",
         declarativeAction: "0152e2f453922010c5e2ddeeff7b121c",
-        assertType: 'form_submitted_to_server'
+        assert: 'form_submitted_to_server'
     })
 })
 ```

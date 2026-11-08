@@ -80,8 +80,8 @@ export class ToolsManager {
     // Store the executor for later use (e.g., server-internal auth invocations)
     this.cliExecutor = cliExecutor;
 
-    // Create commands with appropriate processors for each type
-    // InitCommand will use CLICmdWriter, others will use CLIExecutor
+    // Create commands with appropriate processors for each type:
+    // InitCommand and DependenciesCommand use CLICmdWriter, the others CLIExecutor
     // Note: AuthCommand is not exposed to MCP clients - it's used internally for auto-auth validation
     const commands = CommandFactory.createCommands(
       cliExecutor,
@@ -101,17 +101,8 @@ export class ToolsManager {
    * Register resource access tools for ServiceNow metadata
    */
   private registerResourceTools(): void {
-    try {
-      this.commandRegistry.register(new GetFluentKnowledgeCommand(this.resourceCatalog));
-      this.commandRegistry.register(new CheckAuthStatusCommand(this.ensureAuthValidated));
-
-      logger.debug('Resource tools registered successfully');
-    } catch (error) {
-      logger.error('Error registering resource tools',
-        CommandResultFactory.normalizeError(error)
-      );
-      throw error;
-    }
+    this.commandRegistry.register(new GetFluentKnowledgeCommand(this.resourceCatalog));
+    this.commandRegistry.register(new CheckAuthStatusCommand(this.ensureAuthValidated));
   }
 
   /**
@@ -123,9 +114,6 @@ export class ToolsManager {
     // The SDK serves both tools/call and tools/list from this registration: it
     // enforces this Zod object and advertises its JSON Schema, so the two cannot
     // drift. See src/tools/toolSchema.ts.
-    // This is already a concrete ZodObject (z.strictObject), i.e. a Standard
-    // Schema object, not a v1 raw shape — the codemod could not prove that
-    // statically and flagged it; verified by hand instead.
     const inputSchema = buildInputZodSchema(command.arguments);
 
     // Register with MCP server.
@@ -166,11 +154,12 @@ export class ToolsManager {
             isError: !result.success
           };
         } catch (error) {
-          // Handle exceptions from validateArgs() or command execution
-          const normalizedError = CommandResultFactory.normalizeError(error);
-          logger.error(`Tool '${command.name}' execution failed`, normalizedError);
+          // A throw from validateArgs() or execution is a failed result like a
+          // command-layer rejection (exit 1), so every failure has one shape.
+          const failed = CommandResultFactory.fromError(error);
+          logger.error(`Tool '${command.name}' execution failed`, failed.error);
           return {
-            content: [{ type: 'text' as const, text: `Error: ${normalizedError.message}` }],
+            content: [{ type: 'text' as const, text: this.formatResult({ ...failed, error: failed.error?.message }) }],
             isError: true
           };
         } finally {
@@ -192,10 +181,8 @@ export class ToolsManager {
    * progress). No-ops unless the client supplied a `progressToken` and the
    * command is long-running. Never throws.
    *
-   * Request-scoped `notifications/progress` still flows on the originating
-   * request's stream on 2026-07-28, so this behaviour is unchanged by the v2
-   * swap; only the accessors moved (`ctx.mcpReq.notify` replaces the v1
-   * `extra.sendNotification`).
+   * Request-scoped `notifications/progress` flows on the originating request's
+   * stream on 2026-07-28 as on 2025-11-25.
    * @returns A cleanup function to call when the command completes.
    */
   private startProgress(command: CLICommand, ctx: ServerContext): () => void {

@@ -1,9 +1,9 @@
 # Create a Service Portal Angular Provider as a directive
 
 ```typescript
-import { SpAngularProvider } from '@servicenow/sdk/core'
+import { SPAngularProvider } from '@servicenow/sdk/core'
 
-SpAngularProvider({
+SPAngularProvider({
     $id: Now.ID['loading_spinner_directive'],
     name: 'loadingSpinner',
     type: 'directive',

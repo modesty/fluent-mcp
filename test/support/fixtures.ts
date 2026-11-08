@@ -19,7 +19,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 /** Mirrors src/utils/logger.ts LogLevel values (string enum). */
-export const LOG_LEVEL = {
+const LOG_LEVEL = {
   DEBUG: 'debug',
   INFO: 'info',
   NOTICE: 'notice',
@@ -43,14 +43,13 @@ export const TEST_CONFIG = {
     instruct: '/test/res/instruct',
   },
   servicenowSdk: {
-    cliPath: 'snc',
     commandTimeoutMs: 30000,
   },
 };
 
 /**
- * Logger replacement. Every level is a mock.fn so tests can assert on calls;
- * the default and named `logger` exports reference the same object.
+ * Logger replacement for the default `logger` export. Every level is a mock.fn
+ * so tests can assert on calls.
  */
 export function loggerFixture() {
   const logger = {
@@ -59,15 +58,12 @@ export function loggerFixture() {
     notice: mock.fn(),
     warn: mock.fn(),
     error: mock.fn(),
-    critical: mock.fn(),
-    alert: mock.fn(),
-    emergency: mock.fn(),
   };
   return {
     logger,
     mockOptions: {
       defaultExport: logger,
-      namedExports: { logger, LogLevel: LOG_LEVEL },
+      namedExports: { LogLevel: LOG_LEVEL },
     },
   };
 }

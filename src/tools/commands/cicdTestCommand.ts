@@ -5,6 +5,7 @@ import { resolveSdkCli } from '../../utils/sdkCli.js';
 import { cliOption } from './cliArgv.js';
 import { getProjectRootPath } from '../../config.js';
 import { CLI_OUTPUT_FORMATS, SELECT_PATH_DOMAIN, SYS_ID_DOMAIN, assertPositiveInteger } from './argValidation.js';
+import { DEBUG_ARGUMENT } from './baseCommand.js';
 
 /** The `target`/`action` choices — a caller-supplied token never reaches argv unvalidated. */
 const TEST_TARGETS = ['testsuite', 'test'] as const;
@@ -184,12 +185,7 @@ export class CicdTestCommand extends SessionAwareCLICommand {
       domain: SELECT_PATH_DOMAIN,
       description: 'Dot/bracket path to extract from the JSON envelope `{ ok, result, progress?, interpretedResult? }` (e.g. "interpretedResult.summary.testStatus" or "progress.status"). interpretedResult and progress are top-level keys, not under result; a waiting watch (SDK v4.14.0+) reports its outcome under progress and interpretedResult with an empty result. An unresolved path yields null. Applied by this tool to a successful (ok: true) envelope only; on a failure the full envelope is returned so the error stays visible (the CLI\'s own --select would print only null).',
     },
-    {
-      name: 'debug',
-      type: 'boolean',
-      required: false,
-      description: 'Print debug output',
-    },
+    DEBUG_ARGUMENT,
   ];
 
   /**
@@ -294,11 +290,7 @@ export class CicdTestCommand extends SessionAwareCLICommand {
     const providedAuth = typeof args.auth === 'string' ? args.auth : undefined;
     const resolvedAuth = await this.resolveAuthAlias(providedAuth);
     if (!resolvedAuth) {
-      return CommandResultFactory.error(
-        'cicd_fluent_test requires authentication to a ServiceNow instance, but no credential alias was found. ' +
-        "Pass 'auth' with a stored profile alias, or set SN_INSTANCE_URL so lazy validation can load a matching profile into the session. " +
-        "Use the ServiceNow SDK 'now-sdk auth --add <instance>' command to create a profile."
-      );
+      return this.missingAuthResult();
     }
 
     const { command, baseArgs } = resolveSdkCli();
@@ -343,7 +335,6 @@ export class CicdTestCommand extends SessionAwareCLICommand {
       command,
       sdkArgs,
       getProjectRootPath(),
-      undefined,
       this.timeoutMs,
       signal,
       ENVELOPE_RUN_OPTIONS

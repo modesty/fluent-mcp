@@ -2,30 +2,30 @@
 ```typescript
 // open a catalog item by sys_id
 atf.catalog.openCatalogItem({
-    $id: Now.ID[''], // string | guid, mandatory
+    $id: Now.ID['open_catalog_item_step'], // string | guid, mandatory
     catalogItem: Now.ref('sc_cat_item', '<sys_id>') // sys_id | Record&lt;'sc_cat_item'&gt;
 }): void;
 
 // Add item to Shopping Cart after a call to atf.catalog.openCatalogItem
 atf.catalog.addItemToShoppingCart({
-    $id: Now.ID[''], // string | guid, mandatory
+    $id: Now.ID['add_item_to_shopping_cart_step'], // string | guid, mandatory
     assert: '' // '' | 'form_submission_cancelled_in_browser' | 'form_submitted_to_server';
 }): {
-    cartItemId: '' // sys_id of the item added to the cart
+    cart_item_id: '' // sys_id of the item added to the cart (snake_case OUTPUT)
 };
 
 // Sets quantity value on the current catalog item after a call to atf.catalog.openCatalogItem
 atf.catalog.setCatalogItemQuantity({
-    $id: Now.ID[''], // string | guid, mandatory
+    $id: Now.ID['set_catalog_item_quantity_step'], // string | guid, mandatory
     quantity: '' // number | string
 }): void;
 
 // Order and close the currently opened catalog item after a call to atf.catalog.openCatalogItem, no other API calls are allowed after this
 atf.catalog.orderCatalogItem({
-    $id: Now.ID[''], // string | guid, mandatory
+    $id: Now.ID['order_catalog_item_step'], // string | guid, mandatory
     assert: '', // 'form_submitted_to_server' | 'form_submission_cancelled_in_browser'
 }): {
-    requestId: '', // sys_id
+    request_id: '', // sys_id (snake_case OUTPUT)
     cart: ''
 };
 

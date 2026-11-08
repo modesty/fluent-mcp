@@ -1,5 +1,6 @@
 # Application Menu API example: creating a top application menu with defined role access and an app category object and an application submenu (app module) for top application menu, with link_type as MAP
 ```typescript
+// App scope: x_snc_example
 import { ApplicationMenu, Record, Role } from "@servicenow/sdk/core";
 
 const secureAppUserRole = Role({
@@ -27,7 +28,7 @@ const applicationMenu = ApplicationMenu({
     order: 100,
 })
 
-const applicationSubMenu = Record({
+export const applicationSubMenu = Record({
     $id: Now.ID['rec0'],
     table: "sys_app_module",
     data: {
@@ -35,10 +36,10 @@ const applicationSubMenu = Record({
         application: applicationMenu,
         active: true,
         hint: 'Sub menu under Application Security',
-        linkType: 'MAP',
-        mapPage: Now.ref('cmn_map_page', '<sys_id>'), // sys_id of the existing `Critical incidents` map page, looked up on the instance
-        overrideMenuRoles: false,
-        requireConfirmation: false,
+        link_type: 'MAP',
+        map_page: Now.ref('cmn_map_page', '<sys_id>'), // sys_id of the existing `Critical incidents` map page, looked up on the instance
+        override_menu_roles: false,
+        require_confirmation: false,
         uncancelable: false
     },
 })

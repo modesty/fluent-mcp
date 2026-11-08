@@ -2,7 +2,7 @@
 ```typescript
 // Send a REST API request to glide instance with specified HTTP method, path, query parameters, request headers and body.
 atf.rest.sendRestRequest({ // each of the following props are mandatory
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['send_rest_request_step'], // string | guid, mandatory
   path: '', // string, ex. '/api/now/table/incident'
   body: '', // string, ex. "{data_one: 'value1', data_field: 'value2', data_three: 'value3'}"
   mutualAuth: Now.ref('sys_certificate', '<sys_id>'), // sys_id | Record&lt;'sys_certificate'&gt;
@@ -15,28 +15,28 @@ atf.rest.sendRestRequest({ // each of the following props are mandatory
 
 // Assert the REST API's HTTP response status code name
 atf.rest.assertStatusCodeName({ 
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['assert_status_code_name_step'], // string | guid, mandatory
   operation: 'equals', // 'contains' | 'does_not_contain' | 'equals' | 'not_equals'
   codeName: '', // string, ex. 'OK' 
 }): void
 
 // Assert the HTTP response status code
 atf.rest.assertStatusCode({ 
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['assert_status_code_step'], // string | guid, mandatory
   operation: 'equals',// 'equals' | 'not_equals' | 'less_than' | 'greater_than' | 'less_than_equals' |'greater_than_equals' 
   statusCode: 200, // number 
 }): void
 
 // Assert the HTTP response time
 atf.rest.assertResponseTime({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['assert_response_time_step'], // string | guid, mandatory
   operation: 'less_than', // 'less_than' | 'greater_than'
   responseTime: 3000, // number, in milliseconds 
 }): void
 
 // Assert an HTTP response header. Select the comparison operation and specify the expected value of the header.
 atf.rest.assertResponseHeader({
-  $id: Now.ID[''], // string | guid, mandatory
+  $id: Now.ID['assert_response_header_step'], // string | guid, mandatory
   headerName: '', // string
   operation: 'equals', // 'equals' | 'not_equals' | 'exists' | 'contains' | 'does_not_contain'
   headerValue: '', // string

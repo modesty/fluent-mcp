@@ -19,7 +19,7 @@ NowAssistSkillConfig(
       // Access skill inputs via t.input.fieldName; chain tool dependencies via depends array
     securityControls: {}, // SecurityControls, MANDATORY - defines user access and role restrictions
       // securityControls: {
-      //   userAccess: { type: 'authenticated' } | { type: 'roles', roles: (string | Role | Record<'sys_user_role'>)[] },
+      //   userAccess: { $id: Now.ID['...'], type: 'authenticated' } | { $id: Now.ID['...'], type: 'roles', roles: (string | Role | Record<'sys_user_role'>)[] }, // $id mandatory (it identifies the generated sys_security_acl)
       //   // Provide at least one of the following role lists (SDK v4.7.0+):
       //   roleMap?: (string | Role | Record<'sys_user_role'>)[],         // role NAMES - preferred (ZP10/AP3+); maps to `sys_agent_access_role_mapping`
       //   roleRestrictions?: (string | Role | Record<'sys_user_role'>)[] // role SYS_IDS - legacy path; maps to the `role_list` glide_list column
@@ -27,14 +27,14 @@ NowAssistSkillConfig(
     skillSettings: {}, // SkillSettings, optional - provider configurations for pre/postprocessing
       // skillSettings: { providers: [{ $id, name, order?, preprocessor | postprocessor (exactly one) }] }
     deploymentSettings: {}, // DeploymentSettings, optional - UI Action, NAP, Flow Action deployment
-      // deploymentSettings: { uiAction?: string | { table: string }, nowAssistPanel?: { enabled: true, roles: string[] }, flowAction?: true, skillFamily?: string }
+      // deploymentSettings: { uiAction?: { $id: Now.ID['...'] (mandatory), table: string (mandatory), name?, condition?, active?, script? }, nowAssistPanel?: { enabled: true, roles: string[] }, flowAction?: true, skillFamily?: string }
   },
   // Second argument: Prompt Configuration
   {
     providers: [], // ProviderPromptConfig[], mandatory - at least one provider with prompts
       // Each provider: { provider: string, providerAPI?: object, prompts: PromptSettings[], defaultPrompt?: string, defaultPromptVersion?: number }
       // `provider` is a free string; known providers (SDK v4.9.0): 'Now LLM Service', 'Now LLM Generic', 'Now LLM LTS Generic', 'Azure OpenAI', 'Open AI', 'Google Gemini', 'Google Cloud Vertex AI', 'AWS Claude', 'Amazon Bedrock', 'IBM Watson', 'Perplexity', 'Aleph Alpha', 'Custom LLM Provider'
-      // Each prompt: { $id, name, versions: [{ $id, model: string, temperature?: number, maxTokens?: number, promptState?: 'draft'|'published'|'test', prompt: string | ((p) => string) }] }
+      // Each prompt: { name, versions: [{ $id, model: string, temperature?: number, maxTokens?: number, promptState: 'draft'|'finalized'|'published'|'archived', prompt: string | ((p) => string) }] } — the prompt itself has no $id (TS2353); each version does
       //   `model` is a free string naming a platform-available model (e.g. 'llm_generic_small_v2', 'gpt-4o-mini'); newer models are selectable by name as the platform/provider adds them.
       // In prompt builder callbacks, access inputs via p.input.fieldName and tool outputs via p.tool.ToolName.output
     defaultProvider: '', // string, optional - name of default provider (must match a provider's name)

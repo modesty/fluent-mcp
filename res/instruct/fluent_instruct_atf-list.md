@@ -1,8 +1,8 @@
 # Instructions for Fluent ATF List / Related List API
 
-Always reference `fluent_instruct_atf.md` and the ATF List API specification for details.
+Always reference the `atf` instructions (`get_fluent_knowledge` kind `instruct`) and the ATF List API specification for details.
 
-1. Start from the shared `Test()` scaffold in `fluent_instruct_atf.md`. Reach these steps as `atf.list.*` on the callback's `atf` argument; there is no separate import.
+1. Start from the shared `Test()` scaffold in the `atf` instructions (`get_fluent_knowledge` kind `instruct`). Reach these steps as `atf.list.*` on the callback's `atf` argument; there is no separate import.
 2. Use only List ATF step APIs documented in this metadata spec. Give every step a unique `$id` and keep step order deterministic.
 3. **Only author `atf.list` steps when something actually drives the list's behavior.** Related lists are ubiquitous by default (Attachments, Approvals, Journal Entries, and any list arising purely from a reference field). A test is warranted when a client script (`sys_script_client`), a UI policy (`sys_ui_policy` with `run_scripts = true`), or a relationship this app defines (`sys_relationship`) affects that related list's visibility, membership, or filtering — not for default platform behavior.
 4. **Determine that by checking, not assuming.** Query `sys_script_client`, `sys_ui_policy`, and `sys_relationship` for the target table before concluding a related list has no logic behind it. Match on whether the content actually touches list/related-list behavior; do not filter by author, scope, or age — driving logic lives in Global scope as often as in the app's own scope. When writing the encoded query, note that ServiceNow's `^OR` does **not** distribute an earlier `^AND` term across the whole chain: `run_scripts=true^script_trueLIKEx^ORscript_falseLIKEx` silently lets `run_scripts=false` records back in through the second branch. Split the query or filter the results instead.

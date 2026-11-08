@@ -80,6 +80,9 @@ const WHITELIST = new Set([
     // Dashboard componentProps suggested keys (free-form Record<string,unknown>;
     // not enumerable from SDK explain but documented conventions for report widgets)
     'reportId', 'reportSysId',
+    // This server's own knowledge tool: instructs point at a sibling resource
+    // through it (the model cannot open resource files by name).
+    'get_fluent_knowledge',
 ]);
 
 // Prefixes that mark a dotted token as a USER-CHOSEN identifier in an example,

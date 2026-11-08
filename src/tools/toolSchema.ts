@@ -29,8 +29,6 @@ function wrongTypeMessage(arg: CommandArgument, input: unknown): string {
       return `Argument '${arg.name}' must be a valid number`;
     case 'boolean':
       return `Argument '${arg.name}' must be a boolean`;
-    case 'array':
-      return `Argument '${arg.name}' must be an array`;
   }
 }
 
@@ -117,9 +115,6 @@ export function buildInputZodShape(args: CommandArgument[]): z.ZodRawShape {
         break;
       case 'boolean':
         zodType = z.boolean({ error: typeError });
-        break;
-      case 'array':
-        zodType = z.array(z.any(), { error: typeError });
         break;
     }
     zodType = zodType.describe(arg.description);

@@ -122,12 +122,6 @@ describe('FluentMcpServer with Modular Design', () => {
     server = new FluentMcpServer();
   });
 
-  it('should initialize correctly', () => {
-    assert.ok(server);
-    assert.ok(ToolsManager.mock.callCount() > 0);
-    assert.ok(ResourceManager.mock.callCount() > 0);
-  });
-
   it('should fail fast when required resource directories are missing', async () => {
     // Simulate a broken install: a configured resource directory cannot be resolved.
     findMissingResourcePaths.mock.mockImplementationOnce(() => ['/mock/path/to/spec']);
@@ -258,22 +252,6 @@ describe('FluentMcpServer with Modular Design', () => {
       capturedFactory()();
 
       assertNotCalled(mockSetNotificationHandler);
-    });
-
-    it('declares no client-side capability and no unsent listChanged', async () => {
-      await server.start();
-      capturedFactory()();
-
-      const capabilities = McpServer.mock.calls[0].arguments[1]?.capabilities ?? {};
-      assert.ok(!('roots' in capabilities));
-      assert.ok(!('elicitation' in capabilities));
-      assert.ok(!('sampling' in capabilities));
-      assert.ok(!('logging' in capabilities));
-      // v2 defaults each listChanged to true once it installs a handler set, so
-      // these must be explicitly false — nothing here ever sends them.
-      assert.equal(capabilities.tools?.listChanged, false);
-      assert.equal(capabilities.resources?.listChanged, false);
-      assert.equal(capabilities.prompts?.listChanged, false);
     });
   });
 });

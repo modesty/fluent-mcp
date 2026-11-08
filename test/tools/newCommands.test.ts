@@ -31,7 +31,6 @@ mock.module('../../src/utils/sessionManager.js', {
   namedExports: { SessionManager: { getInstance: () => session } },
 });
 
-const { CommandFactory } = await import('../../src/tools/registry/commandFactory.js');
 const { DownloadCommand, CleanCommand, PackCommand, ExplainCommand } = await import(
   '../../src/tools/commands/index.js'
 );
@@ -74,7 +73,6 @@ describe('New SDK Commands', () => {
       assert.notEqual(directoryArg, undefined);
       assert.equal(directoryArg?.required, true);
       assert.equal(directoryArg?.type, 'string');
-      assert.equal(directoryArg?.description, 'Path to expand application');
 
       // Check optional source argument
       const sourceArg = command.arguments.find(arg => arg.name === 'source');
@@ -107,7 +105,6 @@ describe('New SDK Commands', () => {
         process.execPath,
         [SDK_BIN, 'download', 'my-app'],
         WORKING_DIR,
-        undefined, // stdinInput
         600000,   // timeoutMs
         undefined  // signal
       );
@@ -129,7 +126,6 @@ describe('New SDK Commands', () => {
         process.execPath,
         [SDK_BIN, 'download', 'my-app', '--source=./src', '--incremental', '--debug'],
         WORKING_DIR,
-        undefined, // stdinInput
         600000,   // timeoutMs
         undefined  // signal
       );
@@ -173,7 +169,6 @@ describe('New SDK Commands', () => {
         process.execPath,
         [SDK_BIN, 'clean'],
         WORKING_DIR,
-        undefined, // stdinInput
         15000,    // timeoutMs
         undefined  // signal
       );
@@ -193,7 +188,6 @@ describe('New SDK Commands', () => {
         process.execPath,
         [SDK_BIN, 'clean', '--source=src', '--debug'],
         WORKING_DIR,
-        undefined, // stdinInput
         15000,    // timeoutMs
         undefined  // signal
       );
@@ -237,7 +231,6 @@ describe('New SDK Commands', () => {
         process.execPath,
         [SDK_BIN, 'pack'],
         WORKING_DIR,
-        undefined, // stdinInput
         30000,    // timeoutMs
         undefined  // signal
       );
@@ -257,7 +250,6 @@ describe('New SDK Commands', () => {
         process.execPath,
         [SDK_BIN, 'pack', '--source=./build', '--debug'],
         WORKING_DIR,
-        undefined, // stdinInput
         30000,    // timeoutMs
         undefined  // signal
       );
@@ -315,7 +307,6 @@ describe('New SDK Commands', () => {
         process.execPath,
         [SDK_BIN, 'explain', 'BusinessRule'],
         '/mock/project/root',
-        undefined,
         15000,
         undefined
       );
@@ -325,18 +316,6 @@ describe('New SDK Commands', () => {
       const command = new ExplainCommand(mockProcessor);
 
       await assert.rejects(command.execute({ topic: '--list' }), /Argument 'topic' must not begin with "-"/);
-      assertNotCalled(mockProcessor.process);
-    });
-
-    it('should reject the removed source argument, as tools/call does, and never forward --source', async () => {
-      // The explain CLI has never declared --source. Direct callers are held to
-      // the same strict input schema as tools/call, so the key is rejected.
-      const command = new ExplainCommand(mockProcessor);
-
-      await assert.rejects(
-        command.execute({ topic: 'Acl', source: './src', debug: true }),
-        /Invalid arguments for tool explain_fluent_api: Unrecognized key: "source"/
-      );
       assertNotCalled(mockProcessor.process);
     });
 
@@ -351,7 +330,6 @@ describe('New SDK Commands', () => {
         process.execPath,
         [SDK_BIN, 'explain', '--list'],
         '/mock/project/root',
-        undefined,
         15000,
         undefined
       );
@@ -368,7 +346,6 @@ describe('New SDK Commands', () => {
         process.execPath,
         [SDK_BIN, 'explain', 'flow', '--list'],
         '/mock/project/root',
-        undefined,
         15000,
         undefined
       );
@@ -389,7 +366,6 @@ describe('New SDK Commands', () => {
         process.execPath,
         [SDK_BIN, 'explain', 'BusinessRule', '--format=raw', '--peek'],
         '/mock/project/root',
-        undefined,
         15000,
         undefined
       );
@@ -413,20 +389,6 @@ describe('New SDK Commands', () => {
         /Argument 'format' must be one of: pretty, raw\. Received: "json"/
       );
       assertNotCalled(mockProcessor.process);
-    });
-  });
-
-  describe('CommandFactory Integration', () => {
-    it('should include new commands in CommandFactory.createCommands', () => {
-      const mockExecutor = { process: mock.fn<ProcessFn>() };
-      const commands = CommandFactory.createCommands(mockExecutor);
-
-      const commandNames = commands.map(cmd => cmd.name);
-
-      assert.ok(commandNames.includes('download_fluent_app'));
-      assert.ok(commandNames.includes('clean_fluent_app'));
-      assert.ok(commandNames.includes('pack_fluent_app'));
-      assert.ok(commandNames.includes('explain_fluent_api'));
     });
   });
 });

@@ -2,7 +2,7 @@
 import { Test } from '@servicenow/sdk/core'
 import '@servicenow/sdk-core/global'
 Test({
-  $id: Now.ID[''], // fill in a valid GUID string or the name of the test
+  $id: Now.ID['atf-form-action_0001'], // fill in a valid GUID string or the name of the test
   name: 'Create Outage from Change Request', // string
   description: 'Test to create an outage of type outage from a change request', // string
   active: true, // boolean
@@ -22,14 +22,14 @@ Test({
       'short_description': 'Outage created from change request',
       'unauthorized': 'true'
     },
-    assertType: 'record_successfully_inserted',
+    assert: 'record_successfully_inserted',
     enforceSecurity: true
   })
 
   atf.form.openExistingRecord({
     $id: Now.ID['0003'],
     table: 'change_request', // Open the Change Request record
-    recordId: insertedChangeRequest.recordId,
+    recordId: insertedChangeRequest.record_id,
     formUI: 'standard_ui',
     view: '',
     selectedTabIndex: 0
@@ -42,7 +42,7 @@ Test({
     actionType: 'ui_action',
     uiAction: '18edfe530a0006d401d579b8ca27b3f1',
     declarativeAction: '',
-    assertType: 'page_reloaded_or_redirected'
+    assert: 'page_reloaded_or_redirected'
   })
 
   atf.form.fieldValueValidation({
@@ -59,7 +59,7 @@ Test({
     actionType: 'ui_action',
     uiAction: '0009ff1e7744111020da364c7d5a9933',
     declarativeAction: '',
-    assertType: 'form_submitted_to_server'
+    assert: 'form_submitted_to_server'
   })
 
   atf.form.fieldValueValidation({

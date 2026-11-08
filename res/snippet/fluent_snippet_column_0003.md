@@ -1,4 +1,5 @@
 ```typescript
+// App scope: x_myapp
 import { DurationColumn, EmailColumn, FloatColumn, GuidColumn, HtmlColumn, JsonColumn, Password2Column, Table, TimeColumn, UrlColumn } from '@servicenow/sdk/core'
 
 export const x_myapp_device_config = Table({

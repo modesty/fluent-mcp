@@ -7,7 +7,8 @@
  * 4.13.6 (see `.mosey/upgrade-sdk-4.13.6.md`, "Prompt alignment"):
  *  - `for…of` → TS250, `if` → TS245, `'a' + b` in a property → TS303
  *  - `.map()`-generated records build but write `Symbol(Now.UNRESOLVED)`
- *  - `get_sys_id(...)` → TS2304; `Now.ref('sys_user_role', { name })` builds
+ *  - `get_sys_id(...)` → TS2304; `Now.ref(t, { key })` builds but an ACL's
+ *    `roles` writes a random sys_id for it (W9 item 16)
  *  - a TS module function as `BusinessRule.script` builds; a function as the
  *    string-only `ScriptInclude.script` → TS2322
  *  - an `x_` scope rejects a `u_` augment column; global accepts it
@@ -97,8 +98,12 @@ describe('coding_in_fluent — explain alignment (SDK v4.13.6)', () => {
     });
 
     it('replaces get_sys_id with the now-ref-guide reference mechanisms', () => {
-      assertIncludes(content, "Now.ref('sys_user_role', { name: 'itil' })");
       assertIncludes(content, "`Now.ref('<table>', '<sys_id>')`");
+      // The coalesce form is not resolved by every property (W10: an ACL's
+      // roles got a random sys_id), so the prompt must not offer it as the
+      // ACL role example.
+      assertExcludes(content, "Now.ref('sys_user_role', { name: 'itil' })");
+      assertIncludes(content, "give an ACL the role name (`'itil'`)");
       assertIncludes(content, 'is **not** an SDK API');
       assertIncludes(content, "TS2304: Cannot find name 'get_sys_id'");
       assertExcludes(content, 'already available in the generated code');

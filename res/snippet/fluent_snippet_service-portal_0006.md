@@ -1,9 +1,9 @@
 # Create a Service Portal widget with role-based access control
 
 ```typescript
-import { SpWidget } from '@servicenow/sdk/core'
+import { SPWidget } from '@servicenow/sdk/core'
 
-SpWidget({
+SPWidget({
     $id: Now.ID['admin_widget'],
     name: 'Admin Only Widget',
     description: 'Widget restricted to admin role',
@@ -19,6 +19,6 @@ SpWidget({
     data.adminMessage = "Access Denied";
   }
 })();`,
-    roles: 'admin',
+    roles: ['admin'],
 })
 ```

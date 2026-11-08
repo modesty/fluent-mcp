@@ -201,29 +201,25 @@ export class CheckAuthStatusCommand implements CLICommand {
    * @returns Command result with auth status information
    */
   async execute(): Promise<CommandResult> {
-    try {
-      await this.ensureAuthValidated();
-      const sessionManager = SessionManager.getInstance();
-      const authResult = sessionManager.getAuthValidationResult();
+    // The shared trigger never rejects (ToolsManager catches a failed
+    // validation), so a missing cached result is the only failure to report.
+    await this.ensureAuthValidated();
+    const authResult = SessionManager.getInstance().getAuthValidationResult();
 
-      if (!authResult) {
-        const unknownStatus = {
-          status: 'unknown',
-          message: 'Auth validation completed without a cached result.',
-          timestamp: new Date().toISOString(),
-        };
-        return CommandResultFactory.success(JSON.stringify(unknownStatus, null, 2), 0, unknownStatus);
-      }
-
-      // Return the auth result as formatted JSON plus structured content
-      return CommandResultFactory.success(
-        JSON.stringify(authResult, null, 2),
-        0,
-        { ...authResult }
-      );
-    } catch (error) {
-      logger.error('Error checking auth status', CommandResultFactory.normalizeError(error));
-      return CommandResultFactory.fromError(error);
+    if (!authResult) {
+      const unknownStatus = {
+        status: 'unknown',
+        message: 'Auth validation completed without a cached result.',
+        timestamp: new Date().toISOString(),
+      };
+      return CommandResultFactory.success(JSON.stringify(unknownStatus, null, 2), 0, unknownStatus);
     }
+
+    // Return the auth result as formatted JSON plus structured content
+    return CommandResultFactory.success(
+      JSON.stringify(authResult, null, 2),
+      0,
+      { ...authResult }
+    );
   }
 }

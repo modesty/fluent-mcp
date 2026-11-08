@@ -1,5 +1,6 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
 import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
+import { DEBUG_ARGUMENT } from './baseCommand.js';
 import { assertNotOption } from './cliArgv.js';
 import {
   RESPONSE_TIMEOUT_ARGUMENT,
@@ -33,7 +34,7 @@ export class DownloadCommand extends SessionAwareCLICommand {
       name: 'directory',
       type: 'string',
       required: true,
-      description: 'Path to expand application',
+      description: 'Directory the downloaded metadata XML is unpacked into (sys_app_<id>.xml plus update/). A relative path resolves against the Fluent project directory; files already there are overwritten',
     },
     {
       name: 'source',
@@ -48,12 +49,7 @@ export class DownloadCommand extends SessionAwareCLICommand {
       description: 'Download application metadata from the instance in incremental mode',
     },
     RESPONSE_TIMEOUT_ARGUMENT,
-    {
-      name: 'debug',
-      type: 'boolean',
-      required: false,
-      description: 'Print debug output',
-    }
+    DEBUG_ARGUMENT
   ];
 
   protected validateArgs(args: Record<string, unknown>): void {
@@ -73,7 +69,7 @@ export class DownloadCommand extends SessionAwareCLICommand {
       {
         source: '--source',
         auth: '--auth',
-        incremental: { flag: '--incremental', hasValue: false },
+        incremental: { flag: '--incremental' },
         timeoutSeconds: '--timeout',
       },
       [args.directory as string],  // positional argument

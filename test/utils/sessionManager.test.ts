@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import { loggerFixture } from '../support/fixtures.js';
 
 // SessionManager only logs through the shared logger; keep the run quiet.
-const { logger, mockOptions: loggerOptions } = loggerFixture();
-mock.module('../../src/utils/logger.js', loggerOptions);
+mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 
 const { SessionManager } = await import('../../src/utils/sessionManager.js');
 
@@ -15,7 +14,6 @@ function resetSingleton(): void {
 
 describe('SessionManager', () => {
   beforeEach(() => {
-    for (const level of Object.values(logger)) level.mock.resetCalls();
     // Reset the singleton instance before each test
     resetSingleton();
   });

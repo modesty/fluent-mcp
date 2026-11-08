@@ -1,8 +1,8 @@
 # Instructions for Fluent TestSuite API
 
-Always reference `fluent_instruct_atf.md` and the TestSuite API specification for details.
+Always reference the `atf` instructions (`get_fluent_knowledge` kind `instruct`) and the TestSuite API specification for details.
 
-1. Import `TestSuite` from `@servicenow/sdk/core`. Unlike the `atf.*` step families, this is a **top-level constructor**, not a step reached through the `Test()` callback — it groups whole tests rather than authoring behavior inside one. Author the tests themselves with `Test()` per the shared scaffold in `fluent_instruct_atf.md`, then reference them here.
+1. Import `TestSuite` from `@servicenow/sdk/core`. Unlike the `atf.*` step families, this is a **top-level constructor**, not a step reached through the `Test()` callback — it groups whole tests rather than authoring behavior inside one. Author the tests themselves with `Test()` per the shared scaffold in the `atf` instructions (`get_fluent_knowledge` kind `instruct`), then reference them here.
 2. One `TestSuite()` call writes the suite row (`sys_atf_test_suite`) plus one membership row (`sys_atf_test_suite_test`) per `tests` entry. Do not author `sys_atf_test_suite_test` with `Record()` — membership is derived, and hand-written rows will fight the generated ones.
 3. `$id` and `name` are the only mandatory properties. A suite with neither `tests` nor `testFilter` is valid and useful — that is exactly how you create a container for other suites to nest under via `parent`.
 4. **Run order comes from array position in `tests`, not from a field.** Reorder the array to reorder the run. Only reach for the object form's `order` to preserve *existing* custom or gapped values (100, 200, 300...) when adopting Fluent for a suite that already has them on the instance; pinning order on a greenfield suite just creates a second source of truth. Pinned and derived entries may mix, but a collision between two entries' final order emits a build-time hint because ATF does not guarantee run order between ties.

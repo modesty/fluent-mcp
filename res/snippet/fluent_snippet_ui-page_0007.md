@@ -1,5 +1,7 @@
 # Create a UI Page for custom dashboard with charts
 
+> Inline Jelly in a template literal: escape every Jelly `${...}` as `\${...}`, otherwise TypeScript reads it as an interpolation and the build fails (TS2304 `Cannot find name 'jvar_x'`). Phase-two `$[...]` needs no escape. For a long template, prefer keeping the Jelly in its own file with `html: Now.include('./page.jelly.xml')`.
+
 ```typescript
 import { UiPage } from '@servicenow/sdk/core'
 
@@ -40,9 +42,9 @@ UiPage({
                         <div class="panel panel-primary">
                             <div class="panel-heading">Total Incidents</div>
                             <div class="panel-body" style="font-size: 36px; text-align: center;">
-                                <j:set var="jvar_data" value="${jvar_stats}" />
+                                <j:set var="jvar_data" value="\${jvar_stats}" />
                                 <script>
-                                    var data = ${jvar_data};
+                                    var data = \${jvar_data};
                                     document.write(data.totalIncidents || 0);
                                 </script>
                             </div>

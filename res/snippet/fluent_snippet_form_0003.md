@@ -12,9 +12,8 @@ const new_section = Record({
     $id: Now.ID['new_section'],
     table: 'sys_ui_section',
     data: {
-        name: 'ex_table',
-        table: 'ex_table',
-        view: Now.ref('sys_ui_view', { name: 'exampleview' }), // an existing view, referenced by its name
+        name: 'ex_table', // the table the section belongs to (sys_ui_section has no `table` column; `name` is the table)
+        view: Now.ref('sys_ui_view', '<sys_id>'), // the existing `exampleview` view: look up its sys_id on the instance with `name=exampleview` (a coalesce-key ref such as { name: 'exampleview' } writes a derived sys_id, not the instance's)
         caption: 'Additional details'
     }
 })

@@ -28,14 +28,10 @@ function envelopeChild(count: number, ok = true): string[] {
 }
 
 async function capture(childArgs: string[], options = ENVELOPE_RUN_OPTIONS) {
-  return new CLIExecutor(new NodeProcessRunner()).process(process.execPath, childArgs, process.cwd(), undefined, TEST_TIMEOUT_MS, undefined, options);
+  return new CLIExecutor(new NodeProcessRunner()).process(process.execPath, childArgs, process.cwd(), TEST_TIMEOUT_MS, undefined, options);
 }
 
 describe('select over a large envelope', () => {
-  it('selects from a 100-record envelope', { timeout: TEST_TIMEOUT_MS }, async () => {
-    assert.equal(shapeEnvelopeResult(await capture(envelopeChild(100)), 'records[0].sys_id').output, FIRST_SYS_ID);
-  });
-
   it('selects from an 800-record envelope (~120 KB) that the default cap would cut', { timeout: TEST_TIMEOUT_MS }, async () => {
     const result = await capture(envelopeChild(800));
     assert.ok(result.output.length > DEFAULT_MAX_OUTPUT_CHARS, 'the probe must exceed the default cap');

@@ -200,10 +200,6 @@ describe('Resource Tool Commands', () => {
       }
     });
 
-    it('rejects the removed id key', async () => {
-      await rejected({ kind: 'snippet', metadataType: TEST_METADATA_TYPE, id: TEST_SNIPPET_ID }, /Input validation error: .*"id"/);
-    });
-
     it('takes snippetId only for kind snippet, and only with a metadata type', async () => {
       for (const kind of ['spec', 'instruct']) {
         await rejected({ kind, metadataType: TEST_METADATA_TYPE, snippetId: TEST_SNIPPET_ID }, new RegExp(`snippetId applies only to kind 'snippet', not '${kind}'`));

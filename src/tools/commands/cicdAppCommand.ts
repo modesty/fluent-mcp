@@ -5,6 +5,7 @@ import { resolveSdkCli } from '../../utils/sdkCli.js';
 import { cliOption } from './cliArgv.js';
 import { getProjectRootPath } from '../../config.js';
 import { CLI_OUTPUT_FORMATS, SELECT_PATH_DOMAIN, SYS_ID_DOMAIN } from './argValidation.js';
+import { DEBUG_ARGUMENT } from './baseCommand.js';
 
 /**
  * App-repo actions exposed by `now-sdk cicd`: the `action` argument's choices,
@@ -111,12 +112,7 @@ export class CicdAppCommand extends SessionAwareCLICommand {
       domain: SELECT_PATH_DOMAIN,
       description: 'Dot/bracket path to extract from the JSON envelope `{ ok, result, progress?, interpretedResult? }` (e.g. "result.links.progress.id" or "progress.status"). An unresolved path yields null. Applied by this tool to a successful (ok: true) envelope only; on a failure the full envelope is returned so the error stays visible (the CLI\'s own --select would print only null).',
     },
-    {
-      name: 'debug',
-      type: 'boolean',
-      required: false,
-      description: 'Print debug output',
-    },
+    DEBUG_ARGUMENT,
   ];
 
   /**
@@ -169,11 +165,7 @@ export class CicdAppCommand extends SessionAwareCLICommand {
     const providedAuth = typeof args.auth === 'string' ? args.auth : undefined;
     const resolvedAuth = await this.resolveAuthAlias(providedAuth);
     if (!resolvedAuth) {
-      return CommandResultFactory.error(
-        'cicd_fluent_app requires authentication to a ServiceNow instance, but no credential alias was found. ' +
-        "Pass 'auth' with a stored profile alias, or set SN_INSTANCE_URL so lazy validation can load a matching profile into the session. " +
-        "Use the ServiceNow SDK 'now-sdk auth --add <instance>' command to create a profile."
-      );
+      return this.missingAuthResult();
     }
 
     // The CLI defaults `--app-sys-id`/`--app-version` from the project it is run
@@ -219,7 +211,6 @@ export class CicdAppCommand extends SessionAwareCLICommand {
     if (args.devNotes) sdkArgs.push(cliOption('--dev-notes', args.devNotes));
 
     // `--wait` defaults to true in the CLI, so only the negation is meaningful.
-    // The flag-mapping helper drops `false` values, hence the explicit push.
     if (args.wait === false) sdkArgs.push('--no-wait');
     if (args.pollTimeout !== undefined) sdkArgs.push(cliOption('--poll-timeout', args.pollTimeout));
 
@@ -238,7 +229,6 @@ export class CicdAppCommand extends SessionAwareCLICommand {
       command,
       sdkArgs,
       workingDirectory ?? getProjectRootPath(),
-      undefined,
       this.timeoutMs,
       signal,
       ENVELOPE_RUN_OPTIONS

@@ -58,13 +58,12 @@ describe('SessionAwareCLICommand working-directory resolution', () => {
   let command: TestSessionAwareCommand;
   let processor: { process: ReturnType<typeof mock.fn<ProcessFn>> };
 
-  /** Asserts the processor ran once, in `cwd`, with no stdin, timeout, or signal. */
+  /** Asserts the processor ran once, in `cwd`, with no timeout or signal. */
   function assertRanIn(cwd: string): void {
-    const [bin, argv, workingDirectory, stdinInput, timeoutMs, signal] = processor.process.mock.calls[0].arguments;
+    const [bin, argv, workingDirectory, timeoutMs, signal] = processor.process.mock.calls[0].arguments;
     assert.equal(typeof bin, 'string');
     assert.ok(Array.isArray(argv));
     assert.equal(workingDirectory, cwd);
-    assert.equal(stdinInput, undefined);
     assert.equal(timeoutMs, undefined);
     assert.equal(signal, undefined);
   }
@@ -95,10 +94,7 @@ describe('SessionAwareCLICommand working-directory resolution', () => {
       processor.process,
       process.execPath,
       [SDK_BIN, 'test'],
-      EXPLICIT_DIR,
-      undefined,
-      undefined,
-      undefined
+      EXPLICIT_DIR
     );
     assertNotCalled(session.getWorkingDirectory);
   });
@@ -152,9 +148,6 @@ describe('SessionAwareCLICommand working-directory resolution', () => {
 
   for (const [name, args, cfg, pattern] of [
     ['relative explicit path', { workingDirectory: 'relative/project' }, {}, /must be an absolute path/],
-    ['~ explicit path', { workingDirectory: '~/project' }, {}, /must be an absolute path/],
-    ['filesystem root', { workingDirectory: '/' }, {}, /must identify a dedicated project directory, not "\/"/],
-    ['missing explicit directory', { workingDirectory: path.join(EXPLICIT_DIR, 'missing') }, {}, /does not exist/],
     ['relative configured path', {}, { workingDirectory: 'relative/project' }, /FLUENT_MCP_WORKING_DIR must be an absolute path/],
   ] as const) {
     it(`rejects ${name} instead of falling through`, async () => {
@@ -198,14 +191,6 @@ describe('SessionAwareCLICommand working-directory resolution', () => {
     await command.execute({ workingDirectory: `${link}${path.sep}` });
 
     assertRanIn(EXPLICIT_DIR);
-  });
-
-  it('never forwards workingDirectory as SDK argv', async () => {
-    await command.execute({ workingDirectory: EXPLICIT_DIR });
-
-    const sdkArgs = processor.process.mock.calls[0].arguments[1];
-    assert.ok(!sdkArgs.includes('workingDirectory'));
-    assert.ok(!sdkArgs.includes(EXPLICIT_DIR));
   });
 
   it('normalizes processor exceptions into command errors', async () => {

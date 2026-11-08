@@ -80,9 +80,9 @@ describe('ResourceCatalog (real directory tree)', () => {
     const c = catalog();
     assert.equal((await c.getResource(ResourceType.SPEC, 'TABLE')).content, 'table spec');
     assert.equal((await c.getResource(ResourceType.INSTRUCT, 'table')).content, 'table instruct');
-    assert.equal((await c.getResource(ResourceType.SNIPPET, 'table')).content, 'snippet one');
+    assert.equal((await c.getResource(ResourceType.SNIPPET, 'table', '0001')).content, 'snippet one');
     assert.equal((await c.getResource(ResourceType.SNIPPET, 'table', '0002')).content, 'snippet two');
-    assert.deepEqual(await c.getAvailableMetadataTypes(), ['table']);
+    assert.deepEqual((await c.load()).types, ['table']);
     assert.deepEqual(await c.listSnippets('table'), ['0001', '0002']);
   });
 
@@ -107,10 +107,12 @@ describe('ResourceCatalog (real directory tree)', () => {
     assert.deepEqual(await c.listMetadataTypes(ResourceType.SNIPPET), ['table']);
   });
 
-  it('reports an explicit unknown snippet id as not found, never another snippet', async () => {
-    const result = await catalog().getResource(ResourceType.SNIPPET, 'table', '9999');
-    assert.equal(result.found, false);
-    assert.equal(result.content, '');
+  it('reports a missing or unknown snippet id as not found, never another snippet', async () => {
+    for (const id of ['9999', undefined]) {
+      const result = await catalog().getResource(ResourceType.SNIPPET, 'table', id);
+      assert.equal(result.found, false, String(id));
+      assert.equal(result.content, '');
+    }
   });
 
   it('cannot be steered outside res/ by a path-like metadata type or snippet id', async () => {
@@ -135,14 +137,14 @@ describe('ResourceCatalog (real directory tree)', () => {
   it('reads each directory once across lookups (single-flight load)', async (t) => {
     const readdir = t.mock.method(fs.promises, 'readdir');
     const c = catalog();
-    await Promise.all([c.getAvailableMetadataTypes(), c.listSnippets('table'), c.getResource(ResourceType.SPEC, 'table')]);
+    await Promise.all([c.listMetadataTypes(ResourceType.SPEC), c.listSnippets('table'), c.getResource(ResourceType.SPEC, 'table')]);
     await c.getResource(ResourceType.INSTRUCT, 'table');
     assert.equal(readdir.mock.callCount(), 3);
   });
 
   it('rejects (and retries next time) when a directory cannot be listed', async () => {
     const c = new ResourceCatalog({ ...dirs, [ResourceType.SPEC]: path.join(root, 'missing') } as never);
-    await assert.rejects(c.getAvailableMetadataTypes(), { code: 'ENOENT' });
+    await assert.rejects(c.listMetadataTypes(ResourceType.SPEC), { code: 'ENOENT' });
     await assert.rejects(c.load(), { code: 'ENOENT' });
   });
 });

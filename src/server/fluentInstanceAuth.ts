@@ -59,7 +59,7 @@ export function logAuthValidationResult(result: AuthValidationResult): void {
  *    restore, and validations that overlap in separate server processes
  *    restore the wrong default (W9 review).
  *
- * @returns AuthValidationResult with structured auth status for client notification
+ * @returns AuthValidationResult with structured auth status, also stored in the session
  */
 export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): Promise<AuthValidationResult> {
   const instUrl = process.env.SN_INSTANCE_URL?.trim();
@@ -154,7 +154,6 @@ interface AuthProfile {
   alias: string;
   host?: string;
   type?: string;
-  username?: string;
   defaultYes: boolean;
 }
 
@@ -243,7 +242,7 @@ function deriveAliasFromInstance(instUrl: string): string {
  * messages (or the trimmed output when none are tagged) for the validation result.
  */
 function describeAuthListFailure(output: string): string {
-  return cliErrorMessage(output ?? '', '') ?? (output?.trim() || 'now-sdk auth --list exited with an error and no output');
+  return cliErrorMessage(output, '') ?? (output.trim() || 'now-sdk auth --list exited with an error and no output');
 }
 
 /**
@@ -288,7 +287,6 @@ function parseAuthListOutput(stdout: string): AuthProfile[] {
       const value = kvMatch[2].trim();
       if (key === 'host') current.host = value;
       else if (key === 'type') current.type = value;
-      else if (key === 'username') current.username = value;
       else if (key === 'default') current.defaultYes = /^yes$/i.test(value);
     }
   }

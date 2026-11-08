@@ -5,19 +5,12 @@ import { getConfig } from '../../config.js';
 import logger from '../../utils/logger.js';
 
 /**
- * Fallback process timeout (ms) used only when neither a per-call timeout nor a
- * configured default is available (e.g. tests that mock config without a
- * `servicenowSdk` block). Real runs resolve the default from
- * `config.servicenowSdk.commandTimeoutMs`.
- */
-const FALLBACK_PROCESS_TIMEOUT_MS = 30_000;
-
-/**
  * Spawns child processes to execute CLI commands.
  *
  * Responsibilities:
  * - shell-free execution (injection defense — see H1),
- * - non-interactive stdin: input is written whole and stdin closed at spawn,
+ * - no input: stdin stays open and the runner never writes to it (it never
+ *   answers prompts),
  * - a timeout that terminates the child and resolves with the buffered *partial*
  *   output (rather than discarding it) plus a non-zero exit code (P0.2),
  * - propagation of an external abort signal so an MCP client can cancel a
@@ -37,12 +30,9 @@ export class NodeProcessRunner implements ProcessRunner {
    *   output per stream; a call may raise its stdout cap (`maxStdoutChars`).
    */
   constructor(options?: { defaultTimeoutMs?: number; overrideTimeoutMs?: number; maxOutputChars?: number }) {
-    // Defensive read: some tests mock config without a `servicenowSdk` block.
-    const sdk = getConfig()?.servicenowSdk as
-      | { commandTimeoutMs?: number; commandTimeoutOverrideMs?: number }
-      | undefined;
-    this.defaultTimeoutMs = options?.defaultTimeoutMs ?? sdk?.commandTimeoutMs ?? FALLBACK_PROCESS_TIMEOUT_MS;
-    this.overrideTimeoutMs = options?.overrideTimeoutMs ?? sdk?.commandTimeoutOverrideMs;
+    const sdk = getConfig().servicenowSdk;
+    this.defaultTimeoutMs = options?.defaultTimeoutMs ?? sdk.commandTimeoutMs;
+    this.overrideTimeoutMs = options?.overrideTimeoutMs ?? sdk.commandTimeoutOverrideMs;
 
     this.maxOutputChars = options?.maxOutputChars ?? DEFAULT_MAX_OUTPUT_CHARS;
   }
@@ -63,7 +53,6 @@ export class NodeProcessRunner implements ProcessRunner {
     command: string,
     args: string[] = [],
     cwd?: string,
-    stdinInput?: string,
     timeoutMs?: number,
     signal?: AbortSignal,
     runOptions?: ProcessRunOptions
@@ -142,17 +131,6 @@ export class NodeProcessRunner implements ProcessRunner {
         }
       }
 
-      // Input is written whole and stdin is closed at once, for a CLI that
-      // reads stdin to EOF. (No command passes input since the server stopped
-      // adding auth profiles; W9 review.) The runner never answers prompts: it used to write the next input line whenever
-      // stdout ended in "? <text>", so any child diagnostic of that shape
-      // received a credential (W9 review). Without input, stdin stays open.
-      if (stdinInput !== undefined && child.stdin) {
-        // A child that exits before reading makes the write fail with EPIPE;
-        // its exit code reports the failure, so the stream error is only logged.
-        child.stdin.on('error', (error: Error) => logger.debug(`stdin write failed: ${error.message}`));
-        child.stdin.end(stdinInput);
-      }
 
       child.stdout?.on('data', (data: Buffer) => {
         const text = data.toString();

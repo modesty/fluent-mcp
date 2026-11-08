@@ -128,12 +128,8 @@ export class FluentMcpServer {
     // registerTool(), resources/* and prompts/* from the templates and
     // prompts, completion/complete from both, and server/discover itself.
     //
-    // There is deliberately no hand-written handler. In particular there is no
-    // `notifications/initialized` handler: its only remaining job was to
-    // trigger the transitional `roots/list` fetch, and MCP 2026-07-28 both
-    // removed the handshake it belongs to and made server-initiated requests
-    // illegal. Auth validation is lazy and command-triggered (see
-    // ToolsManager.ensureAuthValidated).
+    // There is deliberately no hand-written handler. Auth validation is lazy
+    // and command-triggered (see ToolsManager.ensureAuthValidated).
     this.toolsManager.registerOn(mcpServer);
     this.resourceManager.registerOn(mcpServer);
     this.promptManager.registerOn(mcpServer);

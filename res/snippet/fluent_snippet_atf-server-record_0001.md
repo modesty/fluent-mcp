@@ -2,7 +2,7 @@
 import { Test } from '@servicenow/sdk/core'
 import '@servicenow/sdk-core/global'
 Test({
-  $id: Now.ID[''], // fill in a valid GUID string or the name of the test
+  $id: Now.ID['atf-server-record_0001'], // fill in a valid GUID string or the name of the test
   name: 'Check Conflicts for CI Already Scheduled', // string
   description: 'Test to validate conflicts for CI Already Scheduled', // string
   active: true, // boolean
@@ -13,21 +13,21 @@ Test({
     $id: Now.ID['0001'],
     table: 'cmdb_ci',
     fieldValues: { 'name': 'Before I wake' },
-    assertType: 'record_successfully_inserted',
+    assert: 'record_successfully_inserted',
     enforceSecurity: true,
   })
 
   // Insert a record into 'change_request' with Configuration item = the configuration item from previous step and Planned start date = '2019-07-25 05:30:00', Planned end date = '2019-07-25 05:40:00', Short description = 'CI Already Scheduled'
-  const changeRequestInsert1 = atf.server.recordInsert({
+  atf.server.recordInsert({
     $id: Now.ID['0002'],
     table: 'change_request',
     fieldValues: {
-      'cmdb_ci': cmdbCiInsert.recordId,
+      'cmdb_ci': cmdbCiInsert.record_id,
       'planned_start_date': '2019-07-25 05:30:00',
       'planned_end_date': '2019-07-25 05:40:00',
       'short_description': 'CI Already Scheduled'
     },
-    assertType: 'record_successfully_inserted',
+    assert: 'record_successfully_inserted',
     enforceSecurity: true,
   })
 
@@ -36,12 +36,12 @@ Test({
     $id: Now.ID['0003'],
     table: 'change_request',
     fieldValues: {
-      'cmdb_ci': cmdbCiInsert.recordId,
+      'cmdb_ci': cmdbCiInsert.record_id,
       'planned_start_date': '2019-07-25 05:30:00',
       'planned_end_date': '2019-07-25 05:40:00',
       'short_description': 'CI Already Scheduled'
     },
-    assertType: 'record_successfully_inserted',
+    assert: 'record_successfully_inserted',
     enforceSecurity: true,
   })
 
@@ -49,9 +49,9 @@ Test({
   atf.server.recordQuery({
     $id: Now.ID['0004'],
     table: 'conflict',
-    fieldValues: `change=${changeRequestInsert2.recordId}^type=CI Already Scheduled`,
+    fieldValues: `change=${changeRequestInsert2.record_id}^type=CI Already Scheduled`,
     enforceSecurity: true,
-    assertType: 'records_match_query',
+    assert: 'records_match_query',
   })
 })
 ```

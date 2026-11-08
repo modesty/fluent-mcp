@@ -18,7 +18,7 @@ export interface Shell {
   setup: string;
 }
 
-export const SH: Shell = { name: 'sh', command: '/bin/sh', flags: [], setup: '' };
+const SH: Shell = { name: 'sh', command: '/bin/sh', flags: [], setup: '' };
 /** zsh without rc files (`-f`), so only its default options apply. */
 export const ZSH: Shell = { name: 'zsh', command: 'zsh', flags: ['-f'], setup: '' };
 /** zsh with MAGIC_EQUAL_SUBST, which expands `=cmd` and `~` inside `anything=value` words too. */

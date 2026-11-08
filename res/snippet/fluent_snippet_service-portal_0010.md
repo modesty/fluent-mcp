@@ -1,9 +1,9 @@
 # Create a Service Portal Angular Provider as a service
 
 ```typescript
-import { SpAngularProvider } from '@servicenow/sdk/core'
+import { SPAngularProvider } from '@servicenow/sdk/core'
 
-SpAngularProvider({
+SPAngularProvider({
     $id: Now.ID['data_service'],
     name: 'DataService',
     type: 'service',

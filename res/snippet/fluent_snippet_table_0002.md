@@ -1,10 +1,10 @@
-# defines a new table extends the sys_metadata table and includes various columns with different properties
+# defines a new global table (u_ prefix) that extends the sys_metadata table and includes various columns with different properties
 ```typescript
 import { Table, StringColumn, IntegerColumn, BooleanColumn, TranslatedTextColumn, GenericColumn, ChoiceColumn } from "@servicenow/sdk/core";
 
-export const sys_formula_function = Table({
+export const u_formula_function = Table({
     index: [{ name: 'qualified_name', element: 'internal_name', unique: false }],
-    name: 'sys_formula_function',
+    name: 'u_formula_function', // global scope: a new table's name carries the u_ prefix; its own columns need none
     label: 'Formula Function',
     attributes: {
         update_synch: true,
@@ -17,8 +17,8 @@ export const sys_formula_function = Table({
             readOnly: true,
             attributes: { update_exempt: true },
             mandatory: true,
-            virtual_type: 'script',
             maxLength: 255,
+            // calculated_value makes the field virtual; the build derives virtual_type 'script'
             dynamicValueDefinitions: {
                 type: 'calculated_value',
                 calculatedValue: script`

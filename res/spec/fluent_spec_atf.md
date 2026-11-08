@@ -63,7 +63,7 @@ Test({ $id: Now.ID['std_values'], name: 'Standard step values' }, (atf) => {
 //                             catalog_item_id, request_id, output_email_record,
 //                             output_reply_email_record, table, user, cart
 // So `atf.form.openExistingRecord({ recordId: submitted.record_id })` mixes both — correctly,
-// and reading `submitted.recordId` is undefined at runtime.
+// and reading `submitted.recordId` fails the build (TS2551).
 // ONE step breaks the rule on both sides — atf.server.replayRequestItem, which takes the
 // snake_case input `request_item` and returns the camelCase output `reqItem`. Nothing else does.
 // (Reusable-test outputs are the exception by design: they keep the keys YOU declare in `outputs`.)

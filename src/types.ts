@@ -8,8 +8,8 @@
 export type AuthStatus = 'authenticated' | 'not_authenticated' | 'validation_error' | 'skipped';
 
 /**
- * Result of authentication validation
- * Used to report auth status to MCP clients via logging notifications
+ * Result of authentication validation, cached in the session and returned by
+ * check_auth_status
  */
 export interface AuthValidationResult {
   /** Current authentication status */

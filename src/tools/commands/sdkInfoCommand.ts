@@ -44,96 +44,54 @@ export class SdkInfoCommand extends BaseCLICommand {
     },
   ];
 
-  /**
-   * Get command and working directory for ServiceNow SDK execution
-   */
-  private getSdkCommand(): { command: string; baseArgs: string[]; workingDirectory: string } {
-    // Resolve the bundled SDK CLI so version/help work regardless of cwd.
-    const { command, baseArgs } = resolveSdkCli();
-
-    return {
-      command,
-      baseArgs,
-      workingDirectory: getProjectRootPath(),
-    };
-  }
-
   async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
     // The schema checks the flag's choices and the command name's grammar.
     this.validateArgs(args);
 
     const flag = args.flag as string;
     const command = args.command as string | undefined;
+    const isHelp = flag === '-h' || flag === '--help';
 
-    if (command !== undefined) {
-      // A command name is help for that command, so it needs the help flag.
-      if (flag !== '-h' && flag !== '--help') {
-        return CommandResultFactory.error(
-          'The \'command\' argument is only valid with -h/--help flag'
-        );
-      }
+    // A command name is help for that command, so it needs the help flag.
+    if (command !== undefined && !isHelp) {
+      return CommandResultFactory.error(
+        'The \'command\' argument is only valid with -h/--help flag'
+      );
     }
 
-    // Build command arguments for SDK execution
-    const { command: sdkCommand, baseArgs, workingDirectory } = this.getSdkCommand();
+    // Run the bundled SDK CLI from the installed package directory, so version
+    // and help work regardless of cwd: now-sdk [<command>] --help, or now-sdk <flag>.
+    const { command: sdkCommand, baseArgs } = resolveSdkCli();
     const sdkArgs: string[] = [...baseArgs];
-
-    if (flag === '-h' || flag === '--help') {
-      if (command) {
-        // Get help for specific command: npx now-sdk <command> --help
-        sdkArgs.push(command, '--help');
-      } else {
-        // Get general help: npx now-sdk --help
-        sdkArgs.push('--help');
-      }
+    if (isHelp) {
+      if (command) sdkArgs.push(command);
+      sdkArgs.push('--help');
     } else {
-      // For version: npx now-sdk <flag>
       sdkArgs.push(flag);
     }
 
-    try {
-      const result = await this.commandProcessor.process(sdkCommand, sdkArgs, workingDirectory, undefined, this.timeoutMs, signal);
-
-      if (result.exitCode === 0) {
-        return CommandResultFactory.success(this.formatOutput(result.output, flag, command));
-      } else {
-        return CommandResultFactory.errorWithOutput(
-          result.output,
-          result.error || new Error(`SDK flag '${flag}' execution failed`),
-          result.exitCode
-        );
-      }
-    } catch (error) {
-      return CommandResultFactory.fromError(error);
+    const result = await this.commandProcessor.process(sdkCommand, sdkArgs, getProjectRootPath(), this.timeoutMs, signal);
+    if (result.exitCode === 0) {
+      return CommandResultFactory.success(SdkInfoCommand.formatOutput(result.output, isHelp, command));
     }
+    return CommandResultFactory.errorWithOutput(
+      result.output,
+      result.error || new Error(`SDK flag '${flag}' execution failed`),
+      result.exitCode
+    );
   }
 
   /**
-   * Format the output based on the flag used
+   * Label the CLI output: `now-sdk --version` prints the bare version, and help
+   * is the CLI's own text for the general or one command's usage.
    */
-  private formatOutput(output: string, flag: string, command?: string): string {
+  private static formatOutput(output: string, isHelp: boolean, command?: string): string {
     const trimmed = output.trim();
-
-    switch (flag) {
-      case '-v':
-      case '--version': {
-        // Extract version for cleaner presentation
-        const versionMatch = trimmed.match(/ServiceNow SDK v?(\d+\.\d+\.\d+[^\s]*)/i);
-        if (versionMatch) {
-          return `ServiceNow SDK Version: ${versionMatch[1]}\n\nFull output:\n${trimmed}`;
-        }
-        return `ServiceNow SDK Version Information:\n\n${trimmed}`;
-      }
-
-      case '-h':
-      case '--help':
-        if (command) {
-          return `ServiceNow SDK Help for '${command}' command:\n\n${trimmed}\n\nNote: Retrieved using 'npx now-sdk ${command} --help'`;
-        }
-        return `ServiceNow SDK General Help:\n\n${trimmed}\n\nNote: Retrieved using 'npx now-sdk --help'`;
-
-      default:
-        return trimmed;
+    if (!isHelp) {
+      return `ServiceNow SDK Version Information:\n\n${trimmed}`;
     }
+    return command
+      ? `ServiceNow SDK Help for '${command}' command:\n\n${trimmed}\n\nNote: Retrieved using the bundled 'now-sdk ${command} --help'`
+      : `ServiceNow SDK General Help:\n\n${trimmed}\n\nNote: Retrieved using the bundled 'now-sdk --help'`;
   }
 }

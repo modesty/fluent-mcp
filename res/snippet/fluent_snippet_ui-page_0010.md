@@ -1,5 +1,7 @@
 # Create a UI Page for knowledge base article display
 
+> Inline Jelly in a template literal: escape every Jelly `${...}` as `\${...}`, otherwise TypeScript reads it as an interpolation and the build fails (TS2304 `Cannot find name 'jvar_x'`). Phase-two `$[...]` needs no escape. For a long template, prefer keeping the Jelly in its own file with `html: Now.include('./page.jelly.xml')`.
+
 ```typescript
 import { UiPage } from '@servicenow/sdk/core'
 
@@ -17,15 +19,16 @@ UiPage({
             
             <div style="padding: 20px;">
                 <div style="margin-bottom: 20px;">
-                    <input type="text" id="searchBox" placeholder="Search knowledge base..." 
-                           style="width: 400px; padding: 10px;">
+                    <input type="text" id="searchBox" placeholder="Search knowledge base..."
+                           style="width: 400px; padding: 10px;" /> <!-- Jelly is XML: void elements must be self-closed -->
                     <button onclick="searchArticles()" style="padding: 10px 20px;">Search</button>
                 </div>
                 
-                <j:if test="${!empty(jvar_article_sys_id)}">
-                    <g:evaluate var="jvar_article">
+                <j:if test="\${!empty(jvar_article_sys_id)}">
+                    <!-- jelly="true" exposes Jelly variables to the script as jelly.jvar_*; never splice a request parameter into the script text -->
+                    <g:evaluate var="jvar_article" jelly="true">
                         var gr = new GlideRecord('kb_knowledge');
-                        if (gr.get('${jvar_article_sys_id}')) {
+                        if (gr.get(jelly.jvar_article_sys_id)) {
                             var article = {
                                 number: gr.getValue('number'),
                                 short_description: gr.getValue('short_description'),
@@ -43,7 +46,7 @@ UiPage({
                         <div class="panel-heading">
                             <h3 class="panel-title">
                                 <script>
-                                    var article = ${jvar_article};
+                                    var article = \${jvar_article};
                                     document.write(article.number + ': ' + article.short_description);
                                 </script>
                             </h3>
@@ -63,7 +66,7 @@ UiPage({
                     </div>
                 </j:if>
                 
-                <j:if test="${empty(jvar_article_sys_id)}">
+                <j:if test="\${empty(jvar_article_sys_id)}">
                     <div class="alert alert-info">
                         Please search for an article or select one from the list.
                     </div>

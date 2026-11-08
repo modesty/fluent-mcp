@@ -1,9 +1,9 @@
 # Create a simple Service Portal widget with HTML template, CSS, and server script
 
 ```typescript
-import { SpWidget } from '@servicenow/sdk/core'
+import { SPWidget } from '@servicenow/sdk/core'
 
-SpWidget({
+SPWidget({
     $id: Now.ID['hello_world_widget'],
     name: 'Hello World',
     description: 'A simple hello world widget',
@@ -13,7 +13,7 @@ SpWidget({
     {{c.data.greeting}}
   </div>
 </div>`,
-    cssTemplate: `.panel {
+    customCss: `.panel {
   margin-bottom: 20px;
 }`,
     serverScript: `(function() {

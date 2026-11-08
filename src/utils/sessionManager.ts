@@ -23,8 +23,6 @@ export class SessionManager {
   private sessionData: SessionData = {};
 
   private constructor() {
-    // Initialize with empty session data - in-memory only
-    this.resetSession();
     logger.debug('Session manager initialized with in-memory storage');
   }
 
