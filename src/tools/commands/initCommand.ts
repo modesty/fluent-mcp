@@ -11,6 +11,7 @@ import { SessionManager } from '../../utils/sessionManager.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
 import { checkInitDestination, createInitDestination, removeCreatedDestination } from '../../utils/projectDirectory.js';
 import { cliOption } from './cliArgv.js';
+import { validateResponseTimeout } from './responseTimeout.js';
 import logger from '../../utils/logger.js';
 import {
   InitArgsResolver,
@@ -32,7 +33,7 @@ import {
  */
 export class InitCommand extends BaseCLICommand {
   name = 'init_fluent_app';
-  description = 'Initialize a new Fluent (ServiceNow SDK) application or convert an existing scoped application. Set intent to "creation" for a new app (requires appName, packageName, scopeName, template) or "conversion" to convert from an instance sys_id or an absolute local application directory (requires from, and auth for instance conversion; pass packageName too, or the returned command prompts for it). Creation is not offline: the returned command reads the vendor prefix of the auth instance (explicit, else the session alias, else the CLI default profile) and contacts the npm registry. The workingDirectory must be an absolute path to an empty directory, or to a new directory under an existing one. The result is a shell command that enters that directory and runs the SDK init. After init, use build_fluent_app to compile.';
+  description = 'Initialize a new Fluent (ServiceNow SDK) application or convert an existing scoped application. Set intent to "creation" for a new app (requires appName, packageName, scopeName, template) or "conversion" to convert from an instance sys_id or an absolute local application directory (requires from, and auth for instance conversion; pass packageName too, or the returned command prompts for it; for a large app on a slow instance, raise timeoutSeconds). Creation is not offline: the returned command reads the vendor prefix of the auth instance (explicit, else the session alias, else the CLI default profile) and contacts the npm registry. The workingDirectory must be an absolute path to an empty directory, or to a new directory under an existing one. The result is a shell command that enters that directory and runs the SDK init. After init, use build_fluent_app to compile.';
   // Creates a local project directory and sets the session working directory; for
   // conversion it also reads from an instance. Non-idempotent (a second run on a
   // populated directory is refused), and open-world for the conversion path.
@@ -85,6 +86,12 @@ export class InitCommand extends BaseCLICommand {
       description: 'Credential alias of the instance now-sdk init contacts (auto-injected from session if not provided). Conversion from an instance reads the application from it. Creation reads its vendor prefix to warn when scopeName does not start with it; without an alias, the CLI uses its default profile for that.',
     },
     {
+      name: 'timeoutSeconds',
+      type: 'number',
+      required: false,
+      description: 'For conversion from an instance only (from is a sys_id; SDK v4.14.2+): seconds now-sdk init waits between response chunks from the instance before giving up (CLI default 3600). An idle timeout, not a total. The returned command runs in your terminal, so no server timeout applies to it.',
+    },
+    {
       name: 'workingDirectory',
       type: 'string',
       required: true,
@@ -110,6 +117,10 @@ export class InitCommand extends BaseCLICommand {
     // Conversion asks for the npm package name when the destination has no
     // package.json (always, for an empty or new one), so pass it when known.
     if (data.packageName) sdkArgs.push(cliOption('--packageName', data.packageName));
+    // `--timeout` sizes the long-running connector `now-sdk init` builds only
+    // for an instance conversion (sdk-cli `command/init`); validation refuses it
+    // for every other mode, where the CLI would accept and ignore it.
+    if (data.timeoutSeconds !== undefined) sdkArgs.push(cliOption('--timeout', data.timeoutSeconds));
 
     // A local-path conversion is entirely local and must not trigger profile
     // discovery. An exact sys_id reads from an instance and therefore needs
@@ -186,6 +197,17 @@ export class InitCommand extends BaseCLICommand {
 
       // Step 2: Resolve and validate data based on intent
       let initData: ConversionInitData | CreationInitData;
+
+      // `now-sdk init --timeout` (SDK v4.14.2+) only reaches the connector of an
+      // instance conversion; the CLI accepts and ignores it otherwise.
+      validateResponseTimeout(args);
+      if (typeof args.timeoutSeconds === 'number' &&
+          !(intent === 'conversion' && typeof args.from === 'string' && InitValidator.isSysId(args.from))) {
+        return CommandResultFactory.error(
+          "Argument 'timeoutSeconds' applies only to conversion from an instance (from is a sys_id). " +
+          'Creation and local conversion do not download from an instance.'
+        );
+      }
 
       if (intent === 'conversion') {
         const conversion = InitArgsResolver.resolveConversionData(args);

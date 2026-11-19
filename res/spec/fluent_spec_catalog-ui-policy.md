@@ -12,7 +12,7 @@ CatalogUiPolicy({
     shortDescription: '',   // string, mandatory — brief description of what this policy does
 
     // ─── Target — one of catalogItem or variableSet (mutually exclusive) ───
-    catalogItem: catalogItemRef,  // string | CatalogItem, optional — the catalog item this policy applies to
+    catalogItem: catalogItemRef,  // string | CatalogItem | CatalogItemRecordProducer, optional — the catalog item or record producer this policy applies to (CatalogItemRecordProducer: SDK v4.14.2+; keep appliesTo: 'item')
     variableSet: variableSetRef,  // string | VariableSet, optional — the variable set this policy applies to (mutually exclusive with catalogItem)
     appliesTo: 'item',      // 'item' | 'set', optional — scope: 'item' for catalog item scope, 'set' for variable set scope
 

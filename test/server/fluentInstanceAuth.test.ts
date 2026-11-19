@@ -210,6 +210,24 @@ describe('autoValidateAuthIfConfigured', () => {
       'a keyring write failure during migration',
       'Could not write the credential encryption key to the OS keyring: The user name or passphrase you entered is not correct.',
     ],
+    // SDK v4.14.2 SN_SDK_KEY_SOURCE=env (sdk-cli credential-store/index.js, key-provider.js): the
+    // SDK itself never offers a reset here, because the right key can still read the store.
+    [
+      'an env-sourced key that is not set',
+      'SN_SDK_ENCRYPTION_KEY is not set, but encrypted credentials exist at /home/u/.now-sdk/credentials.enc. Set it to the key they were encrypted with. The stored credentials were not modified.',
+    ],
+    [
+      'an env-sourced key that does not decrypt the store',
+      "Could not decrypt the stored credentials at /home/u/.now-sdk/credentials.enc with SN_SDK_ENCRYPTION_KEY: the key doesn't match, or the file is corrupted. The stored credentials were not reset. Set SN_SDK_ENCRYPTION_KEY to the original key, or delete that file to start over.",
+    ],
+    [
+      'a malformed env-sourced key',
+      'SN_SDK_ENCRYPTION_KEY must be a base64-encoded 32-byte key.',
+    ],
+    [
+      'an unknown key source',
+      'Unknown SN_SDK_KEY_SOURCE "vault". Expected one of: keyring, env.',
+    ],
   ] as const) {
     it(`never advises 'auth --delete all' for ${label}`, async () => {
       process.env.SN_INSTANCE_URL = 'https://dev12345.service-now.com';

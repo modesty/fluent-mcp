@@ -89,6 +89,7 @@ export class InitArgsResolver {
       workingDirectory: args.workingDirectory as string,
       packageName: InitArgsResolver.isNonEmptyString(args.packageName) ? args.packageName : undefined,
       auth: args.auth as string,
+      timeoutSeconds: typeof args.timeoutSeconds === 'number' ? args.timeoutSeconds : undefined,
       debug: args.debug as boolean,
     };
   }

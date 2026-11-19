@@ -2,7 +2,7 @@
 
 An [MCP server](https://modelcontextprotocol.io) and AI skill suite that brings [ServiceNow Fluent SDK](https://www.servicenow.com/docs/bundle/yokohama-application-development/page/build/servicenow-sdk/concept/servicenow-fluent.html) (`@servicenow/sdk`) capabilities, API specifications, code snippets, and security reviews to AI-assisted development environments.
 
-Built for [@servicenow/sdk@v4.14.0](https://github.com/ServiceNow/sdk/releases/tag/v4.14.0).
+Built for [@servicenow/sdk@v4.14.2](https://github.com/ServiceNow/sdk/releases/tag/v4.14.2).
 
 ## Key Features
 
@@ -54,11 +54,14 @@ Add `@modesty/fluent-mcp` to your MCP client configuration:
 | `FLUENT_MCP_COMMAND_TIMEOUT_MS` | Operator override for CLI command timeout, in ms, digits only, at most `2147483647` (`1e6`, `1.5`, `300000ms` or a longer value are ignored) | Per-tool |
 | `NO_TELEMETRY` | Set to `1` to disable `@servicenow/sdk` CLI telemetry | — |
 | `SN_SDK_CREDENTIALS_DIR` | Directory of the SDK's encrypted profile store `credentials.enc` (SDK v4.14.0+; an empty value is treated as unset) | `~/.now-sdk` |
+| `SN_SDK_KEY_SOURCE` | Where the SDK gets the `credentials.enc` encryption key: `keyring` or `env` (SDK v4.14.2+; any other value is an error). Use `env` in containers, CI, or where the Linux keyring corrupts the key (KWallet) | `keyring` |
+| `SN_SDK_ENCRYPTION_KEY` | With `SN_SDK_KEY_SOURCE=env`: a base64-encoded 32-byte key that you generate and keep in your secret store. The SDK never generates or stores it, and this server never reads it (it reaches the CLI only through the inherited environment) | — |
 
 > **Authentication Tip:** The server only reads your auth profiles. To register an instance profile, run in a terminal:
 > `npx @servicenow/sdk auth --add <instance-url> --type <basic|oauth> --alias <alias>`
 > `auth --add` makes the new profile your CLI default; run `npx @servicenow/sdk auth --use <previous alias>` afterwards to keep the old one.
 > Since `@servicenow/sdk` 4.14.0, profiles are stored encrypted in `credentials.enc` with only the key in the OS keychain. The first auth lookup migrates existing keychain profiles silently; afterwards, profiles added with an older `now-sdk` are not visible to this server. If the store cannot be decrypted, `check_auth_status` reports it, and you must run `now-sdk auth --delete all` in a terminal and add the profile again. Do not reset for any other store error: a file written by a newer `now-sdk` needs that newer SDK, and a keyring write failure needs the OS keyring unlocked.
+> This server bundles `@servicenow/sdk` 4.14.2, which writes a newly created encryption key (first setup, or after a reset) in a format 4.14.0 cannot read. If another project on the same machine pins `now-sdk` 4.14.0, upgrade it to 4.14.2 or later; otherwise 4.14.0 reports the store unreadable and offers a reset that deletes your saved profiles. With `SN_SDK_KEY_SOURCE=env`, a missing, malformed or wrong key is reported and nothing is reset: set `SN_SDK_ENCRYPTION_KEY` to the original key.
 > For headless CI/CD pipelines, set `SN_SDK_NODE_ENV=SN_SDK_CI_INSTALL` along with `SN_SDK_INSTANCE_URL` and `SN_SDK_USER`/`SN_SDK_USER_PWD` or `SN_SDK_OAUTH_CLIENT_ID`/`SN_SDK_OAUTH_CLIENT_SECRET`.
 
 ### MCPB Bundle (Optional)
@@ -101,8 +104,8 @@ This repository ships standalone AI agent skills under [`skills/`](./skills) pac
 | Tool | Description | Key Parameters |
 |------|-------------|----------------|
 | `sdk_info` | Get SDK version (`-v`) or command help (`-h`) | `flag`, `command` |
-| `explain_fluent_api` | Look up Fluent SDK docs for any API class, guide, or tag (no project required) | `topic`, `list`, `peek`, `format` (`pretty`\|`raw`), `debug` |
-| `init_fluent_app` | Initialize a new Fluent app or convert an existing app (non-interactive) | `workingDirectory`, `intent`, `appName`, `packageName`, `scopeName`, `template`, `from`, `auth`, `debug` |
+| `explain_fluent_api` | Look up Fluent SDK docs for any API class, guide, or tag; with no exact match, returns the closest topics ranked by relevance (no project required) | `topic`, `list`, `peek`, `format` (`pretty`\|`raw`), `range` (`"7"` or `"3-7"`, SDK v4.14.2+), `debug` |
+| `init_fluent_app` | Initialize a new Fluent app or convert an existing app (non-interactive) | `workingDirectory`, `intent`, `appName`, `packageName`, `scopeName`, `template`, `from`, `auth`, `timeoutSeconds` (instance conversion, SDK v4.14.2+), `debug` |
 | `build_fluent_app` | Build the Fluent application package | `workingDirectory`, `sourceMap`, `debug` |
 | `deploy_fluent_app` | Deploy/install the built package to a ServiceNow instance | `workingDirectory`, `auth`, `skipFlowActivation`, `async`, `debug` |
 | `fluent_transform` | Transform local XML or instance records into Fluent `.now.ts` source code | `workingDirectory`, `from`, `directory`, `table`, `id`, `force`, `format`, `timeoutSeconds`, `auth`, `debug` |

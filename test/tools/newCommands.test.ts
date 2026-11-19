@@ -264,7 +264,7 @@ describe('New SDK Commands', () => {
       assert.ok(command.description.includes('Look up Fluent SDK documentation'));
       assert.ok(command.description.includes('no authentication or active Fluent project required'));
       assert.deepStrictEqual(command.annotations, { readOnlyHint: true, idempotentHint: true });
-      assert.equal(command.arguments.length, 5);
+      assert.equal(command.arguments.length, 6);
 
       // topic is optional in v4.6.0 (required only when list=false)
       const topicArg = command.arguments.find(arg => arg.name === 'topic');
@@ -287,7 +287,12 @@ describe('New SDK Commands', () => {
       assert.equal(formatArg?.required, false);
       assert.equal(formatArg?.type, 'string');
 
-      // `now-sdk explain` declares no --source option (through SDK v4.14.0), so none is advertised.
+      const rangeArg = command.arguments.find(arg => arg.name === 'range');
+      assert.equal(rangeArg?.required, false);
+      assert.equal(rangeArg?.type, 'string');
+      assert.equal(rangeArg?.domain?.kind, 'pattern');
+
+      // `now-sdk explain` declares no --source option (through SDK v4.14.2), so none is advertised.
       assert.equal(command.arguments.find(arg => arg.name === 'source'), undefined);
 
       const debugArg = command.arguments.find(arg => arg.name === 'debug');
@@ -378,6 +383,54 @@ describe('New SDK Commands', () => {
 
       assert.equal(result.success, false);
       assert.ok(result.output.includes('Provide a topic'));
+      assertNotCalled(mockProcessor.process);
+    });
+
+    // SDK v4.14.2: --range pages through the ranked fuzzy matches of a topic.
+    for (const range of ['7', '3-7']) {
+      it(`should pass --range=${range} with a topic`, async () => {
+        const command = new ExplainCommand(mockProcessor);
+
+        const result = await command.execute({ topic: 'reusable test', range });
+
+        assert.equal(result.success, true);
+        assertCalledWith(
+          mockProcessor.process,
+          process.execPath,
+          [SDK_BIN, 'explain', 'reusable test', `--range=${range}`],
+          '/mock/project/root',
+          15000,
+          undefined
+        );
+      });
+    }
+
+    // The CLI's .check() rejects these after spawn; the tool mirrors it up front.
+    for (const range of ['0', '7-3', '0-4']) {
+      it(`should reject the range ${JSON.stringify(range)} before spawning`, async () => {
+        const command = new ExplainCommand(mockProcessor);
+
+        await assert.rejects(command.execute({ topic: 'flow', range }), /Argument 'range' must be "<n>" or "<from>-<to>"/);
+        assertNotCalled(mockProcessor.process);
+      });
+    }
+
+    for (const range of ['-3', '3-', 'a-b', '3 - 7']) {
+      it(`should reject the malformed range ${JSON.stringify(range)} by schema`, async () => {
+        const command = new ExplainCommand(mockProcessor);
+
+        await assert.rejects(command.execute({ topic: 'flow', range }), /range/);
+        assertNotCalled(mockProcessor.process);
+      });
+    }
+
+    it('should refuse range without a topic (the CLI would ignore it)', async () => {
+      const command = new ExplainCommand(mockProcessor);
+
+      const result = await command.execute({ list: true, range: '5' });
+
+      assert.equal(result.success, false);
+      assert.match(result.output, /'range' requires a topic/);
       assertNotCalled(mockProcessor.process);
     });
 

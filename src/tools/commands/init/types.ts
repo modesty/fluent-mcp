@@ -11,6 +11,8 @@ export interface ConversionInitData {
   /** npm package name for the converted project; without it `now-sdk init` prompts for one. */
   packageName?: string;
   auth?: string;
+  /** `--timeout` (SDK v4.14.2+): idle seconds between instance response chunks; instance conversion only. */
+  timeoutSeconds?: number;
   debug?: boolean;
 }
 
