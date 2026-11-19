@@ -99,10 +99,7 @@ export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): 
         host,
         authType,
         message: `Auth validation failed: could not list auth profiles: ${failure}`,
-        actionRequired: isCredentialStoreFailure(failure)
-          ? "Run 'now-sdk auth --delete all' in a terminal, then add the profile again: " +
-            buildAuthCommand(instUrl, authType, deriveAliasFromInstance(instUrl))
-          : buildAuthCommand(instUrl, authType, deriveAliasFromInstance(instUrl)),
+        actionRequired: credentialStoreAction(failure, buildAuthCommand(instUrl, authType, deriveAliasFromInstance(instUrl))),
         timestamp,
       });
     }
@@ -245,18 +242,75 @@ function describeAuthListFailure(output: string): string {
   return cliErrorMessage(output, '') ?? (output.trim() || 'now-sdk auth --list exited with an error and no output');
 }
 
+/** A credential-store failure `auth --list` can report, and what fixes it. */
+interface CredentialStoreRule {
+  /** Matches the CLI's own message (sdk-cli `auth/credential-store/`). Case-sensitive. */
+  pattern: RegExp;
+  /** The next step, given the add command for the configured instance. */
+  action: (addCommand: string) => string;
+}
+
 /**
- * Whether the SDK v4.14.0+ credential store (`credentials.enc` + OS-keychain key)
- * is unreadable in a way only a reset recovers: the CLI's own non-TTY message
- * (`credential-store/index.js`), which also covers a truncated or corrupted file.
- * Deliberately narrower than "any store error": a file written by a newer now-sdk
- * ("…written in format version N… Upgrade now-sdk") must not be reset, because that
- * destroys the newer data; and a keyring write failure during migration ("Could not
- * write the credential encryption key…") is fixed by unlocking the keyring, while a
- * reset would also delete the legacy keychain entry older SDK installs still read.
+ * The now-sdk child inherits this server's environment, so an env-key fix belongs in the
+ * MCP client's env configuration for this server, and takes effect on restart.
  */
-function isCredentialStoreFailure(message: string): boolean {
-  return /Stored credentials at .+ could not be read/.test(message);
+const SERVER_ENV = "in this MCP server's environment (the env block of its client configuration), then restart the server";
+const KEEP_STORE = 'Do not reset the stored credentials.';
+
+/**
+ * The SDK v4.14.0+ credential store (`credentials.enc` + a key from the OS keyring or, as
+ * of SDK v4.14.2, `SN_SDK_ENCRYPTION_KEY`) fails in distinct ways, and only one of them is
+ * recovered by a reset: the CLI's non-TTY "could not be read" message (`index.js`), which also
+ * covers a truncated or corrupted file. Every other failure keeps data a reset would destroy:
+ * a file written by a newer now-sdk, the legacy keychain entry older SDK installs still read
+ * (keyring write failure during migration), or credentials the right env key can still decrypt.
+ * So each maps to its own fix, and an unrecognized failure falls back to the add command.
+ */
+const CREDENTIAL_STORE_RULES: readonly CredentialStoreRule[] = [
+  {
+    pattern: /Stored credentials at .+ could not be read/,
+    action: (addCommand) => `Run 'now-sdk auth --delete all' in a terminal, then add the profile again: ${addCommand}`,
+  },
+  {
+    // file-store.js UnsupportedFormatVersionError
+    pattern: /Stored credentials were written in format version \d+/,
+    action: () =>
+      `${KEEP_STORE} A newer now-sdk wrote them; upgrade fluent-mcp to a release that bundles that now-sdk version or later.`,
+  },
+  {
+    // key-provider.js OsKeyringProvider.setKey (migration from the legacy keychain entry)
+    pattern: /Could not write the credential encryption key to the OS keyring/,
+    action: () =>
+      `${KEEP_STORE} Unlock the OS keyring and retry, or set SN_SDK_KEY_SOURCE=env and SN_SDK_ENCRYPTION_KEY ` +
+      `(a base64-encoded 32-byte key) ${SERVER_ENV}.`,
+  },
+  {
+    // index.js externalKeyMissingError (SN_SDK_KEY_SOURCE=env)
+    pattern: /SN_SDK_ENCRYPTION_KEY is not set, but encrypted credentials exist/,
+    action: () => `Set SN_SDK_ENCRYPTION_KEY to the key the stored credentials were encrypted with ${SERVER_ENV}. ${KEEP_STORE}`,
+  },
+  {
+    // index.js read(): an env key that does not decrypt the file
+    pattern: /Could not decrypt the stored credentials at .+ with SN_SDK_ENCRYPTION_KEY/,
+    action: () => `Set SN_SDK_ENCRYPTION_KEY to the original key ${SERVER_ENV}. ${KEEP_STORE}`,
+  },
+  {
+    // key-provider.js EnvVarKeyProvider.getKey
+    pattern: /SN_SDK_ENCRYPTION_KEY must be a base64-encoded 32-byte key/,
+    action: () =>
+      `Set SN_SDK_ENCRYPTION_KEY to the base64-encoded 32-byte key the stored credentials were encrypted with ${SERVER_ENV}. ${KEEP_STORE}`,
+  },
+  {
+    // key-provider.js getActiveKeyProvider
+    pattern: /Unknown SN_SDK_KEY_SOURCE /,
+    action: () => `Set SN_SDK_KEY_SOURCE to keyring or env, or unset it to use the OS keyring, ${SERVER_ENV}.`,
+  },
+];
+
+/** The next step for an `auth --list` failure: its store rule's fix, else the add command. */
+function credentialStoreAction(failure: string, addCommand: string): string {
+  const rule = CREDENTIAL_STORE_RULES.find(({ pattern }) => pattern.test(failure));
+  return rule ? rule.action(addCommand) : addCommand;
 }
 
 /** Parse `now-sdk auth --list` stdout into profiles */

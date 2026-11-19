@@ -199,37 +199,45 @@ describe('autoValidateAuthIfConfigured', () => {
   });
 
   // Store errors where `auth --delete all` is the WRONG advice (sdk-cli credential-store):
-  // resetting would destroy a newer now-sdk's data, or delete the legacy keychain entry
-  // older SDK installs still read. The CLI's own message is surfaced instead.
-  for (const [label, cliError] of [
+  // resetting would destroy a newer now-sdk's data, delete the legacy keychain entry older
+  // SDK installs still read, or discard credentials the right env key can still decrypt.
+  // The CLI's own message is surfaced, with the fix for that failure; adding a profile
+  // fixes none of them, so the add command is not offered either.
+  for (const [label, cliError, fix] of [
     [
       'a credentials file written by a newer now-sdk',
       'Stored credentials were written in format version 2, but this version of now-sdk only supports up to version 1. Upgrade now-sdk to read them.',
+      /upgrade fluent-mcp to a release that bundles that now-sdk version or later/,
     ],
     [
       'a keyring write failure during migration',
       'Could not write the credential encryption key to the OS keyring: The user name or passphrase you entered is not correct.',
+      /Unlock the OS keyring and retry, or set SN_SDK_KEY_SOURCE=env and SN_SDK_ENCRYPTION_KEY/,
     ],
     // SDK v4.14.2 SN_SDK_KEY_SOURCE=env (sdk-cli credential-store/index.js, key-provider.js): the
     // SDK itself never offers a reset here, because the right key can still read the store.
     [
       'an env-sourced key that is not set',
       'SN_SDK_ENCRYPTION_KEY is not set, but encrypted credentials exist at /home/u/.now-sdk/credentials.enc. Set it to the key they were encrypted with. The stored credentials were not modified.',
+      /Set SN_SDK_ENCRYPTION_KEY to the key the stored credentials were encrypted with in this MCP server's environment/,
     ],
     [
       'an env-sourced key that does not decrypt the store',
       "Could not decrypt the stored credentials at /home/u/.now-sdk/credentials.enc with SN_SDK_ENCRYPTION_KEY: the key doesn't match, or the file is corrupted. The stored credentials were not reset. Set SN_SDK_ENCRYPTION_KEY to the original key, or delete that file to start over.",
+      /Set SN_SDK_ENCRYPTION_KEY to the original key in this MCP server's environment/,
     ],
     [
       'a malformed env-sourced key',
       'SN_SDK_ENCRYPTION_KEY must be a base64-encoded 32-byte key.',
+      /Set SN_SDK_ENCRYPTION_KEY to the base64-encoded 32-byte key/,
     ],
     [
       'an unknown key source',
       'Unknown SN_SDK_KEY_SOURCE "vault". Expected one of: keyring, env.',
+      /Set SN_SDK_KEY_SOURCE to keyring or env, or unset it/,
     ],
   ] as const) {
-    it(`never advises 'auth --delete all' for ${label}`, async () => {
+    it(`gives the fix for ${label}, never 'auth --delete all' or an add`, async () => {
       process.env.SN_INSTANCE_URL = 'https://dev12345.service-now.com';
       process.env.SN_AUTH_TYPE = 'oauth';
 
@@ -238,7 +246,9 @@ describe('autoValidateAuthIfConfigured', () => {
 
       assert.equal(result.status, 'validation_error');
       assert.ok(result.message.includes(cliError));
+      assert.match(result.actionRequired ?? '', fix);
       assert.ok(!result.actionRequired?.includes('--delete all'));
+      assert.ok(!result.actionRequired?.includes('auth --add'));
       assert.equal(tm.listAuthProfiles.mock.callCount(), 1);
     });
   }

@@ -44,7 +44,7 @@ ScriptOnlyCheck({
   script: '', // string, mandatory - server-side script that runs the check logic
     // The script should use the Instance Scan API to report findings
   protectionPolicy: '', // 'read' | 'protected', optional - protection level for this check
-  $meta: { installMethod: 'demo', useEsLatest: true }, // optional (SDK v4.13.0+): { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean } — installMethod picks when the check loads ('demo' → demo data only); useEsLatest runs its server-side script on the latest ECMAScript version
+  $meta: { installMethod: 'once', useEsLatest: true }, // optional (SDK v4.13.0+): { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean } — installMethod picks when the check loads (not 'demo' here: demo data is only for rows of tables that do not extend sys_metadata (demo-data-guide, SDK v4.14.2)); useEsLatest runs its server-side script on the latest ECMAScript version
   priority: '1', // ScanPriority, mandatory - '1' (Critical) | '2' (High) | '3' (Moderate) | '4' (Low)
   shortDescription: '', // string, mandatory - brief description of the check
   resolutionDetails: '', // string, optional - guidance for resolving findings
@@ -103,7 +103,7 @@ TableCheck({
   table: '', // string, mandatory - target table for the check
   conditions: '', // string, optional - encoded query condition to match tables
   protectionPolicy: '', // 'read' | 'protected', optional - protection level for this check
-  $meta: { installMethod: 'demo', useEsLatest: true }, // optional (SDK v4.13.0+): { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean } — installMethod picks when the check loads ('demo' → demo data only); useEsLatest runs its server-side script on the latest ECMAScript version
+  $meta: { installMethod: 'once', useEsLatest: true }, // optional (SDK v4.13.0+): { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean } — installMethod picks when the check loads (not 'demo' here: demo data is only for rows of tables that do not extend sys_metadata (demo-data-guide, SDK v4.14.2)); useEsLatest runs its server-side script on the latest ECMAScript version
   priority: '1', // ScanPriority, mandatory - '1' (Critical) | '2' (High) | '3' (Moderate) | '4' (Low)
   shortDescription: '', // string, mandatory - brief description of the check
   resolutionDetails: '', // string, optional - guidance for resolving findings

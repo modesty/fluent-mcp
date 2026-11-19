@@ -83,8 +83,8 @@ EmailNotification({
     },
 
     // ─── Install-time loading (SDK v4.13.0+) ───
-    $meta: { installMethod: 'demo' }, // optional: { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean }
-        // installMethod: 'first install' → unload, 'demo' → unload.demo (demo data only), 'once' → apply_once.
+    $meta: { installMethod: 'once' }, // optional: { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean }
+        // installMethod: 'first install' → unload, 'once' → apply_once; not 'demo' here: demo data is only for rows of tables that do not extend sys_metadata (demo-data-guide, SDK v4.14.2).
         // useEsLatest: run this record's server-side script fields (e.g. advancedCondition) on the latest ECMAScript version.
 }): EmailNotification<TableName> // returns an EmailNotification object
 ```

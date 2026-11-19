@@ -41,8 +41,9 @@ UiMacro({
   protectionPolicy: 'read', // 'read' | 'protected', optional (default '') - written to sys_policy. Omit to let other
     // developers customize the macro
   // $override: { ... },          // optional - extra sys_ui_macro columns (accepted by the type; only the guide mentions it)
-  // $meta: { installMethod: 'demo' }, // optional - output folder: 'first install' -> unload, 'demo' -> unload.demo,
-                                       // 'once' -> apply_once
+  // $meta: { installMethod: 'once' }, // optional - output folder: 'first install' -> unload, 'once' -> apply_once;
+                                       // not 'demo' (unload.demo): demo data is only for rows of tables that do not
+                                       // extend sys_metadata (demo-data-guide, SDK v4.14.2)
   // $meta: { useEsLatest: true },     // optional - emits a sys_es_latest_script row for this macro (runtime effect on
                                        // Jelly <g:evaluate> blocks is not verified)
 })
