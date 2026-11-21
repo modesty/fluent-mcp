@@ -16,16 +16,26 @@
  */
 import { describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { ChildProcess, type SpawnOptions } from 'node:child_process';
+import { channel } from 'node:diagnostics_channel';
+import { once } from 'node:events';
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import { configFixture, loggerFixture } from '../support/fixtures.js';
+import { pathToFileURL } from 'node:url';
+import { configFixture, loggerFixture, withEnvironment } from '../support/fixtures.js';
 
 mock.module('../../src/config.js', configFixture().mockOptions);
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 
-const { NodeProcessRunner } = await import('../../src/tools/processors/processRunner.js');
+const {
+  NodeProcessRunner,
+  resolveWindowsTaskkillPath,
+  killWindowsProcessTree,
+  killProcessTree,
+} = await import('../../src/tools/processors/processRunner.js');
 const { CLIExecutor } = await import('../../src/tools/processors/cliExecutor.js');
 
 /** Explicit per-test timeout (with slack for a loaded machine). */
@@ -80,6 +90,62 @@ async function waitForMarker(
 function realSleep(): (ms: number) => Promise<void> {
   const realSetTimeout = globalThis.setTimeout.bind(globalThis);
   return (ms) => new Promise((resolve) => { realSetTimeout(resolve, ms); });
+}
+
+/**
+ * Portable loopback TCP socket probe that observes child/grandchild liveness
+ * through kernel FD closure rather than `process.kill(pid, 0)`. Works identically
+ * on macOS, Linux (even in containers where PID 1 does not reap zombies), and
+ * Windows (without requiring Windows named-pipe paths).
+ */
+async function createSocketProbe(signal: AbortSignal): Promise<{
+  port: number;
+  waitConnected: () => Promise<void>;
+  waitClosed: () => Promise<void>;
+  close: () => void;
+}> {
+  let peer: net.Socket | undefined;
+  let resolveConnected!: () => void;
+  let resolveClosed!: () => void;
+  let closed = false;
+  const connectedPromise = new Promise<void>((resolve) => { resolveConnected = resolve; });
+  const closedPromise = new Promise<void>((resolve) => { resolveClosed = resolve; });
+
+  const server = net.createServer((socket) => {
+    peer = socket;
+    resolveConnected();
+    socket.on('close', () => {
+      closed = true;
+      resolveClosed();
+    });
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const port = (server.address() as net.AddressInfo).port;
+
+  const abortRace = <T>(promise: Promise<T>, label: string): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      if (signal.aborted) { reject(new Error(`${label}: test aborted`)); return; }
+      const onAbort = () => reject(new Error(`${label}: test aborted`));
+      signal.addEventListener('abort', onAbort, { once: true });
+      promise.then(
+        (value) => { signal.removeEventListener('abort', onAbort); resolve(value); },
+        (error) => { signal.removeEventListener('abort', onAbort); reject(error); }
+      );
+    });
+
+  return {
+    port,
+    waitConnected: () => abortRace(connectedPromise, 'waiting for child socket connection'),
+    waitClosed: () => closed ? Promise.resolve() : abortRace(closedPromise, 'waiting for child socket close'),
+    close: () => {
+      peer?.destroy();
+      server.close();
+    },
+  };
 }
 
 describe('NodeProcessRunner — timeout returns partial output (P0.2)', () => {
@@ -206,11 +272,11 @@ describe('NodeProcessRunner — client cancellation kills the child (P0.3)', () 
     assert.match(result.stderr, /cancelled/i);
   });
 
-  it('kills immediately when the signal is already aborted', { timeout: TEST_TIMEOUT_MS }, async () => {
+  it('returns cancellation before even attempting to spawn when the signal is already aborted', { timeout: TEST_TIMEOUT_MS }, async () => {
     const runner = new NodeProcessRunner();
     const result = await runner.run(
-      process.execPath,
-      hangingChildArgs('never-mind'),
+      '', // spawn would throw synchronously for an empty executable
+      [],
       undefined,
       600_000,
       AbortSignal.abort()
@@ -220,15 +286,36 @@ describe('NodeProcessRunner — client cancellation kills the child (P0.3)', () 
     assert.match(result.stderr, /cancelled/i);
   });
 
-  it('kills grandchildren spawned by the child when cancelled', {
+  it('never signals a failed spawn while its asynchronous ENOENT is pending', async (t) => {
+    // Keep a regression from delivering a real signal through a PID-less handle.
+    const kill = t.mock.method(ChildProcess.prototype, 'kill', () => false);
+    const controller = new AbortController();
+    const missing = path.join(os.tmpdir(), 'fluent-mcp-no-such-executable', 'node');
+    const run = new NodeProcessRunner().run(missing, [], undefined, undefined, controller.signal);
+    controller.abort();
+    const result = await run;
+
+    assert.equal(kill.mock.callCount(), 0);
+    assert.equal(result.exitCode, 130);
+    assert.match(result.stderr, /No child process was started/);
+    assert.doesNotMatch(result.stderr, /SIGKILL/);
+  });
+
+  it('kills grandchildren spawned by the child when cancelled (zombie-safe FD check)', {
     timeout: TEST_TIMEOUT_MS,
     skip: process.platform === 'win32' && 'POSIX process groups',
   }, async (t) => {
     const runner = new NodeProcessRunner();
     const controller = new AbortController();
-    const markerDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluent-mcp-tree-'));
-    const markerPath = path.join(markerDir, 'grandchild.pid');
-    const grandchildScript = `require('node:fs').writeFileSync(${JSON.stringify(markerPath)}, String(process.pid)); setInterval(() => {}, 1000);`;
+    const probe = await createSocketProbe(t.signal);
+    // Socket-close exit handler prevents leaking the grandchild if a regression
+    // makes the assertion fail and `finally` closes the probe server.
+    const grandchildScript = [
+      "const net = require('node:net');",
+      `const s = net.createConnection({ host: '127.0.0.1', port: ${probe.port} });`,
+      's.once("close", () => process.exit(0));',
+      'setTimeout(() => process.exit(0), 30000);',
+    ].join(' ');
     const parentScript = [
       "const { spawn } = require('node:child_process');",
       `spawn(process.execPath, ['-e', ${JSON.stringify(grandchildScript)}], { stdio: 'ignore' });`,
@@ -236,41 +323,526 @@ describe('NodeProcessRunner — client cancellation kills the child (P0.3)', () 
     ].join(' ');
 
     const run = runner.run(process.execPath, ['-e', parentScript], undefined, 600_000, controller.signal);
-    let grandchildPid: number | undefined;
     try {
-      await waitForMarker(markerPath, run, t.signal);
-      grandchildPid = Number(fs.readFileSync(markerPath, 'utf-8').trim());
-      assert.ok(Number.isInteger(grandchildPid) && grandchildPid > 0);
-      // Confirm grandchild is alive before cancellation.
-      assert.doesNotThrow(() => process.kill(grandchildPid!, 0));
-
+      await probe.waitConnected();
       controller.abort();
       const result = await run;
       assert.equal(result.exitCode, 130);
-
-      // Give the kernel a short window to reap the SIGKILLed grandchild.
-      const deadline = Date.now() + 2_000;
-      let alive = true;
-      while (Date.now() < deadline) {
-        try {
-          process.kill(grandchildPid, 0);
-          await delay(20, undefined, { signal: t.signal });
-        } catch (error) {
-          if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
-            alive = false;
-            break;
-          }
-          throw error;
-        }
-      }
-      assert.equal(alive, false, `grandchild PID ${grandchildPid} survived cancellation`);
+      await probe.waitClosed();
     } finally {
       controller.abort();
       await run.catch(() => undefined);
-      if (grandchildPid) {
-        try { process.kill(grandchildPid, 'SIGKILL'); } catch { /* already gone */ }
+      probe.close();
+    }
+  });
+
+  it('ends remaining POSIX group members when the leader exits normally', {
+    timeout: TEST_TIMEOUT_MS,
+    skip: process.platform === 'win32' && 'POSIX process groups',
+  }, async (t) => {
+    const runner = new NodeProcessRunner();
+    const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fm-orphan-'));
+    const readyPath = path.join(probeDir, 'ready');
+    const probe = await createSocketProbe(t.signal);
+    // Socket-close exit handler ensures no worker leaks if an assertion catches a regression.
+    const workerScript = [
+      "const fs = require('node:fs');",
+      "const net = require('node:net');",
+      `const s = net.createConnection({ host: '127.0.0.1', port: ${probe.port} }, () => fs.writeFileSync(${JSON.stringify(readyPath)}, ''));`,
+      's.once("close", () => process.exit(0));',
+      'setTimeout(() => process.exit(0), 30000);',
+    ].join(' ');
+    const leaderScript = [
+      "const fs = require('node:fs');",
+      "const { spawn } = require('node:child_process');",
+      `spawn(process.execPath, ['-e', ${JSON.stringify(workerScript)}], { stdio: 'ignore' });`,
+      `const timer = setInterval(() => { if (fs.existsSync(${JSON.stringify(readyPath)})) { clearInterval(timer); process.stdout.write('leader-ok'); process.exit(0); } }, 10);`,
+    ].join(' ');
+
+    try {
+      const result = await runner.run(process.execPath, ['-e', leaderScript], undefined, TEST_TIMEOUT_MS);
+      assert.deepEqual({ exitCode: result.exitCode, stdout: result.stdout }, { exitCode: 0, stdout: 'leader-ok' });
+      // Leader exited cleanly with an independent-stdio worker still in its process group;
+      // NodeProcessRunner must sweep the group before forgetting the leader.
+      await probe.waitClosed();
+    } finally {
+      probe.close();
+      fs.rmSync(probeDir, { recursive: true, force: true });
+    }
+  });
+
+  it('ends remaining POSIX group members that inherit stdio on leader exit without timing out', {
+    timeout: TEST_TIMEOUT_MS,
+    skip: process.platform === 'win32' && 'POSIX process groups',
+  }, async (t) => {
+    const runner = new NodeProcessRunner();
+    // Keep the deadline frozen through both Node startups, the handshake and exit.
+    // The test signal cancels the runner if its exit sweep fails to close the pipes.
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fm-stdio-'));
+    const readyPath = path.join(probeDir, 'ready');
+    const probe = await createSocketProbe(t.signal);
+    const workerScript = [
+      "const fs = require('node:fs');",
+      "const net = require('node:net');",
+      `const s = net.createConnection({ host: '127.0.0.1', port: ${probe.port} }, () => fs.writeFileSync(${JSON.stringify(readyPath)}, ''));`,
+      's.once("close", () => process.exit(0));',
+      'setTimeout(() => process.exit(0), 30000);',
+    ].join(' ');
+    // Worker inherits stdout and stderr (default stdio): if the runner waited for
+    // `close` before sweeping the process group, this successful CLI would hang
+    // until the deadline. Only the exit sweep can complete this run with exit 0.
+    const leaderScript = [
+      "const fs = require('node:fs');",
+      "const { spawn } = require('node:child_process');",
+      `spawn(process.execPath, ['-e', ${JSON.stringify(workerScript)}], { stdio: 'inherit' });`,
+      `const timer = setInterval(() => { if (fs.existsSync(${JSON.stringify(readyPath)})) { clearInterval(timer); process.stdout.write('leader-ok'); process.exit(0); } }, 10);`,
+    ].join(' ');
+
+    try {
+      const run = runner.run(process.execPath, ['-e', leaderScript], undefined, 800, t.signal);
+      await probe.waitConnected();
+      const result = await run;
+      assert.deepEqual({ exitCode: result.exitCode, stdout: result.stdout }, { exitCode: 0, stdout: 'leader-ok' });
+      await probe.waitClosed();
+    } finally {
+      probe.close();
+      fs.rmSync(probeDir, { recursive: true, force: true });
+    }
+  });
+
+  it('bounds the wait for close and reports a cleanup diagnostic when tree termination falls back to leader-only kill', {
+    timeout: TEST_TIMEOUT_MS,
+  }, async (t) => {
+    // Mock setTimeout so child/descendant startup never races the 300 ms deadline.
+    const sleep = realSleep();
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+
+    const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fm-grace-'));
+    const readyPath = path.join(probeDir, 'ready');
+    const emittedPath = path.join(probeDir, 'emitted');
+    const probe = await createSocketProbe(t.signal);
+    // Descendant inherits stdout/stderr so killing only the leader leaves the
+    // pipes open; it exits immediately once our probe socket closes in `finally`.
+    const descendantScript = [
+      "const fs = require('node:fs');",
+      "const net = require('node:net');",
+      `const s = net.createConnection({ host: '127.0.0.1', port: ${probe.port} }, () => fs.writeFileSync(${JSON.stringify(readyPath)}, ''));`,
+      's.once("close", () => process.exit(0));',
+      'setTimeout(() => process.exit(0), 30000);',
+    ].join(' ');
+    const leaderScript = [
+      "const fs = require('node:fs');",
+      "const { spawn } = require('node:child_process');",
+      `spawn(process.execPath, ['-e', ${JSON.stringify(descendantScript)}], { stdio: 'inherit' });`,
+      `const timer = setInterval(() => { if (fs.existsSync(${JSON.stringify(readyPath)})) { clearInterval(timer); fs.writeSync(1, 'partial-before-fallback'); fs.writeFileSync(${JSON.stringify(emittedPath)}, ''); } }, 10);`,
+      'setInterval(() => {}, 1000);',
+    ].join(' ');
+
+    // Simulate failed Windows taskkill with successful leader-only fallback.
+    const runner = new NodeProcessRunner({
+      failedTreeKillCloseGraceMs: 150,
+      terminateTree: (child, sig) => {
+        return child.kill(sig) ? 'leader_only' : 'failed';
+      },
+    });
+
+    const controller = new AbortController();
+    const run = runner.run(process.execPath, ['-e', leaderScript], undefined, 300, controller.signal);
+    let result;
+    try {
+      await probe.waitConnected();
+      await waitForMarker(emittedPath, run, t.signal, sleep);
+      // Fire the command deadline on the mocked clock, then the 150 ms grace timer.
+      t.mock.timers.tick(300);
+      await sleep(20);
+      t.mock.timers.tick(150);
+      result = await run;
+    } finally {
+      controller.abort();
+      probe.close();
+      t.mock.timers.tick(500);
+      await run.catch(() => undefined);
+      fs.rmSync(probeDir, { recursive: true, force: true });
+    }
+
+    assert.equal(result.exitCode, 124);
+    assert.ok(result.stdout.includes('partial-before-fallback'), result.stdout);
+    assert.match(result.stderr, /Only the leader was signaled/);
+    assert.match(result.stderr, /child stdio did not close within 150ms/i);
+  });
+
+  it('preserves the failed tree-termination diagnostic even when close arrives before the grace timer expires', {
+    timeout: TEST_TIMEOUT_MS,
+  }, async (t) => {
+    const sleep = realSleep();
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+
+    const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fm-close-diag-'));
+    const readyPath = path.join(probeDir, 'ready');
+    const emittedPath = path.join(probeDir, 'emitted');
+    const probe = await createSocketProbe(t.signal);
+    // Worker uses independent stdio so killing only the leader lets `close` fire
+    // immediately (well before the 500 ms grace timer), while the worker stays alive.
+    const workerScript = [
+      "const fs = require('node:fs');",
+      "const net = require('node:net');",
+      `const s = net.createConnection({ host: '127.0.0.1', port: ${probe.port} }, () => fs.writeFileSync(${JSON.stringify(readyPath)}, ''));`,
+      's.once("close", () => process.exit(0));',
+      'setTimeout(() => process.exit(0), 30000);',
+    ].join(' ');
+    const leaderScript = [
+      "const fs = require('node:fs');",
+      "const { spawn } = require('node:child_process');",
+      `spawn(process.execPath, ['-e', ${JSON.stringify(workerScript)}], { stdio: 'ignore' });`,
+      `const timer = setInterval(() => { if (fs.existsSync(${JSON.stringify(readyPath)})) { clearInterval(timer); fs.writeSync(1, 'partial-independent'); fs.writeFileSync(${JSON.stringify(emittedPath)}, ''); } }, 10);`,
+      'setInterval(() => {}, 1000);',
+    ].join(' ');
+
+    const runner = new NodeProcessRunner({
+      failedTreeKillCloseGraceMs: 500,
+      terminateTree: (child, sig) => {
+        return child.kill(sig) ? 'leader_only' : 'failed';
+      },
+    });
+
+    const controller = new AbortController();
+    const run = runner.run(process.execPath, ['-e', leaderScript], undefined, 300, controller.signal);
+    let result;
+    try {
+      await probe.waitConnected();
+      await waitForMarker(emittedPath, run, t.signal, sleep);
+      t.mock.timers.tick(300);
+      // Do NOT advance the grace timer: `close` fires on its own because the worker has ignore stdio.
+      result = await run;
+    } finally {
+      controller.abort();
+      probe.close();
+      t.mock.timers.tick(500);
+      await run.catch(() => undefined);
+      fs.rmSync(probeDir, { recursive: true, force: true });
+    }
+
+    assert.equal(result.exitCode, 124);
+    assert.ok(result.stdout.includes('partial-independent'), result.stdout);
+    assert.match(result.stderr, /Only the leader was signaled; a descendant may still be running/);
+  });
+
+  for (const closeBeforeGrace of [false, true] as const) {
+    it(
+      `records skipped Windows tree kill without claiming SIGKILL when leader exited while descendant holds stdio (${closeBeforeGrace ? 'early close' : 'grace expiry'})`,
+      { timeout: TEST_TIMEOUT_MS },
+      async (t) => {
+        t.mock.timers.enable({ apis: ['setTimeout'] });
+
+        const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fm-win-skip-'));
+        const readyPath = path.join(probeDir, 'ready');
+        const probe = await createSocketProbe(t.signal);
+        const descendantScript = [
+          "const fs = require('node:fs');",
+          "const net = require('node:net');",
+          `const s = net.createConnection({ host: '127.0.0.1', port: ${probe.port} }, () => fs.writeFileSync(${JSON.stringify(readyPath)}, ''));`,
+          's.once("close", () => process.exit(0));',
+          'setTimeout(() => process.exit(0), 30000);',
+        ].join(' ');
+        // The descendant inherits stdout, keeping close pending after the leader exits.
+        const leaderScript = [
+          "const fs = require('node:fs');",
+          "const { spawn } = require('node:child_process');",
+          `spawn(process.execPath, ['-e', ${JSON.stringify(descendantScript)}], { stdio: 'inherit' });`,
+          `const timer = setInterval(() => { if (fs.existsSync(${JSON.stringify(readyPath)})) { clearInterval(timer); fs.writeSync(1, 'leader-done'); process.exit(0); } }, 10);`,
+        ].join(' ');
+
+        let taskkillCalled = false;
+        const runner = new NodeProcessRunner({
+          failedTreeKillCloseGraceMs: 150,
+          terminateTree: (child, sig) =>
+            killProcessTree(child, sig, {
+              platform: 'win32',
+              runTaskkill: () => {
+                taskkillCalled = true;
+                return { status: 0 };
+              },
+            }),
+        });
+
+        const controller = new AbortController();
+        // Node publishes the ChildProcess synchronously on construction. Subscribe
+        // only around this spawn so the test observes the runner's actual exit event.
+        const childChannel = channel('child_process');
+        let leader: ChildProcess | undefined;
+        const onChild = (message: unknown) => { leader = (message as { process: ChildProcess }).process; };
+        childChannel.subscribe(onChild);
+        const run = runner.run(process.execPath, ['-e', leaderScript], undefined, 450, controller.signal);
+        childChannel.unsubscribe(onChild);
+        let result;
+        try {
+          assert.ok(leader);
+          const exited = once(leader, 'exit', { signal: t.signal });
+          await Promise.all([probe.waitConnected(), exited]);
+          t.mock.timers.tick(450);
+          if (closeBeforeGrace) {
+            // Descendant exits on its own before the 150 ms grace window expires.
+            probe.close();
+          } else {
+            t.mock.timers.tick(150);
+          }
+          result = await run;
+        } finally {
+          controller.abort();
+          probe.close();
+          t.mock.timers.tick(500);
+          await run.catch(() => undefined);
+          fs.rmSync(probeDir, { recursive: true, force: true });
+        }
+
+        assert.equal(taskkillCalled, false, 'Windows killProcessTree must not invoke taskkill on an exited leader PID');
+        assert.equal(result.exitCode, 124);
+        assert.ok(result.stdout.includes('leader-done'), result.stdout);
+        assert.doesNotMatch(result.stderr, /SIGKILL/, result.stderr);
+        assert.match(result.stderr, /while waiting for child stdio to close/, result.stderr);
+        assert.match(result.stderr, /Process-tree termination was skipped because the leader process had already exited/, result.stderr);
+        assert.match(result.stderr, /descendant may still be running/, result.stderr);
       }
-      fs.rmSync(markerDir, { recursive: true, force: true });
+    );
+  }
+
+  it('never lets a later timeout overwrite an earlier cancellation while a descendant holds stdout open', {
+    timeout: TEST_TIMEOUT_MS,
+  }, async (t) => {
+    const sleep = realSleep();
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+
+    const probeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fm-cancel-race-'));
+    const readyPath = path.join(probeDir, 'ready');
+    const emittedPath = path.join(probeDir, 'emitted');
+    const probe = await createSocketProbe(t.signal);
+    const descendantScript = [
+      "const fs = require('node:fs');",
+      "const net = require('node:net');",
+      `const s = net.createConnection({ host: '127.0.0.1', port: ${probe.port} }, () => fs.writeFileSync(${JSON.stringify(readyPath)}, ''));`,
+      's.once("close", () => process.exit(0));',
+      'setTimeout(() => process.exit(0), 30000);',
+    ].join(' ');
+    const leaderScript = [
+      "const fs = require('node:fs');",
+      "const { spawn } = require('node:child_process');",
+      `spawn(process.execPath, ['-e', ${JSON.stringify(descendantScript)}], { stdio: 'inherit' });`,
+      `const timer = setInterval(() => { if (fs.existsSync(${JSON.stringify(readyPath)})) { clearInterval(timer); fs.writeSync(1, 'before-cancel'); fs.writeFileSync(${JSON.stringify(emittedPath)}, ''); } }, 10);`,
+      'setInterval(() => {}, 1000);',
+    ].join(' ');
+
+    const runner = new NodeProcessRunner({
+      failedTreeKillCloseGraceMs: 150,
+      terminateTree: (child, sig) => {
+        return child.kill(sig) ? 'leader_only' : 'failed';
+      },
+    });
+    const controller = new AbortController();
+    const run = runner.run(process.execPath, ['-e', leaderScript], undefined, 200, controller.signal);
+    let result;
+    try {
+      await probe.waitConnected();
+      await waitForMarker(emittedPath, run, t.signal, sleep);
+      // Cancel at 140 ms on a 200 ms budget, then advance past both the 200 ms
+      // original command deadline and the 150 ms grace timer.
+      t.mock.timers.tick(140);
+      controller.abort();
+      t.mock.timers.tick(100); // t = 240 ms (past the 200 ms deadline)
+      t.mock.timers.tick(60);  // t = 300 ms (past the 150 ms grace window)
+      result = await run;
+    } finally {
+      probe.close();
+      t.mock.timers.tick(500);
+      await run.catch(() => undefined);
+      fs.rmSync(probeDir, { recursive: true, force: true });
+    }
+
+    assert.equal(result.exitCode, 130);
+    assert.match(result.stderr, /cancelled by the client/i);
+    assert.doesNotMatch(result.stderr, /timed out/i);
+  });
+
+  for (const graceful of [false, true]) {
+    it(`sweeps detached children and preserves ${graceful ? 'one-shot graceful shutdown' : 'default signal termination'}`, {
+      timeout: TEST_TIMEOUT_MS,
+      skip: process.platform === 'win32' && 'POSIX process groups',
+    }, async (t) => {
+      const processTreeUrl = pathToFileURL(path.join(process.cwd(), 'scripts', 'process-tree.mjs')).href;
+      const { spawnOwned, signalTree } = await import(processTreeUrl) as {
+        spawnOwned: (command: string, args: string[], options: SpawnOptions) => ChildProcess;
+        signalTree: (child: ChildProcess, signal: NodeJS.Signals) => void;
+      };
+      const runnerModuleUrl = new URL('../../src/tools/processors/processRunner.js', import.meta.url).href;
+
+      const probe = await createSocketProbe(t.signal);
+      // Independent shutdown paths so interrupting the outer test runner mid-test
+      // (before `finally` runs) never orphans either fixture process:
+      //  - owner watches its stdin pipe and self-terminates with SIGTERM on EOF
+      //    (triggering NodeProcessRunner's signal sweep);
+      //  - child also exits if the test's probe socket server disconnects.
+      // Neither path fires while the test worker stays alive during the assertion.
+      const childScript = [
+        "const net = require('node:net');",
+        `const s = net.createConnection({ host: '127.0.0.1', port: ${probe.port} });`,
+        's.once("close", () => process.exit(0));',
+        'setTimeout(() => process.exit(0), 30000);',
+      ].join(' ');
+      const ownerScript = [
+        graceful ? "process.once('SIGTERM', () => process.stdin.once('data', () => process.exit(42)));" : '',
+        "process.stdin.resume(); process.stdin.once('end', () => process.kill(process.pid, 'SIGTERM'));",
+        'setTimeout(() => process.exit(0), 30000).unref();',
+        `const { NodeProcessRunner } = await import(${JSON.stringify(runnerModuleUrl)});`,
+        `await new NodeProcessRunner().run(process.execPath, ['-e', ${JSON.stringify(childScript)}], undefined, 600_000);`,
+      ].join(' ');
+
+      const owner = spawnOwned(process.execPath, ['--input-type=module', '-e', ownerScript], {
+        cwd: process.cwd(),
+        stdio: ['pipe', 'ignore', 'ignore'],
+        env: { ...process.env, FLUENT_MCP_LOG_LEVEL: 'error' },
+      });
+      const ownerExit = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve) => {
+        owner.once('exit', (code, signal) => resolve({ code, signal }));
+      });
+
+      try {
+        await probe.waitConnected();
+        signalTree(owner, 'SIGTERM');
+        await probe.waitClosed();
+        if (graceful) owner.stdin?.write('finish shutdown');
+        assert.deepEqual(await ownerExit, graceful ? { code: 42, signal: null } : { code: null, signal: 'SIGTERM' });
+      } finally {
+        owner.stdin?.end();
+        signalTree(owner, 'SIGKILL');
+        probe.close();
+      }
+    });
+  }
+
+  it('detaches signal handlers once no children are active', {
+    timeout: TEST_TIMEOUT_MS,
+    skip: process.platform === 'win32' && 'POSIX signals',
+  }, async () => {
+    const before = {
+      SIGINT: process.listenerCount('SIGINT'),
+      SIGTERM: process.listenerCount('SIGTERM'),
+      SIGHUP: process.listenerCount('SIGHUP'),
+    };
+    const runner = new NodeProcessRunner();
+    const result = await runner.run(process.execPath, ['-e', "process.stdout.write('ok')"]);
+    assert.equal(result.exitCode, 0);
+    assert.deepEqual({
+      SIGINT: process.listenerCount('SIGINT'),
+      SIGTERM: process.listenerCount('SIGTERM'),
+      SIGHUP: process.listenerCount('SIGHUP'),
+    }, before);
+  });
+});
+
+describe('Windows taskkill resolution and fallback', () => {
+  it('resolves taskkill.exe from SystemRoot/System32, falling back to windir or C:\\Windows', () => {
+    assert.equal(resolveWindowsTaskkillPath({ SystemRoot: 'D:\\WinNT' }), 'D:\\WinNT\\System32\\taskkill.exe');
+    assert.equal(resolveWindowsTaskkillPath({ windir: 'E:\\Windows' }), 'E:\\Windows\\System32\\taskkill.exe');
+    assert.equal(resolveWindowsTaskkillPath({}), 'C:\\Windows\\System32\\taskkill.exe');
+    // A relative SystemRoot must never resolve into cwd.
+    assert.equal(resolveWindowsTaskkillPath({ SystemRoot: '.\\evil' }), 'C:\\Windows\\System32\\taskkill.exe');
+  });
+
+  it('invokes absolute taskkill.exe with a timeout and falls back to child.kill on error or non-zero exit', () => {
+    const calls: Array<{ command: string; args: string[]; options: { stdio: 'ignore'; windowsHide: true; timeout: number } }> = [];
+    let fallbackCount = 0;
+
+    const succeeded = killWindowsProcessTree(
+      4242,
+      () => { fallbackCount += 1; return true; },
+      (command, args, options) => {
+        calls.push({ command, args, options });
+        return { status: 0 };
+      },
+      { SystemRoot: 'C:\\Windows' }
+    );
+    assert.equal(succeeded, 'terminated');
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].command, 'C:\\Windows\\System32\\taskkill.exe');
+    assert.deepEqual(calls[0].args, ['/pid', '4242', '/T', '/F']);
+    assert.equal(calls[0].options.windowsHide, true);
+    assert.ok(calls[0].options.timeout > 0);
+    assert.equal(fallbackCount, 0);
+
+    for (const outcome of [
+      { status: 1 },
+      { status: null },
+      { error: new Error('ETIMEDOUT'), status: null },
+    ]) {
+      let called = false;
+      const ok = killWindowsProcessTree(4242, () => { called = true; return true; }, () => outcome, { SystemRoot: 'C:\\Windows' });
+      assert.equal(ok, 'leader_only', JSON.stringify(outcome));
+      assert.equal(called, true, JSON.stringify(outcome));
+    }
+
+    // A refused signal or exception cannot be reported as a successful leader kill.
+    for (const fallback of [() => false, () => { throw new Error('ESRCH'); }]) {
+      assert.equal(killWindowsProcessTree(4242, fallback, () => ({ status: 128 })), 'failed');
+    }
+  });
+
+  for (const platform of ['darwin', 'win32'] as const) {
+    it(`reports an unsuccessful ${platform} kill in the runner result`, { timeout: TEST_TIMEOUT_MS }, async (t) => {
+      const controller = new AbortController();
+      const runner = new NodeProcessRunner({
+        terminateTree: (child, sig) => killProcessTree(child, sig, { platform, runTaskkill: () => ({ status: 1 }) }),
+      });
+      // Keep the real child short-lived, but simulate the OS kill outcomes.
+      t.mock.method(process, 'kill', () => { throw Object.assign(new Error(), { code: 'ESRCH' }); });
+      t.mock.method(ChildProcess.prototype, 'kill', () => false);
+      const run = runner.run(process.execPath, ['-e', ''], undefined, undefined, controller.signal);
+      controller.abort();
+      const result = await run;
+      assert.equal(result.exitCode, 130);
+      assert.match(result.stderr, platform === 'darwin' ? /process group had already exited/i : /termination failed/i);
+      assert.doesNotMatch(result.stderr, /SIGKILL|was terminated|was signaled/);
+    });
+  }
+
+  it('returns skipped_leader_exited on win32 without invoking taskkill when the leader already exited', () => {
+    let called = false;
+    const exitedChild = { pid: 4242, exitCode: 0, signalCode: null, kill: () => { called = true; return true; } } as unknown as ChildProcess;
+    const outcome = killProcessTree(exitedChild, 'SIGKILL', {
+      platform: 'win32',
+      runTaskkill: () => {
+        called = true;
+        return { status: 0 };
+      },
+    });
+    assert.equal(outcome, 'skipped_leader_exited');
+    assert.equal(called, false);
+  });
+});
+
+describe('NodeProcessRunner — relative SN_SDK_CREDENTIALS_DIR normalization', () => {
+  it('passes the same resolved absolute SN_SDK_CREDENTIALS_DIR to children across different working directories', {
+    timeout: TEST_TIMEOUT_MS,
+  }, async () => {
+    const dirA = fs.mkdtempSync(path.join(os.tmpdir(), 'fm-cwd-a-'));
+    const dirB = fs.mkdtempSync(path.join(os.tmpdir(), 'fm-cwd-b-'));
+    const relativeCredDir = path.join('..', 'shared-creds-store');
+    const expectedAbs = path.resolve(process.cwd(), relativeCredDir);
+    const restoreEnv = withEnvironment({ SN_SDK_CREDENTIALS_DIR: relativeCredDir });
+
+    try {
+      const runner = new NodeProcessRunner();
+      const [resA, resB] = await Promise.all([
+        runner.run(process.execPath, ['-e', 'process.stdout.write(process.env.SN_SDK_CREDENTIALS_DIR || "")'], dirA),
+        runner.run(process.execPath, ['-e', 'process.stdout.write(process.env.SN_SDK_CREDENTIALS_DIR || "")'], dirB),
+      ]);
+      assert.equal(resA.exitCode, 0);
+      assert.equal(resB.exitCode, 0);
+      assert.equal(resA.stdout, expectedAbs);
+      assert.equal(resB.stdout, expectedAbs);
+    } finally {
+      restoreEnv();
+      fs.rmSync(dirA, { recursive: true, force: true });
+      fs.rmSync(dirB, { recursive: true, force: true });
     }
   });
 });
@@ -278,7 +850,7 @@ describe('NodeProcessRunner — client cancellation kills the child (P0.3)', () 
 describe('NodeProcessRunner — external signal termination never reports success', {
   skip: process.platform === 'win32' && 'POSIX signals',
 }, () => {
-  it('reports a non-zero exit code and signal note when the child dies to an external signal', { timeout: TEST_TIMEOUT_MS }, async () => {
+  it('reports a non-zero exit code, terminatedBySignal, and signal note when the child dies to an external signal', { timeout: TEST_TIMEOUT_MS }, async () => {
     const runner = new NodeProcessRunner();
     const result = await runner.run(
       process.execPath,
@@ -286,11 +858,12 @@ describe('NodeProcessRunner — external signal termination never reports succes
     );
 
     assert.equal(result.exitCode, 143); // 128 + SIGTERM (15)
+    assert.equal(result.terminatedBySignal, 'SIGTERM');
     assert.ok(result.stdout.includes('before-signal'));
     assert.match(result.stderr, /terminated by signal SIGTERM/i);
   });
 
-  it('CLIExecutor marks a signal-terminated child as failed', { timeout: TEST_TIMEOUT_MS }, async () => {
+  it('CLIExecutor marks a signal-terminated child as failed and carries terminatedBySignal', { timeout: TEST_TIMEOUT_MS }, async () => {
     const result = await new CLIExecutor(new NodeProcessRunner()).process(
       process.execPath,
       ['-e', "process.kill(process.pid, 'SIGTERM');"]
@@ -298,6 +871,7 @@ describe('NodeProcessRunner — external signal termination never reports succes
 
     assert.equal(result.success, false);
     assert.equal(result.exitCode, 143);
+    assert.equal(result.terminatedBySignal, 'SIGTERM');
     assert.match(result.error?.message ?? '', /terminated by signal SIGTERM/i);
   });
 });

@@ -146,6 +146,10 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
    * ways to provide one.
    */
   protected missingAuthResult(): CommandResult {
+    const validation = SessionManager.getInstance().getAuthValidationResult();
+    if (validation?.status === 'validation_error' || validation?.status === 'not_authenticated') {
+      return CommandResultFactory.error([validation.message, validation.actionRequired].filter(Boolean).join('\n\n'));
+    }
     return CommandResultFactory.error(
       `${this.name} requires authentication to a ServiceNow instance, but no credential alias was found. ` +
       "Pass 'auth' with a stored profile alias, or set SN_INSTANCE_URL so lazy validation can load a matching profile into the session. " +

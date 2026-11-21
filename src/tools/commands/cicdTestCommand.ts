@@ -293,7 +293,8 @@ export class CicdTestCommand extends SessionAwareCLICommand {
   }
 
   protected resolveTimeoutMs(args: Record<string, unknown>): number {
-    return runnerTimeoutForWaitMs(this.timeoutMs, args.pollTimeout);
+    // With wait: false the SDK returns after dispatch / a single snapshot and ignores pollTimeout.
+    return args.wait === false ? this.timeoutMs : runnerTimeoutForWaitMs(this.timeoutMs, args.pollTimeout);
   }
 
   async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {

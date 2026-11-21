@@ -37,10 +37,11 @@ export function shellSplit(text: string, shell: Shell = SH): string[] {
   return run.stdout.split('\0').slice(0, -1);
 }
 
-/** What a Node process started by command text saw: its cwd and its argv after the executable. */
+/** What a Node process started by command text saw: its cwd, argv, and credential dir env. */
 export interface NodeLaunch {
   cwd: string;
   argv: string[];
+  credDir?: string;
 }
 
 let probe: string | undefined;
@@ -51,16 +52,23 @@ let probe: string | undefined;
  * (`NODE_OPTIONS=--import`) prints both and exits before the script runs, so
  * the SDK itself never starts.
  */
-export function launchNodeCommandText(text: string, shell: Shell = SH): NodeLaunch {
+export function launchNodeCommandText(
+  text: string,
+  shell: Shell = SH,
+  extraEnv?: Record<string, string | undefined>
+): NodeLaunch {
   if (!probe) {
     const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fluent-node-probe-')));
     process.once('exit', () => fs.rmSync(dir, { recursive: true, force: true }));
     probe = path.join(dir, 'probe.mjs');
-    fs.writeFileSync(probe, 'process.stdout.write(JSON.stringify({ cwd: process.cwd(), argv: process.argv.slice(1) }));\nprocess.exit(0);\n');
+    fs.writeFileSync(
+      probe,
+      'process.stdout.write(JSON.stringify({ cwd: process.cwd(), argv: process.argv.slice(1), ...(process.env.SN_SDK_CREDENTIALS_DIR !== undefined ? { credDir: process.env.SN_SDK_CREDENTIALS_DIR } : {}) }));\nprocess.exit(0);\n'
+    );
   }
   const run = spawnSync(shell.command, [...shell.flags, '-c', `${shell.setup}${text}`], {
     encoding: 'utf-8',
-    env: { ...process.env, NODE_OPTIONS: `--import=${pathToFileURL(probe).href}` },
+    env: { ...process.env, ...extraEnv, NODE_OPTIONS: `--import=${pathToFileURL(probe).href}` },
   });
   assert.equal(run.status, 0, `${shell.name}: ${run.stderr}`);
   return JSON.parse(run.stdout) as NodeLaunch;

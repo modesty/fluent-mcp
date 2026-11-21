@@ -53,6 +53,8 @@ export interface CommandResult {
   structuredContent?: { [key: string]: unknown };
   /** True when the runner cut the middle out of `output` for exceeding its capture cap. */
   outputTruncated?: boolean;
+  /** Signal name (or `'unknown'`) when the child was killed by an external signal rather than exiting normally. */
+  terminatedBySignal?: string;
 }
 
 /**
@@ -82,6 +84,8 @@ export interface ProcessResult {
   exitCode: number;
   /** True when stdout exceeded its capture cap and its middle was dropped. */
   stdoutTruncated?: boolean;
+  /** Signal name (or `'unknown'`) when the child was terminated by an external signal. */
+  terminatedBySignal?: string;
 }
 
 /** Per-call process options. */

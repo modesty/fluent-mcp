@@ -37,9 +37,11 @@ function assertValidRange(range: string): void {
  * `topic` is optional — required only when `list` is not true.
  *
  * SDK v4.14.2: a topic with no exact match falls back to a ranked fuzzy search
- * over doc names, tags and bodies (5 results by default), and `--list <topic>`
- * ranks its weaker matches the same way (up to 25). `range` selects which
- * ranked results are shown; it has no effect on an exact match.
+ * over doc names, tags and bodies (5 results by default). `range` selects which
+ * ranked results are shown; it has no effect on an exact match. `--list <topic>`
+ * applies `limit: to` before removing strong matches in SDK v4.14.2 and then
+ * slices the remainder, which drops topics across adjacent pages — so `range`
+ * is disallowed with `list: true`.
  */
 export class ExplainCommand extends BaseCLICommand {
   name = 'explain_fluent_api';
@@ -81,7 +83,7 @@ export class ExplainCommand extends BaseCLICommand {
         regex: RANGE_PATTERN,
         expected: '"<n>" for the first n ranked results, or "<from>-<to>" (e.g. "7" or "3-7")',
       },
-      description: 'Ranked results to show when the topic has no exact match, or among the closer matches of list=true with a topic (SDK v4.14.2+): "7" for the first 7, "3-7" for results 3 through 7. Defaults to the first 5 (25 with list=true). Requires topic; ignored on an exact match.',
+      description: 'Ranked results to show only when a non-list topic lookup has no exact match and returns numbered "closest topics by relevance" results (SDK v4.14.2+): "7" for the first 7, "3-7" for results 3 through 7. Defaults to the first 5. Requires topic, cannot be combined with list=true, and is ignored when the topic matches one or more topics directly.',
     },
     DEBUG_ARGUMENT,
   ];
@@ -102,6 +104,15 @@ export class ExplainCommand extends BaseCLICommand {
     // Without a topic there is nothing to rank, and the CLI silently ignores --range.
     if (typeof args.range === 'string' && !args.topic) {
       return CommandResultFactory.error("Argument 'range' requires a topic: it pages through the ranked matches for that topic.");
+    }
+    // SDK v4.14.2 limits fuzzy search hits BEFORE removing strong matches in `--list <topic>`
+    // mode and then slices the remainder, so adjacent pages silently drop topics. Disallow
+    // combining `range` with `list=true` until the SDK fixes list-mode pagination.
+    if (typeof args.range === 'string' && args.list) {
+      return CommandResultFactory.error(
+        "Argument 'range' cannot be used with list=true: the bundled SDK's list mode does not paginate ranked matches cleanly. " +
+        'Omit range to get a filtered topic list (up to 25 closest topics), and use range only without list when a topic lookup returns numbered "closest topics by relevance" results.'
+      );
     }
 
     const positionals = args.topic ? [assertNotOption(String(args.topic), 'topic')] : [];

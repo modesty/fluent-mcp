@@ -4,7 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { CommandArgument, CommandResult, CommandResultFactory, MAX_TIMER_DELAY_MS, isRunnerStoppedExit } from '../../utils/types.js';
 import { ENVELOPE_RUN_OPTIONS, shapeEnvelopeResult } from '../../utils/jsonSelect.js';
-import { parseCliEnvelope } from '../../utils/cliEnvelope.js';
+import { parseCliEnvelope, type CliEnvelope } from '../../utils/cliEnvelope.js';
+import { isCredentialStoreFailure } from '../../utils/credentialStore.js';
 import { AUTH_ARGUMENT, SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 import { cliOption } from './cliArgv.js';
 import { SELECT_PATH_DOMAIN } from './argValidation.js';
@@ -51,13 +52,17 @@ interface ScriptFile {
 }
 
 /**
- * True when `output` is the result envelope of a script that ran and reported
- * errors (`ok: false` with an `errors` array). A run that never started (unknown
- * scope, auth, connection) fails with an `error` envelope instead.
+ * Scope and credential lookup precede the script POST. A status or network
+ * error cannot establish non-execution: the SDK follows HTTP redirects, so the
+ * failure can come from the next hop after the instance received the POST.
  */
-function isScriptErrorEnvelope(output: string): boolean {
-  const envelope = parseCliEnvelope(output);
-  return envelope?.ok === false && Array.isArray(envelope.errors);
+function failedBeforeDispatch(envelope: CliEnvelope | undefined): boolean {
+  const message = envelope?.error?.message;
+  if (envelope?.ok !== false || typeof message !== 'string') return false;
+  return message.startsWith('Could not look up scope ') ||
+    message.startsWith('No application found with scope ') ||
+    message.startsWith('Could not find stored credentials for alias: ') ||
+    isCredentialStoreFailure(message);
 }
 
 /**
@@ -74,10 +79,11 @@ function isScriptErrorEnvelope(output: string): boolean {
  *   symlinks) inside the Fluent project directory — never an arbitrary local
  *   path, which would upload any readable file to the instance — and never on
  *   stdin. A file is copied to a private temp file that the CLI reads, so the
- *   content and SHA-256 echoed in the result are exactly what ran;
+ *   result identifies the exact source supplied even if execution is uncertain;
  * - recording for rollback stays on (the CLI default) and cannot be disabled;
  * - output is always the JSON envelope, and `select` is applied by the tool to a
- *   successful run only, so a failure always shows whether the script ran.
+ *   successful run only, so a failed run keeps the full failure envelope (and
+ *   any unconfirmed outcome carries a no-retry history warning).
  *
  * The CLI's `--timeout` only stops the client from waiting: the script keeps
  * running on the instance, so a timed-out or cancelled run is reported as
@@ -86,7 +92,7 @@ function isScriptErrorEnvelope(output: string): boolean {
  */
 export class ExecScriptCommand extends SessionAwareCLICommand {
   name = 'fluent_exec_script';
-  description = 'Run a server-side JavaScript script on the authenticated ServiceNow instance, like the Scripts - Background page (SDK v4.14.0+ `now-sdk exec`). The script runs with the authenticated user\'s full permissions and needs the admin role. BEFORE EVERY CALL: show the user the full script, the target instance, the scope, and the reason, and get their explicit approval for that run; approval of one script never covers another. With file, show the file\'s full CONTENT, not just its path, and do not edit the file between approval and the call; the result echoes the content and SHA-256 that actually ran. Prefer query_fluent_records for reads and the app\'s own metadata for anything that should ship with the app. The run is recorded in Script Execution History with a rollback context, but rollback only reverts record changes; emails, REST calls, events and scheduled jobs it triggers cannot be undone. A timeout or cancellation does NOT stop the script on the instance; never retry automatically, or a second copy runs. ok: false with an errors array means the script RAN and threw, possibly after changing records, so a retry runs it again; ok: false with error.message means it never ran (for example an unknown scope). Returns a JSON envelope with ok, output, errors, scope, executionHistoryId, and rollbackContextId (absent when no records changed or the history record is unreadable). Requires instance authentication (auto-injected from session, or pass auth explicitly).';
+  description = 'Run a server-side JavaScript script on the authenticated ServiceNow instance, like the Scripts - Background page (SDK v4.14.0+ `now-sdk exec`). The script runs with the authenticated user\'s full permissions and needs the admin role. BEFORE EVERY CALL: show the user the full script, the target instance, the scope, and the reason, and get their explicit approval for that run; approval of one script never covers another. With file, show the file\'s full CONTENT, not just its path, and do not edit the file between approval and the call; the result echoes the supplied content and its SHA-256. Prefer query_fluent_records for reads and the app\'s own metadata for anything that should ship with the app. The run is recorded in Script Execution History with a rollback context, but rollback only reverts record changes; emails, REST calls, events and scheduled jobs it triggers cannot be undone. A timeout or cancellation does NOT stop the script on the instance; never retry automatically, or a second copy runs. ok: false with an errors array means the script RAN and threw, possibly after changing records, so a retry runs it again. ok: false with error.message can indicate a rejected request or an unknown outcome. A lost, empty or unexpected response can follow execution. If execution is uncertain, never retry automatically and check Script Execution History (sys_script_execution_history) on the instance first. Returns a JSON envelope with ok, output, errors, scope, executionHistoryId, and rollbackContextId (absent when no records changed or the history record is unreadable). Requires instance authentication (auto-injected from session, or pass auth explicitly).';
   annotations = { destructiveHint: true, idempotentHint: false, openWorldHint: true };
   timeoutMs = CLI_DEFAULT_TIMEOUT_MS + CLI_REPORT_HEADROOM_MS;
   // With an explicit --scope the CLI reads nothing from its cwd (`workingDirectory`
@@ -141,7 +147,7 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
       type: 'string',
       required: false,
       domain: SELECT_PATH_DOMAIN,
-      description: 'Dot/bracket path to extract from the envelope (e.g. "output[0]" or "executionHistoryId"). An unresolved path yields null rather than an error. Applied by this tool to a successful (ok: true) run only; a failed run returns the full envelope, so it always shows whether the script ran.',
+      description: 'Dot/bracket path to extract from the envelope (e.g. "output[0]" or "executionHistoryId"). An unresolved path yields null rather than an error. Applied by this tool to a successful (ok: true) run only; a failed run returns the full envelope. An ok: false result with an errors array identifies a script that ran and threw. If the result leaves execution uncertain, check Script Execution History before retrying.',
     },
     AUTH_ARGUMENT,
     DEBUG_ARGUMENT,
@@ -306,8 +312,7 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
     scriptFile: ScriptFile | undefined,
     signal?: AbortSignal
   ): Promise<CommandResult> {
-    // Capture stdout whole so `isScriptErrorEnvelope` inspects the full envelope
-    // even for a chatty script; bound and select only afterwards.
+    // Classify the full SDK response before selection or output bounding.
     const captured = await this.executeSdkCommand(
       'exec',
       args,
@@ -327,26 +332,40 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
       }
     );
 
+    const envelope = captured.outputTruncated ? undefined : parseCliEnvelope(captured.output);
+    const scriptReportedErrors = envelope?.ok === false && Array.isArray(envelope.errors);
+    const confirmedRun = envelope?.ok === true || scriptReportedErrors;
     const result = shapeEnvelopeResult(captured, args.select);
 
     let output = result.output;
-    if (isRunnerStoppedExit(captured.exitCode)) {
-      output +=
-        '\n\nThe script may still be running on the instance: stopping this tool does not cancel it. ' +
-        'Do not retry automatically; check its Script Execution History record (sys_script_execution_history) on the instance first.';
-    } else if (!captured.success && isScriptErrorEnvelope(captured.output)) {
-      output +=
-        '\n\nThe script ran on the instance and reported errors; record changes it made before failing are kept unless rolled back ' +
-        'from its Script Execution History record. Do not retry automatically: a retry runs the script again.';
-    } else if (!captured.success && captured.outputTruncated) {
-      output +=
-        '\n\nThe output was too large to read in full, so whether the script ran could not be confirmed; a run that never ' +
-        'started prints only a short message, so it most likely ran. Do not retry automatically; check its Script Execution ' +
-        'History record (sys_script_execution_history) on the instance first.';
+    const appendNote = (note: string) => {
+      output = output ? `${output}\n\n${note}` : note;
+    };
+    if (isRunnerStoppedExit(captured.exitCode) || captured.terminatedBySignal) {
+      appendNote(
+        'The script may still be running on the instance: stopping this tool does not cancel it. ' +
+        'Do not retry automatically; check its Script Execution History record (sys_script_execution_history) on the instance first.'
+      );
+    } else if (scriptReportedErrors) {
+      appendNote(
+        'The script ran on the instance and reported errors; record changes it made before failing are kept unless rolled back ' +
+        'from its Script Execution History record. Do not retry automatically: a retry runs the script again.'
+      );
+    } else if (captured.outputTruncated) {
+      appendNote(
+        'The SDK output was truncated, so whether the script ran could not be confirmed. ' +
+        'Do not retry automatically. Check Script Execution History (sys_script_execution_history) on the instance first.'
+      );
+    } else if (!confirmedRun && !failedBeforeDispatch(envelope)) {
+      appendNote(
+        'The SDK returned no confirmed execution result, so whether the script ran on the instance is unknown. ' +
+        'Do not retry automatically. Check Script Execution History (sys_script_execution_history) on the instance first.'
+      );
     }
     if (scriptFile) {
+      const label = confirmedRun ? 'Script run from file' : 'Script supplied from file';
       output +=
-        `\n\nScript run from file ${scriptFile.relativePath} ` +
+        `\n\n${label} ${scriptFile.relativePath} ` +
         `(sha256 ${scriptFile.sha256}, ${Buffer.byteLength(scriptFile.content, 'utf-8')} bytes):\n` +
         `\`\`\`javascript\n${scriptFile.content}${scriptFile.content.endsWith('\n') ? '' : '\n'}\`\`\``;
     }

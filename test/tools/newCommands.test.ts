@@ -434,6 +434,18 @@ describe('New SDK Commands', () => {
       assertNotCalled(mockProcessor.process);
     });
 
+    it('should refuse range combined with list=true (SDK v4.14.2 list mode drops items across pages)', async () => {
+      const command = new ExplainCommand(mockProcessor);
+
+      const result = await command.execute({ list: true, topic: 'flow', range: '1-3' });
+
+      assert.equal(result.success, false);
+      assert.match(result.output, /'range' cannot be used with list=true/);
+      assert.match(result.output, /Omit range to get a filtered topic list/);
+      assert.match(result.output, /numbered "closest topics by relevance" results/);
+      assertNotCalled(mockProcessor.process);
+    });
+
     it('should reject invalid format value', async () => {
       const command = new ExplainCommand(mockProcessor);
 

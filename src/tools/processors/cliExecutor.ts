@@ -1,6 +1,7 @@
 import { CommandProcessor, CommandResult, CommandResultFactory, ProcessRunOptions, ProcessRunner } from '../../utils/types.js';
 import logger from '../../utils/logger.js';
 import { cliErrorMessage } from '../../utils/cliError.js';
+import { recoverCredentialStoreFailure } from '../../utils/credentialStore.js';
 
 /**
  * Executes CLI commands via a ProcessRunner and returns results
@@ -29,13 +30,21 @@ export class CLIExecutor implements CommandProcessor {
       // The SDK CLI reports failures on stdout (logger lines, or a machine-mode
       // {"ok":false,"error":{...}} envelope), not stderr — recover the real message.
       // Successful runs never carry an Error (stderr warnings are non-fatal).
-      const message = success ? undefined : cliErrorMessage(result.stdout, result.stderr, result.exitCode);
+      // On failure, strip destructive SDK credential-store reset advice from both
+      // the returned output and extracted error, and attach safe recovery steps.
+      const { output, message } = success
+        ? { output: result.stdout, message: undefined }
+        : recoverCredentialStoreFailure(
+          result.stdout, cliErrorMessage(result.stdout, result.stderr, result.exitCode, result.terminatedBySignal), result.stdoutTruncated
+        );
+
       return {
         success,
-        output: result.stdout,
+        output,
         error: message ? new Error(message) : undefined,
         exitCode: result.exitCode,
         ...(result.stdoutTruncated ? { outputTruncated: true } : {}),
+        ...(result.terminatedBySignal ? { terminatedBySignal: result.terminatedBySignal } : {}),
       };
     } catch (error) {
       return CommandResultFactory.fromError(error);

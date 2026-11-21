@@ -86,7 +86,7 @@ describe('ExecScriptCommand', () => {
     }
   });
 
-  it('carries the exec guide\'s approval and no-retry rules in its description', () => {
+  it('carries the exec guide\'s approval and no-retry rules in its description and select schema', () => {
     const command = new ExecScriptCommand(mockProcessor);
     assert.match(command.description, /show the user the full script/);
     assert.match(command.description, /explicit approval for that run/);
@@ -94,6 +94,14 @@ describe('ExecScriptCommand', () => {
     assert.match(command.description, /rollback only reverts record changes/);
     assert.match(command.description, /query_fluent_records/);
     assert.match(command.description, /show the file's full CONTENT, not just its path/);
+    assert.match(command.description, /lost, empty or unexpected response can follow execution/);
+    assert.match(command.description, /check Script Execution History \(sys_script_execution_history\) on the instance first/);
+
+    const selectArg = command.arguments.find((a) => a.name === 'select');
+    assert.ok(selectArg);
+    assert.doesNotMatch(selectArg.description, /always shows whether the script ran/);
+    assert.match(selectArg.description, /result leaves execution uncertain/);
+    assert.match(selectArg.description, /check Script Execution History before retrying/);
   });
 
   it('passes the multi-line script as ONE positional argv entry, with JSON output, in the neutral cwd', async () => {
@@ -176,15 +184,21 @@ describe('ExecScriptCommand', () => {
     assert.equal(mockProcessor.process.mock.calls[0].arguments[3], 360_000);
   });
 
-  it('reports a runner-stopped run as possibly still running on the instance', async () => {
-    for (const exitCode of [124, 130]) {
-      mockProcessor = createProcessor({ success: false, output: 'partial output', exitCode });
+  it('reports a runner-stopped or externally signal-terminated run as possibly still running on the instance', async () => {
+    for (const stopped of [
+      { exitCode: 124 },
+      { exitCode: 130 },
+      { exitCode: 143, terminatedBySignal: 'SIGTERM' },
+      { exitCode: 137, terminatedBySignal: 'SIGKILL' },
+    ]) {
+      mockProcessor = createProcessor({ success: false, output: 'partial output', ...stopped });
       const command = new ExecScriptCommand(mockProcessor);
       const result = await command.execute({ ...BASE_ARGS });
-      assert.equal(result.exitCode, exitCode);
+      assert.equal(result.exitCode, stopped.exitCode);
       assert.match(result.output, /^partial output/);
       assert.match(result.output, /may still be running on the instance/);
       assert.match(result.output, /Do not retry automatically/);
+      assert.match(result.output, /sys_script_execution_history/);
     }
   });
 
@@ -197,11 +211,57 @@ describe('ExecScriptCommand', () => {
     assert.equal(result.output, '"42"');
   });
 
-  it('returns the full envelope of a run that never started, even with select', async () => {
-    const output = '{"ok":false,"error":{"message":"No application found with scope \'x_nope\' on the instance"}}';
-    mockProcessor = createProcessor({ success: false, output, exitCode: 1 });
-    const result = await new ExecScriptCommand(mockProcessor).execute({ ...BASE_ARGS, select: 'output[0]' });
-    assert.equal(result.output, output);
+  it('returns the full envelope of a run that provably never started, without indeterminate transport warnings', async () => {
+    const preDispatchFailures = [
+      '{"ok":false,"error":{"message":"No application found with scope \'x_nope\' on the instance"}}',
+      '{"ok":false,"error":{"message":"Could not look up scope \'x_acme_app\' on the instance: fetch failed"}}',
+      '{"ok":false,"error":{"message":"Stored credentials at sample could not be read."}}',
+    ];
+    for (const output of preDispatchFailures) {
+      mockProcessor = createProcessor({ success: false, output, exitCode: 1 });
+      const result = await new ExecScriptCommand(mockProcessor).execute({ ...BASE_ARGS, select: 'output[0]' });
+      assert.equal(result.output, output);
+    }
+  });
+
+  it('preserves the SDK error and warns for every unconfirmed outcome after possible dispatch', async () => {
+    for (const error of [
+      { message: 'Could not connect to https://dev.service-now.com: other side closed' },
+      // fetch follows redirects: these can describe the next hop after the script POST.
+      { message: 'Could not connect to https://dev.service-now.com: getaddrinfo ENOTFOUND next.invalid' },
+      { message: 'Could not connect to https://dev.service-now.com: connect ECONNREFUSED 127.0.0.1:9999' },
+      { message: 'Script execution request failed: 403 Forbidden. Running scripts needs the admin role', status: 403 },
+      { message: 'terminated' },
+      { message: 'Stopped waiting for the script after 300000ms. It is still running on the instance.' },
+      { message: 'Script execution request failed: 504 Gateway Timeout', status: 504 },
+      { message: 'Script execution request failed: 500 Internal Server Error', status: 500 },
+      { message: 'The instance returned an empty response. The session is not authenticated - re-run now-sdk auth.' },
+      { message: 'The instance did not return a script execution response: <html>Maintenance</html>' },
+      { message: 'The instance did not return a script execution response: Stored credentials at sample could not be read.' },
+      { message: 'An unrecognized SDK failure' },
+    ]) {
+      const output = JSON.stringify({ ok: false, error });
+      mockProcessor = createProcessor({ success: false, output, error: new Error(error.message), exitCode: 1 });
+      const result = await new ExecScriptCommand(mockProcessor).execute({ ...BASE_ARGS, select: 'output[0]' });
+      assert.equal(result.success, false, error.message);
+      assert.equal(result.error?.message, error.message);
+      assert.ok(result.output.startsWith(output), result.output);
+      assert.match(result.output, /Do not retry automatically/, error.message);
+      assert.match(result.output, /sys_script_execution_history/, error.message);
+    }
+  });
+
+  it('warns when the child produces no envelope, including Windows numeric termination without a signal', async () => {
+    for (const failure of [
+      { exitCode: 1, error: new Error('socket hang up') },
+      { exitCode: 0xc000013a }, // STATUS_CONTROL_C_EXIT
+    ]) {
+      mockProcessor = createProcessor({ success: false, output: '', ...failure });
+      const result = await new ExecScriptCommand(mockProcessor).execute({ ...BASE_ARGS });
+      assert.equal(result.exitCode, failure.exitCode);
+      assert.match(result.output, /Do not retry automatically/);
+      assert.match(result.output, /sys_script_execution_history/);
+    }
   });
 
   it('flags a script that ran and threw as not safe to retry, even with select', async () => {
@@ -233,7 +293,7 @@ describe('ExecScriptCommand', () => {
     assert.ok(result.output.length < DEFAULT_MAX_OUTPUT_CHARS + 1_000, String(result.output.length));
   });
 
-  it('treats a failed run whose output was still cut as most likely run', async () => {
+  it('warns when truncation prevents confirmation of the result', async () => {
     mockProcessor = createProcessor({ success: false, output: '{"ok":false,"output":["a",\n\n... [9 characters truncated] ...\n\n]}', exitCode: 1, outputTruncated: true });
     const result = await new ExecScriptCommand(mockProcessor).execute({ ...BASE_ARGS, select: 'output[0]' });
     assert.match(result.output, /whether the script ran could not be confirmed/);
@@ -372,8 +432,20 @@ describe('ExecScriptCommand', () => {
       const command = new ExecScriptCommand(mockProcessor);
       const result = await command.execute({ ...FILE_ARGS, file: 'scripts/backfill.js' });
       assert.match(result.output, /may still be running on the instance/);
-      assert.ok(result.output.includes('Script run from file'));
+      assert.match(result.output, /Script supplied from file/);
+      assert.doesNotMatch(result.output, /Script run from file/);
       assert.equal(fs.existsSync(copyPath), false);
+    });
+
+    it('labels the file as supplied when a missing SDK alias prevents dispatch', async () => {
+      const error = { message: 'Could not find stored credentials for alias: missing, Please check the alias provided' };
+      mockProcessor = createProcessor({ success: false, output: JSON.stringify({ ok: false, error }), exitCode: 1 });
+      const command = new ExecScriptCommand(mockProcessor);
+      const result = await command.execute({ ...FILE_ARGS, file: 'scripts/backfill.js', auth: 'missing' });
+      assert.equal(result.success, false);
+      assert.match(result.output, /Script supplied from file/);
+      assert.ok(result.output.includes(SCRIPT_BODY));
+      assert.doesNotMatch(result.output, /Script run from file|Do not retry automatically/);
     });
 
     const rejectsFile = (label: string, setup: () => Record<string, unknown>, message: RegExp) => {

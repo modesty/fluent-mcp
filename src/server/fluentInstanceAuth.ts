@@ -4,6 +4,11 @@ import { SessionManager } from '../utils/sessionManager.js';
 import { CommandResultFactory } from '../utils/types.js';
 import { AuthValidationResult } from '../types.js';
 import { cliErrorMessage } from '../utils/cliError.js';
+import {
+  credentialStoreRecoveryGuidance,
+  resolveCredentialsDir,
+  sanitizeCredentialStoreMessage,
+} from '../utils/credentialStore.js';
 
 /**
  * Log an auth validation result to stderr at the severity its status carries.
@@ -93,12 +98,13 @@ export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): 
       // SDK v4.14.0+ encrypted store (credentials.enc) cannot be decrypted. Report
       // that instead of treating it as "no matching profile".
       const failure = describeAuthListFailure(listRes.output);
-      logger.warn('Auto-auth failed: could not list auth profiles', { error: failure });
+      const displayFailure = sanitizeCredentialStoreMessage(failure).trim();
+      logger.warn('Auto-auth failed: could not list auth profiles', { error: displayFailure });
       return createResult({
         status: 'validation_error',
         host,
         authType,
-        message: `Auth validation failed: could not list auth profiles: ${failure}`,
+        message: `Auth validation failed: could not list auth profiles: ${displayFailure}`,
         actionRequired: credentialStoreAction(failure, buildAuthCommand(instUrl, authType, deriveAliasFromInstance(instUrl))),
         timestamp,
       });
@@ -176,6 +182,10 @@ function manualSetupResult({ instUrl, authType, host, timestamp, profiles }: Man
   // used), so the command asks for another alias instead of replacing it.
   const aliasTaken = profiles.some((profile) => profile.alias === derivedAlias);
   const previousDefault = profiles.find((profile) => profile.defaultYes)?.alias;
+  const envKeySource = process.env.SN_SDK_KEY_SOURCE === 'env';
+  const hasEnvKey = Boolean(process.env.SN_SDK_ENCRYPTION_KEY?.trim());
+  const customCredDir = resolveCredentialsDir();
+  const addCommand = buildAuthCommand(instUrl, authType, aliasTaken ? '<new alias>' : derivedAlias);
 
   const message = [
     `No auth profile matches ${host}. The server does not add profiles; add one in a terminal with the command below.`,
@@ -183,14 +193,29 @@ function manualSetupResult({ instUrl, authType, host, timestamp, profiles }: Man
       `The alias ${derivedAlias} belongs to a profile for another host, which adding under it would replace, so choose another alias.`,
     previousDefault &&
       `auth --add makes the new profile the CLI default for every now-sdk run on this machine; run npx @servicenow/sdk auth --use ${previousDefault} afterwards to keep ${previousDefault} as the default.`,
+    customCredDir &&
+      `This MCP server reads credentials from ${customCredDir}; set SN_SDK_CREDENTIALS_DIR=${customCredDir} in your terminal before running auth --add so the profile is written to the same store.`,
+    envKeySource && !hasEnvKey &&
+      'SN_SDK_KEY_SOURCE=env is set without SN_SDK_ENCRYPTION_KEY, so the first auth --add will fail until a key is configured. ' +
+      "Generate a base64-encoded 32-byte key and configure SN_SDK_KEY_SOURCE=env and that same SN_SDK_ENCRYPTION_KEY in both your terminal and this MCP server's environment before adding the first profile, then restart this MCP server.",
+    envKeySource && hasEnvKey &&
+      'Because SN_SDK_KEY_SOURCE=env is active, run auth --add in a terminal configured with the same SN_SDK_KEY_SOURCE=env and SN_SDK_ENCRYPTION_KEY, then restart this MCP server.',
   ].filter(Boolean).join(' ');
+
+  const dirClause = customCredDir ? ` with SN_SDK_CREDENTIALS_DIR=${customCredDir}` : '';
+  const actionRequired = envKeySource && !hasEnvKey
+    ? 'Generate a base64-encoded 32-byte key, configure SN_SDK_KEY_SOURCE=env and the same SN_SDK_ENCRYPTION_KEY in both your ' +
+      `terminal and this MCP server's environment${dirClause}, run '${addCommand}' in that terminal, then restart this MCP server.`
+    : customCredDir
+      ? `Set SN_SDK_CREDENTIALS_DIR=${customCredDir} in your terminal, run '${addCommand}', then restart this MCP server.`
+      : addCommand;
 
   return {
     status: 'not_authenticated',
     host,
     authType,
     message,
-    actionRequired: buildAuthCommand(instUrl, authType, aliasTaken ? '<new alias>' : derivedAlias),
+    actionRequired,
     timestamp,
   };
 }
@@ -242,75 +267,9 @@ function describeAuthListFailure(output: string): string {
   return cliErrorMessage(output, '') ?? (output.trim() || 'now-sdk auth --list exited with an error and no output');
 }
 
-/** A credential-store failure `auth --list` can report, and what fixes it. */
-interface CredentialStoreRule {
-  /** Matches the CLI's own message (sdk-cli `auth/credential-store/`). Case-sensitive. */
-  pattern: RegExp;
-  /** The next step, given the add command for the configured instance. */
-  action: (addCommand: string) => string;
-}
-
-/**
- * The now-sdk child inherits this server's environment, so an env-key fix belongs in the
- * MCP client's env configuration for this server, and takes effect on restart.
- */
-const SERVER_ENV = "in this MCP server's environment (the env block of its client configuration), then restart the server";
-const KEEP_STORE = 'Do not reset the stored credentials.';
-
-/**
- * The SDK v4.14.0+ credential store (`credentials.enc` + a key from the OS keyring or, as
- * of SDK v4.14.2, `SN_SDK_ENCRYPTION_KEY`) fails in distinct ways, and only one of them is
- * recovered by a reset: the CLI's non-TTY "could not be read" message (`index.js`), which also
- * covers a truncated or corrupted file. Every other failure keeps data a reset would destroy:
- * a file written by a newer now-sdk, the legacy keychain entry older SDK installs still read
- * (keyring write failure during migration), or credentials the right env key can still decrypt.
- * So each maps to its own fix, and an unrecognized failure falls back to the add command.
- */
-const CREDENTIAL_STORE_RULES: readonly CredentialStoreRule[] = [
-  {
-    pattern: /Stored credentials at .+ could not be read/,
-    action: (addCommand) => `Run 'now-sdk auth --delete all' in a terminal, then add the profile again: ${addCommand}`,
-  },
-  {
-    // file-store.js UnsupportedFormatVersionError
-    pattern: /Stored credentials were written in format version \d+/,
-    action: () =>
-      `${KEEP_STORE} A newer now-sdk wrote them; upgrade fluent-mcp to a release that bundles that now-sdk version or later.`,
-  },
-  {
-    // key-provider.js OsKeyringProvider.setKey (migration from the legacy keychain entry)
-    pattern: /Could not write the credential encryption key to the OS keyring/,
-    action: () =>
-      `${KEEP_STORE} Unlock the OS keyring and retry, or set SN_SDK_KEY_SOURCE=env and SN_SDK_ENCRYPTION_KEY ` +
-      `(a base64-encoded 32-byte key) ${SERVER_ENV}.`,
-  },
-  {
-    // index.js externalKeyMissingError (SN_SDK_KEY_SOURCE=env)
-    pattern: /SN_SDK_ENCRYPTION_KEY is not set, but encrypted credentials exist/,
-    action: () => `Set SN_SDK_ENCRYPTION_KEY to the key the stored credentials were encrypted with ${SERVER_ENV}. ${KEEP_STORE}`,
-  },
-  {
-    // index.js read(): an env key that does not decrypt the file
-    pattern: /Could not decrypt the stored credentials at .+ with SN_SDK_ENCRYPTION_KEY/,
-    action: () => `Set SN_SDK_ENCRYPTION_KEY to the original key ${SERVER_ENV}. ${KEEP_STORE}`,
-  },
-  {
-    // key-provider.js EnvVarKeyProvider.getKey
-    pattern: /SN_SDK_ENCRYPTION_KEY must be a base64-encoded 32-byte key/,
-    action: () =>
-      `Set SN_SDK_ENCRYPTION_KEY to the base64-encoded 32-byte key the stored credentials were encrypted with ${SERVER_ENV}. ${KEEP_STORE}`,
-  },
-  {
-    // key-provider.js getActiveKeyProvider
-    pattern: /Unknown SN_SDK_KEY_SOURCE /,
-    action: () => `Set SN_SDK_KEY_SOURCE to keyring or env, or unset it to use the OS keyring, ${SERVER_ENV}.`,
-  },
-];
-
 /** The next step for an `auth --list` failure: its store rule's fix, else the add command. */
 function credentialStoreAction(failure: string, addCommand: string): string {
-  const rule = CREDENTIAL_STORE_RULES.find(({ pattern }) => pattern.test(failure));
-  return rule ? rule.action(addCommand) : addCommand;
+  return credentialStoreRecoveryGuidance(failure, addCommand) ?? addCommand;
 }
 
 /** Parse `now-sdk auth --list` stdout into profiles */
