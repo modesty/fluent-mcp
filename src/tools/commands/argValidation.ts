@@ -28,11 +28,11 @@ export const SELECT_PATH_DOMAIN: ArgumentDomain = {
  * query parameters carry it too: each names one record, and anything else is a
  * mistake the instance would only report as "not found".
  */
-export const SYS_ID_DOMAIN: ArgumentDomain = {
+export const SYS_ID_DOMAIN = {
   kind: 'pattern',
   regex: /^[0-9a-fA-F]{32}$/,
   expected: 'a sys_id: 32 hexadecimal characters',
-};
+} as const satisfies ArgumentDomain;
 
 /**
  * A positive whole number (`>= 1`), for counts and timeouts the CLI forwards to

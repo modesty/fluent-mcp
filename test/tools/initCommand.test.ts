@@ -41,8 +41,7 @@ mock.module('../../src/utils/sessionManager.js', { namedExports: { SessionManage
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 mock.module('../../src/utils/sdkCli.js', sdkCliFixture().mockOptions);
 
-const { InitCommand } = await import('../../src/tools/commands/initCommand.js');
-const { VALID_TEMPLATES } = await import('../../src/tools/commands/init/index.js');
+const { InitCommand, VALID_TEMPLATES } = await import('../../src/tools/commands/initCommand.js');
 
 const SDK_BIN = '/test/node_modules/@servicenow/sdk/bin/index.js';
 const SYS_ID = 'a1b2c3d4e5f6789012345678901234ab';

@@ -18,8 +18,80 @@ const BROWSER_NAMES = ['any', 'chrome', 'firefox', 'edge', 'ie', 'safari'] as co
 
 /** Actions that start or follow a polled operation and so accept `wait`/`pollTimeout`. */
 const POLLED_ACTIONS: readonly TestAction[] = ['run', 'watch'];
-/** Actions that read a finished result by `resultId`. */
-const RESULT_ACTIONS: readonly TestAction[] = ['result', 'logs'];
+
+type TestLeafKey = `${TestTarget}:${TestAction}`;
+
+interface TestLeafRule {
+  /** Arguments that must be present on this leaf, with their missing-argument message. */
+  required?: ReadonlyArray<readonly [name: string, message: string]>;
+  /** Exactly one of `[a, b]` must be present to identify `subject`. */
+  xor?: readonly [a: string, b: string, subject: string];
+  /** Leaf-specific arguments accepted on this leaf (beyond shared auth/output/select/debug). */
+  allowed: ReadonlySet<string>;
+}
+
+const SUITE_RUN_ARGS = ['testSuiteSysId', 'testSuiteName', 'browserName', 'browserVersion', 'osName', 'osVersion', 'isPerformanceRun'] as const;
+const TEST_RUN_ARGS = ['testSysId', 'testName', 'captureNodeLogs'] as const;
+const POLL_ARGS = ['wait', 'pollTimeout'] as const;
+const LOG_ARGS = ['pattern', 'limit'] as const;
+
+/**
+ * Exhaustive rule table for the seven `now-sdk cicd testsuite|test` leaves.
+ * `testsuite:logs` is deliberately absent (the CLI has no test-suite logs leaf).
+ */
+const TEST_LEAF_RULES: Partial<Record<TestLeafKey, TestLeafRule>> = {
+  'testsuite:run': {
+    xor: ['testSuiteSysId', 'testSuiteName', 'a test suite'],
+    allowed: new Set([...SUITE_RUN_ARGS, 'runInCloud', ...POLL_ARGS]),
+  },
+  'testsuite:watch': {
+    required: [['progressId', "Argument 'progressId' is required when action=\"watch\". Use the progress id returned by a previous run."]],
+    allowed: new Set(['progressId', ...POLL_ARGS]),
+  },
+  'testsuite:result': {
+    required: [['resultId', 'Argument \'resultId\' is required when action="result".']],
+    allowed: new Set(['resultId']),
+  },
+  'test:run': {
+    xor: ['testSysId', 'testName', 'a test'],
+    allowed: new Set([...TEST_RUN_ARGS, 'runInCloud', ...POLL_ARGS]),
+  },
+  'test:watch': {
+    required: [['progressId', "Argument 'progressId' is required when action=\"watch\". Use the progress id returned by a previous run."]],
+    allowed: new Set(['progressId', ...POLL_ARGS]),
+  },
+  'test:result': {
+    required: [['resultId', 'Argument \'resultId\' is required when action="result".']],
+    allowed: new Set(['resultId']),
+  },
+  'test:logs': {
+    required: [['resultId', 'Argument \'resultId\' is required when action="logs".']],
+    allowed: new Set(['resultId', ...LOG_ARGS]),
+  },
+};
+
+/** Self-describing rejection message for each leaf-specific argument when used on a leaf that does not accept it. */
+const DISALLOWED_ARG_MESSAGE: Record<string, (target: TestTarget, action: TestAction) => string> = {
+  ...Object.fromEntries(SUITE_RUN_ARGS.map((name) => [
+    name,
+    (target: TestTarget, action: TestAction) => target !== 'testsuite'
+      ? `Argument '${name}' is only valid with target="testsuite", not target="${target}".`
+      : `Argument '${name}' is only valid with action="run", not action="${action}".`,
+  ])),
+  ...Object.fromEntries(TEST_RUN_ARGS.map((name) => [
+    name,
+    (target: TestTarget, action: TestAction) => target !== 'test'
+      ? `Argument '${name}' is only valid with target="test", not target="${target}".`
+      : `Argument '${name}' is only valid with action="run", not action="${action}".`,
+  ])),
+  runInCloud: (_t, action) => `Argument 'runInCloud' is only valid with action="run", not action="${action}".`,
+  progressId: (_t, action) => `Argument 'progressId' is only valid with action="watch", not action="${action}".`,
+  resultId: (_t, action) => `Argument 'resultId' is only valid with action="result" or action="logs", not action="${action}".`,
+  wait: (_t, action) => `Arguments 'wait' and 'pollTimeout' are not accepted when action="${action}" — it is a single read, not a polled operation.`,
+  pollTimeout: (_t, action) => `Arguments 'wait' and 'pollTimeout' are not accepted when action="${action}" — it is a single read, not a polled operation.`,
+  pattern: (_t, action) => `Argument 'pattern' is only valid with action="logs", not action="${action}".`,
+  limit: (_t, action) => `Argument 'limit' is only valid with action="logs", not action="${action}".`,
+};
 
 /**
  * Command to drive ATF test execution through the ServiceNow CI/CD API
@@ -191,87 +263,40 @@ export class CicdTestCommand extends SessionAwareCLICommand {
   ];
 
   /**
-   * Validate the target/action tokens and the per-leaf argument legality the CLI
-   * enforces, so an unusable combination is named precisely instead of failing
-   * opaquely in the CLI.
+   * Validate per-leaf argument legality from `TEST_LEAF_RULES`, so an unusable
+   * combination is named precisely instead of failing opaquely in the CLI.
    *
-   * The schema has already checked `target`, `action`, `browserName`, `output`
-   * and `select` against their domains.
+   * The schema has already checked `target`, `action`, `browserName`, `output`,
+   * `select`, `limit`, `pollTimeout`, and every sys_id against their domains.
    */
   protected validateArgs(args: Record<string, unknown>): void {
     super.validateArgs(args);
 
     const target = args.target as TestTarget;
     const action = args.action as TestAction;
-
-    if (action === 'watch' && !args.progressId) {
-      throw new Error("Argument 'progressId' is required when action=\"watch\". Use the progress id returned by a previous run.");
-    }
-    if (RESULT_ACTIONS.includes(action) && !args.resultId) {
-      throw new Error(`Argument 'resultId' is required when action="${action}".`);
-    }
-    if (!POLLED_ACTIONS.includes(action) && (args.wait !== undefined || args.pollTimeout !== undefined)) {
-      throw new Error(`Arguments 'wait' and 'pollTimeout' are not accepted when action="${action}" — it is a single read, not a polled operation.`);
-    }
-    if (action === 'logs' && target !== 'test') {
+    const rule = TEST_LEAF_RULES[`${target}:${action}`];
+    if (!rule) {
       throw new Error('action="logs" is only available with target="test" — the CLI has no test-suite logs operation. Fetch logs per test result instead.');
     }
-    if (action !== 'logs') {
-      for (const name of ['pattern', 'limit']) {
-        if (args[name] !== undefined) {
-          throw new Error(`Argument '${name}' is only valid with action="logs", not action="${action}".`);
-        }
+
+    for (const [name, message] of rule.required ?? []) {
+      if (!args[name]) throw new Error(message);
+    }
+
+    if (rule.xor) {
+      const [first, second, subject] = rule.xor;
+      if (args[first] && args[second]) {
+        throw new Error(`Arguments '${first}' and '${second}' are mutually exclusive. Pass only one.`);
+      }
+      if (!args[first] && !args[second]) {
+        throw new Error(`Provide either '${first}' or '${second}' to run ${subject}.`);
       }
     }
 
-    if (action === 'run') {
-      if (target === 'testsuite') {
-        if (args.testSuiteSysId && args.testSuiteName) {
-          throw new Error("Arguments 'testSuiteSysId' and 'testSuiteName' are mutually exclusive. Pass only one.");
-        }
-        if (!args.testSuiteSysId && !args.testSuiteName) {
-          throw new Error("Provide either 'testSuiteSysId' or 'testSuiteName' to run a test suite.");
-        }
-      } else {
-        if (args.testSysId && args.testName) {
-          throw new Error("Arguments 'testSysId' and 'testName' are mutually exclusive. Pass only one.");
-        }
-        if (!args.testSysId && !args.testName) {
-          throw new Error("Provide either 'testSysId' or 'testName' to run a test.");
-        }
+    for (const [name, messageFor] of Object.entries(DISALLOWED_ARG_MESSAGE)) {
+      if (args[name] !== undefined && !rule.allowed.has(name)) {
+        throw new Error(messageFor(target, action));
       }
-    }
-
-    // Identifier and run-tuning arguments only mean something on the matching leaf.
-    const suiteOnly = ['testSuiteSysId', 'testSuiteName', 'browserName', 'browserVersion', 'osName', 'osVersion', 'isPerformanceRun'];
-    const testOnly = ['testSysId', 'testName', 'captureNodeLogs'];
-
-    if (target !== 'testsuite') {
-      for (const name of suiteOnly) {
-        if (args[name] !== undefined) {
-          throw new Error(`Argument '${name}' is only valid with target="testsuite", not target="${target}".`);
-        }
-      }
-    }
-    if (target !== 'test') {
-      for (const name of testOnly) {
-        if (args[name] !== undefined) {
-          throw new Error(`Argument '${name}' is only valid with target="test", not target="${target}".`);
-        }
-      }
-    }
-    if (action !== 'run') {
-      for (const name of [...suiteOnly, ...testOnly, 'runInCloud']) {
-        if (args[name] !== undefined) {
-          throw new Error(`Argument '${name}' is only valid with action="run", not action="${action}".`);
-        }
-      }
-    }
-    if (action !== 'watch' && args.progressId !== undefined) {
-      throw new Error(`Argument 'progressId' is only valid with action="watch", not action="${action}".`);
-    }
-    if (!RESULT_ACTIONS.includes(action) && args.resultId !== undefined) {
-      throw new Error(`Argument 'resultId' is only valid with action="result" or action="logs", not action="${action}".`);
     }
   }
 
