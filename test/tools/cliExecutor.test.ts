@@ -30,6 +30,11 @@ describe('CLIExecutor failure messages', () => {
     const ok = await new CLIExecutor(runner({ stdout: '{"ok":true}', stderr: '', exitCode: 0 })).process('node', ['cli'], '/tmp/x');
     assert.equal(ok.success, true);
     assert.equal(ok.error, undefined);
+    const okWithWarning = await new CLIExecutor(
+      runner({ stdout: '{"ok":true}', stderr: 'DeprecationWarning: something', exitCode: 0 })
+    ).process('node', ['cli'], '/tmp/x');
+    assert.equal(okWithWarning.success, true);
+    assert.equal(okWithWarning.error, undefined);
   });
 
   it('forwards per-call process options and reports a cut stdout', async () => {

@@ -28,7 +28,8 @@ export class CLIExecutor implements CommandProcessor {
       const success = result.exitCode === 0;
       // The SDK CLI reports failures on stdout (logger lines, or a machine-mode
       // {"ok":false,"error":{...}} envelope), not stderr — recover the real message.
-      const message = success ? (result.stderr || undefined) : cliErrorMessage(result.stdout, result.stderr, result.exitCode);
+      // Successful runs never carry an Error (stderr warnings are non-fatal).
+      const message = success ? undefined : cliErrorMessage(result.stdout, result.stderr, result.exitCode);
       return {
         success,
         output: result.stdout,

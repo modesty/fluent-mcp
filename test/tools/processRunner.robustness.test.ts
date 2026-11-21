@@ -26,6 +26,7 @@ mock.module('../../src/config.js', configFixture().mockOptions);
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 
 const { NodeProcessRunner } = await import('../../src/tools/processors/processRunner.js');
+const { CLIExecutor } = await import('../../src/tools/processors/cliExecutor.js');
 
 /** Explicit per-test timeout (with slack for a loaded machine). */
 const TEST_TIMEOUT_MS = 10_000;
@@ -217,6 +218,87 @@ describe('NodeProcessRunner — client cancellation kills the child (P0.3)', () 
 
     assert.equal(result.exitCode, 130);
     assert.match(result.stderr, /cancelled/i);
+  });
+
+  it('kills grandchildren spawned by the child when cancelled', {
+    timeout: TEST_TIMEOUT_MS,
+    skip: process.platform === 'win32' && 'POSIX process groups',
+  }, async (t) => {
+    const runner = new NodeProcessRunner();
+    const controller = new AbortController();
+    const markerDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluent-mcp-tree-'));
+    const markerPath = path.join(markerDir, 'grandchild.pid');
+    const grandchildScript = `require('node:fs').writeFileSync(${JSON.stringify(markerPath)}, String(process.pid)); setInterval(() => {}, 1000);`;
+    const parentScript = [
+      "const { spawn } = require('node:child_process');",
+      `spawn(process.execPath, ['-e', ${JSON.stringify(grandchildScript)}], { stdio: 'ignore' });`,
+      'setInterval(() => {}, 1000);',
+    ].join(' ');
+
+    const run = runner.run(process.execPath, ['-e', parentScript], undefined, 600_000, controller.signal);
+    let grandchildPid: number | undefined;
+    try {
+      await waitForMarker(markerPath, run, t.signal);
+      grandchildPid = Number(fs.readFileSync(markerPath, 'utf-8').trim());
+      assert.ok(Number.isInteger(grandchildPid) && grandchildPid > 0);
+      // Confirm grandchild is alive before cancellation.
+      assert.doesNotThrow(() => process.kill(grandchildPid!, 0));
+
+      controller.abort();
+      const result = await run;
+      assert.equal(result.exitCode, 130);
+
+      // Give the kernel a short window to reap the SIGKILLed grandchild.
+      const deadline = Date.now() + 2_000;
+      let alive = true;
+      while (Date.now() < deadline) {
+        try {
+          process.kill(grandchildPid, 0);
+          await delay(20, undefined, { signal: t.signal });
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
+            alive = false;
+            break;
+          }
+          throw error;
+        }
+      }
+      assert.equal(alive, false, `grandchild PID ${grandchildPid} survived cancellation`);
+    } finally {
+      controller.abort();
+      await run.catch(() => undefined);
+      if (grandchildPid) {
+        try { process.kill(grandchildPid, 'SIGKILL'); } catch { /* already gone */ }
+      }
+      fs.rmSync(markerDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('NodeProcessRunner — external signal termination never reports success', {
+  skip: process.platform === 'win32' && 'POSIX signals',
+}, () => {
+  it('reports a non-zero exit code and signal note when the child dies to an external signal', { timeout: TEST_TIMEOUT_MS }, async () => {
+    const runner = new NodeProcessRunner();
+    const result = await runner.run(
+      process.execPath,
+      ['-e', "require('node:fs').writeSync(1, 'before-signal'); process.kill(process.pid, 'SIGTERM');"]
+    );
+
+    assert.equal(result.exitCode, 143); // 128 + SIGTERM (15)
+    assert.ok(result.stdout.includes('before-signal'));
+    assert.match(result.stderr, /terminated by signal SIGTERM/i);
+  });
+
+  it('CLIExecutor marks a signal-terminated child as failed', { timeout: TEST_TIMEOUT_MS }, async () => {
+    const result = await new CLIExecutor(new NodeProcessRunner()).process(
+      process.execPath,
+      ['-e', "process.kill(process.pid, 'SIGTERM');"]
+    );
+
+    assert.equal(result.success, false);
+    assert.equal(result.exitCode, 143);
+    assert.match(result.error?.message ?? '', /terminated by signal SIGTERM/i);
   });
 });
 

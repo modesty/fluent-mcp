@@ -1,8 +1,69 @@
-import { spawn, SpawnOptionsWithoutStdio } from 'node:child_process';
+import { ChildProcess, spawn, spawnSync, SpawnOptionsWithoutStdio } from 'node:child_process';
+import os from 'node:os';
 import { EXIT_CODE_CANCELLED, EXIT_CODE_TIMEOUT, MAX_TIMER_DELAY_MS, ProcessResult, ProcessRunOptions, ProcessRunner } from '../../utils/types.js';
 import { BoundedBuffer, DEFAULT_MAX_OUTPUT_CHARS } from '../../utils/boundedOutput.js';
 import { getConfig } from '../../config.js';
 import logger from '../../utils/logger.js';
+
+/** Live child processes tracked so a server exit never leaves detached groups behind. */
+const activeChildren = new Set<ChildProcess>();
+let exitHookRegistered = false;
+
+/** POSIX/Node signal name accepted by `child.kill` and `process.kill`. */
+type ProcessSignal = Extract<Parameters<ChildProcess['kill']>[0], string>;
+
+/**
+ * Terminate a child process and its descendants.
+ * POSIX: children are spawned as process-group leaders (`detached: true`), so
+ * signaling `-pid` stops grandchildren too (e.g. build workers spawned by the SDK).
+ * Windows: `detached` creates a console window, so children stay attached and
+ * `taskkill /T /F` ends the tree.
+ */
+function killProcessTree(child: ChildProcess, signal: ProcessSignal = 'SIGKILL'): void {
+  const leaderExited = child.exitCode !== null || child.signalCode !== null;
+  const pid = child.pid;
+  if (pid === undefined) {
+    if (!leaderExited) child.kill(signal);
+    return;
+  }
+  if (process.platform === 'win32') {
+    // On Windows a PID may be reused once the leader exits; only kill live trees.
+    if (leaderExited) return;
+    const res = spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' });
+    if (res.error) child.kill(signal);
+    return;
+  }
+  try {
+    // On POSIX the process group stays reserved while any descendant is alive,
+    // even if the leader already exited while a grandchild still holds stdio open.
+    process.kill(-pid, signal);
+  } catch (error) {
+    if ((error as { code?: unknown }).code !== 'ESRCH' && !leaderExited) {
+      child.kill(signal);
+    }
+  }
+}
+
+/** Register one process-exit sweep so detached POSIX children never outlive this server. */
+function trackActiveChild(child: ChildProcess): void {
+  if (!exitHookRegistered) {
+    exitHookRegistered = true;
+    process.once('exit', () => {
+      for (const live of activeChildren) {
+        killProcessTree(live, 'SIGKILL');
+      }
+      activeChildren.clear();
+    });
+  }
+  activeChildren.add(child);
+}
+
+/** Conventional non-zero exit code for a signal-terminated child (`128 + signum`, else `1`). */
+function exitCodeForSignal(signal: ProcessSignal | null): number {
+  if (!signal) return 1;
+  const signalNumber = (os.constants.signals as Record<string, number | undefined>)[signal];
+  return typeof signalNumber === 'number' ? 128 + signalNumber : 1;
+}
 
 /**
  * Spawns child processes to execute CLI commands.
@@ -68,11 +129,15 @@ export class NodeProcessRunner implements ProcessRunner {
       const options: SpawnOptionsWithoutStdio = {
         stdio: 'pipe',
         shell: false,
+        // POSIX: make the child a process-group leader so timeout/abort kills
+        // grandchildren too. Windows: detached opens a console window, so stay
+        // attached and use taskkill /T /F instead.
+        detached: process.platform !== 'win32',
         cwd, env,
       };
       logger.debug(`Spawning child process (shell=false): ${command} ${args.join(' ')}`, { cwd });
 
-      let child;
+      let child: ChildProcess;
       try {
         child = spawn(command, args, options);
       } catch (error) {
@@ -80,6 +145,7 @@ export class NodeProcessRunner implements ProcessRunner {
         reject(error);
         return;
       }
+      trackActiveChild(child);
 
       const stdout = new BoundedBuffer(runOptions?.maxStdoutChars ?? this.maxOutputChars);
       const stderr = new BoundedBuffer(this.maxOutputChars);
@@ -94,18 +160,19 @@ export class NodeProcessRunner implements ProcessRunner {
       const timeoutId = setTimeout(() => {
         timedOut = true;
         logger.warn(`Command execution timed out after ${effectiveTimeout}ms: ${command} ${args.join(' ')}`);
-        if (!child.killed) child.kill('SIGKILL');
+        killProcessTree(child, 'SIGKILL');
       }, effectiveTimeout);
 
       const onAbort = () => {
         cancelled = true;
         logger.warn(`Command cancelled by client: ${command} ${args.join(' ')}`);
-        if (!child.killed) child.kill('SIGKILL');
+        killProcessTree(child, 'SIGKILL');
       };
 
       const cleanup = () => {
         clearTimeout(timeoutId);
         signal?.removeEventListener('abort', onAbort);
+        activeChildren.delete(child);
       };
 
       const settle = (result: ProcessResult) => {
@@ -146,8 +213,8 @@ export class NodeProcessRunner implements ProcessRunner {
         logger.debug(`[STDERR] ${text.trim()}`);
       });
 
-      child.on('close', (code: number | null) => {
-        logger.debug(`Process exited with code ${code}: ${command} ${args.join(' ')}`);
+      child.on('close', (code: number | null, termSignal: ProcessSignal | null) => {
+        logger.debug(`Process exited with code ${code}${termSignal ? ` (signal ${termSignal})` : ''}: ${command} ${args.join(' ')}`);
 
         // On timeout/cancellation the buffered output is partial; return it with
         // a note and a distinct non-zero exit rather than discarding it (P0.2).
@@ -161,7 +228,16 @@ export class NodeProcessRunner implements ProcessRunner {
             'Process was cancelled by the client and terminated (SIGKILL). Output above is partial.'));
           return;
         }
-        settle(this.buildResult(stdout, stderr, code ?? 0));
+        // An externally killed child (e.g. OOM SIGKILL, SIGTERM, SIGSEGV) exits
+        // with code=null and a signal name — never report that as exit 0 / success.
+        if (code === null) {
+          const exitCode = exitCodeForSignal(termSignal);
+          const detail = termSignal ? `signal ${termSignal}` : 'an unknown signal';
+          settle(this.buildResult(stdout, stderr, exitCode,
+            `Process was terminated by ${detail}. Output above may be partial.`));
+          return;
+        }
+        settle(this.buildResult(stdout, stderr, code));
       });
 
       child.on('error', (error: Error) => {
