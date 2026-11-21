@@ -61,6 +61,16 @@ describe('CLICmdWriter', () => {
   }
 });
 
+describe('download_fluent_dependencies metadata', () => {
+  it('advertises honest writer metadata without openWorldHint or a long-running timeoutMs', () => {
+    const command = new DependenciesCommand(new CLICmdWriter());
+    assert.match(command.description, /Does NOT execute the command directly/i);
+    assert.match(command.description, /returns a shell command/i);
+    assert.deepStrictEqual(command.annotations, { readOnlyHint: true, idempotentHint: true });
+    assert.equal(command.timeoutMs, undefined);
+  });
+});
+
 describe('download_fluent_dependencies command text: writer → shell → yargs', { skip: process.platform === 'win32' }, () => {
   for (const shell of SHELLS) {
     for (const auth of [`'dev' alias --debug`, '=node', 'x:=node']) {

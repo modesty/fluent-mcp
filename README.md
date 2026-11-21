@@ -109,7 +109,7 @@ This repository ships standalone AI agent skills under [`skills/`](./skills) pac
 | `build_fluent_app` | Build the Fluent application package | `workingDirectory`, `sourceMap`, `debug` |
 | `deploy_fluent_app` | Deploy/install the built package to a ServiceNow instance | `workingDirectory`, `auth`, `skipFlowActivation`, `async`, `debug` |
 | `fluent_transform` | Transform local XML or instance records into Fluent `.now.ts` source code | `workingDirectory`, `from`, `directory`, `table`, `id`, `force`, `format`, `timeoutSeconds`, `auth`, `debug` |
-| `download_fluent_dependencies` | Download application dependencies and script/table type definitions | `workingDirectory`, `auth`, `debug` |
+| `download_fluent_dependencies` | Generate the shell command to download application dependencies and script/table type definitions | `workingDirectory`, `auth`, `debug` |
 | `download_fluent_app` | Download application metadata from an instance | `workingDirectory`, `directory`, `source`, `incremental`, `timeoutSeconds`, `auth`, `debug` |
 | `clean_fluent_app` | Clean build output directory | `workingDirectory`, `source`, `debug` |
 | `pack_fluent_app` | Zip built application into an installable artifact | `workingDirectory`, `source`, `debug` |
