@@ -5,15 +5,13 @@ import path from 'node:path';
 import { CommandArgument, CommandResult, CommandResultFactory, MAX_TIMER_DELAY_MS, isRunnerStoppedExit } from '../../utils/types.js';
 import { ENVELOPE_RUN_OPTIONS, shapeEnvelopeResult } from '../../utils/jsonSelect.js';
 import { parseCliEnvelope } from '../../utils/cliEnvelope.js';
-import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
-import { resolveSdkCli } from '../../utils/sdkCli.js';
+import { AUTH_ARGUMENT, SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 import { cliOption } from './cliArgv.js';
-import { getProjectRootPath } from '../../config.js';
 import { SELECT_PATH_DOMAIN } from './argValidation.js';
 import type { ArgumentDomain } from '../../utils/types.js';
 import { CONTROL_CHARACTERS_EXCEPT_LINE_FORMATTING } from '../toolSchema.js';
 import { DEBUG_ARGUMENT } from './baseCommand.js';
-import { CLI_REPORT_HEADROOM_MS } from './responseTimeout.js';
+import { CLI_REPORT_HEADROOM_MS, runnerTimeoutForWaitMs } from './responseTimeout.js';
 import { isWithinDirectory } from '../../utils/projectDirectory.js';
 
 /** `now-sdk exec --timeout` default, in milliseconds (SDK v4.14.0 `exec/index.js` DEFAULT_TIMEOUT_MS). */
@@ -91,6 +89,9 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
   description = 'Run a server-side JavaScript script on the authenticated ServiceNow instance, like the Scripts - Background page (SDK v4.14.0+ `now-sdk exec`). The script runs with the authenticated user\'s full permissions and needs the admin role. BEFORE EVERY CALL: show the user the full script, the target instance, the scope, and the reason, and get their explicit approval for that run; approval of one script never covers another. With file, show the file\'s full CONTENT, not just its path, and do not edit the file between approval and the call; the result echoes the content and SHA-256 that actually ran. Prefer query_fluent_records for reads and the app\'s own metadata for anything that should ship with the app. The run is recorded in Script Execution History with a rollback context, but rollback only reverts record changes; emails, REST calls, events and scheduled jobs it triggers cannot be undone. A timeout or cancellation does NOT stop the script on the instance; never retry automatically, or a second copy runs. ok: false with an errors array means the script RAN and threw, possibly after changing records, so a retry runs it again; ok: false with error.message means it never ran (for example an unknown scope). Returns a JSON envelope with ok, output, errors, scope, executionHistoryId, and rollbackContextId (absent when no records changed or the history record is unreadable). Requires instance authentication (auto-injected from session, or pass auth explicitly).';
   annotations = { destructiveHint: true, idempotentHint: false, openWorldHint: true };
   timeoutMs = CLI_DEFAULT_TIMEOUT_MS + CLI_REPORT_HEADROOM_MS;
+  // With an explicit --scope the CLI reads nothing from its cwd (`workingDirectory`
+  // only locates `file`), so the installed package directory is a neutral cwd.
+  protected readonly requiresProject = false;
   arguments: CommandArgument[] = [
     {
       name: 'script',
@@ -142,12 +143,7 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
       domain: SELECT_PATH_DOMAIN,
       description: 'Dot/bracket path to extract from the envelope (e.g. "output[0]" or "executionHistoryId"). An unresolved path yields null rather than an error. Applied by this tool to a successful (ok: true) run only; a failed run returns the full envelope, so it always shows whether the script ran.',
     },
-    {
-      name: 'auth',
-      type: 'string',
-      required: false,
-      description: 'Credential alias to use for authentication with instance (auto-injected from session if not provided)',
-    },
+    AUTH_ARGUMENT,
     DEBUG_ARGUMENT,
   ];
 
@@ -253,9 +249,7 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
 
   /** The runner budget: the static default, extended past a caller-raised CLI wait. */
   protected resolveTimeoutMs(args: Record<string, unknown>): number {
-    return typeof args.timeoutMs === 'number'
-      ? Math.max(this.timeoutMs, args.timeoutMs + CLI_REPORT_HEADROOM_MS)
-      : this.timeoutMs;
+    return runnerTimeoutForWaitMs(this.timeoutMs, args.timeoutMs);
   }
 
   async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
@@ -274,17 +268,18 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
       return CommandResultFactory.fromError(error);
     }
 
-    // The script runs on a live instance, so authentication is required.
-    const providedAuth = typeof args.auth === 'string' ? args.auth : undefined;
-    const resolvedAuth = await this.resolveAuthAlias(providedAuth);
+    // Resolve auth before creating any temp file for `file`, so an unauthenticated
+    // call touches neither the instance nor os.tmpdir().
+    const resolvedAuth = await this.resolveAuthAlias(typeof args.auth === 'string' ? args.auth : undefined);
     if (!resolvedAuth) {
       return this.missingAuthResult();
     }
+    const authArgs = { ...args, auth: resolvedAuth };
 
     if (!scriptFile) {
       // Inline: one literal argv entry on the shell-free runner. Passing a script
       // positionally (or by file) keeps the CLI from waiting on the runner's open stdin.
-      return this.runExec(args, resolvedAuth, [String(args.script)], undefined, signal);
+      return this.runExec(authArgs, [String(args.script)], undefined, signal);
     }
 
     // A file is run from a private copy, so a later edit to the project file cannot
@@ -292,7 +287,7 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluent-exec-'));
     try {
       const scriptSource = [cliOption('--file', this.writePrivateCopy(tempDir, scriptFile.content))];
-      return await this.runExec(args, resolvedAuth, scriptSource, scriptFile, signal);
+      return await this.runExec(authArgs, scriptSource, scriptFile, signal);
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
@@ -307,40 +302,31 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
 
   private async runExec(
     args: Record<string, unknown>,
-    resolvedAuth: string,
     scriptSource: string[],
     scriptFile: ScriptFile | undefined,
     signal?: AbortSignal
   ): Promise<CommandResult> {
-    const { command, baseArgs } = resolveSdkCli();
-    const sdkArgs: string[] = [
-      ...baseArgs,
+    // Capture stdout whole so `isScriptErrorEnvelope` inspects the full envelope
+    // even for a chatty script; bound and select only afterwards.
+    const captured = await this.executeSdkCommand(
       'exec',
-      ...scriptSource,
-      cliOption('--scope', args.scope),
-      cliOption('--reason', args.reason),
-    ];
-    if (args.timeoutMs !== undefined && args.timeoutMs !== null) {
-      sdkArgs.push(cliOption('--timeout', args.timeoutMs));
-    }
-    if (args.serverLogs) sdkArgs.push('--server-logs');
-    sdkArgs.push(cliOption('--auth', resolvedAuth));
-    // `select` is applied here, not forwarded as --select (see jsonSelect).
-    sdkArgs.push(cliOption('--output', 'json'));
-    this.appendCommonFlags(sdkArgs, args);
-
-    // With an explicit --scope the CLI reads nothing from the current directory,
-    // so the installed package directory is a neutral cwd for the bundled CLI.
-    // Stdout is captured whole, so the envelope parses even for a chatty script;
-    // the notices read the captured envelope, the result returns it bounded.
-    const captured = await this.commandProcessor.process(
-      command,
-      sdkArgs,
-      getProjectRootPath(),
-      this.resolveTimeoutMs(args),
+      args,
+      {
+        scope: '--scope',
+        reason: '--reason',
+        timeoutMs: '--timeout',
+        serverLogs: { flag: '--server-logs' },
+        auth: '--auth',
+      },
+      scriptSource,
       signal,
-      ENVELOPE_RUN_OPTIONS
+      {
+        fixedFlags: ['--output=json'],
+        validated: true,
+        processOptions: ENVELOPE_RUN_OPTIONS,
+      }
     );
+
     const result = shapeEnvelopeResult(captured, args.select);
 
     let output = result.output;

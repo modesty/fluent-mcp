@@ -85,6 +85,12 @@ describe('CicdAppCommand', () => {
     assert.ok((command.timeoutMs ?? 0) > 900_000);
   });
 
+  it('should extend the runner timeout past a caller-raised pollTimeout', async () => {
+    const command = new CicdAppCommand(mockProcessor);
+    await command.execute({ action: 'install', scope: 'x_myco_app', pollTimeout: 1_200_000 });
+    assert.equal(mockProcessor.process.mock.calls[0].arguments[3], 1_260_000);
+  });
+
   it('should build install argv with the subcommand token, JSON envelope, and session auth', async () => {
     const command = new CicdAppCommand(mockProcessor);
 
@@ -735,5 +741,11 @@ describe('CicdTestCommand', () => {
         assert.equal(optionValue(argv, '--poll-timeout'), '1000');
       });
     }
+
+    it('should extend the runner timeout past a caller-raised pollTimeout', async () => {
+      const command = new CicdTestCommand(mockProcessor);
+      await command.execute({ target: 'test', action: 'run', testSysId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', pollTimeout: 1_200_000 });
+      assert.equal(mockProcessor.process.mock.calls[0].arguments[3], 1_260_000);
+    });
   });
 });

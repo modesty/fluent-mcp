@@ -20,7 +20,7 @@ export interface RunSdkOptions {
   processOptions?: ProcessRunOptions;
 }
 
-/** The `debug` argument, which `appendCommonFlags` maps to `--debug`. */
+/** The `debug` argument, which `buildSdkArgv` maps to `--debug`. */
 export const DEBUG_ARGUMENT: CommandArgument = {
   name: 'debug',
   type: 'boolean',
@@ -58,17 +58,6 @@ export abstract class BaseCLICommand implements CLICommand {
   protected validateArgs(args: Record<string, unknown>): void {
     this.inputSchema ??= buildInputZodSchema(this.arguments);
     assertArguments(this.name, this.inputSchema, args);
-  }
-
-  /**
-   * Append common SDK flags to the command arguments
-   * @param sdkArgs The array of SDK arguments to append to
-   * @param args The command arguments object
-   */
-  protected appendCommonFlags(sdkArgs: string[], args: Record<string, unknown>): void {
-    if (args.debug) {
-      sdkArgs.push('--debug');
-    }
   }
 
   /**

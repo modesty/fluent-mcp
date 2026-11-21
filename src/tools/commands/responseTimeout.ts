@@ -25,6 +25,17 @@ export const RESPONSE_TIMEOUT_ARGUMENT: CommandArgument = {
 };
 
 /**
+ * The runner timeout for a call with a caller-supplied millisecond wait
+ * (`pollTimeout`, `exec` `timeoutMs`): the static budget, extended past the
+ * CLI wait by `CLI_REPORT_HEADROOM_MS` so the CLI reports its own timeout first.
+ */
+export function runnerTimeoutForWaitMs(baseMs: number, waitMs: unknown): number {
+  return typeof waitMs === 'number'
+    ? Math.max(baseMs, waitMs + CLI_REPORT_HEADROOM_MS)
+    : baseMs;
+}
+
+/**
  * The runner timeout for a call that may carry `timeoutSeconds`: the command's
  * static budget, extended when the caller asked the CLI to wait longer.
  * @param baseMs The command's static timeoutMs
@@ -32,8 +43,5 @@ export const RESPONSE_TIMEOUT_ARGUMENT: CommandArgument = {
  * @returns The larger of the two budgets, in milliseconds
  */
 export function runnerTimeoutForResponseTimeout(baseMs: number, timeoutSeconds: unknown): number {
-  if (typeof timeoutSeconds !== 'number') {
-    return baseMs;
-  }
-  return Math.max(baseMs, timeoutSeconds * 1000 + CLI_REPORT_HEADROOM_MS);
+  return runnerTimeoutForWaitMs(baseMs, typeof timeoutSeconds === 'number' ? timeoutSeconds * 1000 : undefined);
 }

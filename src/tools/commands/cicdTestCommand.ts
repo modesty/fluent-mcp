@@ -1,11 +1,9 @@
 import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
-import { ENVELOPE_RUN_OPTIONS, shapeEnvelopeResult } from '../../utils/jsonSelect.js';
-import { SessionAwareCLICommand } from './sessionAwareCommand.js';
-import { resolveSdkCli } from '../../utils/sdkCli.js';
+import { AUTH_ARGUMENT, SessionAwareCLICommand } from './sessionAwareCommand.js';
 import { cliOption } from './cliArgv.js';
-import { getProjectRootPath } from '../../config.js';
 import { CLI_OUTPUT_FORMATS, POSITIVE_INTEGER_DOMAIN, SELECT_PATH_DOMAIN, SYS_ID_DOMAIN } from './argValidation.js';
 import { DEBUG_ARGUMENT } from './baseCommand.js';
+import { runnerTimeoutForWaitMs } from './responseTimeout.js';
 
 /** The `target`/`action` choices — a caller-supplied token never reaches argv unvalidated. */
 const TEST_TARGETS = ['testsuite', 'test'] as const;
@@ -15,9 +13,6 @@ type TestAction = (typeof TEST_ACTIONS)[number];
 
 /** Browser choices accepted by `now-sdk cicd testsuite run --browser-name`. */
 const BROWSER_NAMES = ['any', 'chrome', 'firefox', 'edge', 'ie', 'safari'] as const;
-
-/** Actions that start or follow a polled operation and so accept `wait`/`pollTimeout`. */
-const POLLED_ACTIONS: readonly TestAction[] = ['run', 'watch'];
 
 type TestLeafKey = `${TestTarget}:${TestAction}`;
 
@@ -115,6 +110,8 @@ export class CicdTestCommand extends SessionAwareCLICommand {
   description = 'Run or inspect ServiceNow ATF tests through the sn_cicd API (SDK v4.10.0+). Set target to "testsuite" or "test" and action to "run" (start it), "watch" (follow a progressId from a previous run), "result" (fetch a resultId), or "logs" (fetch the captured logs of a single test result, optionally filtered by a regex pattern; target="test" only, SDK v4.12.0+). Identify a suite by testSuiteSysId or testSuiteName, a test by testSysId or testName. action="run" executes real ATF steps on the instance and the records those steps touch change; "watch", "result", and "logs" only read. No Fluent project required. Requires instance authentication (auto-injected from session, or pass auth explicitly).';
   annotations = { destructiveHint: true, idempotentHint: false, openWorldHint: true };
   timeoutMs = 930_000;
+  // These leaves resolve nothing from the current directory, so no Fluent project is needed.
+  protected readonly requiresProject = false;
   arguments: CommandArgument[] = [
     {
       name: 'target',
@@ -237,14 +234,9 @@ export class CicdTestCommand extends SessionAwareCLICommand {
       type: 'number',
       required: false,
       domain: POSITIVE_INTEGER_DOMAIN,
-      description: 'Milliseconds to poll for completion before giving up. CLI default 900000 (15 minutes). Only with action="run" or action="watch". Values above ~15 minutes also require raising FLUENT_MCP_COMMAND_TIMEOUT_MS.',
+      description: 'Milliseconds to poll for completion before giving up. CLI default 900000 (15 minutes). Only with action="run" or action="watch". Raising it also extends this tool\'s own process timeout.',
     },
-    {
-      name: 'auth',
-      type: 'string',
-      required: false,
-      description: 'Credential alias to use for authentication with instance (auto-injected from session if not provided)',
-    },
+    AUTH_ARGUMENT,
     {
       name: 'output',
       type: 'string',
@@ -300,6 +292,10 @@ export class CicdTestCommand extends SessionAwareCLICommand {
     }
   }
 
+  protected resolveTimeoutMs(args: Record<string, unknown>): number {
+    return runnerTimeoutForWaitMs(this.timeoutMs, args.pollTimeout);
+  }
+
   async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
     try {
       this.validateArgs(args);
@@ -310,59 +306,37 @@ export class CicdTestCommand extends SessionAwareCLICommand {
     const target = args.target as TestTarget;
     const action = args.action as TestAction;
 
-    // ATF runs execute against a live instance, so authentication is required.
-    const providedAuth = typeof args.auth === 'string' ? args.auth : undefined;
-    const resolvedAuth = await this.resolveAuthAlias(providedAuth);
-    if (!resolvedAuth) {
-      return this.missingAuthResult();
-    }
-
-    const { command, baseArgs } = resolveSdkCli();
-    const sdkArgs: string[] = [...baseArgs, 'cicd', target, action];
-
-    if (args.testSuiteSysId) sdkArgs.push(cliOption('--test-suite-sys-id', args.testSuiteSysId));
-    if (args.testSuiteName) sdkArgs.push(cliOption('--test-suite-name', args.testSuiteName));
-    if (args.testSysId) sdkArgs.push(cliOption('--test-sys-id', args.testSysId));
-    if (args.testName) sdkArgs.push(cliOption('--test-name', args.testName));
-
-    if (args.progressId) sdkArgs.push(cliOption('--progress-id', args.progressId));
-    if (args.resultId) sdkArgs.push(cliOption('--result-id', args.resultId));
-
-    if (args.browserName) sdkArgs.push(cliOption('--browser-name', args.browserName));
-    if (args.browserVersion) sdkArgs.push(cliOption('--browser-version', args.browserVersion));
-    if (args.osName) sdkArgs.push(cliOption('--os-name', args.osName));
-    if (args.osVersion) sdkArgs.push(cliOption('--os-version', args.osVersion));
-    if (args.runInCloud) sdkArgs.push('--run-in-cloud');
-    if (args.isPerformanceRun) sdkArgs.push('--is-performance-run');
-    if (args.captureNodeLogs) sdkArgs.push('--capture-node-logs');
-
-    if (args.pattern) sdkArgs.push(cliOption('--pattern', args.pattern));
-    if (args.limit !== undefined) sdkArgs.push(cliOption('--limit', args.limit));
-
-    // `--wait` defaults to true in the CLI, so only the negation is meaningful.
-    // `result` and `logs` are plain reads and accept neither polling flag.
-    if (POLLED_ACTIONS.includes(action)) {
-      if (args.wait === false) sdkArgs.push('--no-wait');
-      if (args.pollTimeout !== undefined) sdkArgs.push(cliOption('--poll-timeout', args.pollTimeout));
-    }
-
-    sdkArgs.push(cliOption('--auth', resolvedAuth));
-    sdkArgs.push(cliOption('--output', typeof args.output === 'string' ? args.output : 'json'));
-    this.appendCommonFlags(sdkArgs, args);
-
-    // These leaves resolve nothing from the current directory (unlike the app-repo
-    // operations, which default the app sys_id/version from the project), so the
-    // installed package directory is a neutral cwd for spawning the bundled CLI.
-    // `select` is applied here, not forwarded as --select; stdout is captured
-    // whole so the envelope parses (see jsonSelect).
-    const result = await this.commandProcessor.process(
-      command,
-      sdkArgs,
-      getProjectRootPath(),
-      this.timeoutMs,
+    return this.executeSdkCommand(
+      ['cicd', target, action],
+      args,
+      {
+        testSuiteSysId: '--test-suite-sys-id',
+        testSuiteName: '--test-suite-name',
+        testSysId: '--test-sys-id',
+        testName: '--test-name',
+        progressId: '--progress-id',
+        resultId: '--result-id',
+        browserName: '--browser-name',
+        browserVersion: '--browser-version',
+        osName: '--os-name',
+        osVersion: '--os-version',
+        runInCloud: { flag: '--run-in-cloud' },
+        isPerformanceRun: { flag: '--is-performance-run' },
+        captureNodeLogs: { flag: '--capture-node-logs' },
+        pattern: '--pattern',
+        limit: '--limit',
+        wait: { flag: '--wait', negateOnly: true },
+        pollTimeout: '--poll-timeout',
+        auth: '--auth',
+      },
+      [],
       signal,
-      ENVELOPE_RUN_OPTIONS
+      {
+        fixedFlags: [cliOption('--output', typeof args.output === 'string' ? args.output : 'json')],
+        requireAuth: true,
+        envelope: { select: args.select, raw: args.output === 'raw' },
+        validated: true,
+      }
     );
-    return shapeEnvelopeResult(result, args.select, args.output === 'raw');
   }
 }
