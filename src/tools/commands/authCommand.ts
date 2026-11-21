@@ -1,7 +1,5 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
 import { BaseCLICommand, DEBUG_ARGUMENT } from './baseCommand.js';
-import { resolveSdkCli } from '../../utils/sdkCli.js';
-import { getProjectRootPath } from '../../config.js';
 
 /**
  * Lists the CLI's stored auth profiles (`now-sdk auth --list`) for lazy auth
@@ -24,14 +22,11 @@ export class AuthCommand extends BaseCLICommand {
 
   async execute(args: Record<string, unknown> = {}): Promise<CommandResult> {
     this.validateArgs(args);
-
-    // Resolve the bundled SDK CLI so this works from any cwd.
-    const { command, baseArgs } = resolveSdkCli();
-    const sdkArgs = [...baseArgs, 'auth', '--list'];
-    this.appendCommonFlags(sdkArgs, args);
-
-    // Auth profiles are global SDK state, not Fluent-project state. The package
-    // directory is an intentional neutral cwd for the bundled CLI.
-    return await this.commandProcessor.process(command, sdkArgs, getProjectRootPath());
+    // Auth profiles are global SDK state, not Fluent-project state; runBundledSdk
+    // uses the installed package directory as a neutral cwd.
+    return this.runBundledSdk(args, {
+      subcommand: 'auth',
+      fixedFlags: ['--list'],
+    });
   }
 }

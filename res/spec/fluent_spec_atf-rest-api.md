@@ -1,14 +1,14 @@
 #**Context:** This chunk is part of the ServiceNow Automated Test Framework (ATF) documentation and focuses on REST API testing. It includes APIs for sending HTTP requests using various methods with specific headers and bodies, and making assertions on response status codes, response times, headers, and payloads. These APIs are crucial for validating the behavior and performance of REST APIs during testing within the ATF environment.
 ```typescript
 // Send a REST API request to glide instance with specified HTTP method, path, query parameters, request headers and body.
-atf.rest.sendRestRequest({ // each of the following props are mandatory
+atf.rest.sendRestRequest({ // only $id and path are mandatory; the rest are optional (Test.d.ts; the atf-guide said body/auth were required until SDK v4.14.2)
   $id: Now.ID['send_rest_request_step'], // string | guid, mandatory
-  path: '', // string, ex. '/api/now/table/incident'
-  body: '', // string, ex. "{data_one: 'value1', data_field: 'value2', data_three: 'value3'}"
-  mutualAuth: Now.ref('sys_certificate', '<sys_id>'), // sys_id | Record&lt;'sys_certificate'&gt;
-  auth: '',// '' | 'basic' | 'mutual'
-  basicAuthentication: Now.ref('sys_auth_profile_basic', '<sys_id>'), // sys_id | Record&lt;'sys_auth_profile_basic'&gt;
-  method: 'get', // 'get' | 'post' | 'put' | 'delete' | 'patch'
+  path: '', // string, mandatory, ex. '/api/now/table/incident'
+  body: '', // string, optional, ex. "{data_one: 'value1', data_field: 'value2', data_three: 'value3'}"
+  mutualAuth: Now.ref('sys_certificate', '<sys_id>'), // sys_id | Record&lt;'sys_certificate'&gt;, optional (default ''), used when auth is 'mutual'
+  auth: '',// '' | 'basic' | 'mutual', optional (default 'basic')
+  basicAuthentication: Now.ref('sys_auth_profile_basic', '<sys_id>'), // sys_id | Record&lt;'sys_auth_profile_basic'&gt;, optional (default ''), used when auth is 'basic'
+  method: 'get', // 'get' | 'post' | 'put' | 'delete' | 'patch', optional (default 'get')
   queryParameters: {}, // object, snake_case name value pairs, ex.: { field_one: 'value1', field_two: 'value2' }
   headers: {}, // object, snake_case name value pairs, ex.: { header_one: 'value1', header_two: 'value2' }
 }): void

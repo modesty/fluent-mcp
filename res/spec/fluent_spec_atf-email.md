@@ -23,10 +23,10 @@ atf.email.validateOutboundEmailGeneratedByNotification({
 // Generates a new inbound email. This step also creates an email.read event upon step completion
 atf.email.generateInboundEmail({ 
   $id: Now.ID['generate_inbound_email_step'], // string | guid, mandatory
-  from: '',
-  to: '', 
-  subject: '',
-  body: '' 
+  from: '', // string, optional
+  to: '', // string, mandatory
+  subject: '', // string, optional
+  body: '' // string, optional (the atf-guide called all four required until SDK v4.14.2; Test.d.ts requires only to)
 }): { output_email_record: '' }; // sys_id of the generated sys_email record (snake_case OUTPUT)
 
 // generates an Email [sys_email] record that looks like an email sent in reply to a system notification. This step also creates an email.read event upon step completion.

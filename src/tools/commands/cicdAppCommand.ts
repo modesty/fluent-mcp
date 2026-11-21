@@ -1,11 +1,10 @@
 import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
-import { ENVELOPE_RUN_OPTIONS, shapeEnvelopeResult } from '../../utils/jsonSelect.js';
-import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
-import { resolveSdkCli } from '../../utils/sdkCli.js';
+import { AUTH_ARGUMENT, SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 import { cliOption } from './cliArgv.js';
 import { getProjectRootPath } from '../../config.js';
-import { CLI_OUTPUT_FORMATS, SELECT_PATH_DOMAIN, SYS_ID_DOMAIN } from './argValidation.js';
+import { CLI_OUTPUT_FORMATS, POSITIVE_INTEGER_DOMAIN, SELECT_PATH_DOMAIN, SYS_ID_DOMAIN } from './argValidation.js';
 import { DEBUG_ARGUMENT } from './baseCommand.js';
+import { runnerTimeoutForWaitMs } from './responseTimeout.js';
 
 /**
  * App-repo actions exposed by `now-sdk cicd`: the `action` argument's choices,
@@ -90,14 +89,10 @@ export class CicdAppCommand extends SessionAwareCLICommand {
       name: 'pollTimeout',
       type: 'number',
       required: false,
-      description: 'Milliseconds to poll for completion before giving up. CLI default 900000 (15 minutes). Values above ~15 minutes also require raising FLUENT_MCP_COMMAND_TIMEOUT_MS.',
+      domain: POSITIVE_INTEGER_DOMAIN,
+      description: 'Milliseconds to poll for completion before giving up. CLI default 900000 (15 minutes). Raising it also extends this tool\'s own process timeout.',
     },
-    {
-      name: 'auth',
-      type: 'string',
-      required: false,
-      description: 'Credential alias to use for authentication with instance (auto-injected from session if not provided)',
-    },
+    AUTH_ARGUMENT,
     {
       name: 'output',
       type: 'string',
@@ -151,6 +146,11 @@ export class CicdAppCommand extends SessionAwareCLICommand {
     }
   }
 
+  protected resolveTimeoutMs(args: Record<string, unknown>): number {
+    // With wait: false the SDK returns after dispatch without polling and ignores pollTimeout.
+    return args.wait === false ? this.timeoutMs : runnerTimeoutForWaitMs(this.timeoutMs, args.pollTimeout);
+  }
+
   async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
     try {
       this.validateArgs(args);
@@ -160,17 +160,10 @@ export class CicdAppCommand extends SessionAwareCLICommand {
 
     const action = args.action as AppAction;
 
-    // These operations act on a live instance, so authentication is required.
-    // Resolve it up front and fail with an actionable message.
-    const providedAuth = typeof args.auth === 'string' ? args.auth : undefined;
-    const resolvedAuth = await this.resolveAuthAlias(providedAuth);
-    if (!resolvedAuth) {
-      return this.missingAuthResult();
-    }
-
     // The CLI defaults `--app-sys-id`/`--app-version` from the project it is run
     // in, so prefer a resolved project directory. Outside a project the caller
-    // must identify the application explicitly.
+    // must identify both explicitly so the CLI never reads this server's own
+    // package.json version from the neutral package directory.
     let workingDirectory: string | undefined;
     try {
       workingDirectory = this.getWorkingDirectory(args.workingDirectory);
@@ -185,11 +178,6 @@ export class CicdAppCommand extends SessionAwareCLICommand {
           "Pass 'scope' or 'appSysId' explicitly, or provide the project via the 'workingDirectory' argument, init_fluent_app, or FLUENT_MCP_WORKING_DIR."
         );
       }
-
-      // The CLI defaults `--app-version` from the *cwd's* package.json, and the
-      // only cwd available here is the MCP server's own install directory — so
-      // omitting it outside a project would silently publish/install this
-      // server's version. Require it explicitly instead of inferring a wrong one.
       if (!args.appVersion) {
         return CommandResultFactory.error(
           `cicd_fluent_app requires 'appVersion' for action="${action}" when no Fluent project directory is available: ` +
@@ -199,40 +187,29 @@ export class CicdAppCommand extends SessionAwareCLICommand {
       }
     }
 
-    const { command, baseArgs } = resolveSdkCli();
-    const sdkArgs: string[] = [...baseArgs, 'cicd', action];
-
-    if (args.scope) sdkArgs.push(cliOption('--scope', args.scope));
-    if (args.appSysId) sdkArgs.push(cliOption('--app-sys-id', args.appSysId));
-    if (args.appVersion) sdkArgs.push(cliOption('--app-version', args.appVersion));
-    if (args.baseAppVersion) sdkArgs.push(cliOption('--base-app-version', args.baseAppVersion));
-    if (args.autoUpgradeBaseApp) sdkArgs.push('--auto-upgrade-base-app');
-
-    if (args.devNotes) sdkArgs.push(cliOption('--dev-notes', args.devNotes));
-
-    // `--wait` defaults to true in the CLI, so only the negation is meaningful.
-    if (args.wait === false) sdkArgs.push('--no-wait');
-    if (args.pollTimeout !== undefined) sdkArgs.push(cliOption('--poll-timeout', args.pollTimeout));
-
-    sdkArgs.push(cliOption('--auth', resolvedAuth));
-    sdkArgs.push(cliOption('--output', typeof args.output === 'string' ? args.output : 'json'));
-    this.appendCommonFlags(sdkArgs, args);
-
-    // App-repo work is instance-side. When no project is configured the installed
-    // package directory is only a cwd for spawning the bundled CLI: the checks
-    // above guarantee both project-derived defaults (`--app-sys-id` from
-    // now.config.json, `--app-version` from package.json) are already supplied,
-    // so the CLI reads nothing out of that directory.
-    // `select` is applied here, not forwarded as --select; stdout is captured
-    // whole so the envelope parses (see jsonSelect).
-    const result = await this.commandProcessor.process(
-      command,
-      sdkArgs,
-      workingDirectory ?? getProjectRootPath(),
-      this.timeoutMs,
+    return this.executeSdkCommand(
+      ['cicd', action],
+      args,
+      {
+        scope: '--scope',
+        appSysId: '--app-sys-id',
+        appVersion: '--app-version',
+        baseAppVersion: '--base-app-version',
+        autoUpgradeBaseApp: { flag: '--auto-upgrade-base-app' },
+        devNotes: '--dev-notes',
+        wait: { flag: '--wait', negateOnly: true },
+        pollTimeout: '--poll-timeout',
+        auth: '--auth',
+      },
+      [],
       signal,
-      ENVELOPE_RUN_OPTIONS
+      {
+        fixedFlags: [cliOption('--output', typeof args.output === 'string' ? args.output : 'json')],
+        requireAuth: true,
+        cwd: workingDirectory ?? getProjectRootPath(),
+        envelope: { select: args.select, raw: args.output === 'raw' },
+        validated: true,
+      }
     );
-    return shapeEnvelopeResult(result, args.select, args.output === 'raw');
   }
 }

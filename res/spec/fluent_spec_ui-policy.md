@@ -40,6 +40,6 @@ UiPolicy({
    // Each set value: { field: '', value: '' }
  modelId: '', // string, optional - model ID for scoped UI policies
  modelTable: '', // string, optional - model table for scoped UI policies
- $meta: { installMethod: 'demo' }, // optional (SDK v4.13.0+): { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean } — 'demo' loads the policy only with demo data, 'once' applies it once, 'first install' only on first install
+ $meta: { installMethod: 'once' }, // optional (SDK v4.13.0+): { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean } — 'once' applies the policy once, 'first install' loads it only on first install; not 'demo' here: demo data is only for rows of tables that do not extend sys_metadata (demo-data-guide, SDK v4.14.2)
 }): UiPolicy // returns a UiPolicy object
 ```

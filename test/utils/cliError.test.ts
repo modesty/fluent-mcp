@@ -75,11 +75,13 @@ describe('cliErrorMessage', () => {
     assert.equal(cliErrorMessage('null', '', 1), undefined);
   });
 
-  it('always keeps the runner note on timeout (124) and cancellation (130)', () => {
+  it('always keeps the runner note on timeout (124), cancellation (130), and external signal termination', () => {
     const note = 'Process timed out after 360000ms and was terminated (SIGKILL). Output above is partial.';
     assert.equal(cliErrorMessage('partial', note, 124), note);
     assert.equal(cliErrorMessage('[now-sdk] ERROR: stalled', note, 124), `stalled\n${note}`);
     assert.equal(cliErrorMessage('', 'Process was cancelled by the client and terminated (SIGKILL).', 130), 'Process was cancelled by the client and terminated (SIGKILL).');
+    const sigNote = 'Process was terminated by signal SIGTERM. Output above may be partial.';
+    assert.equal(cliErrorMessage('[now-sdk] ERROR: partial failure', sigNote, 143, 'SIGTERM'), `partial failure\n${sigNote}`);
   });
 });
 

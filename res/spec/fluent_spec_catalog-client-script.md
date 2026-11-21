@@ -42,6 +42,6 @@ CatalogClientScript({
     uiType: 'desktop',      // 'desktop' | 'mobileOrServicePortal' | 'all', optional — where to run the script
 
     publishedRef: '',       // string, optional — published reference sys_id
-    $meta: { installMethod: 'demo' }, // optional (SDK v4.13.0+): { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean } — installMethod picks when the record loads ('demo' → demo data only); useEsLatest targets server-side scripts, so it has no effect on this client-side script
+    $meta: { installMethod: 'once' }, // optional (SDK v4.13.0+): { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean } — installMethod picks when the record loads (not 'demo' here: demo data is only for rows of tables that do not extend sys_metadata (demo-data-guide, SDK v4.14.2)); useEsLatest targets server-side scripts, so it has no effect on this client-side script
 }): CatalogClientScriptProps // returns a CatalogClientScriptProps object
 ```

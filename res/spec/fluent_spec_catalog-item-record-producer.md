@@ -51,6 +51,6 @@ CatalogItemRecordProducer({
     canCancel: false,       // boolean, optional — allow user to cancel the submission, default: false
     redirectUrl: 'generatedRecord', // 'generatedRecord' | 'catalogHomePage', optional — where to redirect after submit, default: 'generatedRecord'
     saveOptions: '',        // string, optional — advanced save configuration
-    $meta: { installMethod: 'demo', useEsLatest: true }, // optional (SDK v4.13.0+): { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean } — installMethod picks when the record loads; useEsLatest runs the producer's server-side script on the latest ECMAScript version
+    $meta: { installMethod: 'once', useEsLatest: true }, // optional (SDK v4.13.0+): { installMethod?: 'first install' | 'demo' | 'once', useEsLatest?: boolean } — installMethod picks when the record loads (not 'demo' here: demo data is only for rows of tables that do not extend sys_metadata (demo-data-guide, SDK v4.14.2)); useEsLatest runs the producer's server-side script on the latest ECMAScript version
 }): CatalogItemRecordProducer // returns a CatalogItemRecordProducer object
 ```

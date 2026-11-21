@@ -41,8 +41,7 @@ mock.module('../../src/utils/sessionManager.js', { namedExports: { SessionManage
 mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 mock.module('../../src/utils/sdkCli.js', sdkCliFixture().mockOptions);
 
-const { InitCommand } = await import('../../src/tools/commands/initCommand.js');
-const { VALID_TEMPLATES } = await import('../../src/tools/commands/init/index.js');
+const { InitCommand, VALID_TEMPLATES } = await import('../../src/tools/commands/initCommand.js');
 
 const SDK_BIN = '/test/node_modules/@servicenow/sdk/bin/index.js';
 const SYS_ID = 'a1b2c3d4e5f6789012345678901234ab';
@@ -523,6 +522,50 @@ describe('InitCommand', () => {
     );
   });
 
+  describe('timeoutSeconds (now-sdk init --timeout, SDK v4.14.2+)', () => {
+    it('is declared by the bundled now-sdk init', () => {
+      const cli = path.resolve('node_modules/@servicenow/sdk/bin/index.js');
+      const help = execFileSync(process.execPath, [cli, 'init', '--help'], { encoding: 'utf8' });
+      assert.match(help, /--timeout\b/);
+    });
+
+    it('passes --timeout to a conversion from an instance', async () => {
+      await initCommand.execute({ workingDirectory: validDir, from: SYS_ID, auth: 'test-auth', timeoutSeconds: 7200 });
+
+      assertCalledWith(
+        mockExecutor.process,
+        process.execPath,
+        [SDK_BIN, 'init', `--from=${SYS_ID}`, '--timeout=7200', '--auth=test-auth'],
+        validDir
+      );
+    });
+
+    // The CLI builds its long-running connector only for an instance conversion and
+    // ignores --timeout otherwise, so the tool refuses it rather than forward a no-op.
+    it('is refused for creation, and creates nothing', async () => {
+      const destination = fresh('creation-timeout');
+
+      const result = await initCommand.execute({ ...CREATION, workingDirectory: destination, timeoutSeconds: 60 });
+
+      assertRefused(result, /'timeoutSeconds' applies only to conversion from an instance/);
+      assert.equal(fs.existsSync(destination), false);
+    });
+
+    it('is refused for a local conversion', async () => {
+      const result = await initCommand.execute({ workingDirectory: fresh('local-timeout'), from: legacyApp('src'), timeoutSeconds: 60 });
+
+      assertRefused(result, /'timeoutSeconds' applies only to conversion from an instance/);
+    });
+
+    for (const timeoutSeconds of [0, -5, 1.5]) {
+      it(`refuses the non-positive-integer value ${timeoutSeconds}`, async () => {
+        const result = await initCommand.execute({ workingDirectory: validDir, from: SYS_ID, auth: 'test-auth', timeoutSeconds });
+
+        assertRefused(result, /timeoutSeconds/);
+      });
+    }
+  });
+
   describe('local conversion source', () => {
     it('passes the canonical source to the SDK without triggering auth validation', async (t) => {
       const source = legacyApp('source');
@@ -661,5 +704,11 @@ describe('InitCommand', () => {
     assert.equal(result.success, false);
     assert.ok(result.error?.message.includes("Argument 'template' must be one of: base, javascript.react"));
     assertNotCalled(mockExecutor.process);
+  });
+
+  it('should reject an unknown intent instead of falling through to conversion', async () => {
+    const result = await initCommand.execute({ intent: 'create', from: SYS_ID, workingDirectory: validDir });
+
+    assertRefused(result, /Argument 'intent' must be one of: conversion, creation/);
   });
 });

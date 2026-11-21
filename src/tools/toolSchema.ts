@@ -86,7 +86,42 @@ function stringType(arg: CommandArgument, domain: ArgumentDomain | undefined): z
         error: (issue: IssueInput) => `Argument '${arg.name}' must be ${expected}. Received: "${String(issue.input)}".`,
       });
     }
+    case 'integer':
+      throw new Error(`Argument '${arg.name}': domain 'integer' applies only to number arguments, not string`);
   }
+}
+
+function integerLabel(min: number | undefined): string {
+  if (min === 1) return 'a positive integer';
+  if (min === 0) return 'a non-negative integer';
+  return min !== undefined ? `an integer >= ${min}` : 'an integer';
+}
+
+/**
+ * Compile a number argument and its optional integer/bounds domain. Advertised
+ * as JSON Schema `type: "integer"` with `minimum`/`maximum` when constrained.
+ */
+function numberType(arg: CommandArgument, domain: ArgumentDomain | undefined): z.ZodTypeAny {
+  const typeError = argumentError(arg, (input) => wrongTypeMessage(arg, input));
+  let num = z.number({ error: typeError });
+  if (domain === undefined) return num;
+  if (domain.kind !== 'integer') {
+    throw new Error(`Argument '${arg.name}': domain '${domain.kind}' applies only to string arguments, not number`);
+  }
+  const { min, max } = domain;
+  const label = integerLabel(min);
+  const rangeError = (issue: IssueInput): string =>
+    `Argument '${arg.name}' must be ${label}. Received: ${String(issue.input)}.`;
+  num = num.int({ error: rangeError });
+  if (min !== undefined) {
+    num = num.min(min, { error: rangeError });
+  }
+  if (max !== undefined) {
+    num = num.max(max, {
+      error: (issue: IssueInput) => `Argument '${arg.name}' must be at most ${max}. Received: ${String(issue.input)}.`,
+    });
+  }
+  return num;
 }
 
 /**
@@ -98,8 +133,8 @@ export function buildInputZodShape(args: CommandArgument[]): z.ZodRawShape {
   const shape: Record<string, z.ZodTypeAny> = {};
 
   for (const arg of args) {
-    if (arg.domain !== undefined && arg.type !== 'string') {
-      throw new Error(`Argument '${arg.name}': a domain applies only to string arguments, not ${arg.type}`);
+    if (arg.domain !== undefined && arg.type === 'boolean') {
+      throw new Error(`Argument '${arg.name}': a domain cannot be applied to boolean arguments`);
     }
     const typeError = argumentError(arg, (input) => wrongTypeMessage(arg, input));
     let zodType: z.ZodTypeAny;
@@ -111,7 +146,7 @@ export function buildInputZodShape(args: CommandArgument[]): z.ZodRawShape {
         zodType = stringType(arg, arg.domain);
         break;
       case 'number':
-        zodType = z.number({ error: typeError });
+        zodType = numberType(arg, arg.domain);
         break;
       case 'boolean':
         zodType = z.boolean({ error: typeError });

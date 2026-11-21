@@ -1,5 +1,5 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
-import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
+import { SOURCE_ARGUMENT, SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 import { DEBUG_ARGUMENT } from './baseCommand.js';
 
 /**
@@ -13,12 +13,7 @@ export class PackCommand extends SessionAwareCLICommand {
   timeoutMs = 30_000;
   arguments: CommandArgument[] = [
     WORKING_DIRECTORY_ARGUMENT,
-    {
-      name: 'source',
-      type: 'string',
-      required: false,
-      description: 'Path to the directory that contains package.json configuration',
-    },
+    SOURCE_ARGUMENT,
     DEBUG_ARGUMENT
   ];
 

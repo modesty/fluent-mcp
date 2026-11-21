@@ -4,22 +4,26 @@
 import type { ZodRawShape } from 'zod';
 
 /**
- * The values a string argument accepts beyond its type. Compiled into the tool's
- * input schema (`src/tools/toolSchema.ts`), so it is enforced on `tools/call`,
- * advertised on `tools/list` (`enum` / `pattern`), and applied by the same
- * schema to direct `execute()` callers. A string argument without a domain is
- * any text without control characters.
- *  - `choices`: one of a closed set of values (the CLI's own declared choices)
- *  - `pattern`: an anchored (`^…$`), flag-free grammar, so the advertised JSON
- *    Schema pattern means exactly what is enforced; `expected` completes the
- *    error sentence "Argument 'x' must be <expected>."
- *  - `multilineText`: text that may also contain newline, carriage return and
- *    tab (source code); every other control character is still rejected
+ * The values an argument accepts beyond its primitive type. Compiled into the
+ * tool's input schema (`src/tools/toolSchema.ts`), so it is enforced on
+ * `tools/call`, advertised on `tools/list` (`enum` / `pattern` / `integer` +
+ * `minimum`/`maximum`), and applied by the same schema to direct `execute()`
+ * callers. A string argument without a domain is any text without control
+ * characters.
+ *  - `choices` (string): one of a closed set of values (the CLI's own choices)
+ *  - `pattern` (string): an anchored (`^…$`), flag-free grammar, so the
+ *    advertised JSON Schema pattern means exactly what is enforced; `expected`
+ *    completes "Argument 'x' must be <expected>."
+ *  - `multilineText` (string): text that may also contain newline, carriage
+ *    return and tab (source code); every other control character is rejected
+ *  - `integer` (number): a whole number with optional inclusive `min`/`max`
+ *    bounds, advertised as JSON Schema `type: "integer"`
  */
 export type ArgumentDomain =
   | { kind: 'choices'; values: readonly [string, ...string[]] }
   | { kind: 'pattern'; regex: RegExp; expected: string }
-  | { kind: 'multilineText' };
+  | { kind: 'multilineText' }
+  | { kind: 'integer'; min?: number; max?: number };
 
 // Domain Models
 export interface CommandArgument {
@@ -27,7 +31,7 @@ export interface CommandArgument {
   type: 'string' | 'number' | 'boolean';
   required: boolean;
   description: string;
-  /** For a string argument: the values it accepts beyond being a string. */
+  /** Values accepted beyond the primitive type (string or number arguments). */
   domain?: ArgumentDomain;
 }
 
@@ -49,6 +53,8 @@ export interface CommandResult {
   structuredContent?: { [key: string]: unknown };
   /** True when the runner cut the middle out of `output` for exceeding its capture cap. */
   outputTruncated?: boolean;
+  /** Signal name (or `'unknown'`) when the child was killed by an external signal rather than exiting normally. */
+  terminatedBySignal?: string;
 }
 
 /**
@@ -78,6 +84,8 @@ export interface ProcessResult {
   exitCode: number;
   /** True when stdout exceeded its capture cap and its middle was dropped. */
   stdoutTruncated?: boolean;
+  /** Signal name (or `'unknown'`) when the child was terminated by an external signal. */
+  terminatedBySignal?: string;
 }
 
 /** Per-call process options. */

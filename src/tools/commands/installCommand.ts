@@ -1,5 +1,5 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
-import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
+import { AUTH_ARGUMENT, SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 import { DEBUG_ARGUMENT } from './baseCommand.js';
 
 /**
@@ -21,12 +21,7 @@ export class InstallCommand extends SessionAwareCLICommand {
   timeoutMs = 900_000;
   arguments: CommandArgument[] = [
     WORKING_DIRECTORY_ARGUMENT,
-    {
-      name: 'auth',
-      type: 'string',
-      required: false,
-      description: 'Credential alias to use for authentication with instance (auto-injected from session if not provided)',
-    },
+    AUTH_ARGUMENT,
     {
       name: 'skipFlowActivation',
       type: 'boolean',

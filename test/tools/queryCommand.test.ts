@@ -89,8 +89,8 @@ describe('QueryCommand', () => {
       [
         SDK_BIN, 'query', 'incident',
         '--query=active=true^priority<=2',
-        '--output=json',
         '--auth=session-alias',
+        '--output=json',
       ],
       PACKAGE_ROOT,
       60000,
@@ -291,6 +291,30 @@ describe('QueryCommand', () => {
     mockProcessor.process.mock.mockImplementation(async () => ({ success: false, output: failure, exitCode: 1 }));
     const failed = await new QueryCommand(mockProcessor).execute({ table: 'nope', query: 'active=true', select: 'records[0].sys_id' });
     assert.equal(failed.output, failure);
+  });
+
+  it('should accept offset 0 and reject invalid numeric bounds for limit, offset, and timeout', async () => {
+    const command = new QueryCommand(mockProcessor);
+    const ok = await command.execute({ table: 'incident', query: 'active=true', offset: 0 });
+    assert.equal(ok.success, true);
+
+    mockProcessor.process.mock.resetCalls();
+    for (const [name, value, expected] of [
+      ['limit', 0, /Argument 'limit' must be a positive integer/],
+      ['limit', -5, /Argument 'limit' must be a positive integer/],
+      ['limit', 1.5, /Argument 'limit' must be a positive integer/],
+      ['offset', -1, /Argument 'offset' must be a non-negative integer/],
+      ['offset', 2.5, /Argument 'offset' must be a non-negative integer/],
+      ['timeout', 0, /Argument 'timeout' must be a positive integer/],
+      ['timeout', -100, /Argument 'timeout' must be a positive integer/],
+      ['timeout', 1.5, /Argument 'timeout' must be a positive integer/],
+    ] as const) {
+      await assert.rejects(
+        command.execute({ table: 'incident', query: 'active=true', [name]: value }),
+        expected
+      );
+    }
+    assertNotCalled(mockProcessor.process);
   });
 
   for (const select of [

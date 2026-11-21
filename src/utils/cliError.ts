@@ -58,13 +58,20 @@ function loggedErrorMessages(...streams: string[]): string[] {
  * The best available failure message of a `now-sdk` invocation, or undefined
  * when neither stream carries one. Preference: the machine-mode envelope's
  * `error.message`, then the CLI's logged `ERROR:` lines, then raw stderr. When
- * the runner itself stopped the child (timeout / cancellation), its stderr note
- * is always kept, since that is the reason the output is partial.
+ * the runner stopped the child (timeout / cancellation) or an external signal
+ * terminated it, the runner's stderr note is always kept, since that is the
+ * reason the output is partial.
  * @param stdout The child's stdout
  * @param stderr The child's stderr (the runner appends its own notes here)
  * @param exitCode The exit code reported by the runner
+ * @param terminatedBySignal Signal name when an external signal terminated the child
  */
-export function cliErrorMessage(stdout: string, stderr: string, exitCode?: number): string | undefined {
+export function cliErrorMessage(
+  stdout: string,
+  stderr: string,
+  exitCode?: number,
+  terminatedBySignal?: string
+): string | undefined {
   const out = stripAnsi(stdout ?? '');
   const err = stripAnsi(stderr ?? '').trim();
 
@@ -72,7 +79,7 @@ export function cliErrorMessage(stdout: string, stderr: string, exitCode?: numbe
   const fromLog = loggedErrorMessages(out, err).join(' ');
   const primary = fromEnvelope ?? (fromLog || undefined);
 
-  if (isRunnerStoppedExit(exitCode) && err) {
+  if ((isRunnerStoppedExit(exitCode) || Boolean(terminatedBySignal)) && err) {
     return primary && !err.includes(primary) ? `${primary}\n${err}` : err;
   }
   return primary ?? (err || undefined);

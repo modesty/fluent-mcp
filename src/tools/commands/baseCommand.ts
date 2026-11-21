@@ -1,8 +1,26 @@
 import type { z } from 'zod';
-import { CLICommand, CommandArgument, CommandProcessor, CommandResult } from '../../utils/types.js';
+import { CLICommand, CommandArgument, CommandProcessor, CommandResult, ProcessRunOptions } from '../../utils/types.js';
 import { assertArguments, buildInputZodSchema } from '../toolSchema.js';
+import { resolveSdkCli } from '../../utils/sdkCli.js';
+import { getProjectRootPath } from '../../config.js';
+import { buildSdkArgv, FlagConfig } from './cliArgv.js';
 
-/** The `debug` argument, which `appendCommonFlags` maps to `--debug`. */
+/** Options for running the bundled `now-sdk` CLI from `BaseCLICommand.runBundledSdk`. */
+export interface RunSdkOptions {
+  subcommand?: string | readonly string[];
+  flags?: Record<string, FlagConfig>;
+  positionals?: readonly string[];
+  fixedFlags?: readonly string[];
+  includeDebug?: boolean;
+  /** Working directory to run in; defaults to the neutral package root. */
+  cwd?: string;
+  /** Timeout in ms; defaults to `this.timeoutMs`. */
+  timeoutMs?: number;
+  signal?: AbortSignal;
+  processOptions?: ProcessRunOptions;
+}
+
+/** The `debug` argument, which `buildSdkArgv` maps to `--debug`. */
 export const DEBUG_ARGUMENT: CommandArgument = {
   name: 'debug',
   type: 'boolean',
@@ -43,13 +61,28 @@ export abstract class BaseCLICommand implements CLICommand {
   }
 
   /**
-   * Append common SDK flags to the command arguments
-   * @param sdkArgs The array of SDK arguments to append to
-   * @param args The command arguments object
+   * Resolve the bundled `now-sdk` CLI, assemble argv via `buildSdkArgv`, and
+   * invoke `commandProcessor.process`. Defaults cwd to the neutral package root
+   * for commands that do not depend on a Fluent project.
    */
-  protected appendCommonFlags(sdkArgs: string[], args: Record<string, unknown>): void {
-    if (args.debug) {
-      sdkArgs.push('--debug');
-    }
+  protected runBundledSdk(args: Record<string, unknown>, options: RunSdkOptions): Promise<CommandResult> {
+    const { command, baseArgs } = resolveSdkCli();
+    const sdkArgs = buildSdkArgv({
+      baseArgs,
+      subcommand: options.subcommand,
+      args,
+      flags: options.flags,
+      positionals: options.positionals,
+      fixedFlags: options.fixedFlags,
+      includeDebug: options.includeDebug,
+    });
+    return this.commandProcessor.process(
+      command,
+      sdkArgs,
+      options.cwd ?? getProjectRootPath(),
+      options.timeoutMs ?? this.timeoutMs,
+      options.signal,
+      options.processOptions
+    );
   }
 }

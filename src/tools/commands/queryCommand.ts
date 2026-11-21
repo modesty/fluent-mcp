@@ -1,8 +1,6 @@
 import { ArgumentDomain, CommandArgument, CommandResult } from '../../utils/types.js';
-import { ENVELOPE_RUN_OPTIONS, shapeEnvelopeResult } from '../../utils/jsonSelect.js';
-import { SessionAwareCLICommand } from './sessionAwareCommand.js';
-import { SELECT_PATH_DOMAIN } from './argValidation.js';
-import { cliOption } from './cliArgv.js';
+import { AUTH_ARGUMENT, SessionAwareCLICommand } from './sessionAwareCommand.js';
+import { NON_NEGATIVE_INTEGER_DOMAIN, POSITIVE_INTEGER_DOMAIN, SELECT_PATH_DOMAIN } from './argValidation.js';
 import { DEBUG_ARGUMENT } from './baseCommand.js';
 
 /**
@@ -60,12 +58,14 @@ export class QueryCommand extends SessionAwareCLICommand {
       name: 'limit',
       type: 'number',
       required: false,
+      domain: POSITIVE_INTEGER_DOMAIN,
       description: 'Maximum records per page (sysparm_limit). Default 100.',
     },
     {
       name: 'offset',
       type: 'number',
       required: false,
+      domain: NON_NEGATIVE_INTEGER_DOMAIN,
       description: 'Starting offset (sysparm_offset). Default 0.',
     },
     {
@@ -109,6 +109,7 @@ export class QueryCommand extends SessionAwareCLICommand {
       name: 'timeout',
       type: 'number',
       required: false,
+      domain: POSITIVE_INTEGER_DOMAIN,
       description: 'Per-request timeout in milliseconds for each page fetch. Default 30000.',
     },
     {
@@ -118,21 +119,14 @@ export class QueryCommand extends SessionAwareCLICommand {
       domain: SELECT_PATH_DOMAIN,
       description: 'Dot/bracket path to extract from the output (SDK v4.10.0+), e.g. "records[0].sys_id". An unresolved path yields null rather than an error. Applied by this tool to a successful (ok: true) envelope only; on a failure the full envelope is returned so the error stays visible (the CLI\'s own --select would print only null).',
     },
-    {
-      name: 'auth',
-      type: 'string',
-      required: false,
-      description: 'Credential alias to use for authentication with instance (auto-injected from session if not provided)',
-    },
+    AUTH_ARGUMENT,
     DEBUG_ARGUMENT,
   ];
 
   /**
-   * Validate query arguments. The schema checks types, `displayValue` and
-   * `select` against their domains, and every string (the encoded query
-   * included) for control characters; printable operators such as `<`, `>`,
-   * `^` and `&` are query data, passed as one literal argv entry. The table
-   * name's grammar is also a schema domain. What remains is a non-empty query.
+   * Validate query arguments. The schema checks types, `displayValue`, `select`,
+   * `table`, numeric bounds, and control characters; printable operators such as
+   * `<`, `>`, `^` and `&` are query data passed as one literal argv entry.
    */
   protected validateArgs(args: Record<string, unknown>): void {
     super.validateArgs(args);
@@ -142,61 +136,30 @@ export class QueryCommand extends SessionAwareCLICommand {
   }
 
   async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
-    this.validateArgs(args);
-
-    // This tool reads from a live ServiceNow instance, so it requires authentication.
-    // Resolve the alias from the explicit `auth` arg or the session, and fail fast
-    // with an actionable message rather than letting the SDK CLI error opaquely.
-    const providedAuth = typeof args.auth === 'string' ? args.auth : undefined;
-    const resolvedAuth = await this.resolveAuthAlias(providedAuth);
-    if (!resolvedAuth) {
-      return this.missingAuthResult();
-    }
-
-    const table = args.table as string;
-
-    // The encoded query is a literal argv entry. Do not add shell quotes: with
-    // shell=false they would reach now-sdk as data and change query semantics.
-    // It lives only in this CLI token list so executeSdkCommand can re-validate
-    // the raw value in mappedArgs without emitting a duplicate --query flag.
-    const queryToken = String(args.query);
-
-    // `--exclude-reference-link` defaults to true in the CLI; the only meaningful
-    // override is to INCLUDE reference links, which yargs expresses as the
-    // `--no-` negation. Inject it explicitly (flag order is irrelevant to yargs).
-    // `--output=json` is fixed (the envelope is always parsed), so it is a CLI
-    // token, not an argument: executeSdkCommand validates only declared arguments.
-    const prefixFlags: string[] = [table, cliOption('--query', queryToken), '--output=json'];
-    if (args.excludeReferenceLink === false) {
-      prefixFlags.push('--no-exclude-reference-link');
-    }
-
-    // Inject the resolved auth alias. `query` stays RAW in the args map (for
-    // re-validation); the flag is emitted via prefixFlags above, so it is
-    // intentionally absent from the flag mapping.
-    const mappedArgs = { ...args, auth: resolvedAuth };
-
-    // `select` is applied here, not forwarded as --select; stdout is captured
-    // whole so the envelope parses (see jsonSelect).
-    const result = await this.executeSdkCommand(
+    return this.executeSdkCommand(
       'query',
-      mappedArgs,
+      args,
       {
+        query: '--query',
         fields: '--fields',
         limit: '--limit',
         offset: '--offset',
         displayValue: '--display-value',
         view: '--view',
         queryCategory: '--query-category',
+        excludeReferenceLink: { flag: '--exclude-reference-link', negateOnly: true },
         timeout: '--timeout',
         auth: '--auth',
         noCount: { flag: '--no-count' },
         queryNoDomain: { flag: '--query-no-domain' },
       },
-      prefixFlags,
+      [args.table as string],
       signal,
-      ENVELOPE_RUN_OPTIONS
+      {
+        fixedFlags: ['--output=json'],
+        requireAuth: true,
+        envelope: { select: args.select },
+      }
     );
-    return shapeEnvelopeResult(result, args.select);
   }
 }

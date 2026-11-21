@@ -7,7 +7,7 @@
  * The text must also start the SDK in the new project directory, since
  * `now-sdk init` writes the project into its cwd.
  */
-import { after, describe, it } from 'node:test';
+import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -15,6 +15,7 @@ import path from 'node:path';
 import { InitCommand } from '../../src/tools/commands/initCommand.js';
 import { CLICmdWriter } from '../../src/tools/processors/cliCmdWriter.js';
 import { cliOption } from '../../src/tools/commands/cliArgv.js';
+import { withEnvironment } from '../support/fixtures.js';
 import { parseCliOption } from '../support/argv.js';
 import { SHELLS, launchNodeCommandText, shellSplit } from '../support/shell.js';
 
@@ -31,6 +32,11 @@ function readArgv(argv: string[]): { appName: unknown; options: string[] } {
 const EXPECTED_OPTIONS = ['--packageName=my-app', '--scopeName=x_my_app', '--template=typescript.basic'];
 
 describe('init_fluent_app command text: writer → shell → yargs', { skip: process.platform === 'win32' }, () => {
+  let restoreEnv: () => void;
+  before(() => {
+    restoreEnv = withEnvironment({ SN_SDK_CREDENTIALS_DIR: undefined, SN_SDK_KEY_SOURCE: undefined });
+  });
+  after(() => restoreEnv());
   const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fluent-init-shell-')));
   after(() => fs.rmSync(root, { recursive: true, force: true }));
 
