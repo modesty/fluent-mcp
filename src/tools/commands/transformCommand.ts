@@ -1,5 +1,5 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
-import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
+import { AUTH_ARGUMENT, SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 import { DEBUG_ARGUMENT } from './baseCommand.js';
 import {
   RESPONSE_TIMEOUT_ARGUMENT,
@@ -51,10 +51,8 @@ export class TransformCommand extends SessionAwareCLICommand {
       description: 'Path to the directory that contains the project\'s package.json (defaults to the working directory)',
     },
     {
-      name: 'auth',
-      type: 'string',
-      required: false,
-      description: 'Credential alias to use for authentication with instance (auto-injected from session if not provided). Not allowed with from.',
+      ...AUTH_ARGUMENT,
+      description: `${AUTH_ARGUMENT.description}. Not allowed with from.`,
     },
     {
       name: 'table',

@@ -8,11 +8,11 @@ import {
 } from '../../utils/types.js';
 import { BaseCLICommand } from './baseCommand.js';
 import { SessionManager } from '../../utils/sessionManager.js';
-import { resolveSdkCli } from '../../utils/sdkCli.js';
-import { cliOption } from './cliArgv.js';
+import { FlagConfig } from './cliArgv.js';
 import logger from '../../utils/logger.js';
 import { getConfig, getProjectRootPath } from '../../config.js';
 import { resolveProjectDirectory } from '../../utils/projectDirectory.js';
+import { ENVELOPE_RUN_OPTIONS, shapeEnvelopeResult } from '../../utils/jsonSelect.js';
 
 export const WORKING_DIRECTORY_ARGUMENT: CommandArgument = {
   name: 'workingDirectory',
@@ -21,6 +21,36 @@ export const WORKING_DIRECTORY_ARGUMENT: CommandArgument = {
   description:
     'Absolute path to the Fluent project for this call. Overrides the initialized session and FLUENT_MCP_WORKING_DIR.',
 };
+
+export const AUTH_ARGUMENT: CommandArgument = {
+  name: 'auth',
+  type: 'string',
+  required: false,
+  description: 'Credential alias to use for authentication with instance (auto-injected from session if not provided)',
+};
+
+export const SOURCE_ARGUMENT: CommandArgument = {
+  name: 'source',
+  type: 'string',
+  required: false,
+  description: 'Path to the directory that contains package.json configuration',
+};
+
+/** Options for `SessionAwareCLICommand.executeSdkCommand`. */
+export interface ExecuteSdkOptions {
+  /** Fixed CLI tokens appended after mapped flags (before `--debug`), e.g. `['--output=json']`. */
+  fixedFlags?: readonly string[];
+  /** Require an auth alias up front and return `missingAuthResult()` when none resolves. */
+  requireAuth?: boolean;
+  /** Explicit working directory (skips `getWorkingDirectory` / `requiresProject`). */
+  cwd?: string;
+  /** Capture stdout whole and apply client-side `select` + bounding (`shapeEnvelopeResult`). */
+  envelope?: { select?: unknown; raw?: boolean };
+  /** Skip `validateArgs` when the caller already validated before pre-flight work. */
+  validated?: boolean;
+  /** Per-call process options (when `envelope` is not set). */
+  processOptions?: ProcessRunOptions;
+}
 
 /**
  * Resolve the auth alias for a command that contacts an instance: the explicit
@@ -141,70 +171,75 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
    * @returns The command result
    */
   protected async executeSdkCommand(
-    sdkCommand: string,
+    sdkCommand: string | readonly string[],
     args: Record<string, unknown>,
-    flagMapping: Record<string, string | { flag: string; negatable?: boolean }> = {},
-    positionalArgs: string[] = [],
+    flagMapping: Record<string, FlagConfig> = {},
+    positionalArgs: readonly string[] = [],
     signal?: AbortSignal,
-    options?: ProcessRunOptions
+    options?: ExecuteSdkOptions
   ): Promise<CommandResult> {
-    // Validate the caller's args with the command's input schema before they
-    // become CLI tokens (the same schema tools/call enforces). Run before auth
-    // injection, so a trusted session alias is not re-validated.
-    this.validateArgs(args);
+    // Validate caller args with the command's input schema before auth injection
+    // or argv construction, unless the caller already ran validateArgs up front.
+    if (!options?.validated) {
+      this.validateArgs(args);
+    }
 
-    // Auto-resolve auth from session if 'auth' is mapped but not provided
-    if ('auth' in flagMapping && !args.auth) {
+    // Resolve auth from session when 'auth' is mapped (or required up front).
+    if (options?.requireAuth) {
+      const providedAuth = typeof args.auth === 'string' ? args.auth : undefined;
+      const resolvedAuth = await this.resolveAuthAlias(providedAuth);
+      if (!resolvedAuth) {
+        return this.missingAuthResult();
+      }
+      args = { ...args, auth: resolvedAuth };
+    } else if ('auth' in flagMapping && !args.auth) {
       const sessionAuth = await this.resolveAuthAlias();
       if (sessionAuth) {
         args = { ...args, auth: sessionAuth };
       }
     }
 
-    // Build the full SDK command args using the bundled CLI so commands work
-    // regardless of cwd: [<base>, 'subcommand', ...positional, ...flags]
-    const { command, baseArgs } = resolveSdkCli();
-    const sdkArgs: string[] = [...baseArgs, sdkCommand];
-
-    // Add positional arguments first (before flags)
-    sdkArgs.push(...positionalArgs);
-
-    // Add mapped flags
-    for (const [argName, flagConfig] of Object.entries(flagMapping)) {
-      const value = args[argName];
-      if (value !== undefined && value !== null && value !== '') {
-        if (typeof flagConfig === 'string') {
-          sdkArgs.push(cliOption(flagConfig, value));
-        } else if (value) {
-          sdkArgs.push(flagConfig.flag);
-        } else if (flagConfig.negatable) {
-          // Explicit false on a default-true CLI flag: emit the yargs negation
-          sdkArgs.push(flagConfig.flag.replace(/^--/, '--no-'));
-        }
-      }
-    }
-
-    // Add common flags (like --debug)
-    this.appendCommonFlags(sdkArgs, args);
-
-    const timeoutMs = this.resolveTimeoutMs(args);
-    if (!this.requiresProject) {
+    let cwd: string;
+    if (options?.cwd !== undefined) {
+      cwd = options.cwd;
+    } else if (!this.requiresProject) {
       // The CLI resolves nothing from its cwd for this command, so the installed
       // package directory is a neutral cwd and no Fluent project is needed.
-      return this.commandProcessor.process(command, sdkArgs, getProjectRootPath(), timeoutMs, signal, options);
+      cwd = getProjectRootPath();
+    } else {
+      try {
+        const workingDirectory = this.getWorkingDirectory(args.workingDirectory);
+        if (!workingDirectory) {
+          return CommandResultFactory.error(
+            "No Fluent project working directory is configured. Pass the 'workingDirectory' tool argument with an absolute path, run init_fluent_app to initialize the session, or set FLUENT_MCP_WORKING_DIR to an absolute path."
+          );
+        }
+        cwd = workingDirectory;
+      } catch (error) {
+        return CommandResultFactory.fromError(error);
+      }
     }
 
+    const processOptions = options?.envelope ? ENVELOPE_RUN_OPTIONS : options?.processOptions;
+    let result: CommandResult;
     try {
-      const workingDirectory = this.getWorkingDirectory(args.workingDirectory);
-      if (!workingDirectory) {
-        return CommandResultFactory.error(
-          "No Fluent project working directory is configured. Pass the 'workingDirectory' tool argument with an absolute path, run init_fluent_app to initialize the session, or set FLUENT_MCP_WORKING_DIR to an absolute path."
-        );
-      }
-      return await this.commandProcessor.process(command, sdkArgs, workingDirectory, timeoutMs, signal, options);
+      result = await this.runBundledSdk(args, {
+        subcommand: sdkCommand,
+        flags: flagMapping,
+        positionals: positionalArgs,
+        fixedFlags: options?.fixedFlags,
+        cwd,
+        timeoutMs: this.resolveTimeoutMs(args),
+        signal,
+        processOptions,
+      });
     } catch (error) {
       return CommandResultFactory.fromError(error);
     }
+
+    return options?.envelope
+      ? shapeEnvelopeResult(result, options.envelope.select, options.envelope.raw)
+      : result;
   }
 
   /**

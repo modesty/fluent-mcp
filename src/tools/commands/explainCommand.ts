@@ -1,8 +1,6 @@
 import { CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { BaseCLICommand, DEBUG_ARGUMENT } from './baseCommand.js';
-import { resolveSdkCli } from '../../utils/sdkCli.js';
-import { assertNotOption, cliOption } from './cliArgv.js';
-import { getProjectRootPath } from '../../config.js';
+import { assertNotOption } from './cliArgv.js';
 
 /** `--format` choices declared by `now-sdk explain`. */
 const EXPLAIN_FORMATS = ['pretty', 'raw'] as const;
@@ -106,26 +104,19 @@ export class ExplainCommand extends BaseCLICommand {
       return CommandResultFactory.error("Argument 'range' requires a topic: it pages through the ranked matches for that topic.");
     }
 
-    const { command, baseArgs } = resolveSdkCli();
-    const sdkArgs = [...baseArgs, 'explain'];
-    if (args.topic) {
-      sdkArgs.push(assertNotOption(String(args.topic), 'topic'));
-    }
-
-    if (args.format) sdkArgs.push(cliOption('--format', args.format));
-    if (args.list) sdkArgs.push('--list');
-    if (args.peek) sdkArgs.push('--peek');
-    if (typeof args.range === 'string') sdkArgs.push(cliOption('--range', args.range));
-    this.appendCommonFlags(sdkArgs, args);
-
-    // `now-sdk explain` self-resolves its documentation. Use the installed
-    // package directory as a neutral cwd so this tool never requires a project.
-    return this.commandProcessor.process(
-      command,
-      sdkArgs,
-      getProjectRootPath(),
-      this.timeoutMs,
-      signal
-    );
+    const positionals = args.topic ? [assertNotOption(String(args.topic), 'topic')] : [];
+    // `now-sdk explain` self-resolves its documentation; runBundledSdk uses the
+    // installed package directory as a neutral cwd so no project is needed.
+    return this.runBundledSdk(args, {
+      subcommand: 'explain',
+      positionals,
+      flags: {
+        format: '--format',
+        list: { flag: '--list' },
+        peek: { flag: '--peek' },
+        range: '--range',
+      },
+      signal,
+    });
   }
 }

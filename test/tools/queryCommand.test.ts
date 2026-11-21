@@ -89,8 +89,8 @@ describe('QueryCommand', () => {
       [
         SDK_BIN, 'query', 'incident',
         '--query=active=true^priority<=2',
-        '--output=json',
         '--auth=session-alias',
+        '--output=json',
       ],
       PACKAGE_ROOT,
       60000,

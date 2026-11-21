@@ -1,5 +1,5 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
-import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
+import { AUTH_ARGUMENT, SOURCE_ARGUMENT, SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 import { DEBUG_ARGUMENT } from './baseCommand.js';
 import { assertNotOption } from './cliArgv.js';
 import {
@@ -23,24 +23,14 @@ export class DownloadCommand extends SessionAwareCLICommand {
   timeoutMs = 600_000;
   arguments: CommandArgument[] = [
     WORKING_DIRECTORY_ARGUMENT,
-    {
-      name: 'auth',
-      type: 'string',
-      required: false,
-      description: 'Credential alias to use for authentication with instance (auto-injected from session if not provided)',
-    },
+    AUTH_ARGUMENT,
     {
       name: 'directory',
       type: 'string',
       required: true,
       description: 'Directory the downloaded metadata XML is unpacked into (sys_app_<id>.xml plus update/). A relative path resolves against the Fluent project directory; files already there are overwritten',
     },
-    {
-      name: 'source',
-      type: 'string',
-      required: false,
-      description: 'Path to the directory that contains package.json configuration',
-    },
+    SOURCE_ARGUMENT,
     {
       name: 'incremental',
       type: 'boolean',

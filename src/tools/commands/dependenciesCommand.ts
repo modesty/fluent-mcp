@@ -1,5 +1,5 @@
 import { CommandArgument, CommandResult } from '../../utils/types.js';
-import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
+import { AUTH_ARGUMENT, SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 import { DEBUG_ARGUMENT } from './baseCommand.js';
 
 /**
@@ -14,12 +14,7 @@ export class DependenciesCommand extends SessionAwareCLICommand {
   annotations = { readOnlyHint: true, idempotentHint: true };
   arguments: CommandArgument[] = [
     WORKING_DIRECTORY_ARGUMENT,
-    {
-      name: 'auth',
-      type: 'string',
-      required: false,
-      description: 'Credential alias to use for authentication with instance (auto-injected from session if not provided)',
-    },
+    AUTH_ARGUMENT,
     DEBUG_ARGUMENT
   ];
 

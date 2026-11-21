@@ -1,7 +1,5 @@
 import { ArgumentDomain, CommandArgument, CommandResult, CommandResultFactory } from '../../utils/types.js';
 import { BaseCLICommand } from './baseCommand.js';
-import { getProjectRootPath } from '../../config.js';
-import { resolveSdkCli } from '../../utils/sdkCli.js';
 
 /** The SDK flags this tool runs: version and help. */
 const SDK_INFO_FLAGS = ['-v', '--version', '-h', '--help'] as const;
@@ -59,18 +57,14 @@ export class SdkInfoCommand extends BaseCLICommand {
       );
     }
 
-    // Run the bundled SDK CLI from the installed package directory, so version
-    // and help work regardless of cwd: now-sdk [<command>] --help, or now-sdk <flag>.
-    const { command: sdkCommand, baseArgs } = resolveSdkCli();
-    const sdkArgs: string[] = [...baseArgs];
-    if (isHelp) {
-      if (command) sdkArgs.push(command);
-      sdkArgs.push('--help');
-    } else {
-      sdkArgs.push(flag);
-    }
-
-    const result = await this.commandProcessor.process(sdkCommand, sdkArgs, getProjectRootPath(), this.timeoutMs, signal);
+    // Run the bundled SDK CLI from the neutral package directory:
+    // now-sdk [<command>] --help, or now-sdk <flag>.
+    const result = await this.runBundledSdk(args, {
+      positionals: isHelp && command ? [command] : [],
+      fixedFlags: [isHelp ? '--help' : flag],
+      includeDebug: false,
+      signal,
+    });
     if (result.exitCode === 0) {
       return CommandResultFactory.success(SdkInfoCommand.formatOutput(result.output, isHelp, command));
     }

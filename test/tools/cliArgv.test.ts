@@ -8,7 +8,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { assertNotOption, cliOption } from '../../src/tools/commands/cliArgv.js';
+import { assertNotOption, buildSdkArgv, cliOption } from '../../src/tools/commands/cliArgv.js';
 import { resolveSdkCli } from '../../src/utils/sdkCli.js';
 import { parseCliOption } from '../support/argv.js';
 
@@ -63,6 +63,46 @@ describe('assertNotOption', () => {
   it('rejects a positional that begins with "-", naming the argument', () => {
     assert.throws(() => assertNotOption('--list', 'topic'), /Argument 'topic' must not begin with "-": the CLI would read "--list" as an option/);
     assert.throws(() => assertNotOption('-x', 'directory'), /Argument 'directory'/);
+  });
+});
+
+describe('buildSdkArgv', () => {
+  it('assembles single and multi-token subcommands, positionals, mapped flags, fixedFlags, and --debug', () => {
+    assert.deepStrictEqual(
+      buildSdkArgv({
+        baseArgs: ['/cli.js'],
+        subcommand: ['cicd', 'test', 'logs'],
+        args: { resultId: 'abc', limit: 0, wait: false, sourceMap: false, force: true, empty: '', nil: null, debug: true },
+        flags: {
+          resultId: '--result-id',
+          limit: '--limit',
+          wait: { flag: '--wait', negateOnly: true },
+          sourceMap: { flag: '--sourceMap', negatable: true },
+          force: { flag: '--force' },
+          empty: '--empty',
+          nil: '--nil',
+        },
+        positionals: ['pos1'],
+        fixedFlags: ['--output=json'],
+      }),
+      ['/cli.js', 'cicd', 'test', 'logs', 'pos1', '--result-id=abc', '--limit=0', '--no-wait', '--no-sourceMap', '--force', '--output=json', '--debug']
+    );
+  });
+
+  it('omits negateOnly flags when true and honors includeDebug: false', () => {
+    assert.deepStrictEqual(
+      buildSdkArgv({
+        baseArgs: ['/cli.js'],
+        subcommand: 'query',
+        args: { excludeReferenceLink: true, noCount: false, debug: true },
+        flags: {
+          excludeReferenceLink: { flag: '--exclude-reference-link', negateOnly: true },
+          noCount: { flag: '--no-count' },
+        },
+        includeDebug: false,
+      }),
+      ['/cli.js', 'query']
+    );
   });
 });
 
