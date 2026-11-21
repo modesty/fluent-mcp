@@ -5,7 +5,6 @@ import { assertNotOption } from './cliArgv.js';
 import {
   RESPONSE_TIMEOUT_ARGUMENT,
   runnerTimeoutForResponseTimeout,
-  validateResponseTimeout,
 } from './responseTimeout.js';
 
 /**
@@ -55,7 +54,6 @@ export class DownloadCommand extends SessionAwareCLICommand {
   protected validateArgs(args: Record<string, unknown>): void {
     super.validateArgs(args);
     if (typeof args.directory === 'string') assertNotOption(args.directory, 'directory');
-    validateResponseTimeout(args);
   }
 
   protected resolveTimeoutMs(args: Record<string, unknown>): number {

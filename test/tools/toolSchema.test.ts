@@ -146,7 +146,7 @@ describe('Tool input schema — advertised (tools/list) and enforced (tools/call
         for (const arg of command.arguments) {
           const prop = (inputSchema.properties ?? {})[arg.name];
           assert.notEqual(prop, undefined);
-          assert.equal(prop.type, JSON_TYPE[arg.type]);
+          assert.equal(prop.type, arg.domain?.kind === 'integer' ? 'integer' : JSON_TYPE[arg.type]);
           assert.equal(prop.description, arg.description);
           assert.equal(prop.anyOf, undefined);
           if (arg.required) {
@@ -241,10 +241,29 @@ describe('argument domains compiled into the schema', () => {
     assert.equal(parse(arg({ type: 'boolean' }), 'yes'), "Argument 'x' must be a boolean");
   });
 
-  it('refuses a pattern that is unanchored or has flags, and a domain on a non-string', () => {
+  it('integer: enforced with bounds, advertised as integer with minimum/maximum', () => {
+    const pos = arg({ type: 'number', domain: { kind: 'integer', min: 1, max: 100 } });
+    assert.equal(parse(pos, 1), 'ok');
+    assert.equal(parse(pos, 100), 'ok');
+    assert.equal(parse(pos, 0), "Argument 'x' must be a positive integer. Received: 0.");
+    assert.equal(parse(pos, 1.5), "Argument 'x' must be a positive integer. Received: 1.5.");
+    assert.equal(parse(pos, 101), "Argument 'x' must be at most 100. Received: 101.");
+    const prop = (inputJsonSchema([pos]).properties as Record<string, { type?: string; minimum?: number; maximum?: number }>).x;
+    assert.equal(prop.type, 'integer');
+    assert.equal(prop.minimum, 1);
+    assert.equal(prop.maximum, 100);
+
+    const nonNeg = arg({ type: 'number', domain: { kind: 'integer', min: 0 } });
+    assert.equal(parse(nonNeg, 0), 'ok');
+    assert.equal(parse(nonNeg, -1), "Argument 'x' must be a non-negative integer. Received: -1.");
+  });
+
+  it('refuses a pattern that is unanchored or has flags, and a domain on a mismatched type', () => {
     for (const regex of [/[a-z]+/, /^[a-z]+/, /^[a-z]+$/i]) {
       assert.throws(() => buildInputZodShape([arg({ domain: { kind: 'pattern', regex, expected: 'e' } })]), /must be anchored \(\^…\$\) and flag-free/);
     }
-    assert.throws(() => buildInputZodShape([arg({ type: 'number', domain: { kind: 'multilineText' } })]), /a domain applies only to string arguments/);
+    assert.throws(() => buildInputZodShape([arg({ type: 'number', domain: { kind: 'multilineText' } })]), /applies only to string arguments/);
+    assert.throws(() => buildInputZodShape([arg({ type: 'string', domain: { kind: 'integer', min: 1 } })]), /applies only to number arguments/);
+    assert.throws(() => buildInputZodShape([arg({ type: 'boolean', domain: { kind: 'integer', min: 1 } })]), /cannot be applied to boolean arguments/);
   });
 });

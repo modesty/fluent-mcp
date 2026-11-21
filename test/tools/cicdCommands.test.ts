@@ -139,6 +139,18 @@ describe('CicdAppCommand', () => {
     assertNotCalled(mockProcessor.process);
   });
 
+  for (const pollTimeout of [0, -1, 1.5]) {
+    it(`should reject a non-positive-integer pollTimeout (${pollTimeout})`, async () => {
+      const command = new CicdAppCommand(mockProcessor);
+
+      const result = await command.execute({ action: 'install', scope: 'x_myco_app', pollTimeout });
+
+      assert.equal(result.success, false);
+      assert.ok(result.output.includes("Argument 'pollTimeout' must be a positive integer"));
+      assertNotCalled(mockProcessor.process);
+    });
+  }
+
   it('should reject an appSysId that is not a sys_id before any process runs', async () => {
     const command = new CicdAppCommand(mockProcessor);
 
@@ -693,6 +705,18 @@ describe('CicdTestCommand', () => {
 
         assert.equal(result.success, false);
         assert.ok(result.output.includes("Argument 'limit' must be a positive integer"));
+      });
+    }
+
+    for (const pollTimeout of [0, -1, 2.5]) {
+      it(`should reject a non-positive-integer pollTimeout (${pollTimeout})`, async () => {
+        const command = new CicdTestCommand(mockProcessor);
+
+        const result = await command.execute({ target: 'test', action: 'run', testSysId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', pollTimeout });
+
+        assert.equal(result.success, false);
+        assert.ok(result.output.includes("Argument 'pollTimeout' must be a positive integer"));
+        assertNotCalled(mockProcessor.process);
       });
     }
 

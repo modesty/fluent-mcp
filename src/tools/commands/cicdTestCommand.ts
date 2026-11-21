@@ -4,7 +4,7 @@ import { SessionAwareCLICommand } from './sessionAwareCommand.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
 import { cliOption } from './cliArgv.js';
 import { getProjectRootPath } from '../../config.js';
-import { CLI_OUTPUT_FORMATS, SELECT_PATH_DOMAIN, SYS_ID_DOMAIN, assertPositiveInteger } from './argValidation.js';
+import { CLI_OUTPUT_FORMATS, POSITIVE_INTEGER_DOMAIN, SELECT_PATH_DOMAIN, SYS_ID_DOMAIN } from './argValidation.js';
 import { DEBUG_ARGUMENT } from './baseCommand.js';
 
 /** The `target`/`action` choices — a caller-supplied token never reaches argv unvalidated. */
@@ -108,6 +108,7 @@ export class CicdTestCommand extends SessionAwareCLICommand {
       name: 'limit',
       type: 'number',
       required: false,
+      domain: POSITIVE_INTEGER_DOMAIN,
       description: 'Maximum number of log lines to return (positive integer, CLI default 100). Only with action="logs".',
     },
     {
@@ -163,6 +164,7 @@ export class CicdTestCommand extends SessionAwareCLICommand {
       name: 'pollTimeout',
       type: 'number',
       required: false,
+      domain: POSITIVE_INTEGER_DOMAIN,
       description: 'Milliseconds to poll for completion before giving up. CLI default 900000 (15 minutes). Only with action="run" or action="watch". Values above ~15 minutes also require raising FLUENT_MCP_COMMAND_TIMEOUT_MS.',
     },
     {
@@ -220,9 +222,6 @@ export class CicdTestCommand extends SessionAwareCLICommand {
           throw new Error(`Argument '${name}' is only valid with action="logs", not action="${action}".`);
         }
       }
-    }
-    if (args.limit !== undefined) {
-      assertPositiveInteger(args.limit, 'limit');
     }
 
     if (action === 'run') {

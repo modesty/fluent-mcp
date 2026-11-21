@@ -1,11 +1,10 @@
 import type { ArgumentDomain } from '../../utils/types.js';
 
 /**
- * Argument rules shared by several commands. Required arguments, types, closed
- * choices, grammars, and the control-character rule are declared on each
- * `CommandArgument` and enforced by its input schema (`src/tools/toolSchema.ts`);
- * what remains here is the shared domains and the numeric check the schema does
- * not express.
+ * Argument domains shared by several commands. Required arguments, types,
+ * closed choices, grammars, integer bounds, and the control-character rule are
+ * declared on each `CommandArgument` and compiled into its input schema
+ * (`src/tools/toolSchema.ts`).
  */
 
 /**
@@ -36,21 +35,13 @@ export const SYS_ID_DOMAIN: ArgumentDomain = {
 };
 
 /**
- * Assert that a numeric argument is a positive integer. The schema only proves
- * the value is a number; counts and durations the CLI forwards to an HTTP client
- * (a page limit, a seconds-based idle timeout) must also be whole and greater
- * than zero — undici treats `0` as "no timeout at all".
- * @param value The value to check
- * @param argName The argument name (for error messages)
- * @returns The value, narrowed to number
- * @throws Error if the value is not a positive integer
+ * A positive whole number (`>= 1`), for counts and timeouts the CLI forwards to
+ * an HTTP client (undici treats `0` as "no timeout at all").
  */
-export function assertPositiveInteger(value: unknown, argName: string): number {
-  if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
-    throw new Error(`Argument '${argName}' must be a positive integer. Received: ${String(value)}.`);
-  }
-  return value;
-}
+export const POSITIVE_INTEGER_DOMAIN: ArgumentDomain = { kind: 'integer', min: 1 };
+
+/** A non-negative whole number (`>= 0`), for zero-based pagination offsets. */
+export const NON_NEGATIVE_INTEGER_DOMAIN: ArgumentDomain = { kind: 'integer', min: 0 };
 
 /** Output formats declared by the SDK CLI commands that emit a machine envelope. */
 export const CLI_OUTPUT_FORMATS = ['json', 'raw'] as const;

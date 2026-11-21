@@ -706,4 +706,10 @@ describe('InitCommand', () => {
     assert.ok(result.error?.message.includes("Argument 'template' must be one of: base, javascript.react"));
     assertNotCalled(mockExecutor.process);
   });
+
+  it('should reject an unknown intent instead of falling through to conversion', async () => {
+    const result = await initCommand.execute({ intent: 'create', from: SYS_ID, workingDirectory: validDir });
+
+    assertRefused(result, /Argument 'intent' must be one of: conversion, creation/);
+  });
 });

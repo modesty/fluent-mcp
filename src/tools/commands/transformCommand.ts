@@ -4,7 +4,6 @@ import { DEBUG_ARGUMENT } from './baseCommand.js';
 import {
   RESPONSE_TIMEOUT_ARGUMENT,
   runnerTimeoutForResponseTimeout,
-  validateResponseTimeout,
 } from './responseTimeout.js';
 
 /**
@@ -96,7 +95,6 @@ export class TransformCommand extends SessionAwareCLICommand {
    */
   protected validateArgs(args: Record<string, unknown>): void {
     super.validateArgs(args);
-    validateResponseTimeout(args);
 
     const hasFrom = isSupplied(args.from);
     if (hasFrom && isSupplied(args.auth)) {

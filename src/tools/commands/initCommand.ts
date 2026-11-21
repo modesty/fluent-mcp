@@ -11,13 +11,14 @@ import { SessionManager } from '../../utils/sessionManager.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
 import { checkInitDestination, createInitDestination, removeCreatedDestination } from '../../utils/projectDirectory.js';
 import { cliOption } from './cliArgv.js';
-import { validateResponseTimeout } from './responseTimeout.js';
+import { POSITIVE_INTEGER_DOMAIN } from './argValidation.js';
 import logger from '../../utils/logger.js';
 import {
   InitArgsResolver,
   InitValidator,
   ConversionInitData,
   CreationInitData,
+  VALID_INTENTS,
   VALID_TEMPLATES,
 } from './init/index.js';
 
@@ -46,6 +47,7 @@ export class InitCommand extends BaseCLICommand {
       name: 'intent',
       type: 'string',
       required: false,
+      domain: { kind: 'choices', values: VALID_INTENTS },
       description: 'Specify your intent: "conversion" to convert an existing scoped app to Fluent, or "creation" to create a new scoped app. If omitted it is inferred — "conversion" when from is set, "creation" when appName, packageName or scopeName is set. Supply it explicitly when none of those are present.',
     },
     {
@@ -89,6 +91,7 @@ export class InitCommand extends BaseCLICommand {
       name: 'timeoutSeconds',
       type: 'number',
       required: false,
+      domain: POSITIVE_INTEGER_DOMAIN,
       description: 'For conversion from an instance only (from is a sys_id; SDK v4.14.2+): seconds now-sdk init waits between response chunks from the instance before giving up (CLI default 3600). An idle timeout, not a total. The returned command runs in your terminal, so no server timeout applies to it.',
     },
     {
@@ -200,7 +203,6 @@ export class InitCommand extends BaseCLICommand {
 
       // `now-sdk init --timeout` (SDK v4.14.2+) only reaches the connector of an
       // instance conversion; the CLI accepts and ignores it otherwise.
-      validateResponseTimeout(args);
       if (typeof args.timeoutSeconds === 'number' &&
           !(intent === 'conversion' && typeof args.from === 'string' && InitValidator.isSysId(args.from))) {
         return CommandResultFactory.error(

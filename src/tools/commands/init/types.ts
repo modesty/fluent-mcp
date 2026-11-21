@@ -32,7 +32,8 @@ export interface CreationInitData {
 /**
  * User intent for init command
  */
-export type InitIntent = 'conversion' | 'creation';
+export const VALID_INTENTS = ['conversion', 'creation'] as const;
+export type InitIntent = (typeof VALID_INTENTS)[number];
 
 /**
  * Validation result with multiple errors

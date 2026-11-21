@@ -4,7 +4,7 @@ import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwa
 import { resolveSdkCli } from '../../utils/sdkCli.js';
 import { cliOption } from './cliArgv.js';
 import { getProjectRootPath } from '../../config.js';
-import { CLI_OUTPUT_FORMATS, SELECT_PATH_DOMAIN, SYS_ID_DOMAIN } from './argValidation.js';
+import { CLI_OUTPUT_FORMATS, POSITIVE_INTEGER_DOMAIN, SELECT_PATH_DOMAIN, SYS_ID_DOMAIN } from './argValidation.js';
 import { DEBUG_ARGUMENT } from './baseCommand.js';
 
 /**
@@ -90,6 +90,7 @@ export class CicdAppCommand extends SessionAwareCLICommand {
       name: 'pollTimeout',
       type: 'number',
       required: false,
+      domain: POSITIVE_INTEGER_DOMAIN,
       description: 'Milliseconds to poll for completion before giving up. CLI default 900000 (15 minutes). Values above ~15 minutes also require raising FLUENT_MCP_COMMAND_TIMEOUT_MS.',
     },
     {

@@ -1,5 +1,5 @@
 import { CommandArgument } from '../../utils/types.js';
-import { assertPositiveInteger } from './argValidation.js';
+import { POSITIVE_INTEGER_DOMAIN } from './argValidation.js';
 
 /**
  * Headroom the runner leaves past a caller-raised CLI wait (the download idle
@@ -19,16 +19,10 @@ export const RESPONSE_TIMEOUT_ARGUMENT: CommandArgument = {
   name: 'timeoutSeconds',
   type: 'number',
   required: false,
+  domain: POSITIVE_INTEGER_DOMAIN,
   description:
     'Seconds the CLI waits between response chunks of a full-application download from the instance before giving up (SDK v4.13.0+, CLI default 3600). An idle timeout, not a total. Raising it also extends this tool\'s own process timeout.',
 };
-
-/** Reject a `timeoutSeconds` that is present but not a positive integer. */
-export function validateResponseTimeout(args: Record<string, unknown>): void {
-  if (args.timeoutSeconds !== undefined && args.timeoutSeconds !== null) {
-    assertPositiveInteger(args.timeoutSeconds, 'timeoutSeconds');
-  }
-}
 
 /**
  * The runner timeout for a call that may carry `timeoutSeconds`: the command's

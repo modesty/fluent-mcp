@@ -9,7 +9,7 @@ import { SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwa
 import { resolveSdkCli } from '../../utils/sdkCli.js';
 import { cliOption } from './cliArgv.js';
 import { getProjectRootPath } from '../../config.js';
-import { SELECT_PATH_DOMAIN, assertPositiveInteger } from './argValidation.js';
+import { SELECT_PATH_DOMAIN } from './argValidation.js';
 import type { ArgumentDomain } from '../../utils/types.js';
 import { CONTROL_CHARACTERS_EXCEPT_LINE_FORMATTING } from '../toolSchema.js';
 import { DEBUG_ARGUMENT } from './baseCommand.js';
@@ -126,6 +126,7 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
       name: 'timeoutMs',
       type: 'number',
       required: false,
+      domain: { kind: 'integer', min: 1, max: MAX_TIMER_DELAY_MS },
       description: `Milliseconds to wait for the script's response (CLI default ${CLI_DEFAULT_TIMEOUT_MS}). Giving up does NOT cancel the script; it keeps running on the instance. Raising it also extends this tool's own process timeout.`,
     },
     {
@@ -179,7 +180,9 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
       this.validateScriptText(args.script as string);
     }
 
-    this.validateReasonTimeout(args);
+    if ((args.reason as string).trim() === '') {
+      throw new Error("Argument 'reason' must not be empty. State why the script is being run.");
+    }
   }
 
   /** The inline script: non-empty, bounded, not parseable as a CLI option. */
@@ -196,20 +199,6 @@ export class ExecScriptCommand extends SessionAwareCLICommand {
     if (script.startsWith('-')) {
       // A leading "-" would be parsed as a CLI option rather than the script positional.
       throw new Error("Argument 'script' must not begin with \"-\". Start it with a statement or a comment.");
-    }
-  }
-
-  private validateReasonTimeout(args: Record<string, unknown>): void {
-    if ((args.reason as string).trim() === '') {
-      throw new Error("Argument 'reason' must not be empty. State why the script is being run.");
-    }
-
-    if (args.timeoutMs !== undefined && args.timeoutMs !== null) {
-      const timeoutMs = assertPositiveInteger(args.timeoutMs, 'timeoutMs');
-      // The CLI's own maximum (`exec/index.js` MAX_TIMEOUT_MS) is the timer limit.
-      if (timeoutMs > MAX_TIMER_DELAY_MS) {
-        throw new Error(`Argument 'timeoutMs' must be at most ${MAX_TIMER_DELAY_MS}. Received: ${timeoutMs}.`);
-      }
     }
   }
 

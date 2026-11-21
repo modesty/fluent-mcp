@@ -1,7 +1,7 @@
 import { ArgumentDomain, CommandArgument, CommandResult } from '../../utils/types.js';
 import { ENVELOPE_RUN_OPTIONS, shapeEnvelopeResult } from '../../utils/jsonSelect.js';
 import { SessionAwareCLICommand } from './sessionAwareCommand.js';
-import { SELECT_PATH_DOMAIN } from './argValidation.js';
+import { NON_NEGATIVE_INTEGER_DOMAIN, POSITIVE_INTEGER_DOMAIN, SELECT_PATH_DOMAIN } from './argValidation.js';
 import { cliOption } from './cliArgv.js';
 import { DEBUG_ARGUMENT } from './baseCommand.js';
 
@@ -60,12 +60,14 @@ export class QueryCommand extends SessionAwareCLICommand {
       name: 'limit',
       type: 'number',
       required: false,
+      domain: POSITIVE_INTEGER_DOMAIN,
       description: 'Maximum records per page (sysparm_limit). Default 100.',
     },
     {
       name: 'offset',
       type: 'number',
       required: false,
+      domain: NON_NEGATIVE_INTEGER_DOMAIN,
       description: 'Starting offset (sysparm_offset). Default 0.',
     },
     {
@@ -109,6 +111,7 @@ export class QueryCommand extends SessionAwareCLICommand {
       name: 'timeout',
       type: 'number',
       required: false,
+      domain: POSITIVE_INTEGER_DOMAIN,
       description: 'Per-request timeout in milliseconds for each page fetch. Default 30000.',
     },
     {
