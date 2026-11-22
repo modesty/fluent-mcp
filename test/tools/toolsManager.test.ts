@@ -216,8 +216,8 @@ describe('ToolsManager', () => {
     assert.equal(silent, 'Error (exit 1): the command reported no error message\n\nOutput:\nnull');
   });
 
-  it('lists auth profiles with auth --list through the shared executor', async () => {
-    const listed = { success: true, output: '[now-sdk] Listing all credentials: ', exitCode: 0 };
+  it('reads auth profiles with the profile reader script through the shared executor', async () => {
+    const listed = { success: true, output: '{"ok":true,"profiles":[]}', exitCode: 0 };
     const process = mock.fn(async (_command: string, _argv: string[], _cwd: string) => listed);
     const executor = { process };
     CLIExecutor.mock.mockImplementationOnce(function () {
@@ -231,7 +231,7 @@ describe('ToolsManager', () => {
     // The executor the CLI commands were built with is the one that runs the listing.
     assert.equal(createCommands.mock.calls[0].arguments[0], executor);
     assert.equal(process.mock.callCount(), 1);
-    assert.deepEqual(process.mock.calls[0].arguments[1].slice(-2), ['auth', '--list']);
+    assert.equal(process.mock.calls[0].arguments[1][0], '-e');
     assert.equal(result, listed);
   });
 });

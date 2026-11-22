@@ -26,6 +26,7 @@ mock.module('../../src/utils/logger.js', loggerFixture().mockOptions);
 const { ToolsManager } = await import('../../src/tools/toolsManager.js');
 const { CheckAuthStatusCommand } = await import('../../src/tools/resources/resourceTools.js');
 const { QueryCommand } = await import('../../src/tools/commands/queryCommand.js');
+const { InstallCommand } = await import('../../src/tools/commands/installCommand.js');
 const { TransformCommand } = await import('../../src/tools/commands/transformCommand.js');
 const { DownloadCommand } = await import('../../src/tools/commands/downloadCommand.js');
 const { DependenciesCommand } = await import('../../src/tools/commands/dependenciesCommand.js');
@@ -347,6 +348,127 @@ net.Socket.prototype.connect = function (opts) {
       const attempted = fs.existsSync(attemptedHostsPath) ? fs.readFileSync(attemptedHostsPath, 'utf8') : '';
       assert.ok(!attempted.includes('other.invalid') && !combined.includes('other.invalid'), `resolved wrong store:\n${attempted}\n${combined}`);
       assert.ok(attempted.includes('review.invalid') || combined.includes('review.invalid'), `expected validated host review.invalid:\n${attempted}\n${combined}`);
+    } finally {
+      SessionManager.getInstance().clearSession();
+    }
+  });
+
+  it('reads real SDK aliases verbatim under FORCE_COLOR=1 and LOG_LEVEL=debug, rejects control characters, and blocks deploy_fluent_app without --auth', {
+    timeout: 45_000,
+  }, async (t) => {
+    const workDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fluent-sgr-alias-')));
+    t.after(() => fs.rmSync(workDir, { recursive: true, force: true }));
+
+    const storeDir = path.join(workDir, 'store');
+    const projectDir = path.join(workDir, 'project');
+    fs.mkdirSync(storeDir, { recursive: true });
+    fs.mkdirSync(projectDir, { recursive: true });
+    const preloadPath = path.join(workDir, 'offline-sdk.cjs');
+    fs.writeFileSync(preloadPath, OFFLINE_PRELOAD);
+    const preloadOption = `--require=${JSON.stringify(preloadPath)}`;
+    const envKey = crypto.randomBytes(32).toString('base64');
+    const authModulePath = require.resolve('@servicenow/sdk-cli/dist/auth/index.js');
+
+    const writeAlias = (alias: string, url: string, isDefault: boolean) => {
+      execFileSync(
+        process.execPath,
+        [
+          '-e',
+          `const { storeCredentials } = require(${JSON.stringify(authModulePath)}); ` +
+          `storeCredentials(${JSON.stringify(alias)}, { instanceUrl: ${JSON.stringify(url)}, type: 'basic', username: 'admin', password: 'pw' }, ${String(isDefault)})` +
+          `.catch((e) => { console.error(e); process.exit(1); });`,
+        ],
+        {
+          env: {
+            ...process.env,
+            NODE_ENV: undefined,
+            NODE_OPTIONS: preloadOption,
+            NO_TELEMETRY: '1',
+            SN_SDK_CREDENTIALS_DIR: storeDir,
+            SN_SDK_KEY_SOURCE: 'env',
+            SN_SDK_ENCRYPTION_KEY: envKey,
+          },
+          stdio: 'pipe',
+        }
+      );
+    };
+    // `dev01` is the CLI default for other.invalid; `dev\x1b[31m01` belongs to target.invalid;
+    // `bad]name` belongs to bracket.invalid; literal `now-sdk` belongs to nowsdk.invalid.
+    writeAlias('dev01', 'https://other.invalid', true);
+    writeAlias('dev\x1b[31m01', 'https://target.invalid', false);
+    writeAlias('bad]name', 'https://bracket.invalid', false);
+    writeAlias('now-sdk', 'https://nowsdk.invalid', false);
+    // `x]\n[spoofed` printed as two complete `auth --list` headers, which gave
+    // spoofed.invalid to the real `spoofed` profile (another host).
+    writeAlias('spoofed', 'https://elsewhere.invalid', false);
+    writeAlias('x]\n[spoofed', 'https://spoofed.invalid', false);
+
+    const inheritedSdkSettings = Object.keys(process.env).filter((name) => /^SN_SDK_/i.test(name));
+    t.after(withEnvironment({
+      ...Object.fromEntries(inheritedSdkSettings.map((name) => [name, undefined])),
+      FORCE_COLOR: '1',
+      // Debug logging used to put SDK log lines among the profiles; the reader moves them to stderr.
+      LOG_LEVEL: 'debug',
+      NODE_ENV: undefined,
+      NODE_OPTIONS: preloadOption,
+      NO_TELEMETRY: '1',
+      SN_INSTANCE_URL: 'https://target.invalid',
+      SN_AUTH_TYPE: 'basic',
+      SN_SDK_CREDENTIALS_DIR: storeDir,
+      SN_SDK_KEY_SOURCE: 'env',
+      SN_SDK_ENCRYPTION_KEY: envKey,
+    }));
+
+    SessionManager.getInstance().clearSession();
+    try {
+      const tm = new ToolsManager();
+      const validation = await autoValidateAuthIfConfigured(tm);
+      assert.equal(validation.status, 'validation_error');
+      assert.equal(validation.alias, undefined);
+      assert.equal(SessionManager.getInstance().getAuthAlias(), undefined);
+      assert.match(validation.message, /control or escape characters/);
+      assert.match(validation.message, /auth --add makes the new profile the CLI default.*auth --use dev01/);
+      assert.ok(validation.actionRequired?.includes(`SN_SDK_CREDENTIALS_DIR=${storeDir}`), validation.actionRequired);
+      assert.match(validation.actionRequired ?? '', /SN_SDK_KEY_SOURCE=env and the same SN_SDK_ENCRYPTION_KEY/);
+
+      // `deploy_fluent_app` without explicit `auth` must propagate the rejection and NOT spawn
+      // `now-sdk install` against the CLI default profile (`dev01` -> other.invalid).
+      const installCmd = new InstallCommand(new CLIExecutor(new NodeProcessRunner()), async () => {
+        await autoValidateAuthIfConfigured(tm);
+      });
+      const deployRes = await installCmd.execute({ workingDirectory: projectDir });
+      assert.equal(deployRes.success, false);
+      assert.match(deployRes.error?.message ?? '', /control or escape characters/);
+      assert.ok(deployRes.error?.message.includes(`SN_SDK_CREDENTIALS_DIR=${storeDir}`), deployRes.error?.message);
+      assert.ok(!fs.existsSync(path.join(workDir, 'network-attempt')), 'deploy_fluent_app must not contact the CLI default instance');
+
+      // An alias containing `]` is read verbatim.
+      SessionManager.getInstance().clearSession();
+      process.env.SN_INSTANCE_URL = 'https://bracket.invalid';
+      const bracketValidation = await autoValidateAuthIfConfigured(tm);
+      assert.equal(bracketValidation.status, 'authenticated', bracketValidation.message);
+      assert.equal(bracketValidation.alias, 'bad]name');
+
+      // A literal `now-sdk` alias is an ordinary alias, not a log line.
+      SessionManager.getInstance().clearSession();
+      process.env.SN_INSTANCE_URL = 'https://nowsdk.invalid';
+      const nowSdkValidation = await autoValidateAuthIfConfigured(tm);
+      assert.equal(nowSdkValidation.status, 'authenticated', nowSdkValidation.message);
+      assert.equal(nowSdkValidation.alias, 'now-sdk');
+
+      // The forged-header alias is one alias with a newline: rejected, and the real
+      // `spoofed` profile is never selected for spoofed.invalid.
+      SessionManager.getInstance().clearSession();
+      process.env.SN_INSTANCE_URL = 'https://spoofed.invalid';
+      const forgedValidation = await autoValidateAuthIfConfigured(tm);
+      assert.equal(forgedValidation.status, 'validation_error');
+      assert.equal(forgedValidation.alias, undefined);
+      assert.equal(SessionManager.getInstance().getAuthAlias(), undefined);
+      assert.match(forgedValidation.message, /control or escape characters/);
+      const forgedDeploy = await installCmd.execute({ workingDirectory: projectDir });
+      assert.equal(forgedDeploy.success, false);
+      assert.match(forgedDeploy.error?.message ?? '', /control or escape characters/);
+      assert.ok(!fs.existsSync(path.join(workDir, 'network-attempt')), 'a rejected alias must never contact any instance');
     } finally {
       SessionManager.getInstance().clearSession();
     }

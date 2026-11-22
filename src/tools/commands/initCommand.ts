@@ -8,7 +8,7 @@ import {
   EnsureAuthValidated,
 } from '../../utils/types.js';
 import { BaseCLICommand, DEBUG_ARGUMENT } from './baseCommand.js';
-import { resolveAuthAlias } from './sessionAwareCommand.js';
+import { resolveAuthOrFailure } from './sessionAwareCommand.js';
 import { SessionManager } from '../../utils/sessionManager.js';
 import { resolveSdkCli } from '../../utils/sdkCli.js';
 import {
@@ -245,25 +245,32 @@ export class InitCommand extends BaseCLICommand {
     this.ensureAuthValidated = ensureAuthValidated;
   }
 
-  private async buildConversionArgs(data: ConversionInitData, baseArgs: string[]): Promise<string[]> {
+  private async buildConversionArgs(
+    data: ConversionInitData,
+    baseArgs: string[]
+  ): Promise<{ sdkArgs: string[]; failure?: string }> {
     const sdkArgs = [...baseArgs, 'init', cliOption('--from', data.from)];
     if (data.packageName) sdkArgs.push(cliOption('--packageName', data.packageName));
     if (data.timeoutSeconds !== undefined) sdkArgs.push(cliOption('--timeout', data.timeoutSeconds));
 
     // Local-path conversion must not trigger lazy profile discovery; an explicit
     // alias is honored without lazy validation, and a sys_id uses full resolution.
-    const convertsFromInstance = isSysId(data.from);
-    const hasExplicitAuth = isNonEmptyString(data.auth);
-    if (convertsFromInstance || hasExplicitAuth) {
-      const auth = await resolveAuthAlias(data.auth, this.ensureAuthValidated);
-      if (auth) sdkArgs.push(cliOption('--auth', auth));
+    // An instance conversion downloads the app, so a failed validation stops it:
+    // without --auth it would download from the CLI default profile's instance.
+    if (isSysId(data.from) || isNonEmptyString(data.auth)) {
+      const { alias, failure } = await resolveAuthOrFailure(data.auth, this.ensureAuthValidated);
+      if (alias) sdkArgs.push(cliOption('--auth', alias));
+      else if (failure) return { sdkArgs, failure };
     }
 
     if (data.debug) sdkArgs.push('--debug');
-    return sdkArgs;
+    return { sdkArgs };
   }
 
-  private async buildCreationArgs(data: CreationInitData, baseArgs: string[]): Promise<{ sdkArgs: string[]; auth?: string }> {
+  private async buildCreationArgs(
+    data: CreationInitData,
+    baseArgs: string[]
+  ): Promise<{ sdkArgs: string[]; auth?: string; authFailure?: string }> {
     const sdkArgs = [...baseArgs, 'init'];
 
     // CLICmdWriter shell-escapes every entry. Strip outer double quotes a caller
@@ -277,19 +284,24 @@ export class InitCommand extends BaseCLICommand {
     );
     // Creation contacts an instance to check its vendor prefix (warnIfScopePrefixMismatch);
     // resolve explicit/session auth so it targets the intended instance instead of an unrelated default.
-    const auth = await resolveAuthAlias(data.auth, this.ensureAuthValidated);
-    if (auth) sdkArgs.push(cliOption('--auth', auth));
+    // That check only warns, so a failed validation does not stop creation: the
+    // network note discloses the fallback and the fix (creationNetworkNote).
+    const { alias, failure } = await resolveAuthOrFailure(data.auth, this.ensureAuthValidated);
+    if (alias) sdkArgs.push(cliOption('--auth', alias));
     if (data.debug) sdkArgs.push('--debug');
 
-    return { sdkArgs, auth };
+    return { sdkArgs, auth: alias, authFailure: failure };
   }
 
-  private static creationNetworkNote(auth: string | undefined): string {
+  private static creationNetworkNote(auth: string | undefined, authFailure: string | undefined): string {
     const instance = auth
       ? `the instance of auth profile ${auth}`
       : "the instance of the CLI's default auth profile, if one is set (pass auth to choose the instance)";
-    return `Running this command contacts ${instance} to read its vendor prefix, and warns when scopeName does not start with it; ` +
+    const note = `Running this command contacts ${instance} to read its vendor prefix, and warns when scopeName does not start with it; ` +
       'the project is created either way. It also contacts the npm registry for the latest SDK version and the template packages.';
+    return authFailure
+      ? `${note}\n\nSN_INSTANCE_URL is configured, but no auth profile was resolved for it, so the vendor prefix comes from the CLI default profile:\n\n${authFailure}`
+      : note;
   }
 
   async execute(args: Record<string, unknown>): Promise<CommandResult> {
@@ -323,11 +335,13 @@ export class InitCommand extends BaseCLICommand {
       let sdkArgs: string[];
       let networkNote: string | undefined;
       if (intent === 'conversion') {
-        sdkArgs = await this.buildConversionArgs(initData as ConversionInitData, baseArgs);
+        const conversion = await this.buildConversionArgs(initData as ConversionInitData, baseArgs);
+        if (conversion.failure) return CommandResultFactory.error(conversion.failure);
+        sdkArgs = conversion.sdkArgs;
       } else {
         const creation = await this.buildCreationArgs(initData as CreationInitData, baseArgs);
         sdkArgs = creation.sdkArgs;
-        networkNote = InitCommand.creationNetworkNote(creation.auth);
+        networkNote = InitCommand.creationNetworkNote(creation.auth, creation.authFailure);
       }
 
       const localSource = intent === 'conversion' && !isSysId((initData as ConversionInitData).from)

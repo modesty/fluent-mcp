@@ -1,8 +1,9 @@
 import logger from '../utils/logger.js';
 import type { ToolsManager } from '../tools/toolsManager.js';
 import { SessionManager } from '../utils/sessionManager.js';
-import { CommandResultFactory } from '../utils/types.js';
+import { CommandResult, CommandResultFactory } from '../utils/types.js';
 import { AuthValidationResult } from '../types.js';
+import { AuthProfile, parseAuthProfiles } from '../tools/commands/authCommand.js';
 import { cliErrorMessage } from '../utils/cliError.js';
 import {
   credentialStoreRecoveryGuidance,
@@ -52,11 +53,13 @@ export function logAuthValidationResult(result: AuthValidationResult): void {
  *
  * Rules:
  * 1. If SN_INSTANCE_URL is not set -> return skipped status
- * 2. List the stored auth profiles via the bundled SDK CLI (`auth --list`).
+ * 2. Read the stored auth profiles through the bundled SDK's credential API
+ *    (`AuthCommand`: structured JSON, never the human `auth --list` text).
  *    The server only reads the profile store.
- *    - If a profile's host matches SN_INSTANCE_URL -> store its alias in the
- *      session; every instance command passes it per call (`--auth`), so the
- *      CLI's default profile is never switched
+ *    - If a profile's host matches SN_INSTANCE_URL and its alias has no control
+ *      characters -> store its alias in the session; every instance command
+ *      passes it per call (`--auth`), so the CLI's default profile is never switched
+ *    - If only control-character aliases match -> validation_error
  * 3. If no profile matches -> not_authenticated with the command that adds one
  *    in a terminal. The server never adds a profile: `auth --add` makes it the
  *    CLI default for every now-sdk run on the machine, and setting the previous
@@ -93,11 +96,11 @@ export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): 
   try {
     const listRes = await toolsManager.listAuthProfiles();
     if (listRes.exitCode !== 0) {
-      // `auth --list` exits 0 even with no profiles ("No credentials found"), so a
-      // non-zero exit means the profile store itself could not be read — e.g. the
-      // SDK v4.14.0+ encrypted store (credentials.enc) cannot be decrypted. Report
-      // that instead of treating it as "no matching profile".
-      const failure = describeAuthListFailure(listRes.output);
+      // The reader exits 0 even with no profiles, so a non-zero exit means the
+      // profile store itself could not be read — e.g. the SDK v4.14.0+ encrypted
+      // store (credentials.enc) cannot be decrypted. Report that instead of
+      // treating it as "no matching profile".
+      const failure = describeAuthListFailure(listRes);
       const displayFailure = sanitizeCredentialStoreMessage(failure).trim();
       logger.warn('Auto-auth failed: could not list auth profiles', { error: displayFailure });
       return createResult({
@@ -109,27 +112,58 @@ export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): 
         timestamp,
       });
     }
-    const profiles = parseAuthListOutput(listRes.output);
+    const profiles = parseAuthProfiles(listRes.output);
+    if (!profiles) {
+      logger.warn('Auto-auth failed: the profile reader returned no well-formed listing', { host });
+      return createResult({
+        status: 'validation_error',
+        host,
+        authType,
+        message: 'Auth validation failed: the bundled SDK returned no well-formed auth profile listing.',
+        actionRequired:
+          'Reinstall fluent-mcp so its bundled @servicenow/sdk is complete, then restart this MCP server. ' +
+          "Until then, pass 'auth' with a stored profile alias on each call.",
+        timestamp,
+      });
+    }
 
-    const matched = profiles.find((p) => urlsEqual(p.host, instUrl));
+    // A session alias is injected after argument validation, so it must meet the
+    // contract an explicit `auth` argument does: no control characters. Such an
+    // alias also could not be shown safely in a message or log.
+    const matching = profiles.filter((p) => urlsEqual(p.host, instUrl));
+    const matched = matching.find((p) => isPlainAlias(p.alias));
     if (matched) {
       // Found a matching profile: store its alias in the session. Every
       // instance command passes it per call (`--auth`), so the CLI's default
       // profile, which other `now-sdk` runs on this machine use, is never
       // switched here: even a status check used to redirect them (W9 review).
       sessionManager.setAuthAlias(matched.alias);
-      logger.debug('Auto-auth validated: matching profile found', { alias: matched.alias, isDefault: matched.defaultYes });
+      logger.debug('Auto-auth validated: matching profile found', { alias: matched.alias, isDefault: matched.isDefault });
       return createResult({
         status: 'authenticated',
         alias: matched.alias,
         host,
         authType: matched.type || authType,
-        isDefault: matched.defaultYes,
-        message: matched.defaultYes
+        isDefault: matched.isDefault,
+        message: matched.isDefault
           ? 'Auto-auth validated: default profile matches SN_INSTANCE_URL'
           : `Auto-auth validated: profile ${matched.alias} matches SN_INSTANCE_URL; it is passed per call, and the CLI default profile is unchanged`,
         timestamp,
       });
+    }
+    if (matching.length > 0) {
+      logger.warn('Auto-auth rejected: matching profile alias contains control or escape characters', { host });
+      return createResult(manualSetupResult({
+        instUrl,
+        authType,
+        host,
+        timestamp,
+        profiles,
+        status: 'validation_error',
+        lead:
+          `A stored auth profile matches ${host}, but its alias contains control or escape characters and cannot be safely auto-selected. ` +
+          'Add a plain-text alias for this instance in a terminal, then restart this MCP server.',
+      }));
     }
 
     logger.debug('No auth profile matches SN_INSTANCE_URL; a profile must be added by hand', { host, authType });
@@ -152,47 +186,63 @@ export async function autoValidateAuthIfConfigured(toolsManager: ToolsManager): 
   }
 }
 
-/** One profile from `now-sdk auth --list`. */
-interface AuthProfile {
-  alias: string;
-  host?: string;
-  type?: string;
-  defaultYes: boolean;
+/** Control characters (including ESC), which the `auth` argument contract excludes. */
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\x00-\x1F\x7F]/;
+
+/** True for an alias that can be passed as `--auth` and shown in a message. */
+function isPlainAlias(alias: string): boolean {
+  return alias.length > 0 && !CONTROL_CHARS.test(alias);
 }
 
-/** What the validation that found no matching profile knows. */
+/** What the validation that found no usable matching profile knows. */
 interface ManualSetupContext {
   instUrl: string;
   authType: string;
   host: string;
   timestamp: string;
-  /** The profiles `auth --list` returned, none of which matches `instUrl`. */
+  /** Every stored profile the reader returned. */
   profiles: AuthProfile[];
+  /** Validation status (`not_authenticated` when absent, `validation_error` when an alias was rejected). */
+  status?: 'not_authenticated' | 'validation_error';
+  /** Opening sentence explaining why a profile must be added in a terminal. */
+  lead?: string;
 }
 
 /**
- * The not_authenticated result when no stored profile matches SN_INSTANCE_URL:
- * the command that adds one in a terminal, and what that command does to the
- * user's other profiles.
+ * The manual-setup result when no usable stored profile matches SN_INSTANCE_URL:
+ * the command that adds one in a terminal (with credential-store settings when
+ * customized or env-backed), and what that command does to the CLI default.
  */
-function manualSetupResult({ instUrl, authType, host, timestamp, profiles }: ManualSetupContext): AuthValidationResult {
+function manualSetupResult({
+  instUrl,
+  authType,
+  host,
+  timestamp,
+  profiles,
+  status = 'not_authenticated',
+  lead = `No auth profile matches ${host}. The server does not add profiles; add one in a terminal with the command below.`,
+}: ManualSetupContext): AuthValidationResult {
   const derivedAlias = deriveAliasFromInstance(instUrl);
   // `auth --add` replaces a profile stored under the same alias. A profile with
   // the derived alias names another host here (a matching one would have been
   // used), so the command asks for another alias instead of replacing it.
   const aliasTaken = profiles.some((profile) => profile.alias === derivedAlias);
-  const previousDefault = profiles.find((profile) => profile.defaultYes)?.alias;
+  const rawPreviousDefault = profiles.find((profile) => profile.isDefault)?.alias;
+  const previousDefault = rawPreviousDefault && isPlainAlias(rawPreviousDefault) ? rawPreviousDefault : undefined;
   const envKeySource = process.env.SN_SDK_KEY_SOURCE === 'env';
   const hasEnvKey = Boolean(process.env.SN_SDK_ENCRYPTION_KEY?.trim());
   const customCredDir = resolveCredentialsDir();
   const addCommand = buildAuthCommand(instUrl, authType, aliasTaken ? '<new alias>' : derivedAlias);
 
   const message = [
-    `No auth profile matches ${host}. The server does not add profiles; add one in a terminal with the command below.`,
+    lead,
     aliasTaken &&
       `The alias ${derivedAlias} belongs to a profile for another host, which adding under it would replace, so choose another alias.`,
-    previousDefault &&
-      `auth --add makes the new profile the CLI default for every now-sdk run on this machine; run npx @servicenow/sdk auth --use ${previousDefault} afterwards to keep ${previousDefault} as the default.`,
+    previousDefault
+      ? `auth --add makes the new profile the CLI default for every now-sdk run on this machine; run npx @servicenow/sdk auth --use ${previousDefault} afterwards to keep ${previousDefault} as the default.`
+      : rawPreviousDefault &&
+        'auth --add makes the new profile the CLI default for every now-sdk run on this machine.',
     customCredDir &&
       `This MCP server reads credentials from ${customCredDir}; set SN_SDK_CREDENTIALS_DIR=${customCredDir} in your terminal before running auth --add so the profile is written to the same store.`,
     envKeySource && !hasEnvKey &&
@@ -203,15 +253,19 @@ function manualSetupResult({ instUrl, authType, host, timestamp, profiles }: Man
   ].filter(Boolean).join(' ');
 
   const dirClause = customCredDir ? ` with SN_SDK_CREDENTIALS_DIR=${customCredDir}` : '';
+  const envSettings = [
+    customCredDir && `SN_SDK_CREDENTIALS_DIR=${customCredDir}`,
+    envKeySource && 'SN_SDK_KEY_SOURCE=env and the same SN_SDK_ENCRYPTION_KEY',
+  ].filter(Boolean).join(' and ');
   const actionRequired = envKeySource && !hasEnvKey
     ? 'Generate a base64-encoded 32-byte key, configure SN_SDK_KEY_SOURCE=env and the same SN_SDK_ENCRYPTION_KEY in both your ' +
       `terminal and this MCP server's environment${dirClause}, run '${addCommand}' in that terminal, then restart this MCP server.`
-    : customCredDir
-      ? `Set SN_SDK_CREDENTIALS_DIR=${customCredDir} in your terminal, run '${addCommand}', then restart this MCP server.`
+    : envSettings
+      ? `Set ${envSettings} in your terminal, run '${addCommand}', then restart this MCP server.`
       : addCommand;
 
   return {
-    status: 'not_authenticated',
+    status,
     host,
     authType,
     message,
@@ -260,49 +314,19 @@ function deriveAliasFromInstance(instUrl: string): string {
 }
 
 /**
- * The CLI logs failures as `[now-sdk] ERROR: <message>` on stdout. Return those
- * messages (or the trimmed output when none are tagged) for the validation result.
+ * The SDK's own message for a failed profile read: the reader's `ok: false`
+ * envelope on stdout. A reader that died before writing one (e.g. a module the
+ * bundled SDK no longer has) leaves its error on stderr, which the executor
+ * already extracted into `error`; the executor's credential-store guidance is
+ * not taken from there, because `credentialStoreAction` adds its own.
  */
-function describeAuthListFailure(output: string): string {
-  return cliErrorMessage(output, '') ?? (output.trim() || 'now-sdk auth --list exited with an error and no output');
+function describeAuthListFailure(result: CommandResult): string {
+  return cliErrorMessage(result.output, '') ?? result.error?.message ??
+    (result.output.trim() || 'the auth profile reader exited with an error and no output');
 }
 
-/** The next step for an `auth --list` failure: its store rule's fix, else the add command. */
+/** The next step for a failed profile read: its store rule's fix, else the add command. */
 function credentialStoreAction(failure: string, addCommand: string): string {
   return credentialStoreRecoveryGuidance(failure, addCommand) ?? addCommand;
 }
 
-/** Parse `now-sdk auth --list` stdout into profiles */
-function parseAuthListOutput(stdout: string): AuthProfile[] {
-  const profiles: AuthProfile[] = [];
-  if (!stdout) return profiles;
-
-  const lines = stdout.split(/\r?\n/);
-  let current: AuthProfile | null = null;
-
-  for (const raw of lines) {
-    const line = raw.trimEnd();
-    // A profile header is alone on its line (`*[alias]` / `[alias]`), which keeps
-    // CLI log lines such as `[now-sdk] Listing all credentials:` from parsing as one.
-    // Hardening: current output prints log lines only before the profiles, where a
-    // bogus `now-sdk` profile had no fields and was harmless.
-    const headerMatch = line.trim().match(/^\*?\[([^\]]+)\]$/);
-    if (headerMatch) {
-      if (current) profiles.push(current);
-      // Mark default if the header starts with '*'
-      const isDefault = line.trimStart().startsWith('*');
-      current = { alias: headerMatch[1], defaultYes: isDefault };
-      continue;
-    }
-    const kvMatch = line.match(/^\s*([a-zA-Z_]+)\s*=\s*(.*)$/);
-    if (kvMatch && current) {
-      const key = kvMatch[1].toLowerCase();
-      const value = kvMatch[2].trim();
-      if (key === 'host') current.host = value;
-      else if (key === 'type') current.type = value;
-      else if (key === 'default') current.defaultYes = /^yes$/i.test(value);
-    }
-  }
-  if (current) profiles.push(current);
-  return profiles;
-}

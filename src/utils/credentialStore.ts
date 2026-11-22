@@ -1,6 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import { parseCliEnvelope } from './cliEnvelope.js';
+import { stripAnsi } from './cliError.js';
 
 /**
  * The server's launch directory, captured once at startup so a relative
@@ -205,7 +206,7 @@ const INSPECTED_ERROR_PREFIX = /^(?:[A-Z][A-Za-z0-9_]*)?Error(?:\s*\[[^\]]+\])?:
  * all SDK commands and `--debug` mode without matching arbitrary user text.
  */
 export function normalizeSdkErrorPrefix(text: string): string {
-  return text
+  return stripAnsi(text)
     .trim()
     .replace(CLI_LOGGER_ERROR_PREFIX, '')
     .replace(SDK_COMMAND_ERROR_PREFIX, '')
@@ -239,7 +240,7 @@ export function credentialStoreRecoveryGuidance(
 export function recoverCredentialStoreFailure(
   output: string, message: string | undefined, outputTruncated?: boolean
 ): { output: string; message?: string } {
-  const failure = message ?? output.trim();
+  const failure = message ?? stripAnsi(output).trim();
   if (outputTruncated || !isCredentialStoreFailure(failure)) return { output, message };
 
   const envelope = parseCliEnvelope(output);
@@ -256,7 +257,7 @@ export function recoverCredentialStoreFailure(
       output = prefix + JSON.stringify({ ...envelope, error: { ...envelope.error, message: sanitized } });
     }
   } else {
-    output = sanitizeCredentialStoreMessage(output);
+    output = sanitizeCredentialStoreMessage(stripAnsi(output));
   }
 
   const sanitized = sanitizeCredentialStoreMessage(failure).trim();
