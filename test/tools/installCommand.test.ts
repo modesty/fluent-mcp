@@ -16,7 +16,7 @@ const session = {
   setWorkingDirectory: mock.fn(),
   getAuthAlias: mock.fn((): string | undefined => undefined),
   setAuthAlias: mock.fn(),
-  getAuthValidationResult: mock.fn(),
+  getAuthValidationResult: mock.fn((): unknown => undefined),
   setAuthValidationResult: mock.fn(),
 };
 
@@ -37,6 +37,8 @@ describe('InstallCommand', () => {
   let mockProcessor: { process: ReturnType<typeof mock.fn<ProcessFn>> };
 
   beforeEach(() => {
+    session.getAuthAlias.mock.mockImplementation(() => undefined);
+    session.getAuthValidationResult.mock.mockImplementation(() => undefined);
     mockProcessor = {
       process: mock.fn<ProcessFn>(async () => ({
         success: true,
@@ -161,6 +163,27 @@ describe('InstallCommand', () => {
         900000,   // timeoutMs
         undefined  // signal
       );
+    });
+
+    it('stops before spawning install when lazy validation rejected the configured instance alias, unless auth is explicit', async () => {
+      session.getAuthValidationResult.mock.mockImplementation(() => ({
+        status: 'validation_error',
+        message: 'A stored auth profile matches target.invalid, but its alias contains control or escape characters.',
+        actionRequired: 'Set SN_SDK_CREDENTIALS_DIR=/store in your terminal, run auth --add, then restart.',
+        timestamp: '2026-11-21T00:00:00.000Z',
+      }));
+      const command = new InstallCommand(mockProcessor);
+
+      const blocked = await command.execute({});
+      assert.equal(blocked.success, false);
+      assert.equal(mockProcessor.process.mock.callCount(), 0);
+      assert.match(blocked.error?.message ?? '', /control or escape characters/);
+      assert.match(blocked.error?.message ?? '', /SN_SDK_CREDENTIALS_DIR=\/store/);
+
+      const explicit = await command.execute({ auth: 'explicit-alias' });
+      assert.equal(explicit.success, true);
+      assert.equal(mockProcessor.process.mock.callCount(), 1);
+      assert.ok(mockProcessor.process.mock.calls[0].arguments[1].includes('--auth=explicit-alias'));
     });
   });
 });

@@ -1,7 +1,8 @@
 /**
- * Tests for lazy auto-auth validation. The server only reads the CLI's profile
- * store (`auth --list`): a matching profile is used per call, and with none it
- * returns the command that adds one in a terminal. The store and its default
+ * Tests for lazy auto-auth validation. The server only reads the SDK's profile
+ * store (AuthCommand: one JSON envelope from the SDK's credential API): a
+ * matching profile is used per call, and with none it returns the command that
+ * adds one in a terminal. The store and its default
  * profile are global state other now-sdk runs share, so validation never adds,
  * deletes or selects a profile (W9 review).
  */
@@ -20,24 +21,26 @@ const { autoValidateAuthIfConfigured, logAuthValidationResult } = await import('
 const { SessionManager } = await import('../../src/utils/sessionManager.js');
 
 /**
- * A ToolsManager whose listAuthProfiles answers `auth --list` with the given
- * output and exit code. listAuthProfiles is the only ToolsManager entry point
+ * A ToolsManager whose listAuthProfiles answers with the given reader output
+ * and exit code. listAuthProfiles is the only ToolsManager entry point
  * validation uses; it has no way to write the profile store.
  */
-function makeToolsManager(listOutput = '', listExitCode = 0) {
-  const listAuthProfiles = mock.fn(async () => ({ success: listExitCode === 0, output: listOutput, exitCode: listExitCode }));
+function makeToolsManager(listOutput = listing(), listExitCode = 0, error?: Error) {
+  const listAuthProfiles = mock.fn(async () => ({ success: listExitCode === 0, output: listOutput, exitCode: listExitCode, error }));
   return { listAuthProfiles, toolsManager: { listAuthProfiles } as unknown as ToolsManager };
 }
 
-/** `auth --list` output for the given profiles, as the CLI prints it. */
-function listing(...profiles: { alias: string; host: string; isDefault?: boolean }[]): string {
-  return ['[now-sdk] Listing all credentials: ', ...profiles.flatMap(({ alias, host, isDefault }) => [
-    isDefault ? `*[${alias}]` : `[${alias}]`,
-    `      host = ${host}`,
-    '      type = basic',
-    '      username = admin',
-    `      ${isDefault ? 'default = Yes' : 'default = No'}`,
-  ])].join('\n');
+/** The profile reader's success envelope (AuthCommand LIST_PROFILES_SCRIPT) for the given profiles. */
+function listing(...profiles: { alias: string; host: string; type?: string; isDefault?: boolean }[]): string {
+  return JSON.stringify({
+    ok: true,
+    profiles: profiles.map(({ alias, host, type = 'basic', isDefault = false }) => ({ alias, host, type, isDefault })),
+  });
+}
+
+/** The profile reader's failure envelope carrying the SDK's thrown message. */
+function failed(message: string): string {
+  return JSON.stringify({ ok: false, error: { message } });
 }
 
 const BASIC_ENV = {
@@ -79,7 +82,7 @@ describe('autoValidateAuthIfConfigured', () => {
     process.env.SN_INSTANCE_URL = 'https://dev12345.service-now.com';
     process.env.SN_AUTH_TYPE = 'oauth';
 
-    const tm = makeToolsManager('');
+    const tm = makeToolsManager();
     const result = await autoValidateAuthIfConfigured(tm.toolsManager);
 
     assert.equal(result.status, 'not_authenticated');
@@ -92,7 +95,7 @@ describe('autoValidateAuthIfConfigured', () => {
 
     // auth --add makes the new profile the CLI default, so the server never
     // adds one itself; the user runs the returned command (W9 review).
-    const tm = makeToolsManager('');
+    const tm = makeToolsManager();
     const result = await autoValidateAuthIfConfigured(tm.toolsManager);
 
     assert.equal(tm.listAuthProfiles.mock.callCount(), 1);
@@ -130,14 +133,7 @@ describe('autoValidateAuthIfConfigured', () => {
     process.env.SN_INSTANCE_URL = 'https://dev12345.service-now.com';
     process.env.SN_AUTH_TYPE = 'oauth';
 
-    const listOutput = [
-      '*[dev12345]',
-      '  host = https://dev12345.service-now.com',
-      '  type = oauth',
-      '  default = yes',
-    ].join('\n');
-
-    const tm = makeToolsManager(listOutput);
+    const tm = makeToolsManager(listing({ alias: 'dev12345', host: 'https://dev12345.service-now.com', type: 'oauth', isDefault: true }));
     const result = await autoValidateAuthIfConfigured(tm.toolsManager);
 
     assert.equal(result.status, 'authenticated');
@@ -189,12 +185,12 @@ describe('autoValidateAuthIfConfigured', () => {
     process.env.SN_INSTANCE_URL = 'https://dev12345.service-now.com';
     process.env.SN_AUTH_TYPE = 'basic';
 
-    // `auth --list` logs failures on stdout and exits 1 (sdk-cli command/auth/index.js).
+    // The reader reports the SDK's thrown message in an ok:false envelope and exits 1.
     // SDK v4.14.2 also emits this exact message when an env-key store is opened with the
     // default keyring provider, so `message` must NOT repeat the CLI's `--delete all`
     // imperative, and `actionRequired` must check key source/store dir/keyring first.
     const tm = makeToolsManager(
-      "[now-sdk] ERROR: Stored credentials at /home/u/.now-sdk/credentials.enc could not be read. Run 'now-sdk auth --delete all' and re-authenticate to reset.",
+      failed("Stored credentials at /home/u/.now-sdk/credentials.enc could not be read. Run 'now-sdk auth --delete all' and re-authenticate to reset."),
       1
     );
     const result = await autoValidateAuthIfConfigured(tm.toolsManager);
@@ -227,7 +223,7 @@ describe('autoValidateAuthIfConfigured', () => {
     process.env.SN_AUTH_TYPE = 'oauth';
 
     const cliError = 'Could not write the credential encryption key to the OS keyring: The user name or passphrase you entered is not correct.';
-    const tm = makeToolsManager(`[now-sdk] ERROR: ${cliError}`, 1);
+    const tm = makeToolsManager(failed(cliError), 1);
     const result = await autoValidateAuthIfConfigured(tm.toolsManager);
 
     assert.equal(result.status, 'validation_error');
@@ -247,8 +243,8 @@ describe('autoValidateAuthIfConfigured', () => {
     Object.assign(process.env, BASIC_ENV, { SN_SDK_KEY_SOURCE: 'env' });
 
     // With SN_SDK_KEY_SOURCE=env, no credentials.enc, and no SN_SDK_ENCRYPTION_KEY,
-    // `auth --list` exits 0 with zero profiles, but `auth --add` would fail on first write.
-    const tm = makeToolsManager('');
+    // the reader exits 0 with zero profiles, but `auth --add` would fail on first write.
+    const tm = makeToolsManager();
     const result = await autoValidateAuthIfConfigured(tm.toolsManager);
 
     assert.equal(result.status, 'not_authenticated');
@@ -267,13 +263,15 @@ describe('autoValidateAuthIfConfigured', () => {
       SN_SDK_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
     });
 
-    const tm = makeToolsManager('');
+    const tm = makeToolsManager();
     const result = await autoValidateAuthIfConfigured(tm.toolsManager);
 
     assert.equal(result.status, 'not_authenticated');
     assert.match(result.message, /Because SN_SDK_KEY_SOURCE=env is active/);
     assert.match(result.message, /same SN_SDK_KEY_SOURCE=env and SN_SDK_ENCRYPTION_KEY/);
-    assert.equal(result.actionRequired, ADD_COMMAND);
+    assert.match(result.actionRequired ?? '', /SN_SDK_KEY_SOURCE=env and the same SN_SDK_ENCRYPTION_KEY/);
+    assert.ok(result.actionRequired?.includes(ADD_COMMAND), result.actionRequired);
+    assert.match(result.actionRequired ?? '', /restart this MCP server/);
   });
 
   it('carries a resolved SN_SDK_CREDENTIALS_DIR into migration fallback re-add instructions', async () => {
@@ -282,7 +280,7 @@ describe('autoValidateAuthIfConfigured', () => {
     Object.assign(process.env, BASIC_ENV, { SN_SDK_CREDENTIALS_DIR: relativeDir });
 
     const cliError = 'Could not write the credential encryption key to the OS keyring: Keyring locked.';
-    const tm = makeToolsManager(`[now-sdk] ERROR: ${cliError}`, 1);
+    const tm = makeToolsManager(failed(cliError), 1);
     const result = await autoValidateAuthIfConfigured(tm.toolsManager);
 
     assert.equal(result.status, 'validation_error');
@@ -301,7 +299,7 @@ describe('autoValidateAuthIfConfigured', () => {
 
     // 1. Unreadable store reporting a relative path.
     const unreadable = makeToolsManager(
-      `[now-sdk] ERROR: Stored credentials at ${path.join(relativeDir, 'credentials.enc')} could not be read. Run 'now-sdk auth --delete all' and re-authenticate to reset.`,
+      failed(`Stored credentials at ${path.join(relativeDir, 'credentials.enc')} could not be read. Run 'now-sdk auth --delete all' and re-authenticate to reset.`),
       1
     );
     const errResult = await autoValidateAuthIfConfigured(unreadable.toolsManager);
@@ -312,7 +310,7 @@ describe('autoValidateAuthIfConfigured', () => {
 
     // 2. Missing SN_SDK_ENCRYPTION_KEY with a path starting with `../` (must not stop at the first `.`).
     const missingKey = makeToolsManager(
-      `[now-sdk] ERROR: SN_SDK_ENCRYPTION_KEY is not set, but encrypted credentials exist at ${path.join(relativeDir, 'credentials.enc')}. Set it to the key they were encrypted with. The stored credentials were not modified.`,
+      failed(`SN_SDK_ENCRYPTION_KEY is not set, but encrypted credentials exist at ${path.join(relativeDir, 'credentials.enc')}. Set it to the key they were encrypted with. The stored credentials were not modified.`),
       1
     );
     const missingKeyResult = await autoValidateAuthIfConfigured(missingKey.toolsManager);
@@ -323,7 +321,7 @@ describe('autoValidateAuthIfConfigured', () => {
     );
 
     // 3. First-time setup (empty store) under a relative SN_SDK_CREDENTIALS_DIR.
-    const empty = makeToolsManager('');
+    const empty = makeToolsManager();
     const setupResult = await autoValidateAuthIfConfigured(empty.toolsManager);
     assert.equal(setupResult.status, 'not_authenticated');
     assert.ok(setupResult.message.includes(resolvedDir), setupResult.message);
@@ -337,7 +335,7 @@ describe('autoValidateAuthIfConfigured', () => {
 
     const cliError =
       "Could not decrypt the stored credentials at /home/u/.now-sdk/credentials.enc with SN_SDK_ENCRYPTION_KEY: the key doesn't match, or the file is corrupted. The stored credentials were not reset. Set SN_SDK_ENCRYPTION_KEY to the original key, or delete that file to start over.";
-    const tm = makeToolsManager(`[now-sdk] ERROR: ${cliError}`, 1);
+    const tm = makeToolsManager(failed(cliError), 1);
     const result = await autoValidateAuthIfConfigured(tm.toolsManager);
 
     assert.equal(result.status, 'validation_error');
@@ -383,7 +381,7 @@ describe('autoValidateAuthIfConfigured', () => {
       process.env.SN_INSTANCE_URL = 'https://dev12345.service-now.com';
       process.env.SN_AUTH_TYPE = 'oauth';
 
-      const tm = makeToolsManager(`[now-sdk] ERROR: ${cliError}`, 1);
+      const tm = makeToolsManager(failed(cliError), 1);
       const result = await autoValidateAuthIfConfigured(tm.toolsManager);
 
       assert.equal(result.status, 'validation_error');
@@ -395,7 +393,7 @@ describe('autoValidateAuthIfConfigured', () => {
     });
   }
 
-  it('reports any other non-zero auth --list exit with the CLI output and the add command', async () => {
+  it('reports any other non-zero reader exit with its output and the add command', async () => {
     process.env.SN_INSTANCE_URL = 'https://dev12345.service-now.com';
     process.env.SN_AUTH_TYPE = 'oauth';
 
@@ -408,30 +406,140 @@ describe('autoValidateAuthIfConfigured', () => {
     assert.equal(tm.listAuthProfiles.mock.callCount(), 1);
   });
 
-  it('ignores CLI log lines when parsing profiles (hardening)', async () => {
+  it('reports a reader that died before writing an envelope with the error it left on stderr', async () => {
     process.env.SN_INSTANCE_URL = 'https://dev12345.service-now.com';
     process.env.SN_AUTH_TYPE = 'oauth';
 
-    // Hardening, not a reproduced failure: real `auth --list` output prints log lines
-    // only before the profiles. The WARN line between the header and its `host =`
-    // line makes this test discriminating — the former regex (`^\*?\[([^\]]+)\]`)
-    // would start a bogus `now-sdk` profile there and give it dev12345's host.
-    const listOutput = [
-      '[now-sdk] Listing all credentials: ',
-      '[dev12345]',
-      '[now-sdk] WARN: example log line between a profile header and its fields',
-      '      host = https://dev12345.service-now.com',
-      '      type = oauth',
-      '      default = No',
-    ].join('\n');
-
-    const tm = makeToolsManager(listOutput);
+    // E.g. a future SDK that adds an `exports` map to sdk-cli: the require throws
+    // before the script's own handler runs, and CLIExecutor extracts stderr into `error`.
+    const crash = "Error: Cannot find module '@servicenow/sdk-cli/dist/auth/index.js'";
+    const tm = makeToolsManager('', 1, new Error(crash));
     const result = await autoValidateAuthIfConfigured(tm.toolsManager);
 
-    // The matching non-default profile is used; the log line never became a profile.
+    assert.equal(result.status, 'validation_error');
+    assert.equal(result.message, `Auth validation failed: could not list auth profiles: ${crash}`);
+    assert.equal(SessionManager.getInstance().getAuthAlias(), undefined);
+  });
+
+  it('reads the envelope after a LOG_LEVEL notice the SDK logger prints while loading', async () => {
+    Object.assign(process.env, BASIC_ENV);
+
+    const output = [
+      '[now-sdk] Setting log level to debug from process.env.LOG_LEVEL',
+      listing({ alias: 'dev12345', host: 'https://dev12345.service-now.com' }),
+    ].join('\n');
+    const result = await autoValidateAuthIfConfigured(makeToolsManager(output).toolsManager);
+
     assert.equal(result.status, 'authenticated');
     assert.equal(result.alias, 'dev12345');
-    assert.equal(tm.listAuthProfiles.mock.callCount(), 1);
+  });
+
+  // Fail closed: a listing the server cannot trust is never partly used.
+  for (const [label, output] of [
+    ['empty output', ''],
+    ['human auth --list text', '[now-sdk] Listing all credentials: \n*[dev12345]\n      host = https://dev12345.service-now.com'],
+    ['an envelope without ok: true', JSON.stringify({ profiles: [] })],
+    ['a profiles value that is not an array', JSON.stringify({ ok: true, profiles: {} })],
+    ['an entry without a string alias', JSON.stringify({ ok: true, profiles: [{ host: 'https://dev12345.service-now.com', isDefault: false }] })],
+    ['an entry without a boolean isDefault', JSON.stringify({
+      ok: true,
+      profiles: [
+        { alias: 'other', host: 'https://other.service-now.com', isDefault: false },
+        { alias: 'dev12345', host: 'https://dev12345.service-now.com', isDefault: 'no' },
+      ],
+    })],
+  ] as const) {
+    it(`reports validation_error and selects nothing for ${label}`, async () => {
+      Object.assign(process.env, BASIC_ENV);
+
+      const result = await autoValidateAuthIfConfigured(makeToolsManager(output).toolsManager);
+
+      assert.equal(result.status, 'validation_error');
+      assert.equal(result.message, 'Auth validation failed: the bundled SDK returned no well-formed auth profile listing.');
+      assert.match(result.actionRequired ?? '', /Reinstall fluent-mcp/);
+      assert.equal(SessionManager.getInstance().getAuthAlias(), undefined);
+    });
+  }
+
+  it('takes aliases verbatim: an alias with ] or a newline cannot forge another profile', async () => {
+    process.env.SN_INSTANCE_URL = 'https://target.service-now.com';
+    process.env.SN_AUTH_TYPE = 'basic';
+
+    // In `auth --list` text, `x]\n[spoofed` printed as two complete headers and gave
+    // the target host to `spoofed`. Structured, it is one alias, and it has a newline.
+    const forged = listing(
+      { alias: 'spoofed', host: 'https://other.service-now.com', isDefault: true },
+      { alias: 'x]\n[spoofed', host: 'https://target.service-now.com' },
+    );
+    const forgedResult = await autoValidateAuthIfConfigured(makeToolsManager(forged).toolsManager);
+    assert.equal(forgedResult.status, 'validation_error');
+    assert.equal(SessionManager.getInstance().getAuthAlias(), undefined);
+
+    SessionManager.getInstance().clearSession();
+    const bracket = listing({ alias: 'bad]name', host: 'https://target.service-now.com' });
+    const bracketResult = await autoValidateAuthIfConfigured(makeToolsManager(bracket).toolsManager);
+    assert.equal(bracketResult.status, 'authenticated');
+    assert.equal(bracketResult.alias, 'bad]name');
+
+    SessionManager.getInstance().clearSession();
+    const nowSdk = listing({ alias: 'now-sdk', host: 'https://target.service-now.com' });
+    const nowSdkResult = await autoValidateAuthIfConfigured(makeToolsManager(nowSdk).toolsManager);
+    assert.equal(nowSdkResult.status, 'authenticated');
+    assert.equal(nowSdkResult.alias, 'now-sdk');
+  });
+
+  it('rejects a matching alias with control characters and gives store settings and the CLI default warning', async () => {
+    const relativeDir = path.join('..', '.tmp-sgr-store', 'profile');
+    const resolvedDir = path.resolve(process.cwd(), relativeDir);
+    process.env.SN_INSTANCE_URL = 'https://target.service-now.com';
+    process.env.SN_AUTH_TYPE = 'basic';
+    process.env.SN_SDK_CREDENTIALS_DIR = relativeDir;
+    process.env.SN_SDK_KEY_SOURCE = 'env';
+    process.env.SN_SDK_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString('base64');
+
+    const result = await autoValidateAuthIfConfigured(makeToolsManager(listing(
+      { alias: 'dev01', host: 'https://other.service-now.com', isDefault: true },
+      { alias: 'dev\x1b[31m01', host: 'https://target.service-now.com' },
+    )).toolsManager);
+
+    assert.equal(result.status, 'validation_error');
+    assert.equal(result.alias, undefined);
+    assert.equal(SessionManager.getInstance().getAuthAlias(), undefined);
+    assert.match(result.message, /control or escape characters/);
+    assert.match(result.message, /auth --add makes the new profile the CLI default.*auth --use dev01/);
+    assert.ok(result.message.includes(`SN_SDK_CREDENTIALS_DIR=${resolvedDir}`), result.message);
+    assert.ok(!result.message.includes('\x1b'));
+    assert.equal(
+      result.actionRequired,
+      `Set SN_SDK_CREDENTIALS_DIR=${resolvedDir} and SN_SDK_KEY_SOURCE=env and the same SN_SDK_ENCRYPTION_KEY in your terminal, ` +
+      "run 'npx @servicenow/sdk auth --add https://target.service-now.com --type basic --alias target.service-now.com', then restart this MCP server."
+    );
+  });
+
+  it('omits the auth --use hint when the CLI default alias has control characters', async () => {
+    Object.assign(process.env, BASIC_ENV);
+
+    const result = await autoValidateAuthIfConfigured(makeToolsManager(listing(
+      { alias: 'evil\nalias', host: 'https://other.service-now.com', isDefault: true },
+    )).toolsManager);
+
+    assert.equal(result.status, 'not_authenticated');
+    assert.match(result.message, /auth --add makes the new profile the CLI default for every now-sdk run on this machine\.$/);
+    assert.ok(!result.message.includes('auth --use'));
+  });
+
+  it('prefers a plain-text alias when another profile for the same host has control characters', async () => {
+    process.env.SN_INSTANCE_URL = 'https://target.service-now.com';
+    process.env.SN_AUTH_TYPE = 'basic';
+
+    const result = await autoValidateAuthIfConfigured(makeToolsManager(listing(
+      { alias: 'dev\x1b[31m01', host: 'https://target.service-now.com' },
+      { alias: 'target-clean', host: 'https://target.service-now.com' },
+    )).toolsManager);
+
+    assert.equal(result.status, 'authenticated');
+    assert.equal(result.alias, 'target-clean');
+    assert.equal(SessionManager.getInstance().getAuthAlias(), 'target-clean');
   });
 });
 

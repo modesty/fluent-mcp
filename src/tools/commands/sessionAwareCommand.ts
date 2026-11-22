@@ -80,6 +80,42 @@ export async function resolveAuthAlias(
 }
 
 /**
+ * Why lazy validation of `SN_INSTANCE_URL` left no alias, with its next step:
+ * it failed (`validation_error`) or found no usable matching profile
+ * (`not_authenticated`). `undefined` when validation was skipped (no
+ * `SN_INSTANCE_URL`) or succeeded, so only an unconfigured server falls back
+ * to the CLI default profile.
+ */
+export function authValidationFailureMessage(): string | undefined {
+  const validation = SessionManager.getInstance().getAuthValidationResult();
+  if (validation?.status === 'validation_error' || validation?.status === 'not_authenticated') {
+    return [validation.message, validation.actionRequired].filter(Boolean).join('\n\n');
+  }
+  return undefined;
+}
+
+/** The outcome of {@link resolveAuthOrFailure}: an alias, or why there is none. */
+export interface AuthResolution {
+  alias?: string;
+  /** Set when `SN_INSTANCE_URL` is configured but resolved no alias. */
+  failure?: string;
+}
+
+/**
+ * Resolve the auth alias as {@link resolveAuthAlias} does and, when none
+ * resolves, report why lazy validation failed. A caller that would otherwise
+ * run without `--auth` must stop on `failure`: the CLI would fall back to its
+ * default profile, which may name an unrelated instance.
+ */
+export async function resolveAuthOrFailure(
+  providedAuth: string | undefined,
+  ensureAuthValidated: EnsureAuthValidated
+): Promise<AuthResolution> {
+  const alias = await resolveAuthAlias(providedAuth, ensureAuthValidated);
+  return alias ? { alias } : { failure: authValidationFailureMessage() };
+}
+
+/**
  * Base class for commands that operate inside a Fluent project directory.
  * Extends BaseCLICommand and adds working directory handling, auth resolution, and timeout support.
  */
@@ -146,10 +182,8 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
    * ways to provide one.
    */
   protected missingAuthResult(): CommandResult {
-    const validation = SessionManager.getInstance().getAuthValidationResult();
-    if (validation?.status === 'validation_error' || validation?.status === 'not_authenticated') {
-      return CommandResultFactory.error([validation.message, validation.actionRequired].filter(Boolean).join('\n\n'));
-    }
+    const failure = authValidationFailureMessage();
+    if (failure) return CommandResultFactory.error(failure);
     return CommandResultFactory.error(
       `${this.name} requires authentication to a ServiceNow instance, but no credential alias was found. ` +
       "Pass 'auth' with a stored profile alias, or set SN_INSTANCE_URL so lazy validation can load a matching profile into the session. " +
@@ -188,18 +222,19 @@ export abstract class SessionAwareCLICommand extends BaseCLICommand {
       this.validateArgs(args);
     }
 
-    // Resolve auth from session when 'auth' is mapped (or required up front).
-    if (options?.requireAuth) {
+    // Resolve auth from the session when 'auth' is mapped (or required up front).
+    // With SN_INSTANCE_URL configured, a failed validation stops the command before
+    // spawn: without --auth the CLI would use its default profile, which may name an
+    // unrelated instance. Without SN_INSTANCE_URL, an optional auth falls back to it.
+    if (options?.requireAuth || ('auth' in flagMapping && !args.auth)) {
       const providedAuth = typeof args.auth === 'string' ? args.auth : undefined;
-      const resolvedAuth = await this.resolveAuthAlias(providedAuth);
-      if (!resolvedAuth) {
+      const { alias, failure } = await resolveAuthOrFailure(providedAuth, this.ensureAuthValidated);
+      if (alias) {
+        args = { ...args, auth: alias };
+      } else if (failure) {
+        return CommandResultFactory.error(failure);
+      } else if (options?.requireAuth) {
         return this.missingAuthResult();
-      }
-      args = { ...args, auth: resolvedAuth };
-    } else if ('auth' in flagMapping && !args.auth) {
-      const sessionAuth = await this.resolveAuthAlias();
-      if (sessionAuth) {
-        args = { ...args, auth: sessionAuth };
       }
     }
 

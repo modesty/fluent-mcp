@@ -30,7 +30,7 @@ const sessionInstance = {
   setWorkingDirectory: mock.fn((_directory: string): void => undefined),
   getAuthAlias: mock.fn((): string | undefined => undefined),
   setAuthAlias: mock.fn(),
-  getAuthValidationResult: mock.fn(() => undefined),
+  getAuthValidationResult: mock.fn((): unknown => undefined),
   setAuthValidationResult: mock.fn(),
 };
 const SessionManager = {
@@ -45,6 +45,13 @@ const { InitCommand, VALID_TEMPLATES } = await import('../../src/tools/commands/
 
 const SDK_BIN = '/test/node_modules/@servicenow/sdk/bin/index.js';
 const SYS_ID = 'a1b2c3d4e5f6789012345678901234ab';
+/** A lazy validation of SN_INSTANCE_URL that found no matching profile. */
+const REJECTED_VALIDATION = {
+  status: 'not_authenticated',
+  message: 'No auth profile matches target.invalid. The server does not add profiles; add one in a terminal with the command below.',
+  actionRequired: 'npx @servicenow/sdk auth --add https://target.invalid --type oauth --alias target.invalid',
+  timestamp: '2026-11-21T00:00:00.000Z',
+};
 const CREATION = {
   appName: 'Test App',
   packageName: 'test-app',
@@ -134,6 +141,7 @@ describe('InitCommand', () => {
     for (const fn of Object.values(sessionInstance)) fn.mock.resetCalls();
     // An alias one test sets must not reach the next.
     sessionInstance.getAuthAlias.mock.mockImplementation(() => undefined);
+    sessionInstance.getAuthValidationResult.mock.mockImplementation(() => undefined);
 
     validDir = directoryWith('valid');
     processMock = createProcessMock();
@@ -448,6 +456,20 @@ describe('InitCommand', () => {
       ), result.output);
     });
 
+    it('still creates without --auth when SN_INSTANCE_URL resolved no alias, and says why in the note', async () => {
+      // The vendor-prefix check only warns, so a failed validation does not block creation.
+      sessionInstance.getAuthValidationResult.mock.mockImplementation(() => REJECTED_VALIDATION);
+
+      const result = await initCommand.execute({ ...CREATION, workingDirectory: validDir });
+
+      assert.equal(result.success, true);
+      assert.ok(!hasOption(processMock.mock.calls[0].arguments[1], '--auth'));
+      assert.ok(result.output.includes(
+        'SN_INSTANCE_URL is configured, but no auth profile was resolved for it, so the vendor prefix comes from the CLI default profile:\n\n' +
+        `${REJECTED_VALIDATION.message}\n\n${REJECTED_VALIDATION.actionRequired}`
+      ), result.output);
+    });
+
     it('adds no network note to a conversion', async () => {
       const result = await initCommand.execute({ from: SYS_ID, auth: 'dev', workingDirectory: validDir });
 
@@ -564,6 +586,37 @@ describe('InitCommand', () => {
         assertRefused(result, /timeoutSeconds/);
       });
     }
+  });
+
+  describe('conversion auth', () => {
+    it('refuses an instance conversion when SN_INSTANCE_URL resolved no alias, and creates nothing', async () => {
+      // Without --auth the download would come from the CLI default profile's instance.
+      sessionInstance.getAuthValidationResult.mock.mockImplementation(() => REJECTED_VALIDATION);
+      const destination = fresh('instance-conversion');
+
+      const result = await initCommand.execute({ from: SYS_ID, workingDirectory: destination });
+
+      assertRefused(result, `${REJECTED_VALIDATION.message}\n\n${REJECTED_VALIDATION.actionRequired}`);
+      assert.equal(fs.existsSync(destination), false);
+    });
+
+    it('runs an instance conversion with an explicit auth even when validation failed', async () => {
+      sessionInstance.getAuthValidationResult.mock.mockImplementation(() => REJECTED_VALIDATION);
+
+      const result = await initCommand.execute({ from: SYS_ID, auth: 'explicit', workingDirectory: validDir });
+
+      assert.equal(result.success, true);
+      assertProcessCalledWithSdkArgs(containsAll(['--auth=explicit']), validDir, "'--auth=explicit'");
+    });
+
+    it('runs a local conversion without consulting auth, even when validation failed', async () => {
+      sessionInstance.getAuthValidationResult.mock.mockImplementation(() => REJECTED_VALIDATION);
+
+      const result = await initCommand.execute({ from: legacyApp('local-source'), workingDirectory: validDir });
+
+      assert.equal(result.success, true);
+      assert.ok(!hasOption(processMock.mock.calls[0].arguments[1], '--auth'));
+    });
   });
 
   describe('local conversion source', () => {
