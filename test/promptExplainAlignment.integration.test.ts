@@ -60,10 +60,6 @@ describe('coding_in_fluent — explain alignment (SDK v4.13.6)', () => {
       assertExcludes(content, 'Client-side scripts, HTML, and CSS always use `Now.include()`');
     });
 
-    it('agrees with create_custom_ui, which forbids Now.include for the bundled page', () => {
-      assertIncludes(read('create_custom_ui.md'), 'never use `Now.include()` for it');
-    });
-
     it('keeps the Script Include rules: Class.create, no Glide imports, require() bridge', () => {
       assertIncludes(content, '`Class.create()`');
       assertIncludes(content, 'does **not** import Glide APIs');

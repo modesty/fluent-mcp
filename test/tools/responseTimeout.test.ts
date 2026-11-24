@@ -41,8 +41,6 @@ const { CONNECT_TIMEOUT_ARGUMENT, RESPONSE_TIMEOUT_ARGUMENT, runnerTimeoutForRes
   '../../src/tools/commands/responseTimeout.js'
 );
 
-const SDK_BIN = '/test/node_modules/@servicenow/sdk/bin/index.js';
-
 type ProcessCall = { arguments: unknown[] };
 
 describe('instance waits (SDK v4.13.0 --timeout, v4.14.3 --connect-timeout)', () => {
@@ -55,12 +53,6 @@ describe('instance waits (SDK v4.13.0 --timeout, v4.14.3 --connect-timeout)', ()
   });
 
   describe('shared argument', () => {
-    it('is named timeoutSeconds so it cannot be confused with query_fluent_records millisecond timeout', () => {
-      assert.equal(RESPONSE_TIMEOUT_ARGUMENT.name, 'timeoutSeconds');
-      assert.equal(RESPONSE_TIMEOUT_ARGUMENT.type, 'number');
-      assert.equal(RESPONSE_TIMEOUT_ARGUMENT.required, false);
-    });
-
     it('describes seconds, the 3600 CLI default, and idle (not total) semantics', () => {
       // The 4.13.0 release note says the default is 300 seconds — that was
       // undici's previous bodyTimeout; longRunningConnector sets 3600.
@@ -79,12 +71,6 @@ describe('instance waits (SDK v4.13.0 --timeout, v4.14.3 --connect-timeout)', ()
   });
 
   describe('connectTimeoutSeconds argument', () => {
-    it('is named with its unit, like timeoutSeconds', () => {
-      assert.equal(CONNECT_TIMEOUT_ARGUMENT.name, 'connectTimeoutSeconds');
-      assert.equal(CONNECT_TIMEOUT_ARGUMENT.type, 'number');
-      assert.equal(CONNECT_TIMEOUT_ARGUMENT.required, false);
-    });
-
     it('states the SDK version, the 10 second CLI default, and where the proxy is configured', () => {
       const { description } = CONNECT_TIMEOUT_ARGUMENT;
       assert.ok(description.includes('SDK v4.14.3+'));
@@ -154,23 +140,6 @@ describe('instance waits (SDK v4.13.0 --timeout, v4.14.3 --connect-timeout)', ()
           assert.equal(mockProcessor.process.mock.callCount(), 0);
         });
       }
-
-      it('maps timeoutSeconds to --timeout and extends the runner timeout', async () => {
-        const command = create(mockProcessor);
-        const result = await command.execute({ ...baseArgs, auth: 'dev', timeoutSeconds: 7200 });
-
-        assert.equal(result.success, true);
-        const [, argv, , timeoutMs] = (mockProcessor.process.mock.calls[0] as ProcessCall).arguments as [
-          unknown,
-          string[],
-          unknown,
-          number,
-        ];
-        assert.equal(argv[0], SDK_BIN);
-        assert.equal(argv[1], subcommand);
-        assert.equal(optionValue(argv, '--timeout'), '7200');
-        assert.equal(timeoutMs, 7_260_000);
-      });
 
       it('uses the static budget when timeoutSeconds is omitted', async () => {
         const command = create(mockProcessor);

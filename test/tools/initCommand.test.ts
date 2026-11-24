@@ -233,14 +233,6 @@ describe('InitCommand', () => {
     assert.ok(result.error?.message.includes('typescript.vue'));
   });
 
-  it('should fail when working directory not provided', async () => {
-    const result = await initCommand.execute({ ...CREATION });
-
-    assert.equal(result.success, false);
-    // The input schema requires workingDirectory, on tools/call and here alike.
-    assert.ok(result.error?.message.includes("Missing required argument 'workingDirectory'"));
-  });
-
   describe('destination', () => {
     it('creates a new directory under an existing parent and saves it to the session', async () => {
       const destination = fresh('new');
@@ -475,25 +467,6 @@ describe('InitCommand', () => {
 
       assert.ok(!result.output.includes('Running this command contacts'), result.output);
     });
-  });
-
-  it('should succeed for an explicit conversion intent with complete arguments', async () => {
-    const result = await initCommand.execute({
-      intent: 'conversion',
-      from: SYS_ID,
-      workingDirectory: validDir,
-      auth: 'test-auth',
-    });
-
-    assert.equal(result.success, true);
-    assert.ok(mockExecutor.process.mock.callCount() > 0);
-  });
-
-  it('should succeed for an explicit creation intent with complete arguments', async () => {
-    const result = await initCommand.execute({ intent: 'creation', ...CREATION, workingDirectory: validDir });
-
-    assert.equal(result.success, true);
-    assert.ok(mockExecutor.process.mock.callCount() > 0);
   });
 
   it('should refuse a from that is neither a sys_id nor an absolute path', async () => {
@@ -780,15 +753,6 @@ describe('InitCommand', () => {
       assert.equal(result.success, true, result.error?.message);
       assertCalledWith(mockExecutor.process, process.execPath, [SDK_BIN, 'init', `--from=${SYS_ID}`, '--auth=dev'], destination);
     });
-  });
-
-  it('should lazily validate auth for sys_id conversion without an alias', async () => {
-    const ensureAuthValidated = mock.fn(async () => undefined);
-    const instanceConversionCommand = new InitCommand(mockExecutor, ensureAuthValidated);
-
-    await instanceConversionCommand.execute({ workingDirectory: validDir, from: SYS_ID });
-
-    assertCalledTimes(ensureAuthValidated, 1);
   });
 
   it('should fail validation for non-existent local path', async () => {

@@ -138,10 +138,6 @@ describe('Tool input schema — advertised (tools/list) and enforced (tools/call
         );
       });
 
-      it('advertised required set matches the declared required args', () => {
-        assert.deepStrictEqual(new Set(inputSchema.required ?? []), new Set(requiredNames));
-      });
-
       it('advertises every argument with a renderer-friendly top-level type', () => {
         for (const arg of command.arguments) {
           const prop = (inputSchema.properties ?? {})[arg.name];

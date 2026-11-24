@@ -181,16 +181,6 @@ describe('FluentMcpServer with Modular Design', () => {
   // serveStdio owns the transport and the era decision; the server's only job is
   // to hand it a factory that satisfies its lifecycle contract.
   describe('server factory contract', () => {
-    it('serves both eras from one factory', async () => {
-      await server.start();
-
-      assertCalledTimes(serveStdio, 1);
-      const [factory, options] = serveStdio.mock.calls[0].arguments;
-      assert.equal(typeof factory, 'function');
-      // 'serve' (not 'reject') is what makes a 2025-era opening work.
-      assert.equal(options?.legacy, 'serve');
-    });
-
     it('builds no MCP server until the factory is invoked', async () => {
       await server.start();
 

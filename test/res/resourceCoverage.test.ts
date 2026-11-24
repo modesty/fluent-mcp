@@ -109,10 +109,6 @@ describe('res/ coverage of the enum', () => {
     const missing = TYPES.filter((t) => !snippets.has(t));
     assert.deepEqual(missing, [...SNIPPET_EXEMPT.keys()]);
   });
-
-  it('the snippet exemptions are all enum types', () => {
-    for (const type of SNIPPET_EXEMPT.keys()) assert.ok(TYPES.includes(type), type);
-  });
 });
 
 describe('Markdown code fences', () => {

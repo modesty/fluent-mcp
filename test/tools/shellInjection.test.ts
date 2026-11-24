@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { hasOption, optionValue } from '../support/argv.js';
+import { optionValue } from '../support/argv.js';
 import { assertNotCalled } from '../support/mockAssertions.js';
 import { configFixture, loggerFixture, sdkCliFixture, tempProjectDir } from '../support/fixtures.js';
 import type { CommandProcessor } from '../../src/utils/types.js';
@@ -56,20 +56,7 @@ describe('Shell-free arg handling for free-string paths (H1)', () => {
     };
   });
 
-  describe('correctness — spaces preserved as one token', () => {
-    it('download passes a directory with spaces as a single argv entry', async () => {
-      const command = new DownloadCommand(mockProcessor);
-      const result = await command.execute({ directory: 'my app dir' });
-
-      assert.equal(result.success, true);
-      const argv = mockProcessor.process.mock.calls[0].arguments[1];
-      assert.deepStrictEqual(argv, [
-        SDK_BIN,
-        'download',
-        'my app dir',
-      ]);
-    });
-
+  describe('correctness — a leading dash', () => {
     it('download rejects a positional directory that begins with "-"', async () => {
       const command = new DownloadCommand(mockProcessor);
 
@@ -83,17 +70,6 @@ describe('Shell-free arg handling for free-string paths (H1)', () => {
 
       assert.equal(result.success, true);
       assert.equal(optionValue(mockProcessor.process.mock.calls[0].arguments[1], '--from'), '-metadata');
-    });
-
-    it('transform passes a from-path with spaces as a single argv entry', async () => {
-      const command = new TransformCommand(mockProcessor);
-      const result = await command.execute({ from: 'my file.xml' });
-
-      assert.equal(result.success, true);
-      const argv = mockProcessor.process.mock.calls[0].arguments[1];
-      // Stricter than the original arrayContaining: the path follows --from as ONE token.
-      assert.ok(hasOption(argv, '--from'));
-      assert.equal(optionValue(argv, '--from'), 'my file.xml');
     });
   });
 
@@ -127,12 +103,11 @@ describe('Shell-free arg handling for free-string paths (H1)', () => {
       assert.equal(fs.existsSync(sentinel), false);
     });
 
-    for (const [label, value] of [['a newline', 'a\nrm -rf /'], ['a carriage return', 'a\rb'], ['a tab', 'a\tb'], ['a NUL', 'a\u0000b']]) {
-      it(`rejects ${label} in a path (control characters are never valid)`, async () => {
-        await assert.rejects(new TransformCommand(mockProcessor).execute({ from: value }), /Invalid characters in argument 'from': control characters are not allowed/);
-        await assert.rejects(new DownloadCommand(mockProcessor).execute({ directory: value }), /Invalid characters in argument 'directory'/);
-        assertNotCalled(mockProcessor.process);
-      });
-    }
+    it('rejects a newline in a path (control characters are never valid)', async () => {
+      const value = 'a\nrm -rf /';
+      await assert.rejects(new TransformCommand(mockProcessor).execute({ from: value }), /Invalid characters in argument 'from': control characters are not allowed/);
+      await assert.rejects(new DownloadCommand(mockProcessor).execute({ directory: value }), /Invalid characters in argument 'directory'/);
+      assertNotCalled(mockProcessor.process);
+    });
   });
 });

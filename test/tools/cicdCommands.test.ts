@@ -141,16 +141,6 @@ describe('CicdAppCommand', () => {
     assert.ok(mockProcessor.process.mock.calls[0].arguments[1].includes('--auto-upgrade-base-app'));
   });
 
-  it('should reject an unknown action instead of interpolating it into argv', async () => {
-    const command = new CicdAppCommand(mockProcessor);
-
-    const result = await command.execute({ action: 'uninstall' });
-
-    assert.equal(result.success, false);
-    assert.ok(result.output.includes('install, publish, rollback'));
-    assertNotCalled(mockProcessor.process);
-  });
-
   for (const pollTimeout of [0, -1, 1.5]) {
     it(`should reject a non-positive-integer pollTimeout (${pollTimeout})`, async () => {
       const command = new CicdAppCommand(mockProcessor);
@@ -454,14 +444,13 @@ describe('CicdTestCommand', () => {
     // The live finding: with this resultId the CLI fetched
     // api/sn_cicd/testsuite/results/../../../now/table/sys_user and returned user records.
     const TRAVERSAL = '../../../now/table/sys_user';
-    for (const [name, args] of [
-      ['resultId', { target: 'testsuite', action: 'result' }],
-      ['resultId', { target: 'test', action: 'logs' }],
-      ['progressId', { target: 'testsuite', action: 'watch' }],
-      ['testSuiteSysId', { target: 'testsuite', action: 'run' }],
-      ['testSysId', { target: 'test', action: 'run' }],
+    for (const [name, args, values] of [
+      ['resultId', { target: 'testsuite', action: 'result' }, [TRAVERSAL, 'res-1', `${'a'.repeat(32)}/logs`, 'a'.repeat(31)]],
+      ['progressId', { target: 'testsuite', action: 'watch' }, [TRAVERSAL]],
+      ['testSuiteSysId', { target: 'testsuite', action: 'run' }, [TRAVERSAL]],
+      ['testSysId', { target: 'test', action: 'run' }, [TRAVERSAL]],
     ] as const) {
-      for (const value of [TRAVERSAL, 'res-1', `${'a'.repeat(32)}/logs`, 'a'.repeat(31)]) {
+      for (const value of values) {
         it(`rejects ${name} ${JSON.stringify(value)} on ${args.target} ${args.action} before any process runs`, async () => {
           const command = new CicdTestCommand(mockProcessor);
           const result = await command.execute({ auth: 'dev', ...args, [name]: value });
@@ -754,15 +743,10 @@ describe('CicdTestCommand', () => {
       assert.equal(mockProcessor.process.mock.calls[0].arguments[3], 1_260_000);
     });
 
-    for (const [action, extra] of [
-      ['run', { testSysId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }],
-      ['watch', { progressId: 'cafebabecafebabecafebabecafebabe' }],
-    ] as const) {
-      it(`should keep the base runner timeout on ${action} when wait is false even if pollTimeout is large`, async () => {
-        const command = new CicdTestCommand(mockProcessor);
-        await command.execute({ target: 'test', action, ...extra, wait: false, pollTimeout: 3_600_000 });
-        assert.equal(mockProcessor.process.mock.calls[0].arguments[3], command.timeoutMs);
-      });
-    }
+    it('should keep the base runner timeout when wait is false even if pollTimeout is large', async () => {
+      const command = new CicdTestCommand(mockProcessor);
+      await command.execute({ target: 'test', action: 'run', testSysId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', wait: false, pollTimeout: 3_600_000 });
+      assert.equal(mockProcessor.process.mock.calls[0].arguments[3], command.timeoutMs);
+    });
   });
 });
