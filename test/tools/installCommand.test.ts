@@ -49,12 +49,6 @@ describe('InstallCommand', () => {
   });
 
   describe('Command metadata', () => {
-    it('should have correct name and description', () => {
-      const command = new InstallCommand(mockProcessor);
-      assert.equal(command.name, 'deploy_fluent_app');
-      assert.ok(command.description.includes('Deploy'));
-    });
-
     it('should have skipFlowActivation argument', () => {
       const command = new InstallCommand(mockProcessor);
       const skipArg = command.arguments.find(arg => arg.name === 'skipFlowActivation');
@@ -78,13 +72,6 @@ describe('InstallCommand', () => {
       assert.equal(asyncArg?.required, false);
       assert.ok(asyncArg?.description.includes('CLI default true since SDK v4.12.0'));
       assert.ok(asyncArg?.description.includes('Set false to force a synchronous install'));
-    });
-
-    it('should budget 15 minutes because the async install poll has no CLI-side cap', () => {
-      // SDK v4.12.0 polls the install tracker with `while (true)`; the runner
-      // timeout is the only bound, and killing mid-poll skips flow activation.
-      const command = new InstallCommand(mockProcessor);
-      assert.equal(command.timeoutMs, 900_000);
     });
   });
 

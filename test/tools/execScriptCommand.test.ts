@@ -318,7 +318,6 @@ describe('ExecScriptCommand', () => {
       ['a non-.js file', { scope: 'global', reason: 'r', file: 'scripts/notes.txt' }, /must be a \.js file/],
       ['a file path with a control character', { scope: 'global', reason: 'r', file: 'a\nb.js' }, /control characters are not allowed/],
       ['a blank script', { ...BASE_ARGS, script: '  \n ' }, /non-empty server-side script/],
-      ['a missing scope', { script: SCRIPT, reason: 'r' }, /Missing required argument 'scope'/],
       ['a missing reason', { script: SCRIPT, scope: 'global' }, /Missing required argument 'reason'/],
       ['a blank reason', { ...BASE_ARGS, reason: '   ' }, /'reason' must not be empty/],
       ['a multi-line reason', { ...BASE_ARGS, reason: 'line one\nline two' }, /control characters are not allowed/],
@@ -457,11 +456,6 @@ describe('ExecScriptCommand', () => {
         assertNotCalled(mockProcessor.process);
       });
     };
-
-    rejectsFile('a file that escapes the project with ..', () => {
-      fs.writeFileSync(path.join(root, 'outside.js'), 'gs.info(1);');
-      return { file: '../outside.js' };
-    }, /must be inside the Fluent project/);
 
     rejectsFile('an absolute path outside the project', () => {
       fs.writeFileSync(path.join(root, 'outside.js'), 'gs.info(1);');

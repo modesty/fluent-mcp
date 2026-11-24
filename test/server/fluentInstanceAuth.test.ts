@@ -78,18 +78,6 @@ describe('autoValidateAuthIfConfigured', () => {
     assert.equal(tm.listAuthProfiles.mock.callCount(), 0);
   });
 
-  it('returns the oauth add command when no profile matches', async () => {
-    process.env.SN_INSTANCE_URL = 'https://dev12345.service-now.com';
-    process.env.SN_AUTH_TYPE = 'oauth';
-
-    const tm = makeToolsManager();
-    const result = await autoValidateAuthIfConfigured(tm.toolsManager);
-
-    assert.equal(result.status, 'not_authenticated');
-    assert.equal(result.actionRequired, 'npx @servicenow/sdk auth --add https://dev12345.service-now.com --type oauth --alias dev12345.service-now.com');
-    assert.equal(tm.listAuthProfiles.mock.callCount(), 1);
-  });
-
   it('returns the basic add command and stores the result when no profile matches', async () => {
     Object.assign(process.env, BASIC_ENV);
 

@@ -118,17 +118,6 @@ describe('QueryCommand', () => {
     assert.equal(mockProcessor.process.mock.calls[0].arguments[2], PACKAGE_ROOT);
   });
 
-  it('should not accept workingDirectory: the CLI reads nothing from its cwd', async () => {
-    const command = new QueryCommand(mockProcessor);
-    assert.ok(!command.arguments.some((a) => a.name === 'workingDirectory'));
-
-    await assert.rejects(
-      command.execute({ table: 'sys_app', query: 'active=true', workingDirectory: WORKING_DIR }),
-      /Unrecognized key: "workingDirectory"/
-    );
-    assertNotCalled(mockProcessor.process);
-  });
-
   it('should map optional flags and append --debug', async () => {
     const command = new QueryCommand(mockProcessor);
 

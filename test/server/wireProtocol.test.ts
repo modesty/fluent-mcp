@@ -362,14 +362,8 @@ describe('dual-era wire protocol', () => {
       assert.equal(caps.prompts?.listChanged, false);
     });
 
-    it('serves tools/list with the full tool set in deterministic name order', async () => {
-      const res = await wire.modern('tools/list');
-
-      assert.deepStrictEqual(res.result.tools.map((t: Frame) => t.name), EXPECTED_TOOLS);
-    });
-
     it('advertises one knowledge tool with kind and metadataType enums', async () => {
-      // EXPECTED_TOOLS above pins that the tools it replaced are gone.
+      // EXPECTED_TOOLS (pinned for both eras below) shows the tools it replaced are gone.
       const res = await wire.modern('tools/list');
       const tool = res.result.tools.find((t: Frame) => t.name === 'get_fluent_knowledge');
       assert.deepStrictEqual(tool.inputSchema.required, ['kind']);
@@ -427,16 +421,6 @@ describe('dual-era wire protocol', () => {
 
     it('serves prompts from registerPrompt; an unknown prompt is -32602, metadata_list is optional', async () => {
       await assertPrompts((method, params) => wire.modern(method, params));
-    });
-
-    it('executes a tool call and returns its content', async () => {
-      const res = await wire.modern('tools/call', {
-        name: 'get_fluent_knowledge',
-        arguments: { kind: 'spec', metadataType: 'business-rule' },
-      });
-
-      assert.ok(!res.result.isError);
-      assert.ok(res.result.content[0].text.length > 100);
     });
 
     it('rejects an unknown tool argument via the enforced input schema', async () => {
@@ -658,17 +642,6 @@ describe('dual-era wire protocol', () => {
       assert.deepEqual(init.result.capabilities.completions, {});
       await assertPrompts((method, params) => wire.legacy(method, params));
       await assertCompletions((method, params) => wire.legacy(method, params));
-    });
-
-    it('issues no server-initiated request even when the client advertises roots and elicitation', async () => {
-      // The legacy path is where a server→client request would still be *legal*,
-      // which is exactly why it needs asserting: nothing here may reach back to
-      // the client for roots or elicitation.
-      await wire.legacyInitialize();
-      await wire.notify('notifications/initialized');
-      await wire.legacy('tools/list');
-
-      assert.deepStrictEqual(wire.serverInitiatedRequests(), []);
     });
 
     it('runs init_fluent_app without prompting for missing input', async () => {

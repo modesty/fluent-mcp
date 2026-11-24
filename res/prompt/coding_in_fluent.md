@@ -133,6 +133,8 @@ Fluent (ServiceNow SDK) is a TypeScript-based domain-specific language that allo
     - **`CatalogUiPolicy` on a record producer** (SDK v4.14.2+) — `catalogItem` accepts a `CatalogItemRecordProducer`, so the policy can reference the producer's own `variables`; keep `appliesTo: 'item'`. `CatalogClientScript` already accepted one.
     - **Ranked documentation search** — when `explain_fluent_api` finds no exact topic, it returns the closest topics ranked by relevance; pass `range` (`"7"` or `"3-7"`) to page through them instead of guessing other topic names.
     - **Slow instance conversion** — `init_fluent_app` accepts `timeoutSeconds` for a conversion from an instance (`from` is a sys_id); raise it for a large application on a slow instance.
+16. **SDK v4.14.3** — no Fluent API changed, so author exactly as for v4.14.2. One operational addition:
+    - **Connect timeouts and proxies** — `fluent_transform`, `download_fluent_app` and `init_fluent_app` (conversion from an instance) accept `connectTimeoutSeconds` (CLI default 10). If one of them fails with `Connect Timeout Error`, do not retry it unchanged: the network probably requires a proxy. Ask the user to set `NODE_USE_ENV_PROXY=1` with `HTTPS_PROXY` (and `NO_PROXY` for hosts that bypass it) in the MCP server's environment and restart the server, or in the terminal that runs a generated `init_fluent_app` command, then retry with a larger `connectTimeoutSeconds`.
 
 ## Working with Specific Metadata Types
 

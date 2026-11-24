@@ -2,7 +2,7 @@
 
 An [MCP server](https://modelcontextprotocol.io) and AI skill suite that brings [ServiceNow Fluent SDK](https://www.servicenow.com/docs/bundle/yokohama-application-development/page/build/servicenow-sdk/concept/servicenow-fluent.html) (`@servicenow/sdk`) capabilities, API specifications, code snippets, and security reviews to AI-assisted development environments.
 
-Built for [@servicenow/sdk@v4.14.2](https://github.com/ServiceNow/sdk/releases/tag/v4.14.2).
+Built for [@servicenow/sdk@v4.14.3](https://github.com/ServiceNow/sdk/releases/tag/v4.14.3).
 
 ## Key Features
 
@@ -53,6 +53,7 @@ Add `@modesty/fluent-mcp` to your MCP client configuration:
 | `FLUENT_MCP_LOG_LEVEL` | Minimum stderr log level (`debug`, `info`, `notice`, `warning` or `warn`, `error`; case-insensitive, an unknown value falls back to `info` with a warning) | `info` |
 | `FLUENT_MCP_COMMAND_TIMEOUT_MS` | Operator override for CLI command timeout, in ms, digits only, at most `2147483647` (`1e6`, `1.5`, `300000ms` or a longer value are ignored) | Per-tool |
 | `NO_TELEMETRY` | Set to `1` to disable `@servicenow/sdk` CLI telemetry | — |
+| `NODE_USE_ENV_PROXY` | Set to `1` to route the SDK CLI's instance requests through `HTTPS_PROXY` / `HTTP_PROXY`, bypassing it for hosts in `NO_PROXY`. Download and transform honor it on any Node version (SDK v4.14.3+); deploy, query, cicd and exec only on Node 24+ or 22.21+ (the Node that runs this server). A generated `init_fluent_app` command takes these from the terminal that runs it. If connecting through the proxy takes longer than 10 s, raise `connectTimeoutSeconds` | — |
 | `SN_SDK_CREDENTIALS_DIR` | Directory of the SDK's encrypted profile store `credentials.enc` (SDK v4.14.0+; an empty value is treated as unset) | `~/.now-sdk` |
 | `SN_SDK_KEY_SOURCE` | Where the SDK gets the `credentials.enc` encryption key: `keyring` or `env` (SDK v4.14.2+; any other value is an error). Use `env` in containers, CI, or where the Linux keyring corrupts the key (KWallet) | `keyring` |
 | `SN_SDK_ENCRYPTION_KEY` | With `SN_SDK_KEY_SOURCE=env`: a base64-encoded 32-byte key that you generate and keep in your secret store. The SDK never generates or stores it, and this server never reads it (it reaches the CLI only through the inherited environment) | — |
@@ -61,7 +62,7 @@ Add `@modesty/fluent-mcp` to your MCP client configuration:
 > `npx @servicenow/sdk auth --add <instance-url> --type <basic|oauth> --alias <alias>`
 > `auth --add` makes the new profile your CLI default; run `npx @servicenow/sdk auth --use <previous alias>` afterwards to keep the old one.
 > Since `@servicenow/sdk` 4.14.0, profiles are stored encrypted in `credentials.enc` with only the key in the OS keychain (or in `SN_SDK_ENCRYPTION_KEY` when `SN_SDK_KEY_SOURCE=env`). The first auth lookup migrates existing keychain profiles silently; afterwards, profiles added with an older `now-sdk` are not visible to this server. If `check_auth_status` reports that `credentials.enc` could not be read, verify `SN_SDK_CREDENTIALS_DIR` and the server account’s permissions to read the file and traverse its parent directories. Check whether the store was created with `SN_SDK_KEY_SOURCE=env` and `SN_SDK_ENCRYPTION_KEY` (configure both in your MCP client and restart the server), and ensure the OS keyring is unlocked before resetting. Treat `now-sdk auth --delete all` as a last resort only after confirming your terminal resolves the same store path, because it removes `credentials.enc` in that directory plus the shared OS keyring key and legacy keychain entry. Do not reset for any other store error: a file written by a newer `now-sdk` needs that newer SDK, and a keyring write failure needs the OS keyring unlocked (then restart the server) or a fresh env-backed store with profiles re-added.
-> This server bundles `@servicenow/sdk` 4.14.2, which writes a newly created encryption key (first setup, or after a reset) in a format 4.14.0 cannot read. If another project on the same machine pins `now-sdk` 4.14.0, upgrade it to 4.14.2 or later; otherwise 4.14.0 reports the store unreadable and offers a reset that deletes your saved profiles. With `SN_SDK_KEY_SOURCE=env`, a missing, malformed or wrong key is reported and nothing is reset: set `SN_SDK_ENCRYPTION_KEY` to the original key for an env-backed store. For a store created with the OS keyring, restore `SN_SDK_KEY_SOURCE=keyring`, unlock the original keyring, and restart the MCP server. Generated init and dependencies commands carry the server’s key provider and configured store directory. For the env provider, export the matching key in the terminal that runs the command.
+> This server bundles `@servicenow/sdk` 4.14.3, which (like 4.14.2) writes a newly created encryption key (first setup, or after a reset) in a format 4.14.0 cannot read. If another project on the same machine pins `now-sdk` 4.14.0, upgrade it to 4.14.2 or later; otherwise 4.14.0 reports the store unreadable and offers a reset that deletes your saved profiles. With `SN_SDK_KEY_SOURCE=env`, a missing, malformed or wrong key is reported and nothing is reset: set `SN_SDK_ENCRYPTION_KEY` to the original key for an env-backed store. For a store created with the OS keyring, restore `SN_SDK_KEY_SOURCE=keyring`, unlock the original keyring, and restart the MCP server. Generated init and dependencies commands carry the server’s key provider and configured store directory. For the env provider, export the matching key in the terminal that runs the command.
 > For headless CI/CD pipelines, set `SN_SDK_NODE_ENV=SN_SDK_CI_INSTALL` along with `SN_SDK_INSTANCE_URL` and `SN_SDK_USER`/`SN_SDK_USER_PWD` or `SN_SDK_OAUTH_CLIENT_ID`/`SN_SDK_OAUTH_CLIENT_SECRET`.
 
 ### MCPB Bundle (Optional)
@@ -97,7 +98,7 @@ This repository ships standalone AI agent skills under [`skills/`](./skills) pac
 
 ---
 
-## Available Tools (18)
+## Available Tools (16)
 
 ### SDK Command Tools (14)
 
@@ -105,12 +106,12 @@ This repository ships standalone AI agent skills under [`skills/`](./skills) pac
 |------|-------------|----------------|
 | `sdk_info` | Get SDK version (`-v`) or command help (`-h`) | `flag`, `command` |
 | `explain_fluent_api` | Look up Fluent SDK docs for any API class, guide, or tag; with no exact match, returns the closest topics ranked by relevance (no project required) | `topic`, `list`, `peek`, `format` (`pretty`\|`raw`), `range` (`"7"` or `"3-7"`, SDK v4.14.2+), `debug` |
-| `init_fluent_app` | Initialize a new Fluent app or convert an existing app (non-interactive) | `workingDirectory`, `intent`, `appName`, `packageName`, `scopeName`, `template`, `from`, `auth`, `timeoutSeconds` (instance conversion, SDK v4.14.2+), `debug` |
+| `init_fluent_app` | Initialize a new Fluent app or convert an existing app (non-interactive) | `workingDirectory`, `intent`, `appName`, `packageName`, `scopeName`, `template`, `from`, `auth`, `timeoutSeconds` (instance conversion, SDK v4.14.2+), `connectTimeoutSeconds` (instance conversion, SDK v4.14.3+), `debug` |
 | `build_fluent_app` | Build the Fluent application package | `workingDirectory`, `sourceMap`, `debug` |
 | `deploy_fluent_app` | Deploy/install the built package to a ServiceNow instance | `workingDirectory`, `auth`, `skipFlowActivation`, `async`, `debug` |
-| `fluent_transform` | Transform local XML or instance records into Fluent `.now.ts` source code | `workingDirectory`, `from`, `directory`, `table`, `id`, `force`, `format`, `timeoutSeconds`, `auth`, `debug` |
+| `fluent_transform` | Transform local XML or instance records into Fluent `.now.ts` source code | `workingDirectory`, `from`, `directory`, `table`, `id`, `force`, `format`, `timeoutSeconds`, `connectTimeoutSeconds` (SDK v4.14.3+), `auth`, `debug` |
 | `download_fluent_dependencies` | Generate the shell command to download application dependencies and script/table type definitions | `workingDirectory`, `auth`, `debug` |
-| `download_fluent_app` | Download application metadata from an instance | `workingDirectory`, `directory`, `source`, `incremental`, `timeoutSeconds`, `auth`, `debug` |
+| `download_fluent_app` | Download application metadata from an instance | `workingDirectory`, `directory`, `source`, `incremental`, `timeoutSeconds`, `connectTimeoutSeconds` (SDK v4.14.3+), `auth`, `debug` |
 | `clean_fluent_app` | Clean build output directory | `workingDirectory`, `source`, `debug` |
 | `pack_fluent_app` | Zip built application into an installable artifact | `workingDirectory`, `source`, `debug` |
 | `query_fluent_records` | Read-only Table REST query against an instance (returns JSON envelope); needs no Fluent project | `table`, `query`, `fields`, `limit`, `offset`, `displayValue`, `select`, `timeout`, `auth` |

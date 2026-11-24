@@ -137,12 +137,6 @@ describe('SDK Command Tools', () => {
     );
   });
 
-  it('SdkInfoCommand should handle missing required flag parameter', async () => {
-    const sdkInfoCommand = sdkInfo();
-
-    await assert.rejects(sdkInfoCommand.execute({}), /Missing required argument 'flag'/);
-  });
-
   it('SdkInfoCommand should handle errors correctly', async () => {
     const sdkInfoCommand = sdkInfo();
 

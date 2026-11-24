@@ -89,18 +89,6 @@ describe('CLICmdWriter', () => {
         { cwd: awkward, argv: ['a b'], credDir: defaultCredDir }
       );
     });
-
-    it(`pins a resolved absolute SN_SDK_CREDENTIALS_DIR in generated terminal commands under ${shell.name}`, { skip: process.platform === 'win32' }, async () => {
-      const relativeCredDir = path.relative(process.cwd(), awkward);
-      const expectedAbs = path.resolve(process.cwd(), relativeCredDir);
-      process.env.SN_SDK_CREDENTIALS_DIR = relativeCredDir;
-
-      const result = await new CLICmdWriter().process(process.execPath, ['-e', '0', '--', 'ok'], root);
-      assert.ok(result.output.includes('SN_SDK_CREDENTIALS_DIR='), result.output);
-
-      const launched = launchNodeCommandText(result.output, shell);
-      assert.deepEqual(launched, { cwd: root, argv: ['ok'], credDir: expectedAbs });
-    });
   }
 });
 

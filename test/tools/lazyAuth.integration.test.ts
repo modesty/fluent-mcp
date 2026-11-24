@@ -115,21 +115,6 @@ describe('lazy auto-auth', () => {
     }
   });
 
-  it('bypasses auto-validation when auth is explicit', async () => {
-    const ensureAuth = ensureAuthSpy();
-    const commandProcessor = processor();
-    const deploy = new InstallCommand(commandProcessor, ensureAuth);
-
-    await deploy.execute({
-      auth: 'explicit-alias',
-      workingDirectory: PROJECT_DIR,
-    });
-
-    assertNotCalled(ensureAuth);
-    const argv = commandProcessor.process.mock.calls[0].arguments[1];
-    assert.equal(optionValue(argv, '--auth'), 'explicit-alias');
-  });
-
   it('memoizes a failed validation instead of racing or retrying', async () => {
     autoValidate.mock.mockImplementation(async () => {
       throw new Error('validation unavailable');

@@ -72,7 +72,7 @@ describe('TransformCommand (SDK v4.13.6 transform)', () => {
   describe('metadata', () => {
     it('exposes force and format alongside the existing arguments', () => {
       assert.deepStrictEqual(command.arguments.map((arg) => arg.name), [
-        'workingDirectory', 'from', 'directory', 'auth', 'table', 'id', 'force', 'format', 'timeoutSeconds', 'debug',
+        'workingDirectory', 'from', 'directory', 'auth', 'table', 'id', 'force', 'format', 'timeoutSeconds', 'connectTimeoutSeconds', 'debug',
       ]);
       const byName = Object.fromEntries(command.arguments.map((arg) => [arg.name, arg]));
       assert.equal(byName.force.type, 'boolean');
@@ -125,6 +125,14 @@ describe('TransformCommand (SDK v4.13.6 transform)', () => {
       assertContainsAll(argvOf(), ['--table=sys_script', '--id=abc123', '--auth=dev']);
     });
 
+    it('table with id accepts both instance waits, since SDK v4.14.3 sends every request through the connector', async () => {
+      await command.execute({
+        workingDirectory: PROJECT_DIR, auth: 'dev', table: 'sys_script', id: 'abc123',
+        timeoutSeconds: 300, connectTimeoutSeconds: 30,
+      });
+      assertContainsAll(argvOf(), ['--timeout=300', '--connect-timeout=30']);
+    });
+
     it('table without from still maps auth, because only --from marks the CLI run offline', async () => {
       await command.execute({ workingDirectory: PROJECT_DIR, table: 'sys_script' });
       assertCalledTimes(ensureAuth, 1);
@@ -174,6 +182,24 @@ describe('TransformCommand (SDK v4.13.6 transform)', () => {
         assertNotCalled(ensureAuth);
         assertNotCalled(mockProcessor.process);
       });
+    }
+
+    // The CLI builds no connector for --from and never sends a request through it
+    // for --table without --id, so both waits would be silent no-ops there.
+    for (const wait of ['timeoutSeconds', 'connectTimeoutSeconds'] as const) {
+      for (const [mode, args] of [
+        ['a from transform', { from: 'metadata' }],
+        ['table without id', { auth: 'dev', table: 'sys_script' }],
+      ] as const) {
+        it(`${wait} with ${mode}`, async () => {
+          await assertRejectsContaining(
+            command.execute({ workingDirectory: PROJECT_DIR, ...args, [wait]: 60 }),
+            `Argument '${wait}' applies only to a transform that reads from the instance`
+          );
+          assertNotCalled(ensureAuth);
+          assertNotCalled(mockProcessor.process);
+        });
+      }
     }
 
     it('treats an empty-string from as absent, matching the flag map', async () => {

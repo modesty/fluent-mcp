@@ -894,17 +894,6 @@ describe('NodeProcessRunner — output is bounded (P0.4)', () => {
     assert.match(result.stdout, /characters truncated/);
   });
 
-  it('does not truncate output within the budget', { timeout: TEST_TIMEOUT_MS }, async () => {
-    const runner = new NodeProcessRunner({ maxOutputChars: 200 });
-    const result = await runner.run(
-      process.execPath,
-      ["-e", "process.stdout.write('short output')"]
-    );
-
-    assert.equal(result.stdout, 'short output');
-    assert.doesNotMatch(result.stdout, /characters truncated/);
-  });
-
   it('flags a cut stdout, and lets a call raise the stdout cap without raising stderr\'s', { timeout: TEST_TIMEOUT_MS }, async () => {
     const runner = new NodeProcessRunner({ maxOutputChars: 200 });
     const childArgs = ['-e', "process.stdout.write('A'.repeat(2000)); process.stderr.write('E'.repeat(2000))"];

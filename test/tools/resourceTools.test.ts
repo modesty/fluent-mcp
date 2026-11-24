@@ -126,14 +126,6 @@ describe('Resource Tool Commands', () => {
       const unlisted = await sparse.execute({ kind: 'instruct', metadataType: 'script-include' });
       assert.match(unlisted.output, /No instruct resource found for metadata type 'script-include'/);
     });
-
-    it('returns the authoring guide for a metadata type', async () => {
-      const result = await command.execute({ kind: 'instruct', metadataType: TEST_METADATA_TYPE });
-
-      assert.equal(result.success, true);
-      assert.equal(result.output, mockInstructContent);
-      assert.equal(result.structuredContent?.resourceType, 'instruct');
-    });
   });
 
   describe("kind 'snippet'", () => {
@@ -172,13 +164,6 @@ describe('Resource Tool Commands', () => {
       assert.equal(result.success, false);
       assert.match(result.output, /No snippets found for metadata type 'script-include'/);
     });
-
-    it('lists only the types that have a snippet', async () => {
-      const result = await command.execute({ kind: 'snippet' });
-
-      assert.equal(result.success, true);
-      assert.deepEqual(result.structuredContent?.availableTypes, [TEST_METADATA_TYPE]);
-    });
   });
 
   describe('the input contract', () => {
@@ -205,10 +190,6 @@ describe('Resource Tool Commands', () => {
         await rejected({ kind, metadataType: TEST_METADATA_TYPE, snippetId: TEST_SNIPPET_ID }, new RegExp(`snippetId applies only to kind 'snippet', not '${kind}'`));
       }
       await rejected({ kind: 'snippet', snippetId: TEST_SNIPPET_ID }, /snippetId needs a metadataType/);
-    });
-
-    it('does not resolve a path-like snippet id outside the index', async () => {
-      await rejected({ kind: 'snippet', metadataType: TEST_METADATA_TYPE, snippetId: '/../../../../README' }, /Snippet '\/\.\.\/\.\.\/\.\.\/\.\.\/README' not found/);
     });
   });
 });

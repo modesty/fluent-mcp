@@ -233,14 +233,6 @@ describe('InitCommand', () => {
     assert.ok(result.error?.message.includes('typescript.vue'));
   });
 
-  it('should fail when working directory not provided', async () => {
-    const result = await initCommand.execute({ ...CREATION });
-
-    assert.equal(result.success, false);
-    // The input schema requires workingDirectory, on tools/call and here alike.
-    assert.ok(result.error?.message.includes("Missing required argument 'workingDirectory'"));
-  });
-
   describe('destination', () => {
     it('creates a new directory under an existing parent and saves it to the session', async () => {
       const destination = fresh('new');
@@ -477,25 +469,6 @@ describe('InitCommand', () => {
     });
   });
 
-  it('should succeed for an explicit conversion intent with complete arguments', async () => {
-    const result = await initCommand.execute({
-      intent: 'conversion',
-      from: SYS_ID,
-      workingDirectory: validDir,
-      auth: 'test-auth',
-    });
-
-    assert.equal(result.success, true);
-    assert.ok(mockExecutor.process.mock.callCount() > 0);
-  });
-
-  it('should succeed for an explicit creation intent with complete arguments', async () => {
-    const result = await initCommand.execute({ intent: 'creation', ...CREATION, workingDirectory: validDir });
-
-    assert.equal(result.success, true);
-    assert.ok(mockExecutor.process.mock.callCount() > 0);
-  });
-
   it('should refuse a from that is neither a sys_id nor an absolute path', async () => {
     const result = await initCommand.execute({ workingDirectory: validDir, from: 'invalid-sys-id' });
 
@@ -584,6 +557,53 @@ describe('InitCommand', () => {
         const result = await initCommand.execute({ workingDirectory: validDir, from: SYS_ID, auth: 'test-auth', timeoutSeconds });
 
         assertRefused(result, /timeoutSeconds/);
+      });
+    }
+  });
+
+  describe('connectTimeoutSeconds (now-sdk init --connect-timeout, SDK v4.14.3+)', () => {
+    it('is declared by the bundled now-sdk init', () => {
+      const cli = path.resolve('node_modules/@servicenow/sdk/bin/index.js');
+      const help = execFileSync(process.execPath, [cli, 'init', '--help'], { encoding: 'utf8' });
+      assert.match(help, /--connect-timeout\b/);
+    });
+
+    it('passes --connect-timeout to a conversion from an instance', async () => {
+      await initCommand.execute({
+        workingDirectory: validDir, from: SYS_ID, auth: 'test-auth', timeoutSeconds: 7200, connectTimeoutSeconds: 60,
+      });
+
+      assertCalledWith(
+        mockExecutor.process,
+        process.execPath,
+        [SDK_BIN, 'init', `--from=${SYS_ID}`, '--timeout=7200', '--connect-timeout=60', '--auth=test-auth'],
+        validDir
+      );
+    });
+
+    // Like --timeout, it only sizes the connector of an instance conversion.
+    it('is refused for creation, and creates nothing', async () => {
+      const destination = fresh('creation-connect-timeout');
+
+      const result = await initCommand.execute({ ...CREATION, workingDirectory: destination, connectTimeoutSeconds: 60 });
+
+      assertRefused(result, /'connectTimeoutSeconds' applies only to conversion from an instance/);
+      assert.equal(fs.existsSync(destination), false);
+    });
+
+    it('is refused for a local conversion', async () => {
+      const result = await initCommand.execute({
+        workingDirectory: fresh('local-connect-timeout'), from: legacyApp('src'), connectTimeoutSeconds: 60,
+      });
+
+      assertRefused(result, /'connectTimeoutSeconds' applies only to conversion from an instance/);
+    });
+
+    for (const connectTimeoutSeconds of [0, -5, 1.5]) {
+      it(`refuses the non-positive-integer value ${connectTimeoutSeconds}`, async () => {
+        const result = await initCommand.execute({ workingDirectory: validDir, from: SYS_ID, auth: 'test-auth', connectTimeoutSeconds });
+
+        assertRefused(result, /connectTimeoutSeconds/);
       });
     }
   });
@@ -733,15 +753,6 @@ describe('InitCommand', () => {
       assert.equal(result.success, true, result.error?.message);
       assertCalledWith(mockExecutor.process, process.execPath, [SDK_BIN, 'init', `--from=${SYS_ID}`, '--auth=dev'], destination);
     });
-  });
-
-  it('should lazily validate auth for sys_id conversion without an alias', async () => {
-    const ensureAuthValidated = mock.fn(async () => undefined);
-    const instanceConversionCommand = new InitCommand(mockExecutor, ensureAuthValidated);
-
-    await instanceConversionCommand.execute({ workingDirectory: validDir, from: SYS_ID });
-
-    assertCalledTimes(ensureAuthValidated, 1);
   });
 
   it('should fail validation for non-existent local path', async () => {

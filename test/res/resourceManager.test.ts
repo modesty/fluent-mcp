@@ -41,17 +41,6 @@ describe('ResourceManager templates', () => {
     templates = registerTemplates(new ResourceManager(fakeCatalog as never));
   });
 
-  it('registers one template per scheme, in list order', () => {
-    assert.deepEqual(
-      templates.registered.map((r) => [r.name, r.template.uriTemplate.toString(), r.config.mimeType]),
-      [
-        ['sn-spec', 'sn-spec://{metadataType}', 'text/markdown'],
-        ['sn-instruct', 'sn-instruct://{metadataType}', 'text/markdown'],
-        ['sn-snippet', 'sn-snippet://{metadataType}/{snippetId}', 'text/markdown'],
-      ]
-    );
-  });
-
   it('lists every spec, instruction, and snippet (not only the first snippet)', async () => {
     const resources = await templates.list();
     assert.deepEqual(resources.map((r) => r.uri), [

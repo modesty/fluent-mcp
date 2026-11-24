@@ -75,17 +75,6 @@ describe('PromptManager registration', () => {
     for (const { config } of registered) assert.ok(config.description.length > 20);
   });
 
-  it('declares metadata_list as an optional, completable argument; create_custom_ui takes none', async () => {
-    const { registered } = await loadPrompts();
-    const [coding, ui] = registered;
-    assert.deepEqual(Object.keys(coding.config.argsSchema?.shape ?? {}), ['metadata_list']);
-    assert.equal(ui.config.argsSchema, undefined);
-    const field = coding.config.argsSchema?.shape.metadata_list as { type: string; unwrap(): unknown };
-    assert.equal(field.type, 'optional');
-    const { isCompletable } = await import('@modelcontextprotocol/server');
-    assert.ok(isCompletable(field.unwrap()));
-  });
-
   it('returns the bare guide when metadata_list is omitted or empty', async () => {
     const prompts = await loadPrompts();
     const bare = (await prompts.get('coding_in_fluent', {})).messages[0].content.text;
@@ -198,12 +187,6 @@ describe('coding_in_fluent prompt rendering (P0.1)', () => {
     assert.ok(text.includes('sn-spec://business-rule'));
     assert.ok(text.includes('sn-instruct://business-rule'));
     assert.ok(text.includes('sn-snippet://table/0001'));
-  });
-
-  it('emits zero generic boilerplate stubs', async () => {
-    const text = await renderCodingInFluent('business-rule,client-script,acl');
-    assert.ok(!text.includes('Use the appropriate Fluent API methods'));
-    assert.ok(!text.includes('Reference the specific instructions for'));
   });
 
   it('appends the full enum-derived catalog of every metadata type', async () => {

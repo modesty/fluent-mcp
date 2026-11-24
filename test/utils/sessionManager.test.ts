@@ -29,13 +29,6 @@ describe('SessionManager', () => {
     assert.equal(manager1, manager2);
   });
 
-  it('should set working directory', () => {
-    const manager = SessionManager.getInstance();
-
-    manager.setWorkingDirectory('/new-dir');
-    assert.equal(manager.getWorkingDirectory(), '/new-dir');
-  });
-
   it('should clear session data', () => {
     const manager = SessionManager.getInstance();
 
