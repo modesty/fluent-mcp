@@ -19,6 +19,7 @@ import {
 } from '../../utils/projectDirectory.js';
 import { cliOption } from './cliArgv.js';
 import { POSITIVE_INTEGER_DOMAIN, SYS_ID_DOMAIN } from './argValidation.js';
+import { CONNECT_TIMEOUT_ARGUMENT } from './responseTimeout.js';
 import logger from '../../utils/logger.js';
 
 /** Valid intents for `init_fluent_app`. */
@@ -43,6 +44,7 @@ interface ConversionInitData {
   packageName?: string;
   auth?: string;
   timeoutSeconds?: number;
+  connectTimeoutSeconds?: number;
   debug?: boolean;
 }
 
@@ -76,6 +78,14 @@ const isNonEmptyString = (value: unknown): value is string =>
 
 /** Whether a conversion `from` value is an instance application sys_id (32 hex). */
 const isSysId = (value: string): boolean => SYS_ID_DOMAIN.regex.test(value);
+
+/**
+ * The instance waits `now-sdk init` reads: `--timeout` (SDK v4.14.2+) and
+ * `--connect-timeout` (SDK v4.14.3+). Both size the long-running connector,
+ * which the CLI builds only for a conversion from an instance; it accepts and
+ * ignores them otherwise.
+ */
+const INSTANCE_WAIT_ARGUMENTS = ['timeoutSeconds', 'connectTimeoutSeconds'] as const;
 
 /** Whether `directory` holds a `sys_app`/`sys_store_app` XML record where `now-sdk init` looks. */
 function hasSysAppXml(directory: string): boolean {
@@ -130,6 +140,7 @@ function resolveConversionData(args: Record<string, unknown>): ConversionInitDat
     packageName: isNonEmptyString(args.packageName) ? args.packageName : undefined,
     auth: args.auth as string | undefined,
     timeoutSeconds: typeof args.timeoutSeconds === 'number' ? args.timeoutSeconds : undefined,
+    connectTimeoutSeconds: typeof args.connectTimeoutSeconds === 'number' ? args.connectTimeoutSeconds : undefined,
     debug: args.debug as boolean | undefined,
   };
 }
@@ -168,7 +179,7 @@ function resolveCreationData(args: Record<string, unknown>): CreationInitData {
  */
 export class InitCommand extends BaseCLICommand {
   name = 'init_fluent_app';
-  description = 'Initialize a new Fluent (ServiceNow SDK) application or convert an existing scoped application. Set intent to "creation" for a new app (requires appName, packageName, scopeName, template) or "conversion" to convert from an instance sys_id or an absolute local application directory (requires from, and auth for instance conversion; pass packageName too, or the returned command prompts for it; for a large app on a slow instance, raise timeoutSeconds). Creation is not offline: the returned command reads the vendor prefix of the auth instance (explicit, else the session alias, else the CLI default profile) and contacts the npm registry. The workingDirectory must be an absolute path to an empty directory, or to a new directory under an existing one. The result is a shell command that enters that directory and runs the SDK init. After init, use build_fluent_app to compile.';
+  description = 'Initialize a new Fluent (ServiceNow SDK) application or convert an existing scoped application. Set intent to "creation" for a new app (requires appName, packageName, scopeName, template) or "conversion" to convert from an instance sys_id or an absolute local application directory (requires from, and auth for instance conversion; pass packageName too, or the returned command prompts for it; for a large app on a slow instance, raise timeoutSeconds; on a slow network or behind a proxy, raise connectTimeoutSeconds). Creation is not offline: the returned command reads the vendor prefix of the auth instance (explicit, else the session alias, else the CLI default profile) and contacts the npm registry. The workingDirectory must be an absolute path to an empty directory, or to a new directory under an existing one. The result is a shell command that enters that directory and runs the SDK init. After init, use build_fluent_app to compile.';
   // Creates a local project directory and sets the session working directory; for
   // conversion it also reads from an instance. Non-idempotent (a second run on a
   // populated directory is refused), and open-world for the conversion path.
@@ -229,6 +240,10 @@ export class InitCommand extends BaseCLICommand {
       description: 'For conversion from an instance only (from is a sys_id; SDK v4.14.2+): seconds now-sdk init waits between response chunks from the instance before giving up (CLI default 3600). An idle timeout, not a total. The returned command runs in your terminal, so no server timeout applies to it.',
     },
     {
+      ...CONNECT_TIMEOUT_ARGUMENT,
+      description: 'For conversion from an instance only (from is a sys_id; SDK v4.14.3+): seconds now-sdk init waits to open a connection to the instance before giving up (CLI default 10). Raise it on a slow network or behind a proxy; the returned command runs in your terminal, so the proxy comes from that shell (NODE_USE_ENV_PROXY=1 with HTTPS_PROXY, HTTP_PROXY, NO_PROXY), and no server timeout applies.',
+    },
+    {
       name: 'workingDirectory',
       type: 'string',
       required: true,
@@ -252,6 +267,7 @@ export class InitCommand extends BaseCLICommand {
     const sdkArgs = [...baseArgs, 'init', cliOption('--from', data.from)];
     if (data.packageName) sdkArgs.push(cliOption('--packageName', data.packageName));
     if (data.timeoutSeconds !== undefined) sdkArgs.push(cliOption('--timeout', data.timeoutSeconds));
+    if (data.connectTimeoutSeconds !== undefined) sdkArgs.push(cliOption('--connect-timeout', data.connectTimeoutSeconds));
 
     // Local-path conversion must not trigger lazy profile discovery; an explicit
     // alias is honored without lazy validation, and a sys_id uses full resolution.
@@ -317,12 +333,12 @@ export class InitCommand extends BaseCLICommand {
         );
       }
 
-      // `now-sdk init --timeout` (SDK v4.14.2+) only reaches the connector of an
-      // instance conversion; the CLI accepts and ignores it otherwise.
-      if (typeof args.timeoutSeconds === 'number' &&
+      // The instance waits only reach the connector of an instance conversion.
+      const misplacedWait = INSTANCE_WAIT_ARGUMENTS.find((name) => typeof args[name] === 'number');
+      if (misplacedWait &&
           !(intent === 'conversion' && typeof args.from === 'string' && isSysId(args.from))) {
         return CommandResultFactory.error(
-          "Argument 'timeoutSeconds' applies only to conversion from an instance (from is a sys_id). " +
+          `Argument '${misplacedWait}' applies only to conversion from an instance (from is a sys_id). ` +
           'Creation and local conversion do not download from an instance.'
         );
       }

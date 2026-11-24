@@ -306,7 +306,7 @@ SN_INSTANCE_URL=https://company.service-now.com SN_AUTH_TYPE=oauth npm run inspe
    npm run build && npm run inspect
    ```
 
-2. **Check Tools (18 tools: 14 SDK commands and four resource/authentication tools):**
+2. **Check Tools (16 tools: 14 SDK commands plus `get_fluent_knowledge` and `check_auth_status`):**
    - build_fluent_app
    - check_auth_status
    - cicd_fluent_app
@@ -442,7 +442,7 @@ npm run build
 
 echo "Inspector checklist:"
 echo "1. Connect the node server"
-echo "2. Verify all 18 tools are present"
+echo "2. Verify all 16 tools are present"
 echo "3. Execute sdk_info with flag -v"
 echo "4. Read resources and get prompts"
 echo "5. Review Results, Console, and Protocol for errors"

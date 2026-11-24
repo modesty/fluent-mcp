@@ -588,6 +588,53 @@ describe('InitCommand', () => {
     }
   });
 
+  describe('connectTimeoutSeconds (now-sdk init --connect-timeout, SDK v4.14.3+)', () => {
+    it('is declared by the bundled now-sdk init', () => {
+      const cli = path.resolve('node_modules/@servicenow/sdk/bin/index.js');
+      const help = execFileSync(process.execPath, [cli, 'init', '--help'], { encoding: 'utf8' });
+      assert.match(help, /--connect-timeout\b/);
+    });
+
+    it('passes --connect-timeout to a conversion from an instance', async () => {
+      await initCommand.execute({
+        workingDirectory: validDir, from: SYS_ID, auth: 'test-auth', timeoutSeconds: 7200, connectTimeoutSeconds: 60,
+      });
+
+      assertCalledWith(
+        mockExecutor.process,
+        process.execPath,
+        [SDK_BIN, 'init', `--from=${SYS_ID}`, '--timeout=7200', '--connect-timeout=60', '--auth=test-auth'],
+        validDir
+      );
+    });
+
+    // Like --timeout, it only sizes the connector of an instance conversion.
+    it('is refused for creation, and creates nothing', async () => {
+      const destination = fresh('creation-connect-timeout');
+
+      const result = await initCommand.execute({ ...CREATION, workingDirectory: destination, connectTimeoutSeconds: 60 });
+
+      assertRefused(result, /'connectTimeoutSeconds' applies only to conversion from an instance/);
+      assert.equal(fs.existsSync(destination), false);
+    });
+
+    it('is refused for a local conversion', async () => {
+      const result = await initCommand.execute({
+        workingDirectory: fresh('local-connect-timeout'), from: legacyApp('src'), connectTimeoutSeconds: 60,
+      });
+
+      assertRefused(result, /'connectTimeoutSeconds' applies only to conversion from an instance/);
+    });
+
+    for (const connectTimeoutSeconds of [0, -5, 1.5]) {
+      it(`refuses the non-positive-integer value ${connectTimeoutSeconds}`, async () => {
+        const result = await initCommand.execute({ workingDirectory: validDir, from: SYS_ID, auth: 'test-auth', connectTimeoutSeconds });
+
+        assertRefused(result, /connectTimeoutSeconds/);
+      });
+    }
+  });
+
   describe('conversion auth', () => {
     it('refuses an instance conversion when SN_INSTANCE_URL resolved no alias, and creates nothing', async () => {
       // Without --auth the download would come from the CLI default profile's instance.

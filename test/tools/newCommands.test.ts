@@ -65,6 +65,7 @@ describe('New SDK Commands', () => {
         'source',
         'incremental',
         'timeoutSeconds',
+        'connectTimeoutSeconds',
         'debug',
       ]);
 

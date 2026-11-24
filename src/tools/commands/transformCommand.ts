@@ -2,6 +2,7 @@ import { CommandArgument, CommandResult } from '../../utils/types.js';
 import { AUTH_ARGUMENT, SessionAwareCLICommand, WORKING_DIRECTORY_ARGUMENT } from './sessionAwareCommand.js';
 import { DEBUG_ARGUMENT } from './baseCommand.js';
 import {
+  CONNECT_TIMEOUT_ARGUMENT,
   RESPONSE_TIMEOUT_ARGUMENT,
   runnerTimeoutForResponseTimeout,
 } from './responseTimeout.js';
@@ -11,6 +12,15 @@ import {
  * `executeSdkCommand`, which drops `undefined`, `null`, and `''`.
  */
 const isSupplied = (value: unknown): boolean => value !== undefined && value !== null && value !== '';
+
+/**
+ * The instance waits (`--timeout`, `--connect-timeout`). They size the CLI's
+ * long-running connector, which only a transform that reads from the instance
+ * uses: the CLI builds none for `from`, and `table` without `id` never sends a
+ * request through it. Elsewhere the CLI accepts and ignores them.
+ */
+const INSTANCE_WAIT_ARGUMENTS = ['timeoutSeconds', 'connectTimeoutSeconds'] as const;
+const INSTANCE_WAIT_SCOPE = 'a transform that reads from the instance: the whole application (no from, table, or id), or table with id';
 
 /**
  * Command to transform files in a Fluent (ServiceNow SDK) application
@@ -27,14 +37,14 @@ const isSupplied = (value: unknown): boolean => value !== undefined && value !==
  */
 export class TransformCommand extends SessionAwareCLICommand {
   name = 'fluent_transform';
-  description = 'Convert XML metadata into Fluent source code, or pull changes made on a ServiceNow instance back into the project\'s .now.ts files. Use from for local XML files/directories (offline; cannot be combined with auth or id). Omit from to pull the whole application from the instance (auth auto-injected from session, or pass auth). Use table with id (SDK v4.7.0+) to pull one record and its related records from the instance. table without id only filters local XML (from, or the project directory) to those tables and their descendants — it does not download, though the CLI still requires credentials when from is omitted. For a large full-application pull, raise timeoutSeconds (SDK v4.13.0+). Overwrites local changes to the records it updates.';
+  description = 'Convert XML metadata into Fluent source code, or pull changes made on a ServiceNow instance back into the project\'s .now.ts files. Use from for local XML files/directories (offline; cannot be combined with auth or id). Omit from to pull the whole application from the instance (auth auto-injected from session, or pass auth). Use table with id (SDK v4.7.0+) to pull one record and its related records from the instance. table without id only filters local XML (from, or the project directory) to those tables and their descendants — it does not download, though the CLI still requires credentials when from is omitted. When reading from the instance, raise timeoutSeconds (SDK v4.13.0+) for a large application, or connectTimeoutSeconds (SDK v4.14.3+) on a slow network or behind a proxy. Overwrites local changes to the records it updates.';
   // Writes/overwrites generated Fluent source in the working directory, so it can
   // clobber local edits — flag as destructive so clients confirm before running.
   annotations = { openWorldHint: true, destructiveHint: true };
   // A full-application instance transform downloads the whole app first. SDK
   // v4.13.0 moved that download onto a long-running dispatcher (3600 s idle
   // budget), so the old 180 s cap killed the child long before the CLI would
-  // give up; timeoutSeconds extends it further.
+  // give up; timeoutSeconds and connectTimeoutSeconds extend it further.
   timeoutMs = 600_000;
   arguments: CommandArgument[] = [
     WORKING_DIRECTORY_ARGUMENT,
@@ -80,7 +90,11 @@ export class TransformCommand extends SessionAwareCLICommand {
     },
     {
       ...RESPONSE_TIMEOUT_ARGUMENT,
-      description: `${RESPONSE_TIMEOUT_ARGUMENT.description} Only affects a full-application transform from the instance (no from, table, or id).`,
+      description: `${RESPONSE_TIMEOUT_ARGUMENT.description} Only for ${INSTANCE_WAIT_SCOPE}.`,
+    },
+    {
+      ...CONNECT_TIMEOUT_ARGUMENT,
+      description: `${CONNECT_TIMEOUT_ARGUMENT.description} Only for ${INSTANCE_WAIT_SCOPE}.`,
     },
     DEBUG_ARGUMENT
   ];
@@ -89,7 +103,8 @@ export class TransformCommand extends SessionAwareCLICommand {
    * Enforce the CLI's own combination rules up front, so the caller gets a
    * message naming the conflict instead of a yargs failure after spawn. Only
    * the rules that involve exposed arguments are mirrored: `from` conflicts
-   * with `auth` and `id`; `id` and `force` each require `table`.
+   * with `auth` and `id`; `id` and `force` each require `table`. The instance
+   * waits are refused where the CLI would ignore them (`INSTANCE_WAIT_ARGUMENTS`).
    */
   protected validateArgs(args: Record<string, unknown>): void {
     super.validateArgs(args);
@@ -111,10 +126,18 @@ export class TransformCommand extends SessionAwareCLICommand {
     if (args.force === true && !isSupplied(args.table)) {
       throw new Error("Argument 'force' requires 'table' — it only relaxes the table-based transform's root-table check.");
     }
+    const readsInstance = !hasFrom && (!isSupplied(args.table) || isSupplied(args.id));
+    const misplacedWait = INSTANCE_WAIT_ARGUMENTS.find((name) => isSupplied(args[name]));
+    if (!readsInstance && misplacedWait) {
+      throw new Error(
+        `Argument '${misplacedWait}' applies only to ${INSTANCE_WAIT_SCOPE}. ` +
+        'A from transform, and table without id, read local XML and send no request to the instance.'
+      );
+    }
   }
 
   protected resolveTimeoutMs(args: Record<string, unknown>): number {
-    return runnerTimeoutForResponseTimeout(this.timeoutMs, args.timeoutSeconds);
+    return runnerTimeoutForResponseTimeout(this.timeoutMs, args.timeoutSeconds, args.connectTimeoutSeconds);
   }
 
   async execute(args: Record<string, unknown>, signal?: AbortSignal): Promise<CommandResult> {
@@ -134,6 +157,7 @@ export class TransformCommand extends SessionAwareCLICommand {
       force: { flag: '--force' },
       format: { flag: '--format', negatable: true },
       timeoutSeconds: '--timeout',
+      connectTimeoutSeconds: '--connect-timeout',
     }, [], signal);
   }
 }
